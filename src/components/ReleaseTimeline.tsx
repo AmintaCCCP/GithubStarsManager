@@ -10,10 +10,12 @@ export const ReleaseTimeline: React.FC = () => {
     releases, 
     repositories, 
     releaseSubscriptions, 
+    readReleases,
     githubToken, 
     language,
     setReleases,
     addReleases,
+    markReleaseAsRead,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -314,6 +316,14 @@ export const ReleaseTimeline: React.FC = () => {
     return body.substring(0, maxLength) + '...';
   };
 
+  const handleReleaseClick = (releaseId: number) => {
+    markReleaseAsRead(releaseId);
+  };
+
+  const isReleaseUnread = (releaseId: number) => {
+    return !readReleases.has(releaseId);
+  };
+
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   if (subscribedReleases.length === 0) {
@@ -560,17 +570,23 @@ export const ReleaseTimeline: React.FC = () => {
       <div className="space-y-4">
         {paginatedReleases.map(release => {
           const downloadLinks = getDownloadLinks(release);
+          const isUnread = isReleaseUnread(release.id);
           
           return (
             <div
               key={release.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleReleaseClick(release.id)}
             >
               {viewMode === 'detailed' ? (
                 // Detailed View
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      {/* Unread indicator */}
+                      {isUnread && (
+                        <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
+                      )}
                       <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
                         <GitBranch className="w-5 h-5 text-green-600 dark:text-green-400" />
                       </div>
@@ -593,6 +609,10 @@ export const ReleaseTimeline: React.FC = () => {
                         rel="noopener noreferrer"
                         className="p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         title={t('在GitHub上查看', 'View on GitHub')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReleaseClick(release.id);
+                        }}
                       >
                         <ExternalLink className="w-4 h-4" />
                       </a>
@@ -620,6 +640,10 @@ export const ReleaseTimeline: React.FC = () => {
                             rel="noopener noreferrer"
                             className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
                             title={link.name}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReleaseClick(release.id);
+                            }}
                           >
                             <div className="flex items-center space-x-1">
                               {link.platforms.map((platform, pIndex) => (
@@ -648,6 +672,10 @@ export const ReleaseTimeline: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 dark:text-blue-400 hover:underline text-sm mt-2 inline-block"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReleaseClick(release.id);
+                          }}
                         >
                           {t('阅读完整Release说明 →', 'Read full release notes →')}
                         </a>
@@ -662,6 +690,10 @@ export const ReleaseTimeline: React.FC = () => {
                     {/* Repository and Version - 缩小列宽 */}
                     <div className="col-span-3 min-w-0">
                       <div className="flex items-center space-x-2">
+                        {/* Unread indicator */}
+                        {isUnread && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                        )}
                         <div className="w-6 h-6 bg-green-100 dark:bg-green-900 rounded flex items-center justify-center flex-shrink-0">
                           <GitBranch className="w-3 h-3 text-green-600 dark:text-green-400" />
                         </div>
@@ -695,6 +727,10 @@ export const ReleaseTimeline: React.FC = () => {
                               rel="noopener noreferrer"
                               className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                               title={`${link.name} (${link.platforms.join(', ')})`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReleaseClick(release.id);
+                              }}
                             >
                               <div className="flex items-center space-x-0.5">
                                 {link.platforms.map((platform, pIndex) => (
@@ -734,6 +770,10 @@ export const ReleaseTimeline: React.FC = () => {
                         rel="noopener noreferrer"
                         className="p-1.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         title={t('在GitHub上查看', 'View on GitHub')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReleaseClick(release.id);
+                        }}
                       >
                         <ExternalLink className="w-3 h-3" />
                       </a>

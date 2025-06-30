@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Save, Trash2, Check, X, Settings, Bot, Key, TestTube, Globe, Cloud, Upload, Download, AlertTriangle, CheckCircle, Info, FileDown, FileUp } from 'lucide-react';
+import { Plus, Save, Trash2, Check, X, Settings, Bot, Key, TestTube, Globe, Cloud, Upload, Download, AlertTriangle, CheckCircle, Info, FileDown, FileUp, Edit3 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIConfig, WebDAVConfig } from '../types';
 import { AIService } from '../services/aiService';
@@ -33,7 +33,8 @@ export const SettingsPanel: React.FC = () => {
 
   const [isAddingAIConfig, setIsAddingAIConfig] = useState(false);
   const [isAddingWebDAVConfig, setIsAddingWebDAVConfig] = useState(false);
-  const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
+  const [editingAIConfigId, setEditingAIConfigId] = useState<string | null>(null);
+  const [editingWebDAVConfigId, setEditingWebDAVConfigId] = useState<string | null>(null);
   const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
   const [testingWebDAVId, setTestingWebDAVId] = useState<string | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'backing-up' | 'restoring' | 'exporting' | 'importing'>('idle');
@@ -50,6 +51,8 @@ export const SettingsPanel: React.FC = () => {
     password: '',
     path: '/github-stars-backup',
   });
+  const [editingAIConfig, setEditingAIConfig] = useState<Partial<AIConfig>>({});
+  const [editingWebDAVConfig, setEditingWebDAVConfig] = useState<Partial<WebDAVConfig>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +115,39 @@ export const SettingsPanel: React.FC = () => {
       path: '/github-stars-backup',
     });
     setIsAddingWebDAVConfig(false);
+  };
+
+  const handleEditAIConfig = (config: AIConfig) => {
+    setEditingAIConfigId(config.id);
+    setEditingAIConfig({ ...config });
+  };
+
+  const handleSaveEditingAIConfig = () => {
+    if (!editingAIConfig.name || !editingAIConfig.baseUrl || !editingAIConfig.apiKey || !editingAIConfig.model) {
+      alert(language === 'zh' ? '请填写所有字段' : 'Please fill in all fields');
+      return;
+    }
+
+    updateAIConfig(editingAIConfigId!, editingAIConfig);
+    setEditingAIConfigId(null);
+    setEditingAIConfig({});
+  };
+
+  const handleEditWebDAVConfig = (config: WebDAVConfig) => {
+    setEditingWebDAVConfigId(config.id);
+    setEditingWebDAVConfig({ ...config });
+  };
+
+  const handleSaveEditingWebDAVConfig = () => {
+    const errors = WebDAVService.validateConfig(editingWebDAVConfig);
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+      return;
+    }
+
+    updateWebDAVConfig(editingWebDAVConfigId!, editingWebDAVConfig);
+    setEditingWebDAVConfigId(null);
+    setEditingWebDAVConfig({});
   };
 
   const handleTestAIConfig = async (config: AIConfig) => {
@@ -743,45 +779,136 @@ export const SettingsPanel: React.FC = () => {
                   : 'border-gray-200 dark:border-gray-600'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">
-                    {config.name}
-                    {config.id === activeWebDAVConfig && (
-                      <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded text-xs">
-                        {t('活跃', 'Active')}
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {config.url} • {config.path}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleTestWebDAVConfig(config)}
-                    disabled={testingWebDAVId === config.id}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                  >
-                    <TestTube className="w-4 h-4" />
-                    <span>{testingWebDAVId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
-                  </button>
-                  {config.id !== activeWebDAVConfig && (
+              {editingWebDAVConfigId === config.id ? (
+                // Edit mode
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('配置名称', 'Configuration Name')} *
+                      </label>
+                      <input
+                        type="text"
+                        value={editingWebDAVConfig.name || ''}
+                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('用户名', 'Username')} *
+                      </label>
+                      <input
+                        type="text"
+                        value={editingWebDAVConfig.username || ''}
+                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, username: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {t('WebDAV服务器URL', 'WebDAV Server URL')} *
+                    </label>
+                    <input
+                      type="url"
+                      value={editingWebDAVConfig.url || ''}
+                      onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, url: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('密码', 'Password')} *
+                      </label>
+                      <input
+                        type="password"
+                        value={editingWebDAVConfig.password || ''}
+                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('备份路径', 'Backup Path')} *
+                      </label>
+                      <input
+                        type="text"
+                        value={editingWebDAVConfig.path || ''}
+                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, path: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleSetActiveWebDAV(config.id)}
-                      className="px-3 py-1.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-sm"
+                      onClick={handleSaveEditingWebDAVConfig}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                     >
-                      {t('设为活跃', 'Set Active')}
+                      <Check className="w-4 h-4" />
+                      <span>{t('保存', 'Save')}</span>
                     </button>
-                  )}
-                  <button
-                    onClick={() => deleteWebDAVConfig(config.id)}
-                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <button
+                      onClick={() => {
+                        setEditingWebDAVConfigId(null);
+                        setEditingWebDAVConfig({});
+                      }}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>{t('取消', 'Cancel')}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // View mode
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">
+                      {config.name}
+                      {config.id === activeWebDAVConfig && (
+                        <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded text-xs">
+                          {t('活跃', 'Active')}
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {config.url} • {config.path}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleTestWebDAVConfig(config)}
+                      disabled={testingWebDAVId === config.id}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      <TestTube className="w-4 h-4" />
+                      <span>{testingWebDAVId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
+                    </button>
+                    <button
+                      onClick={() => handleEditWebDAVConfig(config)}
+                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    {config.id !== activeWebDAVConfig && (
+                      <button
+                        onClick={() => handleSetActiveWebDAV(config.id)}
+                        className="px-3 py-1.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-sm"
+                      >
+                        {t('设为活跃', 'Set Active')}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteWebDAVConfig(config.id)}
+                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -951,45 +1078,123 @@ export const SettingsPanel: React.FC = () => {
                   : 'border-gray-200 dark:border-gray-600'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">
-                    {config.name}
-                    {config.id === activeAIConfig && (
-                      <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded text-xs">
-                        {t('活跃', 'Active')}
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {config.baseUrl} • {config.model}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleTestAIConfig(config)}
-                    disabled={testingConfigId === config.id}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                  >
-                    <TestTube className="w-4 h-4" />
-                    <span>{testingConfigId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
-                  </button>
-                  {config.id !== activeAIConfig && (
+              {editingAIConfigId === config.id ? (
+                // Edit mode
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('配置名称', 'Configuration Name')}
+                      </label>
+                      <input
+                        type="text"
+                        value={editingAIConfig.name || ''}
+                        onChange={(e) => setEditingAIConfig(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('模型', 'Model')}
+                      </label>
+                      <input
+                        type="text"
+                        value={editingAIConfig.model || ''}
+                        onChange={(e) => setEditingAIConfig(prev => ({ ...prev, model: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {t('API基础URL', 'API Base URL')}
+                    </label>
+                    <input
+                      type="url"
+                      value={editingAIConfig.baseUrl || ''}
+                      onChange={(e) => setEditingAIConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {t('API密钥', 'API Key')}
+                    </label>
+                    <input
+                      type="password"
+                      value={editingAIConfig.apiKey || ''}
+                      onChange={(e) => setEditingAIConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleSetActiveAI(config.id)}
-                      className="px-3 py-1.5 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-sm"
+                      onClick={handleSaveEditingAIConfig}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
                     >
-                      {t('设为活跃', 'Set Active')}
+                      <Check className="w-4 h-4" />
+                      <span>{t('保存', 'Save')}</span>
                     </button>
-                  )}
-                  <button
-                    onClick={() => deleteAIConfig(config.id)}
-                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <button
+                      onClick={() => {
+                        setEditingAIConfigId(null);
+                        setEditingAIConfig({});
+                      }}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>{t('取消', 'Cancel')}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // View mode
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">
+                      {config.name}
+                      {config.id === activeAIConfig && (
+                        <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded text-xs">
+                          {t('活跃', 'Active')}
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {config.baseUrl} • {config.model}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleTestAIConfig(config)}
+                      disabled={testingConfigId === config.id}
+                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      <TestTube className="w-4 h-4" />
+                      <span>{testingConfigId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
+                    </button>
+                    <button
+                      onClick={() => handleEditAIConfig(config)}
+                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    {config.id !== activeAIConfig && (
+                      <button
+                        onClick={() => handleSetActiveAI(config.id)}
+                        className="px-3 py-1.5 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-sm"
+                      >
+                        {t('设为活跃', 'Set Active')}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteAIConfig(config.id)}
+                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

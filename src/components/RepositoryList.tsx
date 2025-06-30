@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { Repository } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 
@@ -23,6 +23,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     setLoading,
     updateRepository,
     language,
+    customCategories,
   } = useAppStore();
 
   const [showAISummary, setShowAISummary] = useState(true);
@@ -34,15 +35,24 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const shouldStopRef = useRef(false);
   const isAnalyzingRef = useRef(false);
 
+  const allCategories = getAllCategories(customCategories, language);
+
   // Filter repositories by selected category
   const filteredRepositories = repositories.filter(repo => {
     if (selectedCategory === 'all') return true;
     
+    const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
+    if (!selectedCategoryObj) return false;
+
+    // Check custom category first
+    if (repo.custom_category === selectedCategoryObj.name) {
+      return true;
+    }
+    
     // 优先使用AI标签进行匹配
     if (repo.ai_tags && repo.ai_tags.length > 0) {
-      const categoryKeywords = getCategoryKeywords(selectedCategory);
       return repo.ai_tags.some(tag => 
-        categoryKeywords.some(keyword => 
+        selectedCategoryObj.keywords.some(keyword => 
           tag.toLowerCase().includes(keyword.toLowerCase()) ||
           keyword.toLowerCase().includes(tag.toLowerCase())
         )
@@ -58,8 +68,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       repo.ai_summary || ''
     ].join(' ').toLowerCase();
     
-    const categoryKeywords = getCategoryKeywords(selectedCategory);
-    return categoryKeywords.some(keyword => 
+    return selectedCategoryObj.keywords.some(keyword => 
       repoText.includes(keyword.toLowerCase())
     );
   });
@@ -111,6 +120,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const githubApi = new GitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
       
+      // 获取自定义分类名称列表
+      const customCategoryNames = customCategories.map(cat => cat.name);
+      
       let analyzed = 0;
       
       for (let i = 0; i < targetRepos.length; i++) {
@@ -140,7 +152,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           const readmeContent = await githubApi.getRepositoryReadme(owner, name);
           
           // AI分析
-          const analysis = await aiService.analyzeRepository(repo, readmeContent);
+          const analysis = await aiService.analyzeRepository(repo, readmeContent, customCategoryNames);
           
           // 更新仓库信息
           const updatedRepo = {
@@ -207,14 +219,17 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   if (filteredRepositories.length === 0) {
+    const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
+    const categoryName = selectedCategoryObj?.name || selectedCategory;
+    
     return (
       <div className="text-center py-12">
         <p className="text-gray-500 dark:text-gray-400">
           {selectedCategory === 'all' 
             ? (language === 'zh' ? '未找到仓库。点击同步加载您的星标仓库。' : 'No repositories found. Click sync to load your starred repositories.')
             : (language === 'zh' 
-                ? `在"${getCategoryName(selectedCategory)}"分类中未找到仓库。`
-                : `No repositories found in "${getCategoryName(selectedCategory)}" category.`
+                ? `在"${categoryName}"分类中未找到仓库。`
+                : `No repositories found in "${categoryName}" category.`
               )
           }
         </p>
@@ -372,45 +387,3 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     </div>
   );
 };
-
-// Helper function to get category keywords
-function getCategoryKeywords(categoryId: string): string[] {
-  const categoryMap: Record<string, string[]> = {
-    'web': ['web应用', 'web', 'website', 'frontend', 'react', 'vue', 'angular'],
-    'mobile': ['移动应用', 'mobile', 'android', 'ios', 'flutter', 'react-native'],
-    'desktop': ['桌面应用', 'desktop', 'electron', 'gui', 'qt', 'gtk'],
-    'database': ['数据库', 'database', 'sql', 'nosql', 'mongodb', 'mysql', 'postgresql'],
-    'ai': ['ai工具', 'ai', 'ml', 'machine learning', 'deep learning', 'neural'],
-    'devtools': ['开发工具', 'tool', 'cli', 'build', 'deploy', 'debug', 'test', 'automation'],
-    'security': ['安全工具', 'security', 'encryption', 'auth', 'vulnerability'],
-    'game': ['游戏', 'game', 'gaming', 'unity', 'unreal', 'godot'],
-    'design': ['设计工具', 'design', 'ui', 'ux', 'graphics', 'image'],
-    'productivity': ['效率工具', 'productivity', 'note', 'todo', 'calendar', 'task'],
-    'education': ['教育学习', 'education', 'learning', 'tutorial', 'course'],
-    'social': ['社交网络', 'social', 'chat', 'messaging', 'communication'],
-    'analytics': ['数据分析', 'analytics', 'data', 'visualization', 'chart']
-  };
-  
-  return categoryMap[categoryId] || [];
-}
-
-// Helper function to get category name
-function getCategoryName(categoryId: string): string {
-  const nameMap: Record<string, string> = {
-    'web': 'Web应用',
-    'mobile': '移动应用',
-    'desktop': '桌面应用',
-    'database': '数据库',
-    'ai': 'AI/机器学习',
-    'devtools': '开发工具',
-    'security': '安全工具',
-    'game': '游戏',
-    'design': '设计工具',
-    'productivity': '效率工具',
-    'education': '教育学习',
-    'social': '社交网络',
-    'analytics': '数据分析'
-  };
-  
-  return nameMap[categoryId] || categoryId;
-}

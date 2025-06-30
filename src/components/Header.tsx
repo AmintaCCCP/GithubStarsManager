@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
+import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Github } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -19,6 +19,7 @@ export const Header: React.FC = () => {
     setLoading,
     setLastSync,
     logout,
+    language,
   } = useAppStore();
 
   const handleSync = async () => {
@@ -94,6 +95,8 @@ export const Header: React.FC = () => {
     return date.toLocaleDateString();
   };
 
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -124,7 +127,7 @@ export const Header: React.FC = () => {
               }`}
             >
               <Search className="w-4 h-4 inline mr-2" />
-              Repositories ({repositories.length})
+              {t('仓库', 'Repositories')} ({repositories.length})
             </button>
             <button
               onClick={() => setCurrentView('releases')}
@@ -135,7 +138,7 @@ export const Header: React.FC = () => {
               }`}
             >
               <Calendar className="w-4 h-4 inline mr-2" />
-              Releases
+              {t('发布', 'Releases')}
             </button>
             <button
               onClick={() => setCurrentView('settings')}
@@ -146,20 +149,31 @@ export const Header: React.FC = () => {
               }`}
             >
               <Settings className="w-4 h-4 inline mr-2" />
-              Settings
+              {t('设置', 'Settings')}
             </button>
           </nav>
 
           {/* User Actions */}
           <div className="flex items-center space-x-3">
+            {/* GitHub Repository Link */}
+            <a
+              href="https://github.com/AmintaCCCP/GithubStarsManager"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title={t('查看项目源码', 'View project source code')}
+            >
+              <Github className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </a>
+
             {/* Sync Status */}
             <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <span>Last sync: {formatLastSync(lastSync)}</span>
+              <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
               <button
                 onClick={handleSync}
                 disabled={isLoading}
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                title="Sync repositories"
+                title={t('同步仓库', 'Sync repositories')}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
@@ -169,7 +183,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Toggle theme"
+              title={t('切换主题', 'Toggle theme')}
             >
               {theme === 'light' ? (
                 <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
@@ -194,7 +208,7 @@ export const Header: React.FC = () => {
                 <button
                   onClick={logout}
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  title="Logout"
+                  title={t('退出登录', 'Logout')}
                 >
                   <LogOut className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                 </button>

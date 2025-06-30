@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser } from '../types';
+import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category } from '../types';
 
 interface AppActions {
   // Auth actions
@@ -35,6 +35,13 @@ interface AppActions {
   setReleases: (releases: Release[]) => void;
   addReleases: (releases: Release[]) => void;
   toggleReleaseSubscription: (repoId: number) => void;
+  markReleaseAsRead: (releaseId: number) => void;
+  markAllReleasesAsRead: () => void;
+  
+  // Category actions
+  addCustomCategory: (category: Category) => void;
+  updateCustomCategory: (id: string, updates: Partial<Category>) => void;
+  deleteCustomCategory: (id: string) => void;
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
@@ -52,6 +59,93 @@ const initialSearchFilters: SearchFilters = {
   isAnalyzed: undefined,
   isSubscribed: undefined,
 };
+
+const defaultCategories: Category[] = [
+  {
+    id: 'all',
+    name: '全部分类',
+    icon: 'Folder',
+    keywords: []
+  },
+  {
+    id: 'web',
+    name: 'Web应用',
+    icon: 'Globe',
+    keywords: ['web应用', 'web', 'website', 'frontend', 'react', 'vue', 'angular']
+  },
+  {
+    id: 'mobile',
+    name: '移动应用',
+    icon: 'Smartphone',
+    keywords: ['移动应用', 'mobile', 'android', 'ios', 'flutter', 'react-native']
+  },
+  {
+    id: 'desktop',
+    name: '桌面应用',
+    icon: 'Code',
+    keywords: ['桌面应用', 'desktop', 'electron', 'gui', 'qt', 'gtk']
+  },
+  {
+    id: 'database',
+    name: '数据库',
+    icon: 'Database',
+    keywords: ['数据库', 'database', 'sql', 'nosql', 'mongodb', 'mysql', 'postgresql']
+  },
+  {
+    id: 'ai',
+    name: 'AI/机器学习',
+    icon: 'Bot',
+    keywords: ['ai工具', 'ai', 'ml', 'machine learning', 'deep learning', 'neural']
+  },
+  {
+    id: 'devtools',
+    name: '开发工具',
+    icon: 'Wrench',
+    keywords: ['开发工具', 'tool', 'cli', 'build', 'deploy', 'debug', 'test', 'automation']
+  },
+  {
+    id: 'security',
+    name: '安全工具',
+    icon: 'Shield',
+    keywords: ['安全工具', 'security', 'encryption', 'auth', 'vulnerability']
+  },
+  {
+    id: 'game',
+    name: '游戏',
+    icon: 'Gamepad2',
+    keywords: ['游戏', 'game', 'gaming', 'unity', 'unreal', 'godot']
+  },
+  {
+    id: 'design',
+    name: '设计工具',
+    icon: 'Palette',
+    keywords: ['设计工具', 'design', 'ui', 'ux', 'graphics', 'image']
+  },
+  {
+    id: 'productivity',
+    name: '效率工具',
+    icon: 'Zap',
+    keywords: ['效率工具', 'productivity', 'note', 'todo', 'calendar', 'task']
+  },
+  {
+    id: 'education',
+    name: '教育学习',
+    icon: 'BookOpen',
+    keywords: ['教育学习', 'education', 'learning', 'tutorial', 'course']
+  },
+  {
+    id: 'social',
+    name: '社交网络',
+    icon: 'Users',
+    keywords: ['社交网络', 'social', 'chat', 'messaging', 'communication']
+  },
+  {
+    id: 'analytics',
+    name: '数据分析',
+    icon: 'BarChart3',
+    keywords: ['数据分析', 'analytics', 'data', 'visualization', 'chart']
+  }
+];
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
@@ -72,6 +166,8 @@ export const useAppStore = create<AppState & AppActions>()(
       searchResults: [],
       releases: [],
       releaseSubscriptions: new Set<number>(),
+      readReleases: new Set<number>(),
+      customCategories: [],
       theme: 'light',
       currentView: 'repositories',
       language: 'zh',
@@ -92,6 +188,7 @@ export const useAppStore = create<AppState & AppActions>()(
         repositories: [],
         releases: [],
         releaseSubscriptions: new Set(),
+        readReleases: new Set(),
         searchResults: [],
         lastSync: null,
       }),
@@ -161,6 +258,28 @@ export const useAppStore = create<AppState & AppActions>()(
         }
         return { releaseSubscriptions: newSubscriptions };
       }),
+      markReleaseAsRead: (releaseId) => set((state) => {
+        const newReadReleases = new Set(state.readReleases);
+        newReadReleases.add(releaseId);
+        return { readReleases: newReadReleases };
+      }),
+      markAllReleasesAsRead: () => set((state) => {
+        const allReleaseIds = new Set(state.releases.map(r => r.id));
+        return { readReleases: allReleaseIds };
+      }),
+
+      // Category actions
+      addCustomCategory: (category) => set((state) => ({
+        customCategories: [...state.customCategories, { ...category, isCustom: true }]
+      })),
+      updateCustomCategory: (id, updates) => set((state) => ({
+        customCategories: state.customCategories.map(category => 
+          category.id === id ? { ...category, ...updates } : category
+        )
+      })),
+      deleteCustomCategory: (id) => set((state) => ({
+        customCategories: state.customCategories.filter(category => category.id !== id)
+      })),
 
       // UI actions
       setTheme: (theme) => set({ theme }),
@@ -188,9 +307,13 @@ export const useAppStore = create<AppState & AppActions>()(
         activeWebDAVConfig: state.activeWebDAVConfig,
         lastBackup: state.lastBackup,
         
-        // 持久化Release订阅
+        // 持久化Release订阅和已读状态
         releaseSubscriptions: Array.from(state.releaseSubscriptions),
+        readReleases: Array.from(state.readReleases),
         releases: state.releases,
+        
+        // 持久化自定义分类
+        customCategories: state.customCategories,
         
         // 持久化UI设置
         theme: state.theme,
@@ -198,11 +321,17 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Convert array back to Set
+          // Convert arrays back to Sets
           if (Array.isArray(state.releaseSubscriptions)) {
             state.releaseSubscriptions = new Set(state.releaseSubscriptions as number[]);
           } else {
             state.releaseSubscriptions = new Set<number>();
+          }
+          
+          if (Array.isArray(state.readReleases)) {
+            state.readReleases = new Set(state.readReleases as number[]);
+          } else {
+            state.readReleases = new Set<number>();
           }
           
           // 确保认证状态正确
@@ -224,15 +353,53 @@ export const useAppStore = create<AppState & AppActions>()(
             state.webdavConfigs = [];
           }
           
+          // 初始化自定义分类
+          if (!state.customCategories) {
+            state.customCategories = [];
+          }
+          
           console.log('Store rehydrated:', {
             isAuthenticated: state.isAuthenticated,
             repositoriesCount: state.repositories?.length || 0,
             lastSync: state.lastSync,
             language: state.language,
-            webdavConfigsCount: state.webdavConfigs?.length || 0
+            webdavConfigsCount: state.webdavConfigs?.length || 0,
+            customCategoriesCount: state.customCategories?.length || 0
           });
         }
       },
     }
   )
 );
+
+// Helper function to get all categories (default + custom)
+export const getAllCategories = (customCategories: Category[], language: 'zh' | 'en' = 'zh'): Category[] => {
+  const translatedDefaults = defaultCategories.map(cat => ({
+    ...cat,
+    name: language === 'en' ? translateCategoryName(cat.name) : cat.name
+  }));
+  
+  return [...translatedDefaults, ...customCategories];
+};
+
+// Helper function to translate category names
+const translateCategoryName = (zhName: string): string => {
+  const translations: Record<string, string> = {
+    '全部分类': 'All Categories',
+    'Web应用': 'Web Apps',
+    '移动应用': 'Mobile Apps',
+    '桌面应用': 'Desktop Apps',
+    '数据库': 'Database',
+    'AI/机器学习': 'AI/Machine Learning',
+    '开发工具': 'Development Tools',
+    '安全工具': 'Security Tools',
+    '游戏': 'Games',
+    '设计工具': 'Design Tools',
+    '效率工具': 'Productivity Tools',
+    '教育学习': 'Education',
+    '社交网络': 'Social Network',
+    '数据分析': 'Data Analytics'
+  };
+  
+  return translations[zhName] || zhName;
+};

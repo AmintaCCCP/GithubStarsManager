@@ -20,6 +20,11 @@ export interface Repository {
   analyzed_at?: string;
   // Release subscription
   subscribed_to_releases?: boolean;
+  // Manual editing fields
+  custom_description?: string;
+  custom_tags?: string[];
+  custom_category?: string;
+  last_edited?: string;
 }
 
 export interface Release {
@@ -34,6 +39,8 @@ export interface Release {
     full_name: string;
     name: string;
   };
+  // Read status
+  is_read?: boolean;
 }
 
 export interface GitHubUser {
@@ -76,6 +83,14 @@ export interface SearchFilters {
   isSubscribed?: boolean; // 新增：是否订阅Release
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  keywords: string[];
+  isCustom?: boolean;
+}
+
 export interface AppState {
   // Auth
   user: GitHubUser | null;
@@ -103,6 +118,10 @@ export interface AppState {
   // Releases
   releases: Release[];
   releaseSubscriptions: Set<number>;
+  readReleases: Set<number>; // 新增：已读Release
+  
+  // Categories
+  customCategories: Category[]; // 新增：自定义分类
   
   // UI
   theme: 'light' | 'dark';

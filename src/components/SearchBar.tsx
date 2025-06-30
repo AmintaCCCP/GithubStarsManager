@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell } from 'lucide-react';
+import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 
@@ -400,6 +400,19 @@ export const SearchBar: React.FC = () => {
               >
                 <Bell className="w-4 h-4" />
                 <span>{t('已订阅Release', 'Subscribed to Releases')}</span>
+              </button>
+              <button
+                onClick={() => setSearchFilters({ 
+                  isSubscribed: searchFilters.isSubscribed === false ? undefined : false 
+                })}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  searchFilters.isSubscribed === false
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <BellOff className="w-4 h-4" />
+                <span>{t('未订阅Release', 'Not Subscribed to Releases')}</span>
               </button>
             </div>
           </div>
