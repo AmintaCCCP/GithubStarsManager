@@ -30,6 +30,9 @@ Use your own AI model API that supports OpenAI-compatible interfaces.
 2. Navigate to the directory, and open a Terminal window at the downloaded folder.
 3. Run `npm install` to install dependencies and `npm run dev` to build
 
+> You can also download desktop client for MacOS:
+> https://github.com/AmintaCCCP/GithubStarsManager/releases
+
 ## Additional Notes
 
 1. There is no backend for this app, so save your important data on your own.
