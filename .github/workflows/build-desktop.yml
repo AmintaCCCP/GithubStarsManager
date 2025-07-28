@@ -45,12 +45,13 @@ jobs:
         else
           echo "Creating fallback dist directory and index.html"
           mkdir -p dist
-          cat > dist/index.html << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
+          node -e "
+          const fs = require('fs');
+          const html = \`<!DOCTYPE html>
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
     <title>GitHub Stars Manager</title>
     <style>
         body { 
@@ -72,10 +73,10 @@ jobs:
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class=\"container\">
         <h1>GitHub Stars Manager</h1>
         <p>Welcome to GitHub Stars Manager Desktop Application!</p>
-        <div class="status">
+        <div class=\"status\">
             <p>This is a fallback page. The main application should load here.</p>
             <p>Application built successfully with GitHub Actions.</p>
         </div>
@@ -87,9 +88,10 @@ jobs:
         });
     </script>
 </body>
-</html>
-EOF
-          echo "✓ Fallback index.html created"
+</html>\`;
+          fs.writeFileSync('dist/index.html', html);
+          console.log('✓ Fallback index.html created');
+          "
         fi
       
     - name: Install sharp for icon generation
