@@ -1,0 +1,97 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffb347;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="githubGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0f0f0;stop-opacity:1" />
+    </linearGradient>
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGradient)" stroke="#4a5568" stroke-width="4"/>
+  
+  <!-- GitHub logo background circle -->
+  <circle cx="256" cy="200" r="80" fill="url(#githubGradient)" filter="url(#shadow)"/>
+  
+  <!-- GitHub cat icon (simplified) -->
+  <g transform="translate(256, 200)">
+    <!-- Cat body -->
+    <ellipse cx="0" cy="10" rx="35" ry="45" fill="#24292e"/>
+    <!-- Cat head -->
+    <circle cx="0" cy="-20" r="30" fill="#24292e"/>
+    <!-- Cat ears -->
+    <polygon points="-20,-35 -10,-50 -5,-35" fill="#24292e"/>
+    <polygon points="20,-35 10,-50 5,-35" fill="#24292e"/>
+    <!-- Cat eyes -->
+    <circle cx="-10" cy="-25" r="4" fill="#ffffff"/>
+    <circle cx="10" cy="-25" r="4" fill="#ffffff"/>
+    <circle cx="-10" cy="-25" r="2" fill="#24292e"/>
+    <circle cx="10" cy="-25" r="2" fill="#24292e"/>
+    <!-- Cat nose -->
+    <polygon points="0,-15 -3,-10 3,-10" fill="#ffffff"/>
+    <!-- Cat whiskers -->
+    <line x1="-25" y1="-20" x2="-35" y2="-18" stroke="#ffffff" stroke-width="2"/>
+    <line x1="-25" y1="-15" x2="-35" y2="-15" stroke="#ffffff" stroke-width="2"/>
+    <line x1="25" y1="-20" x2="35" y2="-18" stroke="#ffffff" stroke-width="2"/>
+    <line x1="25" y1="-15" x2="35" y2="-15" stroke="#ffffff" stroke-width="2"/>
+  </g>
+  
+  <!-- Stars around GitHub logo -->
+  <g fill="url(#starGradient)" filter="url(#shadow)">
+    <!-- Main star -->
+    <g transform="translate(180, 140)">
+      <polygon points="0,-20 6,-6 20,-6 10,2 16,16 0,8 -16,16 -10,2 -20,-6 -6,-6" />
+    </g>
+    <!-- Secondary stars -->
+    <g transform="translate(330, 160) scale(0.7)">
+      <polygon points="0,-20 6,-6 20,-6 10,2 16,16 0,8 -16,16 -10,2 -20,-6 -6,-6" />
+    </g>
+    <g transform="translate(200, 280) scale(0.5)">
+      <polygon points="0,-20 6,-6 20,-6 10,2 16,16 0,8 -16,16 -10,2 -20,-6 -6,-6" />
+    </g>
+    <g transform="translate(320, 280) scale(0.6)">
+      <polygon points="0,-20 6,-6 20,-6 10,2 16,16 0,8 -16,16 -10,2 -20,-6 -6,-6" />
+    </g>
+  </g>
+  
+  <!-- Management/Organization symbols -->
+  <g transform="translate(256, 350)" fill="#ffffff" filter="url(#shadow)">
+    <!-- Folder icon -->
+    <rect x="-30" y="-10" width="60" height="40" rx="4" fill="#4299e1" opacity="0.9"/>
+    <rect x="-25" y="-15" width="20" height="8" rx="2" fill="#4299e1" opacity="0.9"/>
+    <!-- Files inside folder -->
+    <rect x="-20" y="-2" width="15" height="2" fill="#ffffff" opacity="0.8"/>
+    <rect x="-20" y="5" width="25" height="2" fill="#ffffff" opacity="0.8"/>
+    <rect x="-20" y="12" width="20" height="2" fill="#ffffff" opacity="0.8"/>
+  </g>
+  
+  <!-- AI/Smart features indicator -->
+  <g transform="translate(380, 320)" fill="#10b981" filter="url(#shadow)">
+    <circle cx="0" cy="0" r="15" fill="#10b981"/>
+    <!-- Brain/AI symbol -->
+    <path d="M-8,-5 Q-8,-10 -3,-10 Q2,-10 2,-5 Q7,-5 7,0 Q7,5 2,5 Q-3,5 -3,0 Q-8,0 -8,-5" fill="#ffffff"/>
+    <circle cx="-3" cy="-3" r="1.5" fill="#10b981"/>
+    <circle cx="2" cy="-3" r="1.5" fill="#10b981"/>
+    <circle cx="-1" cy="2" r="1" fill="#10b981"/>
+  </g>
+  
+  <!-- App title -->
+  <text x="256" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" filter="url(#shadow)">
+    GitHub Stars
+  </text>
+  <text x="256" y="475" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#e2e8f0">
+    Manager
+  </text>
+</svg>

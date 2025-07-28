@@ -1,0 +1,204 @@
+name: Build Desktop App
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build web app
+      run: npm run build
+      
+    - name: Install Electron dependencies
+      run: |
+        npm install --save-dev electron electron-builder
+        
+    - name: Create Electron main process
+      run: |
+        mkdir -p electron
+        cat > electron/main.js << 'EOF'
+        const { app, BrowserWindow, Menu } = require('electron');
+        const path = require('path');
+        const isDev = process.env.NODE_ENV === 'development';
+        
+        function createWindow() {
+          const mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            minWidth: 800,
+            minHeight: 600,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              enableRemoteModule: false,
+              webSecurity: true
+            },
+            icon: path.join(__dirname, '../dist/vite.svg'),
+            titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+            show: false
+          });
+        
+          // Load the app
+          if (isDev) {
+            mainWindow.loadURL('http://localhost:5173');
+            mainWindow.webContents.openDevTools();
+          } else {
+            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+          }
+        
+          mainWindow.once('ready-to-show', () => {
+            mainWindow.show();
+          });
+        
+          // Handle window closed
+          mainWindow.on('closed', () => {
+            if (process.platform !== 'darwin') {
+              app.quit();
+            }
+          });
+        
+          return mainWindow;
+        }
+        
+        // App event handlers
+        app.whenReady().then(() => {
+          createWindow();
+        
+          app.on('activate', () => {
+            if (BrowserWindow.getAllWindows().length === 0) {
+              createWindow();
+            }
+          });
+        });
+        
+        app.on('window-all-closed', () => {
+          if (process.platform !== 'darwin') {
+            app.quit();
+          }
+        });
+        
+        // Security: Prevent new window creation
+        app.on('web-contents-created', (event, contents) => {
+          contents.on('new-window', (event, navigationUrl) => {
+            event.preventDefault();
+            require('electron').shell.openExternal(navigationUrl);
+          });
+        });
+        EOF
+        
+    - name: Create Electron package.json
+      run: |
+        cat > electron/package.json << 'EOF'
+        {
+          "name": "github-stars-manager-desktop",
+          "version": "1.0.0",
+          "description": "GitHub Stars Manager Desktop App",
+          "main": "main.js",
+          "author": "GitHub Stars Manager",
+          "license": "MIT"
+        }
+        EOF
+        
+    - name: Update main package.json for Electron
+      run: |
+        npm pkg set main="electron/main.js"
+        npm pkg set homepage="./"
+        npm pkg set scripts.electron="electron ."
+        npm pkg set scripts.electron-dev="NODE_ENV=development electron ."
+        npm pkg set scripts.dist="electron-builder"
+        npm pkg set build.appId="com.github-stars-manager.app"
+        npm pkg set build.productName="GitHub Stars Manager"
+        npm pkg set build.directories.output="release"
+        npm pkg set build.files[0]="dist/**/*"
+        npm pkg set build.files[1]="electron/**/*"
+        npm pkg set build.files[2]="node_modules/**/*"
+        npm pkg set build.files[3]="package.json"
+        
+    - name: Configure platform-specific build settings
+      shell: bash
+      run: |
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          npm pkg set build.win.target="nsis"
+          npm pkg set build.win.icon="dist/vite.svg"
+          npm pkg set build.nsis.oneClick=false
+          npm pkg set build.nsis.allowToChangeInstallationDirectory=true
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          npm pkg set build.mac.target="dmg"
+          npm pkg set build.mac.icon="dist/vite.svg"
+          npm pkg set build.mac.category="public.app-category.productivity"
+        else
+          npm pkg set build.linux.target="AppImage"
+          npm pkg set build.linux.icon="dist/vite.svg"
+          npm pkg set build.linux.category="Office"
+        fi
+        
+    - name: Build Electron app
+      run: npm run dist
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-app
+        path: release/*.exe
+        
+    - name: Upload artifacts (macOS)
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-app
+        path: release/*.dmg
+        
+    - name: Upload artifacts (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-app
+        path: release/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          windows-app/*
+          macos-app/*
+          linux-app/*
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
