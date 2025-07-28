@@ -53,31 +53,128 @@ jobs:
       run: |
         node -e "
         const fs = require('fs');
+        const sharp = require('sharp');
         const path = require('path');
         
-        // Create basic icon files for build process
-        const buildDir = 'build';
-        if (!fs.existsSync(buildDir)) {
-          fs.mkdirSync(buildDir, { recursive: true });
+        async function generateIcons() {
+          const buildDir = 'build';
+          if (!fs.existsSync(buildDir)) {
+            fs.mkdirSync(buildDir, { recursive: true });
+          }
+          
+          // Look for source icon in common locations
+          let sourceIcon = null;
+          const possiblePaths = [
+            'assets/icon.png',
+            'public/icon.png', 
+            'src/assets/icon.png',
+            'icon.png'
+          ];
+          
+          for (const iconPath of possiblePaths) {
+            if (fs.existsSync(iconPath)) {
+              sourceIcon = iconPath;
+              break;
+            }
+          }
+          
+          if (!sourceIcon) {
+            console.log('No source icon found, creating default icon...');
+            // Create a simple colored square as default
+            await sharp({
+              create: {
+                width: 512,
+                height: 512,
+                channels: 4,
+                background: { r: 59, g: 130, b: 246, alpha: 1 }
+              }
+            })
+            .png()
+            .toFile('build/icon-512x512.png');
+            
+            // Copy for other formats
+            fs.copyFileSync('build/icon-512x512.png', 'build/icon.png');
+          } else {
+            console.log('Using source icon:', sourceIcon);
+            
+            // Generate PNG icons for Linux
+            await sharp(sourceIcon)
+              .resize(512, 512)
+              .png()
+              .toFile('build/icon-512x512.png');
+              
+            await sharp(sourceIcon)
+              .resize(256, 256)
+              .png()
+              .toFile('build/icon-256x256.png');
+              
+            // Copy original for general use
+            fs.copyFileSync(sourceIcon, 'build/icon.png');
+          }
+          
+          console.log('Icon files generated successfully');
         }
         
-        // Create a simple base64 encoded 1x1 PNG as placeholder
-        const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-        const pngBuffer = Buffer.from(pngBase64, 'base64');
-        
-        // Create placeholder icon files with actual PNG data
-        fs.writeFileSync('build/icon-512x512.png', pngBuffer);
-        
-        // Create minimal ICO file (Windows)
-        const icoHeader = Buffer.from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x30, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00]);
-        const icoData = Buffer.concat([icoHeader, pngBuffer]);
-        fs.writeFileSync('build/icon.ico', icoData);
-        
-        // Create minimal ICNS file (macOS) - just copy the PNG for now
-        fs.writeFileSync('build/icon.icns', pngBuffer);
-        
-        console.log('Icon files created successfully');
+        generateIcons().catch(console.error);
         "
+        
+    - name: Generate Windows ICO file
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        # Install imagemagick for ICO conversion
+        if command -v magick >/dev/null 2>&1; then
+          magick build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+        elif command -v convert >/dev/null 2>&1; then
+          convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+        else
+          echo "ImageMagick not available, using PNG as fallback"
+          cp build/icon-512x512.png build/icon.ico
+        fi
+        
+    - name: Generate macOS ICNS file  
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        # Create iconset directory
+        mkdir -p build/icon.iconset
+        
+        # Generate different sizes for ICNS
+        node -e "
+        const sharp = require('sharp');
+        const fs = require('fs');
+        
+        async function generateIconSet() {
+          const sizes = [16, 32, 64, 128, 256, 512, 1024];
+          const sourceIcon = fs.existsSync('build/icon.png') ? 'build/icon.png' : 'build/icon-512x512.png';
+          
+          for (const size of sizes) {
+            await sharp(sourceIcon)
+              .resize(size, size)
+              .png()
+              .toFile(\`build/icon.iconset/icon_\${size}x\${size}.png\`);
+              
+            if (size <= 512) {
+              await sharp(sourceIcon)
+                .resize(size * 2, size * 2)
+                .png()
+                .toFile(\`build/icon.iconset/icon_\${size}x\${size}@2x.png\`);
+            }
+          }
+          
+          console.log('IconSet generated');
+        }
+        
+        generateIconSet().catch(console.error);
+        "
+        
+        # Convert to ICNS using iconutil (macOS only)
+        if command -v iconutil >/dev/null 2>&1; then
+          iconutil -c icns build/icon.iconset -o build/icon.icns
+        else
+          echo "iconutil not available, using PNG as fallback"
+          cp build/icon-512x512.png build/icon.icns
+        fi
       
     - name: Install Electron dependencies
       run: npm install --save-dev electron electron-builder
