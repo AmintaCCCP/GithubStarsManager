@@ -74,86 +74,79 @@ jobs:
         
     - name: Create Electron main process
       run: |
-        node -e "
-        const fs = require('fs');
+        mkdir -p electron
+        cat > electron/main.js << 'EOF'
+        const { app, BrowserWindow, Menu, shell } = require('electron');
         const path = require('path');
-        
-        if (!fs.existsSync('electron')) {
-          fs.mkdirSync('electron', { recursive: true });
+        const isDev = process.env.NODE_ENV === 'development';
+
+        let mainWindow;
+
+        function createWindow() {
+          mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            minWidth: 800,
+            minHeight: 600,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              enableRemoteModule: false,
+              webSecurity: true
+            },
+            icon: path.join(__dirname, '../public/icon.svg'),
+            titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+            show: false
+          });
+
+          if (isDev) {
+            mainWindow.loadURL('http://localhost:5173');
+            mainWindow.webContents.openDevTools();
+          } else {
+            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+          }
+
+          mainWindow.once('ready-to-show', () => {
+            mainWindow.show();
+          });
+
+          mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+            shell.openExternal(url);
+            return { action: 'deny' };
+          });
+
+          mainWindow.on('closed', () => {
+            mainWindow = null;
+          });
         }
+
+        app.whenReady().then(createWindow);
+
+        app.on('window-all-closed', () => {
+          if (process.platform !== 'darwin') {
+            app.quit();
+          }
+        });
+
+        app.on('activate', () => {
+          if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+          }
+        });
+        EOF
         
-        const mainJsContent = \\\`const { app, BrowserWindow, Menu, shell } = require('electron');
-const path = require('path');
-const isDev = process.env.NODE_ENV === 'development';
-
-let mainWindow;
-
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      webSecurity: true
-    },
-    icon: path.join(__dirname, '../public/icon.svg'),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    show: false
-  });
-
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-  }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
-
-app.whenReady().then(createWindow);
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});\\\`;
+        cat > electron/package.json << 'EOF'
+        {
+          "name": "github-stars-manager-desktop",
+          "version": "1.0.0",
+          "description": "GitHub Stars Manager Desktop App",
+          "main": "main.js",
+          "author": "GitHub Stars Manager",
+          "license": "MIT"
+        }
+        EOF
         
-        fs.writeFileSync('electron/main.js', mainJsContent);
-        
-        const electronPackageJson = {
-          name: 'github-stars-manager-desktop',
-          version: '1.0.0',
-          description: 'GitHub Stars Manager Desktop App',
-          main: 'main.js',
-          author: 'GitHub Stars Manager',
-          license: 'MIT'
-        };
-        
-        fs.writeFileSync('electron/package.json', JSON.stringify(electronPackageJson, null, 2));
-        console.log('Electron files created successfully');
-        "
+        echo "Electron files created successfully"
         
     - name: Update main package.json for Electron
       run: |
