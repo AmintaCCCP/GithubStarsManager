@@ -53,10 +53,9 @@ jobs:
       run: |
         node -e "
         const fs = require('fs');
-        const sharp = require('sharp');
         const path = require('path');
         
-        async function generateIcons() {
+        function generateIcons() {
           const buildDir = 'build';
           if (!fs.existsSync(buildDir)) {
             fs.mkdirSync(buildDir, { recursive: true });
@@ -78,102 +77,43 @@ jobs:
             }
           }
           
-          if (!sourceIcon) {
-            console.log('No source icon found, creating default icon...');
-            // Create a simple colored square as default
-            await sharp({
-              create: {
-                width: 512,
-                height: 512,
-                channels: 4,
-                background: { r: 59, g: 130, b: 246, alpha: 1 }
-              }
-            })
-            .png()
-            .toFile('build/icon-512x512.png');
-            
-            // Copy for other formats
-            fs.copyFileSync('build/icon-512x512.png', 'build/icon.png');
-          } else {
+          if (sourceIcon) {
             console.log('Using source icon:', sourceIcon);
-            
-            // Generate PNG icons for Linux
-            await sharp(sourceIcon)
-              .resize(512, 512)
-              .png()
-              .toFile('build/icon-512x512.png');
-              
-            await sharp(sourceIcon)
-              .resize(256, 256)
-              .png()
-              .toFile('build/icon-256x256.png');
-              
-            // Copy original for general use
             fs.copyFileSync(sourceIcon, 'build/icon.png');
+            fs.copyFileSync(sourceIcon, 'build/icon-512x512.png');
+          } else {
+            console.log('No source icon found, will use electron-builder default');
+            // Create a simple placeholder
+            const placeholderSvg = '<svg width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#3b82f6\"/><text x=\"256\" y=\"256\" text-anchor=\"middle\" dy=\".3em\" fill=\"white\" font-size=\"48\" font-family=\"Arial\">APP</text></svg>';
+            fs.writeFileSync('build/icon.svg', placeholderSvg);
           }
           
-          console.log('Icon files generated successfully');
+          console.log('Icon files prepared successfully');
         }
         
-        generateIcons().catch(console.error);
+        generateIcons();
         "
         
     - name: Generate Windows ICO file
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
-        # Install imagemagick for ICO conversion
-        if command -v magick >/dev/null 2>&1; then
-          magick build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
-        elif command -v convert >/dev/null 2>&1; then
-          convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+        # For Windows, electron-builder can handle PNG to ICO conversion
+        if [ -f "build/icon.png" ]; then
+          cp build/icon.png build/icon.ico
         else
-          echo "ImageMagick not available, using PNG as fallback"
-          cp build/icon-512x512.png build/icon.ico
+          echo "No icon file found, electron-builder will use default"
         fi
         
     - name: Generate macOS ICNS file  
       if: matrix.os == 'macos-latest'
       shell: bash
       run: |
-        # Create iconset directory
-        mkdir -p build/icon.iconset
-        
-        # Generate different sizes for ICNS
-        node -e "
-        const sharp = require('sharp');
-        const fs = require('fs');
-        
-        async function generateIconSet() {
-          const sizes = [16, 32, 64, 128, 256, 512, 1024];
-          const sourceIcon = fs.existsSync('build/icon.png') ? 'build/icon.png' : 'build/icon-512x512.png';
-          
-          for (const size of sizes) {
-            await sharp(sourceIcon)
-              .resize(size, size)
-              .png()
-              .toFile(\`build/icon.iconset/icon_\${size}x\${size}.png\`);
-              
-            if (size <= 512) {
-              await sharp(sourceIcon)
-                .resize(size * 2, size * 2)
-                .png()
-                .toFile(\`build/icon.iconset/icon_\${size}x\${size}@2x.png\`);
-            }
-          }
-          
-          console.log('IconSet generated');
-        }
-        
-        generateIconSet().catch(console.error);
-        "
-        
-        # Convert to ICNS using iconutil (macOS only)
-        if command -v iconutil >/dev/null 2>&1; then
-          iconutil -c icns build/icon.iconset -o build/icon.icns
+        # For macOS, electron-builder can handle PNG to ICNS conversion
+        if [ -f "build/icon.png" ]; then
+          cp build/icon.png build/icon.icns
         else
-          echo "iconutil not available, using PNG as fallback"
-          cp build/icon-512x512.png build/icon.icns
+          echo "No icon file found, electron-builder will use default"
         fi
       
     - name: Install Electron dependencies
@@ -302,7 +242,7 @@ jobs:
         if ('${{ matrix.os }}' === 'windows-latest') {
           packageJson.build.win = {
             target: 'nsis',
-            icon: 'build/icon.ico'
+            icon: 'build/icon.png'
           };
           packageJson.build.nsis = {
             oneClick: false,
@@ -311,7 +251,7 @@ jobs:
         } else if ('${{ matrix.os }}' === 'macos-latest') {
           packageJson.build.mac = {
             target: 'dmg',
-            icon: 'build/icon.icns',
+            icon: 'build/icon.png',
             category: 'public.app-category.productivity'
           };
         } else {
@@ -333,6 +273,7 @@ jobs:
         CI: true
         
     - name: List build output
+      shell: bash
       run: |
         echo "Build output directory contents:"
         ls -la release/ || echo "Release directory not found"
@@ -377,6 +318,7 @@ jobs:
       continue-on-error: true
       
     - name: List downloaded files
+      shell: bash
       run: |
         echo "Downloaded files structure:"
         find . -type f | head -20
@@ -384,6 +326,7 @@ jobs:
         find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" | head -20
         
     - name: Prepare release files
+      shell: bash
       run: |
         mkdir -p release-files
         # Copy all found artifacts to a single directory
