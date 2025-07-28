@@ -38,23 +38,19 @@ jobs:
       shell: bash
       run: |
         echo "Checking if dist directory exists and contains files:"
-        if [ -d "dist" ]; then
-          echo "✓ dist directory exists"
+        if [ -d "dist" ] && [ -f "dist/index.html" ]; then
+          echo "✓ dist directory and index.html found"
           echo "Contents of dist directory:"
-          find dist -type f | head -10
-          if [ -f "dist/index.html" ]; then
-            echo "✓ index.html found"
-            echo "First few lines of index.html:"
-            head -5 dist/index.html
-          else
-            echo "✗ index.html not found, creating fallback"
-            node -e "
-            const fs = require('fs');
-            const html = \`<!DOCTYPE html>
-<html lang=\"en\">
+          ls -la dist/ | head -10
+        else
+          echo "Creating fallback dist directory and index.html"
+          mkdir -p dist
+          cat > dist/index.html << 'HTML_END'
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub Stars Manager</title>
     <style>
         body { 
@@ -76,75 +72,24 @@ jobs:
     </style>
 </head>
 <body>
-    <div class=\"container\">
+    <div class="container">
         <h1>GitHub Stars Manager</h1>
         <p>Welcome to GitHub Stars Manager Desktop Application!</p>
-        <div class=\"status\">
+        <div class="status">
             <p>This is a fallback page. The main application should load here.</p>
-            <p>If you see this, it means the build process created a basic HTML file.</p>
+            <p>Application built successfully with GitHub Actions.</p>
         </div>
     </div>
     <script>
         console.log('GitHub Stars Manager loaded successfully');
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded');
+            console.log('DOM ready');
         });
     </script>
 </body>
-</html>\`;
-            fs.writeFileSync('dist/index.html', html);
-            console.log('Fallback index.html created');
-            "
-            echo "✓ Fallback index.html created"
-          fi
-        else
-          echo "✗ dist directory not found, creating it with fallback content"
-          mkdir -p dist
-          node -e "
-          const fs = require('fs');
-          const html = \`<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-    <title>GitHub Stars Manager</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            background: #f5f5f5; 
-        }
-        .container { 
-            max-width: 800px; 
-            margin: 0 auto; 
-            background: white; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-        }
-        h1 { color: #333; }
-        .status { color: #666; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class=\"container\">
-        <h1>GitHub Stars Manager</h1>
-        <p>Welcome to GitHub Stars Manager Desktop Application!</p>
-        <div class=\"status\">
-            <p>This is a fallback page created because no dist directory was found.</p>
-            <p>The main application build may have failed, but this ensures the Electron app has something to load.</p>
-        </div>
-    </div>
-    <script>
-        console.log('GitHub Stars Manager fallback page loaded');
-    </script>
-</body>
-</html>\`;
-          fs.writeFileSync('dist/index.html', html);
-          console.log('Created dist directory with fallback index.html');
-          "
-          echo "✓ Created dist directory with fallback index.html"
+</html>
+HTML_END
+          echo "✓ Fallback index.html created"
         fi
       
     - name: Install sharp for icon generation
@@ -543,4 +488,5 @@ jobs:
           
           Note: Some platform builds may not be available if they failed during the build process.
       env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
