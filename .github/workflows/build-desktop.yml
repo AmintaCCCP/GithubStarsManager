@@ -33,8 +33,10 @@ jobs:
       
     - name: Build web app
       run: npm run build
+      env:
+        VITE_BASE_PATH: './'
       
-    - name: Verify web build
+    - name: Verify and fix web build
       shell: bash
       run: |
         echo "Checking if dist directory exists and contains files:"
@@ -42,12 +44,29 @@ jobs:
           echo "✓ dist directory and index.html found"
           echo "Contents of dist directory:"
           ls -la dist/ | head -10
+          
+          # 检查 index.html 中的路径并修复
+          echo "Checking and fixing asset paths in index.html..."
+          if [ -f "dist/index.html" ]; then
+            # 确保所有资源路径都是相对路径
+            sed -i.bak 's|href="/|href="./|g' dist/index.html
+            sed -i.bak 's|src="/|src="./|g' dist/index.html
+            sed -i.bak 's|href="\([^"]*\)"|href="./\1"|g' dist/index.html
+            sed -i.bak 's|src="\([^"]*\)"|src="./\1"|g' dist/index.html
+            # 移除备份文件
+            rm -f dist/index.html.bak
+            echo "✓ Asset paths fixed in index.html"
+          fi
         else
           echo "Creating fallback dist directory and index.html"
           mkdir -p dist
           cp templates/fallback-index.html dist/index.html
           echo "✓ Fallback index.html created from template"
         fi
+        
+        # 显示最终的 index.html 内容（前几行）
+        echo "Final index.html content (first 10 lines):"
+        head -10 dist/index.html || echo "Could not read index.html"
       
     - name: Install sharp for icon generation
       run: npm install sharp --save-dev
@@ -63,7 +82,7 @@ jobs:
         console.log('Build directory created');
         "
       
-    - name: Generate icons
+    - name: Generate icons and app resources
       shell: bash
       run: |
         node -e "
@@ -97,10 +116,21 @@ jobs:
             fs.copyFileSync(sourceIcon, 'build/icon.png');
             fs.copyFileSync(sourceIcon, 'build/icon-512x512.png');
           } else {
-            console.log('No source icon found, will use electron-builder default');
-            // Create a simple placeholder
-            const placeholderSvg = '<svg width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#3b82f6\"/><text x=\"256\" y=\"256\" text-anchor=\"middle\" dy=\".3em\" fill=\"white\" font-size=\"48\" font-family=\"Arial\">APP</text></svg>';
-            fs.writeFileSync('build/icon.svg', placeholderSvg);
+            console.log('Creating default application icon');
+            // Create a better default icon
+            const iconSvg = \`<svg width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\">
+              <defs>
+                <linearGradient id=\"grad1\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">
+                  <stop offset=\"0%\" style=\"stop-color:#667eea;stop-opacity:1\" />
+                  <stop offset=\"100%\" style=\"stop-color:#764ba2;stop-opacity:1\" />
+                </linearGradient>
+              </defs>
+              <rect width=\"512\" height=\"512\" fill=\"url(#grad1)\" rx=\"64\"/>
+              <text x=\"256\" y=\"280\" text-anchor=\"middle\" fill=\"white\" font-size=\"120\" font-family=\"Arial, sans-serif\" font-weight=\"bold\">⭐</text>
+              <text x=\"256\" y=\"380\" text-anchor=\"middle\" fill=\"white\" font-size=\"32\" font-family=\"Arial, sans-serif\">GitHub</text>
+              <text x=\"256\" y=\"420\" text-anchor=\"middle\" fill=\"white\" font-size=\"32\" font-family=\"Arial, sans-serif\">Stars</text>
+            </svg>\`;
+            fs.writeFileSync('build/icon.svg', iconSvg);
           }
           
           console.log('Icon files prepared successfully');
@@ -166,48 +196,79 @@ jobs:
           '      nodeIntegration: false,\\n' +
           '      contextIsolation: true,\\n' +
           '      enableRemoteModule: false,\\n' +
-          '      webSecurity: false\\n' +
+          '      webSecurity: false,\\n' +
+          '      allowRunningInsecureContent: true,\\n' +
+          '      devTools: isDev // 只在开发模式下启用 DevTools\\n' +
           '    },\\n' +
           '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
           '    titleBarStyle: process.platform === \\'darwin\\' ? \\'hiddenInset\\' : \\'default\\',\\n' +
-          '    show: false\\n' +
+          '    show: false,\\n' +
+          '    autoHideMenuBar: true, // 隐藏菜单栏\\n' +
+          '    frame: true, // 保持窗口框架\\n' +
+          '    backgroundColor: \\'#ffffff\\' // 设置背景色，避免白屏闪烁\\n' +
           '  });\\n\\n' +
-          '  // Add error handling\\n' +
-          '  mainWindow.webContents.on(\\'did-fail-load\\', (event, errorCode, errorDescription) => {\\n' +
-          '    console.error(\\'Failed to load:\\', errorCode, errorDescription);\\n' +
+          '  // 添加错误处理和加载事件\\n' +
+          '  mainWindow.webContents.on(\\'did-fail-load\\', (event, errorCode, errorDescription, validatedURL) => {\\n' +
+          '    console.error(\\'Failed to load:\\', errorCode, errorDescription, validatedURL);\\n' +
+          '    // 如果主页面加载失败，尝试加载 fallback 页面\\n' +
+          '    const fallbackPath = path.join(__dirname, \\'../dist/index.html\\');\\n' +
+          '    if (fs.existsSync(fallbackPath)) {\\n' +
+          '      console.log(\\'Loading fallback page:\\', fallbackPath);\\n' +
+          '      mainWindow.loadFile(fallbackPath);\\n' +
+          '    }\\n' +
           '  });\\n\\n' +
           '  mainWindow.webContents.on(\\'dom-ready\\', () => {\\n' +
-          '    console.log(\\'DOM ready\\');\\n' +
+          '    if (isDev) console.log(\\'DOM ready\\');\\n' +
+          '    // 注入一些基础样式，防止白屏\\n' +
+          '    mainWindow.webContents.insertCSS(\\'body { background-color: #ffffff; }\\');\\n' +
+          '  });\\n\\n' +
+          '  mainWindow.webContents.on(\\'did-finish-load\\', () => {\\n' +
+          '    if (isDev) console.log(\\'Page finished loading\\');\\n' +
+          '    // 页面加载完成后显示窗口\\n' +
+          '    if (!mainWindow.isVisible()) {\\n' +
+          '      mainWindow.show();\\n' +
+          '    }\\n' +
           '  });\\n\\n' +
           '  if (isDev) {\\n' +
           '    mainWindow.loadURL(\\'http://localhost:5173\\');\\n' +
           '    mainWindow.webContents.openDevTools();\\n' +
           '  } else {\\n' +
-          '    // Try multiple possible paths for the built app\\n' +
+          '    // 生产环境：尝试多个可能的路径\\n' +
           '    const possiblePaths = [\\n' +
           '      path.join(__dirname, \\'../dist/index.html\\'),\\n' +
-          '      path.join(__dirname, \\'../build/index.html\\'),\\n' +
+          '      path.join(process.resourcesPath, \\'app.asar/dist/index.html\\'),\\n' +
           '      path.join(process.resourcesPath, \\'app/dist/index.html\\'),\\n' +
-          '      path.join(process.resourcesPath, \\'dist/index.html\\')\\n' +
+          '      path.join(process.resourcesPath, \\'dist/index.html\\'),\\n' +
+          '      path.join(__dirname, \\'../build/index.html\\')\\n' +
           '    ];\\n\\n' +
           '    let indexPath = null;\\n' +
           '    for (const testPath of possiblePaths) {\\n' +
-          '      if (fs.existsSync(testPath)) {\\n' +
-          '        indexPath = testPath;\\n' +
-          '        break;\\n' +
+          '      try {\\n' +
+          '        if (fs.existsSync(testPath)) {\\n' +
+          '          indexPath = testPath;\\n' +
+          '          break;\\n' +
+          '        }\\n' +
+          '      } catch (error) {\\n' +
+          '        // 忽略文件系统错误，继续尝试下一个路径\\n' +
+          '        continue;\\n' +
           '      }\\n' +
           '    }\\n\\n' +
           '    if (indexPath) {\\n' +
-          '      console.log(\\'Loading from:\\', indexPath);\\n' +
-          '      mainWindow.loadFile(indexPath);\\n' +
+          '      console.log(\\'Loading application from:\\', indexPath);\\n' +
+          '      mainWindow.loadFile(indexPath).catch(error => {\\n' +
+          '        console.error(\\'Failed to load file:\\', error);\\n' +
+          '        // 加载失败时显示错误页面\\n' +
+          '        mainWindow.loadURL(\\'data:text/html,<h1>Application Load Error</h1><p>Could not load the main application. Please restart the app.</p>\\');\\n' +
+          '      });\\n' +
           '    } else {\\n' +
           '      console.error(\\'Could not find index.html in any expected location\\');\\n' +
           '      console.log(\\'Checked paths:\\', possiblePaths);\\n' +
-          '      // Load a simple error page\\n' +
-          '      mainWindow.loadURL(\\'data:text/html,<h1>Error: Could not load application</h1><p>Please check the console for details.</p>\\');\\n' +
+          '      console.log(\\'Current directory:\\', __dirname);\\n' +
+          '      console.log(\\'Process resources path:\\', process.resourcesPath);\\n' +
+          '      // 显示详细的错误信息\\n' +
+          '      const errorHtml = \\'<h1>Application Not Found</h1><p>Could not locate the application files.</p><p>Please reinstall the application.</p>\\';\\n' +
+          '      mainWindow.loadURL(\\'data:text/html,\\' + encodeURIComponent(errorHtml));\\n' +
           '    }\\n' +
-          '    // Open DevTools in production for debugging\\n' +
-          '    mainWindow.webContents.openDevTools();\\n' +
           '  }\\n\\n' +
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
@@ -258,6 +319,10 @@ jobs:
         packageJson.homepage = './';
         packageJson.scripts = packageJson.scripts || {};
         
+        // 确保构建脚本使用正确的基础路径
+        packageJson.scripts.build = 'vite build --base=./';
+        packageJson.scripts['build:electron'] = 'vite build --base=./ && electron-builder';
+        
         // Ensure proper base path for Electron
         if (!packageJson.build) packageJson.build = {};
         packageJson.build.extraMetadata = {
@@ -279,7 +344,9 @@ jobs:
             'build/**/*',
             'electron/**/*',
             'node_modules/**/*',
-            'package.json'
+            'package.json',
+            '!node_modules/.cache/**/*',
+            '!**/*.map'
           ],
           extraResources: [
             {
@@ -287,6 +354,11 @@ jobs:
               to: 'dist',
               filter: ['**/*']
             }
+          ],
+          compression: 'normal',
+          asar: true,
+          asarUnpack: [
+            'dist/**/*'
           ]
         };
         
@@ -303,24 +375,54 @@ jobs:
         
         if ('${{ matrix.os }}' === 'windows-latest') {
           packageJson.build.win = {
-            target: 'nsis',
-            icon: 'build/icon.png'
+            target: [
+              {
+                target: 'nsis',
+                arch: ['x64']
+              }
+            ],
+            icon: 'build/icon.png',
+            requestedExecutionLevel: 'asInvoker'
           };
           packageJson.build.nsis = {
             oneClick: false,
-            allowToChangeInstallationDirectory: true
+            allowToChangeInstallationDirectory: true,
+            createDesktopShortcut: true,
+            createStartMenuShortcut: true,
+            shortcutName: 'GitHub Stars Manager'
           };
         } else if ('${{ matrix.os }}' === 'macos-latest') {
           packageJson.build.mac = {
-            target: 'dmg',
+            target: [
+              {
+                target: 'dmg',
+                arch: ['x64', 'arm64']
+              }
+            ],
             icon: 'build/icon.png',
-            category: 'public.app-category.productivity'
+            category: 'public.app-category.productivity',
+            hardenedRuntime: true,
+            gatekeeperAssess: false
+          };
+          packageJson.build.dmg = {
+            title: 'GitHub Stars Manager',
+            icon: 'build/icon.png'
           };
         } else {
           packageJson.build.linux = {
-            target: 'AppImage',
+            target: [
+              {
+                target: 'AppImage',
+                arch: ['x64']
+              }
+            ],
             icon: 'build/icon-512x512.png',
-            category: 'Office'
+            category: 'Office',
+            desktop: {
+              Name: 'GitHub Stars Manager',
+              Comment: 'Manage your GitHub starred repositories',
+              Categories: 'Office;Development;'
+            }
           };
         }
         
@@ -331,15 +433,29 @@ jobs:
     - name: Debug before build
       shell: bash
       run: |
-        echo "=== Debug Information ==="
+        echo "=== Pre-Build Debug Information ==="
         echo "Current directory contents:"
         ls -la
+        echo ""
         echo "Dist directory contents:"
         ls -la dist/ || echo "No dist directory"
+        echo ""
         echo "Electron directory contents:"
         ls -la electron/ || echo "No electron directory"
+        echo ""
+        echo "Build directory contents:"
+        ls -la build/ || echo "No build directory"
+        echo ""
         echo "Package.json build config:"
         node -e "console.log(JSON.stringify(require('./package.json').build, null, 2))"
+        echo ""
+        echo "Checking dist/index.html content:"
+        if [ -f "dist/index.html" ]; then
+          echo "First 20 lines of dist/index.html:"
+          head -20 dist/index.html
+        else
+          echo "dist/index.html not found"
+        fi
         
     - name: Build Electron app
       run: npm run dist

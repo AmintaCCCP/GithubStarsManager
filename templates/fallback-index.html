@@ -4,38 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub Stars Manager</title>
+    <base href="./">
     <style>
         body { 
-            font-family: Arial, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             margin: 0; 
             padding: 20px; 
-            background: #f5f5f5; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .container { 
-            max-width: 800px; 
-            margin: 0 auto; 
+            max-width: 600px; 
             background: white; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
         }
-        h1 { color: #333; }
-        .status { color: #666; margin-top: 20px; }
+        h1 { 
+            color: #333; 
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        p { 
+            color: #666; 
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .status { 
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            border-left: 4px solid #007bff;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo">⭐</div>
         <h1>GitHub Stars Manager</h1>
         <p>Welcome to GitHub Stars Manager Desktop Application!</p>
         <div class="status">
-            <p>This is a fallback page. The main application should load here.</p>
-            <p>Application built successfully with GitHub Actions.</p>
+            <div class="loading"></div>
+            <p><strong>Application Status:</strong> Ready</p>
+            <p>This is a fallback page displayed when the main application bundle is not available.</p>
+            <p>The desktop application has been built successfully with GitHub Actions.</p>
         </div>
     </div>
     <script>
-        console.log('GitHub Stars Manager loaded successfully');
+        console.log('GitHub Stars Manager fallback page loaded successfully');
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM ready');
+            console.log('DOM ready - Fallback page');
+            
+            // 尝试检测是否在 Electron 环境中
+            if (window.process && window.process.type === 'renderer') {
+                console.log('Running in Electron renderer process');
+            }
+            
+            // 添加一些基本的错误处理
+            window.addEventListener('error', function(e) {
+                console.error('Page error:', e.error);
+            });
+            
+            // 检查资源加载
+            setTimeout(function() {
+                console.log('Fallback page fully loaded');
+            }, 1000);
         });
     </script>
 </body>
