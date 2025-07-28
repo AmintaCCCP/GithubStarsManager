@@ -38,7 +38,15 @@ jobs:
       run: npm install sharp --save-dev
       
     - name: Create build directory
-      run: node -e "const fs = require('fs'); if (!fs.existsSync('build')) fs.mkdirSync('build', { recursive: true });"
+      shell: bash
+      run: |
+        node -e "
+        const fs = require('fs');
+        if (!fs.existsSync('build')) {
+          fs.mkdirSync('build', { recursive: true });
+        }
+        console.log('Build directory created');
+        "
       
     - name: Generate icons
       shell: bash
