@@ -38,122 +38,225 @@ jobs:
         
     - name: Create Electron main process
       run: |
-        mkdir -p electron
-        cat > electron/main.js << 'EOF'
-        const { app, BrowserWindow, Menu } = require('electron');
+        node -e "
+        const fs = require('fs');
         const path = require('path');
-        const isDev = process.env.NODE_ENV === 'development';
         
-        function createWindow() {
-          const mainWindow = new BrowserWindow({
-            width: 1200,
-            height: 800,
-            minWidth: 800,
-            minHeight: 600,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              enableRemoteModule: false,
-              webSecurity: true
-            },
-            icon: path.join(__dirname, '../dist/vite.svg'),
-            titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-            show: false
-          });
-        
-          // Load the app
-          if (isDev) {
-            mainWindow.loadURL('http://localhost:5173');
-            mainWindow.webContents.openDevTools();
-          } else {
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-          }
-        
-          mainWindow.once('ready-to-show', () => {
-            mainWindow.show();
-          });
-        
-          // Handle window closed
-          mainWindow.on('closed', () => {
-            if (process.platform !== 'darwin') {
-              app.quit();
-            }
-          });
-        
-          return mainWindow;
+        // Create electron directory
+        if (!fs.existsSync('electron')) {
+          fs.mkdirSync('electron', { recursive: true });
         }
         
-        // App event handlers
-        app.whenReady().then(() => {
-          createWindow();
+        // Create main.js content
+        const mainJsContent = \`const { app, BrowserWindow, Menu, shell } = require('electron');
+const path = require('path');
+const isDev = process.env.NODE_ENV === 'development';
+
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      webSecurity: true
+    },
+    icon: path.join(__dirname, '../build/icon.ico'),
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    show: false
+  });
+
+  // Load the app
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    
+    // Set application menu for macOS
+    if (process.platform === 'darwin') {
+      const template = [
+        {
+          label: 'GitHub Stars Manager',
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideothers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' }
+          ]
+        },
+        {
+          label: 'Edit',
+          submenu: [
+            { role: 'undo' },
+            { role: 'redo' },
+            { type: 'separator' },
+            { role: 'cut' },
+            { role: 'copy' },
+            { role: 'paste' },
+            { role: 'selectall' }
+          ]
+        },
+        {
+          label: 'View',
+          submenu: [
+            { role: 'reload' },
+            { role: 'forceReload' },
+            { role: 'toggleDevTools' },
+            { type: 'separator' },
+            { role: 'resetZoom' },
+            { role: 'zoomIn' },
+            { role: 'zoomOut' },
+            { type: 'separator' },
+            { role: 'togglefullscreen' }
+          ]
+        },
+        {
+          label: 'Window',
+          submenu: [
+            { role: 'minimize' },
+            { role: 'close' }
+          ]
+        }
+      ];
+      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    }
+  });
+
+  // Handle external links
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+// Security settings
+app.on('web-contents-created', (event, contents) => {
+  contents.on('new-window', (event, navigationUrl) => {
+    event.preventDefault();
+    shell.openExternal(navigationUrl);
+  });
+});
+\`;
         
-          app.on('activate', () => {
-            if (BrowserWindow.getAllWindows().length === 0) {
-              createWindow();
-            }
-          });
-        });
+        // Write main.js file
+        fs.writeFileSync('electron/main.js', mainJsContent);
         
-        app.on('window-all-closed', () => {
-          if (process.platform !== 'darwin') {
-            app.quit();
-          }
-        });
+        // Create package.json for electron
+        const electronPackageJson = {
+          name: 'github-stars-manager-desktop',
+          version: '1.0.0',
+          description: 'GitHub Stars Manager Desktop App',
+          main: 'main.js',
+          author: 'GitHub Stars Manager',
+          license: 'MIT'
+        };
         
-        // Security: Prevent new window creation
-        app.on('web-contents-created', (event, contents) => {
-          contents.on('new-window', (event, navigationUrl) => {
-            event.preventDefault();
-            require('electron').shell.openExternal(navigationUrl);
-          });
-        });
-        EOF
+        fs.writeFileSync('electron/package.json', JSON.stringify(electronPackageJson, null, 2));
+        
+        console.log('Electron files created successfully');
+        "
         
     - name: Create Electron package.json
       run: |
-        cat > electron/package.json << 'EOF'
-        {
-          "name": "github-stars-manager-desktop",
-          "version": "1.0.0",
-          "description": "GitHub Stars Manager Desktop App",
-          "main": "main.js",
-          "author": "GitHub Stars Manager",
-          "license": "MIT"
-        }
-        EOF
+        echo "Electron package.json already created in previous step"
         
     - name: Update main package.json for Electron
       run: |
-        npm pkg set main="electron/main.js"
-        npm pkg set homepage="./"
-        npm pkg set scripts.electron="electron ."
-        npm pkg set scripts.electron-dev="NODE_ENV=development electron ."
-        npm pkg set scripts.dist="electron-builder"
-        npm pkg set build.appId="com.github-stars-manager.app"
-        npm pkg set build.productName="GitHub Stars Manager"
-        npm pkg set build.directories.output="release"
-        npm pkg set build.files[0]="dist/**/*"
-        npm pkg set build.files[1]="electron/**/*"
-        npm pkg set build.files[2]="node_modules/**/*"
-        npm pkg set build.files[3]="package.json"
+        node -e "
+        const fs = require('fs');
+        const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        
+        packageJson.main = 'electron/main.js';
+        packageJson.homepage = './';
+        packageJson.scripts = packageJson.scripts || {};
+        packageJson.scripts.electron = 'electron .';
+        packageJson.scripts['electron-dev'] = 'NODE_ENV=development electron .';
+        packageJson.scripts.dist = 'electron-builder';
+        
+        packageJson.build = {
+          appId: 'com.github-stars-manager.app',
+          productName: 'GitHub Stars Manager',
+          directories: {
+            output: 'release'
+          },
+          files: [
+            'dist/**/*',
+            'electron/**/*',
+            'node_modules/**/*',
+            'package.json'
+          ]
+        };
+        
+        fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+        console.log('Package.json updated successfully');
+        "
         
     - name: Configure platform-specific build settings
       shell: bash
       run: |
+        node -e "
+        const fs = require('fs');
+        const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          npm pkg set build.win.target="nsis"
-          npm pkg set build.win.icon="dist/vite.svg"
-          npm pkg set build.nsis.oneClick=false
-          npm pkg set build.nsis.allowToChangeInstallationDirectory=true
+          packageJson.build.win = {
+            target: 'nsis',
+            icon: 'build/icon.ico'
+          };
+          packageJson.build.nsis = {
+            oneClick: false,
+            allowToChangeInstallationDirectory: true
+          };
         elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-          npm pkg set build.mac.target="dmg"
-          npm pkg set build.mac.icon="dist/vite.svg"
-          npm pkg set build.mac.category="public.app-category.productivity"
+          packageJson.build.mac = {
+            target: 'dmg',
+            icon: 'build/icon.icns',
+            category: 'public.app-category.productivity'
+          };
         else
-          npm pkg set build.linux.target="AppImage"
-          npm pkg set build.linux.icon="dist/vite.svg"
-          npm pkg set build.linux.category="Office"
+          packageJson.build.linux = {
+            target: 'AppImage',
+            icon: 'build/icon-512x512.png',
+            category: 'Office'
+          };
         fi
+        
+        fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+        console.log('Platform-specific settings configured');
+        "
         
     - name: Build Electron app
       run: npm run dist
