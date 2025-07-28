@@ -234,54 +234,87 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
-      continue-on-error: true
+        
+    - name: List build output
+      run: |
+        echo "Build output directory contents:"
+        ls -la release/ || echo "Release directory not found"
+        find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" || echo "No build artifacts found"
         
     - name: Upload artifacts (Windows)
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-latest' && success()
       uses: actions/upload-artifact@v4
       with:
         name: windows-app
         path: |
           release/*.exe
           release/*.msi
-        if-no-files-found: warn
+        if-no-files-found: ignore
         
     - name: Upload artifacts (macOS)
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-latest' && success()
       uses: actions/upload-artifact@v4
       with:
         name: macos-app
         path: release/*.dmg
-        if-no-files-found: warn
+        if-no-files-found: ignore
         
     - name: Upload artifacts (Linux)
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-latest' && success()
       uses: actions/upload-artifact@v4
       with:
         name: linux-app
         path: release/*.AppImage
-        if-no-files-found: warn
+        if-no-files-found: ignore
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    continue-on-error: true
+    if: startsWith(github.ref, 'refs/tags/v') && always()
+    permissions:
+      contents: write
     
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       continue-on-error: true
       
+    - name: List downloaded files
+      run: |
+        echo "Downloaded files structure:"
+        find . -type f | head -20
+        echo "Looking for build artifacts:"
+        find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" | head -20
+        
+    - name: Prepare release files
+      run: |
+        mkdir -p release-files
+        # Copy all found artifacts to a single directory
+        find . -name "*.exe" -exec cp {} release-files/ \; 2>/dev/null || true
+        find . -name "*.msi" -exec cp {} release-files/ \; 2>/dev/null || true
+        find . -name "*.dmg" -exec cp {} release-files/ \; 2>/dev/null || true
+        find . -name "*.AppImage" -exec cp {} release-files/ \; 2>/dev/null || true
+        echo "Files prepared for release:"
+        ls -la release-files/ || echo "No files found"
+      
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          windows-app/*
-          macos-app/*
-          linux-app/*
+        files: release-files/*
         draft: false
         prerelease: false
         generate_release_notes: true
+        fail_on_unmatched_files: false
+        body: |
+          ## Desktop Application Release
+          
+          This release includes desktop applications for multiple platforms.
+          
+          ### Available Downloads:
+          - Windows: `.exe` installer
+          - macOS: `.dmg` installer  
+          - Linux: `.AppImage` portable executable
+          
+          Note: Some platform builds may not be available if they failed during the build process.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
