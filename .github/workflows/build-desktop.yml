@@ -48,12 +48,13 @@ jobs:
             head -5 dist/index.html
           else
             echo "✗ index.html not found, creating fallback"
-            cat > dist/index.html << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
+            node -e "
+            const fs = require('fs');
+            const html = \`<!DOCTYPE html>
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
     <title>GitHub Stars Manager</title>
     <style>
         body { 
@@ -75,10 +76,10 @@ jobs:
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class=\"container\">
         <h1>GitHub Stars Manager</h1>
         <p>Welcome to GitHub Stars Manager Desktop Application!</p>
-        <div class="status">
+        <div class=\"status\">
             <p>This is a fallback page. The main application should load here.</p>
             <p>If you see this, it means the build process created a basic HTML file.</p>
         </div>
@@ -90,19 +91,22 @@ jobs:
         });
     </script>
 </body>
-</html>
-EOF
+</html>\`;
+            fs.writeFileSync('dist/index.html', html);
+            console.log('Fallback index.html created');
+            "
             echo "✓ Fallback index.html created"
           fi
         else
           echo "✗ dist directory not found, creating it with fallback content"
           mkdir -p dist
-          cat > dist/index.html << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
+          node -e "
+          const fs = require('fs');
+          const html = \`<!DOCTYPE html>
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
     <title>GitHub Stars Manager</title>
     <style>
         body { 
@@ -124,10 +128,10 @@ EOF
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class=\"container\">
         <h1>GitHub Stars Manager</h1>
         <p>Welcome to GitHub Stars Manager Desktop Application!</p>
-        <div class="status">
+        <div class=\"status\">
             <p>This is a fallback page created because no dist directory was found.</p>
             <p>The main application build may have failed, but this ensures the Electron app has something to load.</p>
         </div>
@@ -136,8 +140,10 @@ EOF
         console.log('GitHub Stars Manager fallback page loaded');
     </script>
 </body>
-</html>
-EOF
+</html>\`;
+          fs.writeFileSync('dist/index.html', html);
+          console.log('Created dist directory with fallback index.html');
+          "
           echo "✓ Created dist directory with fallback index.html"
         fi
       
