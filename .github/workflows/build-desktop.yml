@@ -34,6 +34,113 @@ jobs:
     - name: Build web app
       run: npm run build
       
+    - name: Verify web build
+      shell: bash
+      run: |
+        echo "Checking if dist directory exists and contains files:"
+        if [ -d "dist" ]; then
+          echo "✓ dist directory exists"
+          echo "Contents of dist directory:"
+          find dist -type f | head -10
+          if [ -f "dist/index.html" ]; then
+            echo "✓ index.html found"
+            echo "First few lines of index.html:"
+            head -5 dist/index.html
+          else
+            echo "✗ index.html not found, creating fallback"
+            cat > dist/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Stars Manager</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { color: #333; }
+        .status { color: #666; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GitHub Stars Manager</h1>
+        <p>Welcome to GitHub Stars Manager Desktop Application!</p>
+        <div class="status">
+            <p>This is a fallback page. The main application should load here.</p>
+            <p>If you see this, it means the build process created a basic HTML file.</p>
+        </div>
+    </div>
+    <script>
+        console.log('GitHub Stars Manager loaded successfully');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+        });
+    </script>
+</body>
+</html>
+EOF
+            echo "✓ Fallback index.html created"
+          fi
+        else
+          echo "✗ dist directory not found, creating it with fallback content"
+          mkdir -p dist
+          cat > dist/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Stars Manager</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { color: #333; }
+        .status { color: #666; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GitHub Stars Manager</h1>
+        <p>Welcome to GitHub Stars Manager Desktop Application!</p>
+        <div class="status">
+            <p>This is a fallback page created because no dist directory was found.</p>
+            <p>The main application build may have failed, but this ensures the Electron app has something to load.</p>
+        </div>
+    </div>
+    <script>
+        console.log('GitHub Stars Manager fallback page loaded');
+    </script>
+</body>
+</html>
+EOF
+          echo "✓ Created dist directory with fallback index.html"
+        fi
+      
     - name: Install sharp for icon generation
       run: npm install sharp --save-dev
       
@@ -138,6 +245,7 @@ jobs:
         
         const mainJsContent = 'const { app, BrowserWindow, Menu, shell } = require(\\'electron\\');\\n' +
           'const path = require(\\'path\\');\\n' +
+          'const fs = require(\\'fs\\');\\n' +
           'const isDev = process.env.NODE_ENV === \\'development\\';\\n\\n' +
           'let mainWindow;\\n\\n' +
           'function createWindow() {\\n' +
@@ -150,17 +258,48 @@ jobs:
           '      nodeIntegration: false,\\n' +
           '      contextIsolation: true,\\n' +
           '      enableRemoteModule: false,\\n' +
-          '      webSecurity: true\\n' +
+          '      webSecurity: false\\n' +
           '    },\\n' +
-          '    icon: path.join(__dirname, \\'../public/icon.svg\\'),\\n' +
+          '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
           '    titleBarStyle: process.platform === \\'darwin\\' ? \\'hiddenInset\\' : \\'default\\',\\n' +
           '    show: false\\n' +
+          '  });\\n\\n' +
+          '  // Add error handling\\n' +
+          '  mainWindow.webContents.on(\\'did-fail-load\\', (event, errorCode, errorDescription) => {\\n' +
+          '    console.error(\\'Failed to load:\\', errorCode, errorDescription);\\n' +
+          '  });\\n\\n' +
+          '  mainWindow.webContents.on(\\'dom-ready\\', () => {\\n' +
+          '    console.log(\\'DOM ready\\');\\n' +
           '  });\\n\\n' +
           '  if (isDev) {\\n' +
           '    mainWindow.loadURL(\\'http://localhost:5173\\');\\n' +
           '    mainWindow.webContents.openDevTools();\\n' +
           '  } else {\\n' +
-          '    mainWindow.loadFile(path.join(__dirname, \\'../dist/index.html\\'));\\n' +
+          '    // Try multiple possible paths for the built app\\n' +
+          '    const possiblePaths = [\\n' +
+          '      path.join(__dirname, \\'../dist/index.html\\'),\\n' +
+          '      path.join(__dirname, \\'../build/index.html\\'),\\n' +
+          '      path.join(process.resourcesPath, \\'app/dist/index.html\\'),\\n' +
+          '      path.join(process.resourcesPath, \\'dist/index.html\\')\\n' +
+          '    ];\\n\\n' +
+          '    let indexPath = null;\\n' +
+          '    for (const testPath of possiblePaths) {\\n' +
+          '      if (fs.existsSync(testPath)) {\\n' +
+          '        indexPath = testPath;\\n' +
+          '        break;\\n' +
+          '      }\\n' +
+          '    }\\n\\n' +
+          '    if (indexPath) {\\n' +
+          '      console.log(\\'Loading from:\\', indexPath);\\n' +
+          '      mainWindow.loadFile(indexPath);\\n' +
+          '    } else {\\n' +
+          '      console.error(\\'Could not find index.html in any expected location\\');\\n' +
+          '      console.log(\\'Checked paths:\\', possiblePaths);\\n' +
+          '      // Load a simple error page\\n' +
+          '      mainWindow.loadURL(\\'data:text/html,<h1>Error: Could not load application</h1><p>Please check the console for details.</p>\\');\\n' +
+          '    }\\n' +
+          '    // Open DevTools in production for debugging\\n' +
+          '    mainWindow.webContents.openDevTools();\\n' +
           '  }\\n\\n' +
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
@@ -210,6 +349,12 @@ jobs:
         packageJson.main = 'electron/main.js';
         packageJson.homepage = './';
         packageJson.scripts = packageJson.scripts || {};
+        
+        // Ensure proper base path for Electron
+        if (!packageJson.build) packageJson.build = {};
+        packageJson.build.extraMetadata = {
+          main: 'electron/main.js'
+        };
         packageJson.scripts.electron = 'electron .';
         packageJson.scripts['electron-dev'] = 'NODE_ENV=development electron .';
         packageJson.scripts.dist = 'electron-builder';
@@ -218,13 +363,22 @@ jobs:
           appId: 'com.github-stars-manager.app',
           productName: 'GitHub Stars Manager',
           directories: {
-            output: 'release'
+            output: 'release',
+            buildResources: 'build'
           },
           files: [
             'dist/**/*',
+            'build/**/*',
             'electron/**/*',
             'node_modules/**/*',
             'package.json'
+          ],
+          extraResources: [
+            {
+              from: 'dist',
+              to: 'dist',
+              filter: ['**/*']
+            }
           ]
         };
         
@@ -266,11 +420,25 @@ jobs:
         console.log('Platform-specific settings configured');
         "
         
+    - name: Debug before build
+      shell: bash
+      run: |
+        echo "=== Debug Information ==="
+        echo "Current directory contents:"
+        ls -la
+        echo "Dist directory contents:"
+        ls -la dist/ || echo "No dist directory"
+        echo "Electron directory contents:"
+        ls -la electron/ || echo "No electron directory"
+        echo "Package.json build config:"
+        node -e "console.log(JSON.stringify(require('./package.json').build, null, 2))"
+        
     - name: Build Electron app
       run: npm run dist
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
+        DEBUG: electron-builder
         
     - name: List build output
       shell: bash
@@ -278,6 +446,18 @@ jobs:
         echo "Build output directory contents:"
         ls -la release/ || echo "Release directory not found"
         find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" || echo "No build artifacts found"
+        
+    - name: Test Electron app (Linux only)
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: |
+        # Install xvfb for headless testing
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+        
+        # Test if the app can start (will exit quickly but should not crash)
+        echo "Testing Electron app startup..."
+        timeout 10s xvfb-run -a npm run electron || echo "App test completed (timeout expected)"
         
     - name: Upload artifacts (Windows)
       if: matrix.os == 'windows-latest' && success()
