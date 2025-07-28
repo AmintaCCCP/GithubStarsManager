@@ -82,7 +82,7 @@ jobs:
           fs.mkdirSync('electron', { recursive: true });
         }
         
-        const mainJsContent = \`const { app, BrowserWindow, Menu, shell } = require('electron');
+        const mainJsContent = \\\`const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -138,7 +138,7 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-});\`;
+});\\\`;
         
         fs.writeFileSync('electron/main.js', mainJsContent);
         
