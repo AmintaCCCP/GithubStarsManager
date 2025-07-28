@@ -45,7 +45,7 @@ jobs:
         else
           echo "Creating fallback dist directory and index.html"
           mkdir -p dist
-          cat > dist/index.html << 'HTML_END'
+          cat > dist/index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -88,7 +88,7 @@ jobs:
     </script>
 </body>
 </html>
-HTML_END
+EOF
           echo "✓ Fallback index.html created"
         fi
       
@@ -488,5 +488,4 @@ HTML_END
           
           Note: Some platform builds may not be available if they failed during the build process.
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
