@@ -32,9 +32,11 @@ jobs:
     - name: Build web app
       run: npm run build
       
+    - name: Generate icons
+      run: npm run generate-icons
+      
     - name: Install Electron dependencies
-      run: |
-        npm install --save-dev electron electron-builder
+      run: npm install --save-dev electron electron-builder
         
     - name: Create Electron main process
       run: |
@@ -49,127 +51,127 @@ jobs:
         
         // Create main.js content
         const mainJsContent = \`const { app, BrowserWindow, Menu, shell } = require('electron');
-const path = require('path');
-const isDev = process.env.NODE_ENV === 'development';
+        const path = require('path');
+        const isDev = process.env.NODE_ENV === 'development';
 
-let mainWindow;
+        let mainWindow;
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      webSecurity: true
-    },
-    icon: path.join(__dirname, '../build/icon.ico'),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    show: false
-  });
+        function createWindow() {
+          mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            minWidth: 800,
+            minHeight: 600,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              enableRemoteModule: false,
+              webSecurity: true
+            },
+            icon: path.join(__dirname, '../build/icon.ico'),
+            titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+            show: false
+          });
 
-  // Load the app
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-  }
+          // Load the app
+          if (isDev) {
+            mainWindow.loadURL('http://localhost:5173');
+            mainWindow.webContents.openDevTools();
+          } else {
+            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+          }
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    
-    // Set application menu for macOS
-    if (process.platform === 'darwin') {
-      const template = [
-        {
-          label: 'GitHub Stars Manager',
-          submenu: [
-            { role: 'about' },
-            { type: 'separator' },
-            { role: 'services' },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideothers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { role: 'quit' }
-          ]
-        },
-        {
-          label: 'Edit',
-          submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
-            { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
-            { role: 'selectall' }
-          ]
-        },
-        {
-          label: 'View',
-          submenu: [
-            { role: 'reload' },
-            { role: 'forceReload' },
-            { role: 'toggleDevTools' },
-            { type: 'separator' },
-            { role: 'resetZoom' },
-            { role: 'zoomIn' },
-            { role: 'zoomOut' },
-            { type: 'separator' },
-            { role: 'togglefullscreen' }
-          ]
-        },
-        {
-          label: 'Window',
-          submenu: [
-            { role: 'minimize' },
-            { role: 'close' }
-          ]
+          mainWindow.once('ready-to-show', () => {
+            mainWindow.show();
+            
+            // Set application menu for macOS
+            if (process.platform === 'darwin') {
+              const template = [
+                {
+                  label: 'GitHub Stars Manager',
+                  submenu: [
+                    { role: 'about' },
+                    { type: 'separator' },
+                    { role: 'services' },
+                    { type: 'separator' },
+                    { role: 'hide' },
+                    { role: 'hideothers' },
+                    { role: 'unhide' },
+                    { type: 'separator' },
+                    { role: 'quit' }
+                  ]
+                },
+                {
+                  label: 'Edit',
+                  submenu: [
+                    { role: 'undo' },
+                    { role: 'redo' },
+                    { type: 'separator' },
+                    { role: 'cut' },
+                    { role: 'copy' },
+                    { role: 'paste' },
+                    { role: 'selectall' }
+                  ]
+                },
+                {
+                  label: 'View',
+                  submenu: [
+                    { role: 'reload' },
+                    { role: 'forceReload' },
+                    { role: 'toggleDevTools' },
+                    { type: 'separator' },
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' }
+                  ]
+                },
+                {
+                  label: 'Window',
+                  submenu: [
+                    { role: 'minimize' },
+                    { role: 'close' }
+                  ]
+                }
+              ];
+              Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+            }
+          });
+
+          // Handle external links
+          mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+            shell.openExternal(url);
+            return { action: 'deny' };
+          });
+
+          mainWindow.on('closed', () => {
+            mainWindow = null;
+          });
         }
-      ];
-      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    }
-  });
 
-  // Handle external links
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
+        app.whenReady().then(createWindow);
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
+        app.on('window-all-closed', () => {
+          if (process.platform !== 'darwin') {
+            app.quit();
+          }
+        });
 
-app.whenReady().then(createWindow);
+        app.on('activate', () => {
+          if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+          }
+        });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
-
-// Security settings
-app.on('web-contents-created', (event, contents) => {
-  contents.on('new-window', (event, navigationUrl) => {
-    event.preventDefault();
-    shell.openExternal(navigationUrl);
-  });
-});
-\`;
+        // Security settings
+        app.on('web-contents-created', (event, contents) => {
+          contents.on('new-window', (event, navigationUrl) => {
+            event.preventDefault();
+            shell.openExternal(navigationUrl);
+          });
+        });
+        \`;
         
         // Write main.js file
         fs.writeFileSync('electron/main.js', mainJsContent);
@@ -188,10 +190,6 @@ app.on('web-contents-created', (event, contents) => {
         
         console.log('Electron files created successfully');
         "
-        
-    - name: Create Electron package.json
-      run: |
-        echo "Electron package.json already created in previous step"
         
     - name: Update main package.json for Electron
       run: |
@@ -231,7 +229,7 @@ app.on('web-contents-created', (event, contents) => {
         const fs = require('fs');
         const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
         
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+        if ('${{ matrix.os }}' === 'windows-latest') {
           packageJson.build.win = {
             target: 'nsis',
             icon: 'build/icon.ico'
@@ -240,19 +238,19 @@ app.on('web-contents-created', (event, contents) => {
             oneClick: false,
             allowToChangeInstallationDirectory: true
           };
-        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+        } else if ('${{ matrix.os }}' === 'macos-latest') {
           packageJson.build.mac = {
             target: 'dmg',
             icon: 'build/icon.icns',
             category: 'public.app-category.productivity'
           };
-        else
+        } else {
           packageJson.build.linux = {
             target: 'AppImage',
             icon: 'build/icon-512x512.png',
             category: 'Office'
           };
-        fi
+        }
         
         fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
         console.log('Platform-specific settings configured');
