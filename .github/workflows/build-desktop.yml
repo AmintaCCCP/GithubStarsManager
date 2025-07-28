@@ -38,9 +38,10 @@ jobs:
       run: npm install sharp --save-dev
       
     - name: Create build directory
-      run: mkdir -p build
+      run: node -e "const fs = require('fs'); if (!fs.existsSync('build')) fs.mkdirSync('build', { recursive: true });"
       
     - name: Generate icons
+      shell: bash
       run: |
         node -e "
         const fs = require('fs');
@@ -52,103 +53,110 @@ jobs:
           fs.mkdirSync(buildDir, { recursive: true });
         }
         
-        // Copy the SVG icon as a placeholder
-        if (fs.existsSync('public/icon.svg')) {
-          fs.copyFileSync('public/icon.svg', 'build/icon.svg');
-        }
+        // Create a simple base64 encoded 1x1 PNG as placeholder
+        const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        const pngBuffer = Buffer.from(pngBase64, 'base64');
         
-        // Create placeholder icon files
-        const iconSizes = [16, 32, 48, 64, 128, 256, 512, 1024];
+        // Create placeholder icon files with actual PNG data
+        fs.writeFileSync('build/icon-512x512.png', pngBuffer);
         
-        // For now, just create empty placeholder files
-        // In a real implementation, you would use sharp or similar to generate actual icons
-        fs.writeFileSync('build/icon.ico', '');
-        fs.writeFileSync('build/icon.icns', '');
-        fs.writeFileSync('build/icon-512x512.png', '');
+        // Create minimal ICO file (Windows)
+        const icoHeader = Buffer.from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x30, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00]);
+        const icoData = Buffer.concat([icoHeader, pngBuffer]);
+        fs.writeFileSync('build/icon.ico', icoData);
         
-        console.log('Icon placeholders created');
+        // Create minimal ICNS file (macOS) - just copy the PNG for now
+        fs.writeFileSync('build/icon.icns', pngBuffer);
+        
+        console.log('Icon files created successfully');
         "
       
     - name: Install Electron dependencies
       run: npm install --save-dev electron electron-builder
+      
+    - name: Setup Windows build environment
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Install Windows SDK components if needed
+        echo "Setting up Windows build environment"
         
     - name: Create Electron main process
+      shell: bash
       run: |
-        mkdir -p electron
-        cat > electron/main.js << 'EOF'
-        const { app, BrowserWindow, Menu, shell } = require('electron');
+        node -e "
+        const fs = require('fs');
         const path = require('path');
-        const isDev = process.env.NODE_ENV === 'development';
-
-        let mainWindow;
-
-        function createWindow() {
-          mainWindow = new BrowserWindow({
-            width: 1200,
-            height: 800,
-            minWidth: 800,
-            minHeight: 600,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              enableRemoteModule: false,
-              webSecurity: true
-            },
-            icon: path.join(__dirname, '../public/icon.svg'),
-            titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-            show: false
-          });
-
-          if (isDev) {
-            mainWindow.loadURL('http://localhost:5173');
-            mainWindow.webContents.openDevTools();
-          } else {
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-          }
-
-          mainWindow.once('ready-to-show', () => {
-            mainWindow.show();
-          });
-
-          mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-            shell.openExternal(url);
-            return { action: 'deny' };
-          });
-
-          mainWindow.on('closed', () => {
-            mainWindow = null;
-          });
-        }
-
-        app.whenReady().then(createWindow);
-
-        app.on('window-all-closed', () => {
-          if (process.platform !== 'darwin') {
-            app.quit();
-          }
-        });
-
-        app.on('activate', () => {
-          if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-          }
-        });
-        EOF
         
-        cat > electron/package.json << 'EOF'
-        {
-          "name": "github-stars-manager-desktop",
-          "version": "1.0.0",
-          "description": "GitHub Stars Manager Desktop App",
-          "main": "main.js",
-          "author": "GitHub Stars Manager",
-          "license": "MIT"
+        if (!fs.existsSync('electron')) {
+          fs.mkdirSync('electron', { recursive: true });
         }
-        EOF
         
-        echo "Electron files created successfully"
+        const mainJsContent = 'const { app, BrowserWindow, Menu, shell } = require(\\'electron\\');\\n' +
+          'const path = require(\\'path\\');\\n' +
+          'const isDev = process.env.NODE_ENV === \\'development\\';\\n\\n' +
+          'let mainWindow;\\n\\n' +
+          'function createWindow() {\\n' +
+          '  mainWindow = new BrowserWindow({\\n' +
+          '    width: 1200,\\n' +
+          '    height: 800,\\n' +
+          '    minWidth: 800,\\n' +
+          '    minHeight: 600,\\n' +
+          '    webPreferences: {\\n' +
+          '      nodeIntegration: false,\\n' +
+          '      contextIsolation: true,\\n' +
+          '      enableRemoteModule: false,\\n' +
+          '      webSecurity: true\\n' +
+          '    },\\n' +
+          '    icon: path.join(__dirname, \\'../public/icon.svg\\'),\\n' +
+          '    titleBarStyle: process.platform === \\'darwin\\' ? \\'hiddenInset\\' : \\'default\\',\\n' +
+          '    show: false\\n' +
+          '  });\\n\\n' +
+          '  if (isDev) {\\n' +
+          '    mainWindow.loadURL(\\'http://localhost:5173\\');\\n' +
+          '    mainWindow.webContents.openDevTools();\\n' +
+          '  } else {\\n' +
+          '    mainWindow.loadFile(path.join(__dirname, \\'../dist/index.html\\'));\\n' +
+          '  }\\n\\n' +
+          '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
+          '    mainWindow.show();\\n' +
+          '  });\\n\\n' +
+          '  mainWindow.webContents.setWindowOpenHandler(({ url }) => {\\n' +
+          '    shell.openExternal(url);\\n' +
+          '    return { action: \\'deny\\' };\\n' +
+          '  });\\n\\n' +
+          '  mainWindow.on(\\'closed\\', () => {\\n' +
+          '    mainWindow = null;\\n' +
+          '  });\\n' +
+          '}\\n\\n' +
+          'app.whenReady().then(createWindow);\\n\\n' +
+          'app.on(\\'window-all-closed\\', () => {\\n' +
+          '  if (process.platform !== \\'darwin\\') {\\n' +
+          '    app.quit();\\n' +
+          '  }\\n' +
+          '});\\n\\n' +
+          'app.on(\\'activate\\', () => {\\n' +
+          '  if (BrowserWindow.getAllWindows().length === 0) {\\n' +
+          '    createWindow();\\n' +
+          '  }\\n' +
+          '});';
+        
+        fs.writeFileSync('electron/main.js', mainJsContent);
+        
+        const electronPackageJson = {
+          name: 'github-stars-manager-desktop',
+          version: '1.0.0',
+          description: 'GitHub Stars Manager Desktop App',
+          main: 'main.js',
+          author: 'GitHub Stars Manager',
+          license: 'MIT'
+        };
+        
+        fs.writeFileSync('electron/package.json', JSON.stringify(electronPackageJson, null, 2));
+        console.log('Electron files created successfully');
+        "
         
     - name: Update main package.json for Electron
+      shell: bash
       run: |
         node -e "
         const fs = require('fs');
@@ -189,7 +197,7 @@ jobs:
         if ('${{ matrix.os }}' === 'windows-latest') {
           packageJson.build.win = {
             target: 'nsis',
-            icon: 'public/icon.svg'
+            icon: 'build/icon.ico'
           };
           packageJson.build.nsis = {
             oneClick: false,
@@ -198,13 +206,13 @@ jobs:
         } else if ('${{ matrix.os }}' === 'macos-latest') {
           packageJson.build.mac = {
             target: 'dmg',
-            icon: 'public/icon.svg',
+            icon: 'build/icon.icns',
             category: 'public.app-category.productivity'
           };
         } else {
           packageJson.build.linux = {
             target: 'AppImage',
-            icon: 'public/icon.svg',
+            icon: 'build/icon-512x512.png',
             category: 'Office'
           };
         }
@@ -217,6 +225,7 @@ jobs:
       run: npm run dist
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CI: true
       continue-on-error: true
         
     - name: Upload artifacts (Windows)
