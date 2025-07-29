@@ -161,6 +161,12 @@ jobs:
           echo "No icon file found, electron-builder will use default"
         fi
       
+    - name: Install system dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
+        
     - name: Install Electron dependencies
       run: npm install --save-dev electron electron-builder
       
@@ -322,6 +328,7 @@ jobs:
         // 确保构建脚本使用正确的基础路径
         packageJson.scripts.build = 'vite build --base=./';
         packageJson.scripts['build:electron'] = 'vite build --base=./ && electron-builder';
+        packageJson.scripts.dist = 'electron-builder --publish=never';
         
         // Ensure proper base path for Electron
         if (!packageJson.build) packageJson.build = {};
@@ -356,10 +363,8 @@ jobs:
             }
           ],
           compression: 'normal',
-          asar: true,
-          asarUnpack: [
-            'dist/**/*'
-          ]
+          asar: false, // 暂时禁用 ASAR 以简化调试
+          publish: null // 确保不会尝试发布
         };
         
         fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
@@ -410,19 +415,9 @@ jobs:
           };
         } else {
           packageJson.build.linux = {
-            target: [
-              {
-                target: 'AppImage',
-                arch: ['x64']
-              }
-            ],
+            target: 'AppImage',
             icon: 'build/icon-512x512.png',
-            category: 'Office',
-            desktop: {
-              Name: 'GitHub Stars Manager',
-              Comment: 'Manage your GitHub starred repositories',
-              Categories: 'Office;Development;'
-            }
+            category: 'Office'
           };
         }
         
@@ -456,6 +451,11 @@ jobs:
         else
           echo "dist/index.html not found"
         fi
+        echo ""
+        echo "Setting proper permissions:"
+        chmod -R 755 dist/ || echo "Could not set dist permissions"
+        chmod -R 755 electron/ || echo "Could not set electron permissions"
+        chmod -R 755 build/ || echo "Could not set build permissions"
         
     - name: Build Electron app
       run: npm run dist
@@ -463,13 +463,25 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
         DEBUG: electron-builder
+        # Linux 特定环境变量
+        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
     - name: List build output
       shell: bash
       run: |
         echo "Build output directory contents:"
         ls -la release/ || echo "Release directory not found"
+        echo ""
+        echo "Looking for build artifacts:"
         find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" || echo "No build artifacts found"
+        echo ""
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          echo "Linux specific checks:"
+          echo "AppImage files:"
+          find . -name "*.AppImage" -exec ls -la {} \; || echo "No AppImage files found"
+          echo "Checking AppImage permissions:"
+          find . -name "*.AppImage" -exec file {} \; || echo "No AppImage files to check"
+        fi
         
     - name: Test Electron app (Linux only)
       if: matrix.os == 'ubuntu-latest'
