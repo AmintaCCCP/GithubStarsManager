@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Apple, Monitor, Terminal, Smartphone, Globe, Download, ChevronDown } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Download, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow, format } from 'date-fns';
+import { AssetFilterManager } from './AssetFilterManager';
 
 export const ReleaseTimeline: React.FC = () => {
   const { 
@@ -13,13 +14,14 @@ export const ReleaseTimeline: React.FC = () => {
     readReleases,
     githubToken, 
     language,
+    assetFilters,
     setReleases,
     addReleases,
     markReleaseAsRead,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,74 +66,17 @@ export const ReleaseTimeline: React.FC = () => {
     });
   };
 
-  // Enhanced platform detection based on the userscript
-  const detectPlatforms = (filename: string): string[] => {
-    const name = filename.toLowerCase();
-    const platforms: string[] = [];
 
-    // Platform detection rules based on the userscript
-    const platformRules = {
-      windows: [
-        '.exe', '.msi', '.zip', '.7z',
-        'windows', 'win32', 'win64', 'win-x64', 'win-x86', 'win-arm64',
-        '-win.', '.win.', '-windows.', '.windows.',
-        'setup', 'installer'
-      ],
-      macos: [
-        '.dmg', '.pkg', '.app.zip',
-        'darwin', 'macos', 'mac-os', 'osx', 'mac-universal',
-        '-mac.', '.mac.', '-macos.', '.macos.', '-darwin.', '.darwin.',
-        'universal', 'x86_64-apple', 'arm64-apple'
-      ],
-      linux: [
-        '.deb', '.rpm', '.tar.gz', '.tar.xz', '.tar.bz2', '.appimage',
-        'linux', 'ubuntu', 'debian', 'fedora', 'centos', 'arch', 'alpine',
-        '-linux.', '.linux.', 'x86_64-unknown-linux', 'aarch64-unknown-linux',
-        'musl', 'gnu'
-      ],
-      android: [
-        '.apk', '.aab',
-        'android', '-android.', '.android.',
-        'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
-      ],
-      ios: [
-        '.ipa',
-        'ios', '-ios.', '.ios.',
-        'iphone', 'ipad'
-      ]
-    };
-
-    // Check each platform
-    Object.entries(platformRules).forEach(([platform, keywords]) => {
-      if (keywords.some(keyword => name.includes(keyword))) {
-        platforms.push(platform);
-      }
-    });
-
-    // Special handling for universal files
-    if (platforms.length === 0) {
-      // Check for source code or universal packages
-      if (name.includes('source') || name.includes('src') || 
-          name.includes('universal') || name.includes('all') ||
-          name.match(/\.(zip|tar\.gz|tar\.xz)$/) && !name.includes('win') && !name.includes('mac') && !name.includes('linux')) {
-        platforms.push('universal');
-      }
-    }
-
-    return platforms.length > 0 ? platforms : ['universal'];
-  };
 
   const getDownloadLinks = (release: Release) => {
-    const links: Array<{ name: string; url: string; platforms: string[]; size: number; downloadCount: number }> = [];
+    const links: Array<{ name: string; url: string; size: number; downloadCount: number }> = [];
     
     // Use GitHub release assets (this is the correct way to get downloads)
     if (release.assets && release.assets.length > 0) {
       release.assets.forEach(asset => {
-        const platforms = detectPlatforms(asset.name);
         links.push({
           name: asset.name,
           url: asset.browser_download_url,
-          platforms,
           size: asset.size,
           downloadCount: asset.download_count
         });
@@ -147,10 +92,9 @@ export const ReleaseTimeline: React.FC = () => {
       if (url.includes('/download/') || url.includes('/releases/') || 
           name.toLowerCase().includes('download') ||
           /\.(exe|dmg|deb|rpm|apk|ipa|zip|tar\.gz|msi|pkg|appimage)$/i.test(url)) {
-        const platforms = detectPlatforms(name + ' ' + url);
         // Avoid duplicates with assets
         if (!links.some(link => link.url === url || link.name === name)) {
-          links.push({ name, url, platforms, size: 0, downloadCount: 0 });
+          links.push({ name, url, size: 0, downloadCount: 0 });
         }
       }
     }
@@ -163,7 +107,7 @@ export const ReleaseTimeline: React.FC = () => {
     releaseSubscriptions.has(release.repository.id)
   );
 
-  // Apply search and platform filters
+  // Apply search and custom filters
   const filteredReleases = useMemo(() => {
     let filtered = subscribedReleases;
 
@@ -179,12 +123,19 @@ export const ReleaseTimeline: React.FC = () => {
       );
     }
 
-    // Platform filter
-    if (selectedPlatforms.length > 0) {
+    // Custom asset filters
+    if (selectedFilters.length > 0) {
+      const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+      
       filtered = filtered.filter(release => {
         const downloadLinks = getDownloadLinks(release);
+        
         return downloadLinks.some(link => 
-          selectedPlatforms.some(platform => link.platforms.includes(platform))
+          activeFilters.some(filter => 
+            filter.keywords.some(keyword => 
+              link.name.toLowerCase().includes(keyword.toLowerCase())
+            )
+          )
         );
       });
     }
@@ -192,24 +143,27 @@ export const ReleaseTimeline: React.FC = () => {
     return filtered.sort((a, b) => 
       new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
     );
-  }, [subscribedReleases, searchQuery, selectedPlatforms]);
+  }, [subscribedReleases, searchQuery, selectedFilters, assetFilters]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReleases.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
 
-  // Get available platforms from all releases
-  const availablePlatforms = useMemo(() => {
-    const platforms = new Set<string>();
-    subscribedReleases.forEach(release => {
-      const downloadLinks = getDownloadLinks(release);
-      downloadLinks.forEach(link => {
-        link.platforms.forEach(platform => platforms.add(platform));
-      });
-    });
-    return Array.from(platforms).sort();
-  }, [subscribedReleases]);
+  // Filter handlers
+  const handleFilterToggle = (filterId: string) => {
+    setSelectedFilters(prev => 
+      prev.includes(filterId)
+        ? prev.filter(id => id !== filterId)
+        : [...prev, filterId]
+    );
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  const handleClearFilters = () => {
+    setSelectedFilters([]);
+    setCurrentPage(1);
+  };
 
   const handleRefresh = async () => {
     if (!githubToken) {
@@ -286,18 +240,9 @@ export const ReleaseTimeline: React.FC = () => {
     }
   };
 
-  const handlePlatformToggle = (platform: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platform)
-        ? prev.filter(p => p !== platform)
-        : [...prev, platform]
-    );
-    setCurrentPage(1); // Reset to first page when filtering
-  };
-
-  const clearFilters = () => {
+  const clearAllFilters = () => {
     setSearchQuery('');
-    setSelectedPlatforms([]);
+    setSelectedFilters([]);
     setCurrentPage(1);
   };
 
@@ -331,51 +276,7 @@ export const ReleaseTimeline: React.FC = () => {
     return rangeWithDots;
   };
 
-  const getPlatformIcon = (platform: string) => {
-    const platformLower = platform.toLowerCase();
-    
-    switch (platformLower) {
-      case 'windows':
-        return Monitor;
-      case 'macos':
-      case 'mac':
-      case 'ios':
-        return Apple;
-      case 'linux':
-        return Terminal;
-      case 'android':
-        return Smartphone;
-      case 'universal':
-      default:
-        return Download;
-    }
-  };
 
-  const getPlatformDisplayName = (platform: string) => {
-    const platformLower = platform.toLowerCase();
-    const nameMap: Record<string, string> = {
-      windows: 'Windows',
-      macos: 'macOS',
-      mac: 'macOS',
-      linux: 'Linux',
-      android: 'Android',
-      ios: 'iOS',
-      universal: 'Universal'
-    };
-    return nameMap[platformLower] || platform;
-  };
-
-  const getPlatformColor = (platform: string) => {
-    const colorMap: Record<string, string> = {
-      windows: 'text-blue-600 dark:text-blue-400',
-      macos: 'text-gray-600 dark:text-gray-400',
-      linux: 'text-yellow-600 dark:text-yellow-400',
-      android: 'text-green-600 dark:text-green-400',
-      ios: 'text-gray-600 dark:text-gray-400',
-      universal: 'text-purple-600 dark:text-purple-400'
-    };
-    return colorMap[platform] || 'text-gray-600 dark:text-gray-400';
-  };
 
   const truncateBody = (body: string, maxLength = 200) => {
     if (body.length <= maxLength) return body;
@@ -529,35 +430,23 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
 
-          {/* Platform Filters */}
-          {availablePlatforms.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
-                {t('平台:', 'Platforms:')}
-              </span>
-              {availablePlatforms.map(platform => (
-                <button
-                  key={platform}
-                  onClick={() => handlePlatformToggle(platform)}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                    selectedPlatforms.includes(platform)
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
-                  <span className="capitalize">{getPlatformDisplayName(platform)}</span>
-                </button>
-              ))}
-              {(searchQuery || selectedPlatforms.length > 0) && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  <span>{t('清除', 'Clear')}</span>
-                </button>
-              )}
+          {/* Custom Asset Filters */}
+          <AssetFilterManager
+            selectedFilters={selectedFilters}
+            onFilterToggle={handleFilterToggle}
+            onClearFilters={handleClearFilters}
+          />
+
+          {/* Clear All Filters */}
+          {(searchQuery || selectedFilters.length > 0) && (
+            <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={clearAllFilters}
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                <span>{t('清除所有筛选', 'Clear All Filters')}</span>
+              </button>
             </div>
           )}
         </div>
@@ -571,7 +460,7 @@ export const ReleaseTimeline: React.FC = () => {
                 `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
               )}
             </span>
-            {(searchQuery || selectedPlatforms.length > 0) && (
+            {(searchQuery || selectedFilters.length > 0) && (
               <span className="text-sm text-blue-600 dark:text-blue-400">
                 ({t('已筛选', 'filtered')})
               </span>
@@ -732,48 +621,44 @@ export const ReleaseTimeline: React.FC = () => {
                       </div>
                       
                       {openDropdowns.has(release.id) && (
-                        <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                          {downloadLinks.map((link, index) => (
-                            <a
-                              key={index}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleReleaseClick(release.id);
-                                toggleDropdown(release.id);
-                              }}
-                            >
-                              <div className="flex items-center space-x-3 min-w-0 flex-1">
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                  {link.platforms.map((platform, pIndex) => {
-                                    const IconComponent = getPlatformIcon(platform);
-                                    return (
-                                      <IconComponent
-                                        key={pIndex}
-                                        className={`w-4 h-4 ${getPlatformColor(platform)}`}
-                                        title={getPlatformDisplayName(platform)}
-                                      />
-                                    );
-                                  })}
-                                </div>
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                          {downloadLinks.map((link, index) => {
+                            const asset = release.assets.find(asset => asset.name === link.name);
+                            return (
+                              <a
+                                key={index}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReleaseClick(release.id);
+                                  toggleDropdown(release.id);
+                                }}
+                              >
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
                                     {link.name}
                                   </div>
-                                  {link.size > 0 && (
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      {formatFileSize(link.size)}
-                                      {link.downloadCount > 0 && ` • ${link.downloadCount.toLocaleString()} ${t('下载', 'downloads')}`}
-                                    </div>
-                                  )}
+                                  <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {link.size > 0 && (
+                                      <span>{formatFileSize(link.size)}</span>
+                                    )}
+                                    {asset?.updated_at && (
+                                      <span>
+                                        {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
+                                      </span>
+                                    )}
+                                    {link.downloadCount > 0 && (
+                                      <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              <Download className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            </a>
-                          ))}
+                                <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
+                              </a>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -852,47 +737,44 @@ export const ReleaseTimeline: React.FC = () => {
                           </button>
                           
                           {openDropdowns.has(release.id) && (
-                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                              {downloadLinks.map((link, index) => (
-                                <a
-                                  key={index}
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleReleaseClick(release.id);
-                                    toggleDropdown(release.id);
-                                  }}
-                                >
-                                  <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                      {link.platforms.slice(0, 2).map((platform, pIndex) => {
-                                        const IconComponent = getPlatformIcon(platform);
-                                        return (
-                                          <IconComponent
-                                            key={pIndex}
-                                            className={`w-3 h-3 ${getPlatformColor(platform)}`}
-                                            title={getPlatformDisplayName(platform)}
-                                          />
-                                        );
-                                      })}
-                                    </div>
+                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                              {downloadLinks.map((link, index) => {
+                                const asset = release.assets.find(asset => asset.name === link.name);
+                                return (
+                                  <a
+                                    key={index}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReleaseClick(release.id);
+                                      toggleDropdown(release.id);
+                                    }}
+                                  >
                                     <div className="min-w-0 flex-1">
-                                      <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                      <div className="text-xs font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
                                         {link.name}
                                       </div>
-                                      {link.size > 0 && (
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                                          {formatFileSize(link.size)}
-                                        </div>
-                                      )}
+                                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {link.size > 0 && (
+                                          <span>{formatFileSize(link.size)}</span>
+                                        )}
+                                        {asset?.updated_at && (
+                                          <span>
+                                            {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
+                                          </span>
+                                        )}
+                                        {link.downloadCount > 0 && (
+                                          <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <Download className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                </a>
-                              ))}
+                                    <Download className="w-3 h-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
+                                  </a>
+                                );
+                              })}
                             </div>
                           )}
                         </div>

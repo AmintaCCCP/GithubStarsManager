@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category } from '../types';
+import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter } from '../types';
 
 interface AppActions {
   // Auth actions
@@ -42,6 +42,11 @@ interface AppActions {
   addCustomCategory: (category: Category) => void;
   updateCustomCategory: (id: string, updates: Partial<Category>) => void;
   deleteCustomCategory: (id: string) => void;
+  
+  // Asset Filter actions
+  addAssetFilter: (filter: AssetFilter) => void;
+  updateAssetFilter: (id: string, updates: Partial<AssetFilter>) => void;
+  deleteAssetFilter: (id: string) => void;
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
@@ -168,6 +173,7 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseSubscriptions: new Set<number>(),
       readReleases: new Set<number>(),
       customCategories: [],
+      assetFilters: [],
       theme: 'light',
       currentView: 'repositories',
       language: 'zh',
@@ -284,6 +290,19 @@ export const useAppStore = create<AppState & AppActions>()(
         customCategories: state.customCategories.filter(category => category.id !== id)
       })),
 
+      // Asset Filter actions
+      addAssetFilter: (filter) => set((state) => ({
+        assetFilters: [...state.assetFilters, filter]
+      })),
+      updateAssetFilter: (id, updates) => set((state) => ({
+        assetFilters: state.assetFilters.map(filter => 
+          filter.id === id ? { ...filter, ...updates } : filter
+        )
+      })),
+      deleteAssetFilter: (id) => set((state) => ({
+        assetFilters: state.assetFilters.filter(filter => filter.id !== id)
+      })),
+
       // UI actions
       setTheme: (theme) => set({ theme }),
       setCurrentView: (currentView) => set({ currentView }),
@@ -317,6 +336,9 @@ export const useAppStore = create<AppState & AppActions>()(
         
         // 持久化自定义分类
         customCategories: state.customCategories,
+        
+        // 持久化资源过滤器
+        assetFilters: state.assetFilters,
         
         // 持久化UI设置
         theme: state.theme,
@@ -359,6 +381,11 @@ export const useAppStore = create<AppState & AppActions>()(
           // 初始化自定义分类
           if (!state.customCategories) {
             state.customCategories = [];
+          }
+          
+          // 初始化资源过滤器
+          if (!state.assetFilters) {
+            state.assetFilters = [];
           }
           
           console.log('Store rehydrated:', {

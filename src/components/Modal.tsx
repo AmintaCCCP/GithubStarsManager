@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -9,13 +9,33 @@ interface ModalProps {
   maxWidth?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
-  maxWidth = 'max-w-md' 
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  maxWidth = 'max-w-md'
 }) => {
+  // Close modal on Escape key press
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -28,7 +48,10 @@ export const Modal: React.FC<ModalProps> = ({
       
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className={`relative w-full ${maxWidth} bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700`}>
+        <div 
+          className={`relative w-full ${maxWidth} bg-white dark:bg-gray-800 rounded-xl shadow-xl transform transition-all`}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">

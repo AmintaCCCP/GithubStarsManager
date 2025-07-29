@@ -105,6 +105,12 @@ export interface Category {
   isCustom?: boolean;
 }
 
+export interface AssetFilter {
+  id: string;
+  name: string;
+  keywords: string[];
+}
+
 export interface AppState {
   // Auth
   user: GitHubUser | null;
@@ -136,6 +142,9 @@ export interface AppState {
   
   // Categories
   customCategories: Category[]; // 新增：自定义分类
+  
+  // Asset Filters
+  assetFilters: AssetFilter[]; // 新增：资源过滤器
   
   // UI
   theme: 'light' | 'dark';
