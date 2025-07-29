@@ -251,11 +251,14 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       toggleReleaseSubscription: (repoId) => set((state) => {
         const newSubscriptions = new Set(state.releaseSubscriptions);
-        if (newSubscriptions.has(repoId)) {
+        const wasSubscribed = newSubscriptions.has(repoId);
+        
+        if (wasSubscribed) {
           newSubscriptions.delete(repoId);
         } else {
           newSubscriptions.add(repoId);
         }
+        
         return { releaseSubscriptions: newSubscriptions };
       }),
       markReleaseAsRead: (releaseId) => set((state) => {

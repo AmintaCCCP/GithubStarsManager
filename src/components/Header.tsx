@@ -103,8 +103,12 @@ export const Header: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-              <Star className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden">
+              <img 
+                src="/assets/icon.png" 
+                alt="GitHub Stars Manager" 
+                className="w-10 h-10 object-cover"
+              />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">

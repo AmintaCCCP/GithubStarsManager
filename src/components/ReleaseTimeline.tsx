@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Apple, Monitor, Terminal, Smartphone, Globe, Download } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -288,15 +288,37 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const getPlatformIcon = (platform: string) => {
-    const iconMap: Record<string, string> = {
-      windows: 'fab fa-windows',
-      macos: 'fab fa-apple',
-      linux: 'fab fa-linux',
-      android: 'fab fa-android',
-      ios: 'fab fa-apple',
-      universal: 'fas fa-download'
+    const platformLower = platform.toLowerCase();
+    
+    switch (platformLower) {
+      case 'windows':
+        return Monitor;
+      case 'macos':
+      case 'mac':
+      case 'ios':
+        return Apple;
+      case 'linux':
+        return Terminal;
+      case 'android':
+        return Smartphone;
+      case 'universal':
+      default:
+        return Download;
+    }
+  };
+
+  const getPlatformDisplayName = (platform: string) => {
+    const platformLower = platform.toLowerCase();
+    const nameMap: Record<string, string> = {
+      windows: 'Windows',
+      macos: 'macOS',
+      mac: 'macOS',
+      linux: 'Linux',
+      android: 'Android',
+      ios: 'iOS',
+      universal: 'Universal'
     };
-    return iconMap[platform] || 'fas fa-download';
+    return nameMap[platformLower] || platform;
   };
 
   const getPlatformColor = (platform: string) => {
@@ -338,9 +360,29 @@ export const ReleaseTimeline: React.FC = () => {
         <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
           {subscribedRepoCount === 0 
             ? t('从仓库页面订阅仓库Release以在此查看更新。', 'Subscribe to repository releases from the Repositories tab to see updates here.')
-            : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。尝试同步以获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Try syncing to get the latest updates.`)
+            : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。点击下方刷新按钮获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Click the refresh button below to get the latest updates.`)
           }
         </p>
+        
+        {/* 刷新按钮 - 在有订阅仓库时显示 */}
+        {subscribedRepoCount > 0 && (
+          <div className="mb-6">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
+            </button>
+            {lastRefreshTime && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+              </p>
+            )}
+          </div>
+        )}
+
         {subscribedRepoCount === 0 && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mx-auto">
             <div className="flex items-center space-x-2 text-blue-700 dark:text-blue-300">
@@ -459,8 +501,8 @@ export const ReleaseTimeline: React.FC = () => {
                       : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
-                  <i className={`${getPlatformIcon(platform)} w-4 h-4`}></i>
-                  <span className="capitalize">{platform}</span>
+                  {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
+                  <span className="capitalize">{getPlatformDisplayName(platform)}</span>
                 </button>
               ))}
               {(searchQuery || selectedPlatforms.length > 0) && (
@@ -646,13 +688,16 @@ export const ReleaseTimeline: React.FC = () => {
                             }}
                           >
                             <div className="flex items-center space-x-1">
-                              {link.platforms.map((platform, pIndex) => (
-                                <i
-                                  key={pIndex}
-                                  className={`${getPlatformIcon(platform)} w-4 h-4 ${getPlatformColor(platform)}`}
-                                  title={platform}
-                                ></i>
-                              ))}
+                              {link.platforms.map((platform, pIndex) => {
+                                const IconComponent = getPlatformIcon(platform);
+                                return (
+                                  <IconComponent
+                                    key={pIndex}
+                                    className={`w-4 h-4 ${getPlatformColor(platform)}`}
+                                    title={getPlatformDisplayName(platform)}
+                                  />
+                                );
+                              })}
                             </div>
                             <span className="truncate max-w-32">{link.name}</span>
                           </a>
@@ -733,13 +778,16 @@ export const ReleaseTimeline: React.FC = () => {
                               }}
                             >
                               <div className="flex items-center space-x-0.5">
-                                {link.platforms.map((platform, pIndex) => (
-                                  <i
-                                    key={pIndex}
-                                    className={`${getPlatformIcon(platform)} w-3 h-3 ${getPlatformColor(platform)}`}
-                                    title={platform}
-                                  ></i>
-                                ))}
+                                {link.platforms.map((platform, pIndex) => {
+                                  const IconComponent = getPlatformIcon(platform);
+                                  return (
+                                    <IconComponent
+                                      key={pIndex}
+                                      className={`w-3 h-3 ${getPlatformColor(platform)}`}
+                                      title={getPlatformDisplayName(platform)}
+                                    />
+                                  );
+                                })}
                               </div>
                               <span className="text-xs text-gray-700 dark:text-gray-300 truncate max-w-16">
                                 {link.name.split('.').pop() || link.name}

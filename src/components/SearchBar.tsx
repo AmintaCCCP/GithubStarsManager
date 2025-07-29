@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff } from 'lucide-react';
+import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 
@@ -245,19 +245,46 @@ export const SearchBar: React.FC = () => {
     (searchFilters.isSubscribed !== undefined ? 1 : 0);
 
   const getPlatformIcon = (platform: string) => {
-    const iconMap: Record<string, string> = {
-      mac: 'fab fa-apple',
-      macos: 'fab fa-apple',
-      windows: 'fab fa-windows',
-      win: 'fab fa-windows',
-      linux: 'fab fa-linux',
-      ios: 'fab fa-apple',
-      android: 'fab fa-android',
-      web: 'fas fa-globe',
-      cli: 'fas fa-terminal',
-      docker: 'fab fa-docker',
+    const platformLower = platform.toLowerCase();
+    
+    switch (platformLower) {
+      case 'mac':
+      case 'macos':
+      case 'ios':
+        return Apple;
+      case 'windows':
+      case 'win':
+        return Monitor;
+      case 'linux':
+        return Terminal;
+      case 'android':
+        return Smartphone;
+      case 'web':
+        return Globe;
+      case 'cli':
+        return Terminal;
+      case 'docker':
+        return Package;
+      default:
+        return Monitor;
+    }
+  };
+
+  const getPlatformDisplayName = (platform: string) => {
+    const platformLower = platform.toLowerCase();
+    const nameMap: Record<string, string> = {
+      mac: 'macOS',
+      macos: 'macOS',
+      windows: 'Windows',
+      win: 'Windows',
+      linux: 'Linux',
+      ios: 'iOS',
+      android: 'Android',
+      web: 'Web',
+      cli: 'CLI',
+      docker: 'Docker',
     };
-    return iconMap[platform.toLowerCase()] || 'fas fa-desktop';
+    return nameMap[platformLower] || platform;
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
@@ -458,8 +485,8 @@ export const SearchBar: React.FC = () => {
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
-                    <i className={`${getPlatformIcon(platform)} w-4 h-4`}></i>
-                    <span>{platform}</span>
+                    {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
+                    <span>{getPlatformDisplayName(platform)}</span>
                   </button>
                 ))}
               </div>

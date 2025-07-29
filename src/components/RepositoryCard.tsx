@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen } from 'lucide-react';
+import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Zap } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -87,19 +87,46 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   const getPlatformIcon = (platform: string) => {
-    const iconMap: Record<string, string> = {
-      mac: 'fab fa-apple',
-      macos: 'fab fa-apple',
-      windows: 'fab fa-windows',
-      win: 'fab fa-windows',
-      linux: 'fab fa-linux',
-      ios: 'fab fa-apple',
-      android: 'fab fa-android',
-      web: 'fas fa-globe',
-      cli: 'fas fa-terminal',
-      docker: 'fab fa-docker',
+    const platformLower = platform.toLowerCase();
+    
+    switch (platformLower) {
+      case 'mac':
+      case 'macos':
+      case 'ios':
+        return Apple;
+      case 'windows':
+      case 'win':
+        return Monitor; // 使用 Monitor 代表 Windows
+      case 'linux':
+        return Terminal; // 使用 Terminal 代表 Linux
+      case 'android':
+        return Smartphone;
+      case 'web':
+        return Globe;
+      case 'cli':
+        return Terminal;
+      case 'docker':
+        return Package;
+      default:
+        return Monitor; // 默认使用 Monitor
+    }
+  };
+
+  const getPlatformDisplayName = (platform: string) => {
+    const platformLower = platform.toLowerCase();
+    const nameMap: Record<string, string> = {
+      mac: 'macOS',
+      macos: 'macOS',
+      windows: 'Windows',
+      win: 'Windows',
+      linux: 'Linux',
+      ios: 'iOS',
+      android: 'Android',
+      web: 'Web',
+      cli: 'CLI',
+      docker: 'Docker',
     };
-    return iconMap[platform.toLowerCase()] || 'fas fa-desktop';
+    return nameMap[platformLower] || platform;
   };
 
   const handleAIAnalyze = async () => {
@@ -407,15 +434,20 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             {language === 'zh' ? '支持平台:' : 'Platforms:'}
           </span>
           <div className="flex space-x-1">
-            {repository.ai_platforms.slice(0, 6).map((platform, index) => (
-              <div
-                key={index}
-                className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400"
-                title={platform}
-              >
-                <i className={`${getPlatformIcon(platform)} text-xs`}></i>
-              </div>
-            ))}
+            {repository.ai_platforms.slice(0, 6).map((platform, index) => {
+              const IconComponent = getPlatformIcon(platform);
+              const displayName = getPlatformDisplayName(platform);
+              
+              return (
+                <div
+                  key={index}
+                  className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-default"
+                  title={displayName}
+                >
+                  <IconComponent className="w-3 h-3" />
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
