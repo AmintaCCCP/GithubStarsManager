@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Apple, Monitor, Terminal, Smartphone, Globe, Download } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Apple, Monitor, Terminal, Smartphone, Globe, Download, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -25,6 +25,44 @@ export const ReleaseTimeline: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
+  const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.download-dropdown')) {
+        setOpenDropdowns(new Set());
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Format file size helper function
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  // Toggle dropdown for a specific release
+  const toggleDropdown = (releaseId: number) => {
+    setOpenDropdowns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(releaseId)) {
+        newSet.delete(releaseId);
+      } else {
+        newSet.add(releaseId);
+      }
+      return newSet;
+    });
+  };
 
   // Enhanced platform detection based on the userscript
   const detectPlatforms = (filename: string): string[] => {
@@ -84,10 +122,24 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const getDownloadLinks = (release: Release) => {
-    // Extract download links from release body
-    const downloadRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
-    const links: Array<{ name: string; url: string; platforms: string[] }> = [];
+    const links: Array<{ name: string; url: string; platforms: string[]; size: number; downloadCount: number }> = [];
     
+    // Use GitHub release assets (this is the correct way to get downloads)
+    if (release.assets && release.assets.length > 0) {
+      release.assets.forEach(asset => {
+        const platforms = detectPlatforms(asset.name);
+        links.push({
+          name: asset.name,
+          url: asset.browser_download_url,
+          platforms,
+          size: asset.size,
+          downloadCount: asset.download_count
+        });
+      });
+    }
+
+    // Fallback: Extract download links from release body (for custom links)
+    const downloadRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
     let match;
     while ((match = downloadRegex.exec(release.body)) !== null) {
       const [, name, url] = match;
@@ -96,18 +148,10 @@ export const ReleaseTimeline: React.FC = () => {
           name.toLowerCase().includes('download') ||
           /\.(exe|dmg|deb|rpm|apk|ipa|zip|tar\.gz|msi|pkg|appimage)$/i.test(url)) {
         const platforms = detectPlatforms(name + ' ' + url);
-        links.push({ name, url, platforms });
-      }
-    }
-
-    // Also check for GitHub release assets pattern
-    const assetRegex = /https:\/\/github\.com\/[^\/]+\/[^\/]+\/releases\/download\/[^\/]+\/([^\s\)]+)/g;
-    while ((match = assetRegex.exec(release.body)) !== null) {
-      const [url, filename] = match;
-      const platforms = detectPlatforms(filename);
-      // Avoid duplicates
-      if (!links.some(link => link.url === url)) {
-        links.push({ name: filename, url, platforms });
+        // Avoid duplicates with assets
+        if (!links.some(link => link.url === url || link.name === name)) {
+          links.push({ name, url, platforms, size: 0, downloadCount: 0 });
+        }
       }
     }
 
@@ -667,42 +711,71 @@ export const ReleaseTimeline: React.FC = () => {
                     </h5>
                   )}
 
-                  {/* Download Links */}
+                  {/* Download Links - Dropdown */}
                   {downloadLinks.length > 0 && (
-                    <div className="mb-4">
-                      <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('下载:', 'Downloads:')}
-                      </h6>
-                      <div className="flex flex-wrap gap-2">
-                        {downloadLinks.map((link, index) => (
-                          <a
-                            key={index}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                            title={link.name}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReleaseClick(release.id);
-                            }}
-                          >
-                            <div className="flex items-center space-x-1">
-                              {link.platforms.map((platform, pIndex) => {
-                                const IconComponent = getPlatformIcon(platform);
-                                return (
-                                  <IconComponent
-                                    key={pIndex}
-                                    className={`w-4 h-4 ${getPlatformColor(platform)}`}
-                                    title={getPlatformDisplayName(platform)}
-                                  />
-                                );
-                              })}
-                            </div>
-                            <span className="truncate max-w-32">{link.name}</span>
-                          </a>
-                        ))}
+                    <div className="mb-4 relative download-dropdown">
+                      <div className="flex items-center justify-between mb-2">
+                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {t('下载:', 'Downloads:')} ({downloadLinks.length})
+                        </h6>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleDropdown(release.id);
+                          }}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{t('查看下载', 'View Downloads')}</span>
+                          <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
+                        </button>
                       </div>
+                      
+                      {openDropdowns.has(release.id) && (
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                          {downloadLinks.map((link, index) => (
+                            <a
+                              key={index}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReleaseClick(release.id);
+                                toggleDropdown(release.id);
+                              }}
+                            >
+                              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                  {link.platforms.map((platform, pIndex) => {
+                                    const IconComponent = getPlatformIcon(platform);
+                                    return (
+                                      <IconComponent
+                                        key={pIndex}
+                                        className={`w-4 h-4 ${getPlatformColor(platform)}`}
+                                        title={getPlatformDisplayName(platform)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    {link.name}
+                                  </div>
+                                  {link.size > 0 && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {formatFileSize(link.size)}
+                                      {link.downloadCount > 0 && ` • ${link.downloadCount.toLocaleString()} ${t('下载', 'downloads')}`}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <Download className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -760,44 +833,67 @@ export const ReleaseTimeline: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* Download Links - 横向排列，可换行 */}
-                    <div className="col-span-4 min-w-0">
+                    {/* Download Links - Dropdown */}
+                    <div className="col-span-4 min-w-0 relative download-dropdown">
                       {downloadLinks.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {downloadLinks.slice(0, 6).map((link, index) => (
-                            <a
-                              key={index}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                              title={`${link.name} (${link.platforms.join(', ')})`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleReleaseClick(release.id);
-                              }}
-                            >
-                              <div className="flex items-center space-x-0.5">
-                                {link.platforms.map((platform, pIndex) => {
-                                  const IconComponent = getPlatformIcon(platform);
-                                  return (
-                                    <IconComponent
-                                      key={pIndex}
-                                      className={`w-3 h-3 ${getPlatformColor(platform)}`}
-                                      title={getPlatformDisplayName(platform)}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <span className="text-xs text-gray-700 dark:text-gray-300 truncate max-w-16">
-                                {link.name.split('.').pop() || link.name}
-                              </span>
-                            </a>
-                          ))}
-                          {downloadLinks.length > 6 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-                              +{downloadLinks.length - 6}
-                            </span>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleDropdown(release.id);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm w-full justify-between"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Download className="w-4 h-4" />
+                              <span>{downloadLinks.length} {t('个文件', 'files')}</span>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {openDropdowns.has(release.id) && (
+                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                              {downloadLinks.map((link, index) => (
+                                <a
+                                  key={index}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReleaseClick(release.id);
+                                    toggleDropdown(release.id);
+                                  }}
+                                >
+                                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                    <div className="flex items-center space-x-1 flex-shrink-0">
+                                      {link.platforms.slice(0, 2).map((platform, pIndex) => {
+                                        const IconComponent = getPlatformIcon(platform);
+                                        return (
+                                          <IconComponent
+                                            key={pIndex}
+                                            className={`w-3 h-3 ${getPlatformColor(platform)}`}
+                                            title={getPlatformDisplayName(platform)}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                        {link.name}
+                                      </div>
+                                      {link.size > 0 && (
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          {formatFileSize(link.size)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Download className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                </a>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ) : (

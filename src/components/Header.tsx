@@ -105,7 +105,7 @@ export const Header: React.FC = () => {
           <div className="flex items-center space-x-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden">
               <img 
-                src="/assets/icon.png" 
+                src="/icon.png" 
                 alt="GitHub Stars Manager" 
                 className="w-10 h-10 object-cover"
               />

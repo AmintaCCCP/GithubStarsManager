@@ -91,6 +91,7 @@ export class GitHubApiService {
         body: release.body || '',
         published_at: release.published_at,
         html_url: release.html_url,
+        assets: release.assets || [],
         repository: {
           id: 0, // Will be set by caller
           full_name: `${owner}/${repo}`,
@@ -146,6 +147,7 @@ export class GitHubApiService {
         body: release.body || '',
         published_at: release.published_at,
         html_url: release.html_url,
+        assets: release.assets || [],
         repository: {
           id: 0, // Will be set by caller
           full_name: `${owner}/${repo}`,

@@ -27,6 +27,17 @@ export interface Repository {
   last_edited?: string;
 }
 
+export interface ReleaseAsset {
+  id: number;
+  name: string;
+  size: number;
+  download_count: number;
+  browser_download_url: string;
+  content_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Release {
   id: number;
   tag_name: string;
@@ -34,6 +45,7 @@ export interface Release {
   body: string;
   published_at: string;
   html_url: string;
+  assets: ReleaseAsset[];
   repository: {
     id: number;
     full_name: string;
