@@ -58,6 +58,8 @@ export interface AIConfig {
   apiKey: string;
   model: string;
   isActive: boolean;
+  customPrompt?: string; // 自定义提示词
+  useCustomPrompt?: boolean; // 是否使用自定义提示词
 }
 
 export interface WebDAVConfig {

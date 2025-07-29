@@ -14,7 +14,9 @@ export class AIService {
     tags: string[];
     platforms: string[];
   }> {
-    const prompt = this.createAnalysisPrompt(repository, readmeContent, customCategories);
+    const prompt = this.config.useCustomPrompt && this.config.customPrompt
+      ? this.createCustomAnalysisPrompt(repository, readmeContent, customCategories)
+      : this.createAnalysisPrompt(repository, readmeContent, customCategories);
     
     try {
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
@@ -59,6 +61,31 @@ export class AIService {
       // Fallback to basic analysis
       return this.fallbackAnalysis(repository);
     }
+  }
+
+  private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
+    const repoInfo = `
+${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
+${this.language === 'zh' ? '描述' : 'Description'}: ${repository.description || (this.language === 'zh' ? '无描述' : 'No description')}
+${this.language === 'zh' ? '编程语言' : 'Programming Language'}: ${repository.language || (this.language === 'zh' ? '未知' : 'Unknown')}
+${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
+${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
+
+${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
+${readmeContent.substring(0, 2000)}
+    `.trim();
+
+    const categoriesInfo = customCategories && customCategories.length > 0 
+      ? `\n\n${this.language === 'zh' ? '可用的应用分类' : 'Available Application Categories'}: ${customCategories.join(', ')}`
+      : '';
+
+    // 替换自定义提示词中的占位符
+    let customPrompt = this.config.customPrompt || '';
+    customPrompt = customPrompt.replace(/\{REPO_INFO\}/g, repoInfo);
+    customPrompt = customPrompt.replace(/\{CATEGORIES_INFO\}/g, categoriesInfo);
+    customPrompt = customPrompt.replace(/\{LANGUAGE\}/g, this.language);
+
+    return customPrompt;
   }
 
   private createAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {

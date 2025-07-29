@@ -95,7 +95,7 @@ jobs:
             fs.mkdirSync(buildDir, { recursive: true });
           }
           
-          // Look for source icon in common locations
+          // Look for source icon in common locations (优先使用 assets/icon.png)
           let sourceIcon = null;
           const possiblePaths = [
             'assets/icon.png',
@@ -207,11 +207,13 @@ jobs:
           '      devTools: isDev // 只在开发模式下启用 DevTools\\n' +
           '    },\\n' +
           '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
-          '    titleBarStyle: process.platform === \\'darwin\\' ? \\'hiddenInset\\' : \\'default\\',\\n' +
+          '    titleBarStyle: \\'default\\', // 使用默认标题栏，避免重叠问题\\n' +
           '    show: false,\\n' +
           '    autoHideMenuBar: true, // 隐藏菜单栏\\n' +
           '    frame: true, // 保持窗口框架\\n' +
-          '    backgroundColor: \\'#ffffff\\' // 设置背景色，避免白屏闪烁\\n' +
+          '    backgroundColor: \\'#ffffff\\', // 设置背景色，避免白屏闪烁\\n' +
+          '    titleBarOverlay: false, // 禁用标题栏覆盖\\n' +
+          '    trafficLightPosition: { x: 20, y: 20 } // macOS 交通灯按钮位置\\n' +
           '  });\\n\\n' +
           '  // 添加错误处理和加载事件\\n' +
           '  mainWindow.webContents.on(\\'did-fail-load\\', (event, errorCode, errorDescription, validatedURL) => {\\n' +

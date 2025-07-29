@@ -64,85 +64,85 @@ const defaultCategories: Category[] = [
   {
     id: 'all',
     name: '全部分类',
-    icon: 'Folder',
+    icon: '📁',
     keywords: []
   },
   {
     id: 'web',
     name: 'Web应用',
-    icon: 'Globe',
+    icon: '🌐',
     keywords: ['web应用', 'web', 'website', 'frontend', 'react', 'vue', 'angular']
   },
   {
     id: 'mobile',
     name: '移动应用',
-    icon: 'Smartphone',
+    icon: '📱',
     keywords: ['移动应用', 'mobile', 'android', 'ios', 'flutter', 'react-native']
   },
   {
     id: 'desktop',
     name: '桌面应用',
-    icon: 'Code',
+    icon: '💻',
     keywords: ['桌面应用', 'desktop', 'electron', 'gui', 'qt', 'gtk']
   },
   {
     id: 'database',
     name: '数据库',
-    icon: 'Database',
+    icon: '🗄️',
     keywords: ['数据库', 'database', 'sql', 'nosql', 'mongodb', 'mysql', 'postgresql']
   },
   {
     id: 'ai',
     name: 'AI/机器学习',
-    icon: 'Bot',
+    icon: '🤖',
     keywords: ['ai工具', 'ai', 'ml', 'machine learning', 'deep learning', 'neural']
   },
   {
     id: 'devtools',
     name: '开发工具',
-    icon: 'Wrench',
+    icon: '🔧',
     keywords: ['开发工具', 'tool', 'cli', 'build', 'deploy', 'debug', 'test', 'automation']
   },
   {
     id: 'security',
     name: '安全工具',
-    icon: 'Shield',
+    icon: '🛡️',
     keywords: ['安全工具', 'security', 'encryption', 'auth', 'vulnerability']
   },
   {
     id: 'game',
     name: '游戏',
-    icon: 'Gamepad2',
+    icon: '🎮',
     keywords: ['游戏', 'game', 'gaming', 'unity', 'unreal', 'godot']
   },
   {
     id: 'design',
     name: '设计工具',
-    icon: 'Palette',
+    icon: '🎨',
     keywords: ['设计工具', 'design', 'ui', 'ux', 'graphics', 'image']
   },
   {
     id: 'productivity',
     name: '效率工具',
-    icon: 'Zap',
+    icon: '⚡',
     keywords: ['效率工具', 'productivity', 'note', 'todo', 'calendar', 'task']
   },
   {
     id: 'education',
     name: '教育学习',
-    icon: 'BookOpen',
+    icon: '📚',
     keywords: ['教育学习', 'education', 'learning', 'tutorial', 'course']
   },
   {
     id: 'social',
     name: '社交网络',
-    icon: 'Users',
+    icon: '👥',
     keywords: ['社交网络', 'social', 'chat', 'messaging', 'communication']
   },
   {
     id: 'analytics',
     name: '数据分析',
-    icon: 'BarChart3',
+    icon: '📊',
     keywords: ['数据分析', 'analytics', 'data', 'visualization', 'chart']
   }
 ];

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, Save, X, Plus, BookOpen } from 'lucide-react';
+import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen } from 'lucide-react';
 import { Repository } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
-import { getAllCategories } from '../store/useAppStore';
 import { formatDistanceToNow } from 'date-fns';
+import { RepositoryEditModal } from './RepositoryEditModal';
 
 interface RepositoryCardProps {
   repository: Repository;
@@ -19,30 +19,23 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const { 
     releaseSubscriptions, 
     toggleReleaseSubscription, 
-    updateRepository,
     githubToken,
     aiConfigs,
     activeAIConfig,
     isLoading,
     setLoading,
     language,
-    customCategories
+    customCategories,
+    updateRepository
   } = useAppStore();
   
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    description: repository.custom_description || repository.description || '',
-    tags: repository.custom_tags || repository.ai_tags || [],
-    category: repository.custom_category || ''
-  });
-  const [newTag, setNewTag] = useState('');
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   
   const isSubscribed = releaseSubscriptions.has(repository.id);
-  const allCategories = getAllCategories(customCategories, language);
 
   // Check if text is actually truncated by comparing scroll height with client height
   useEffect(() => {
@@ -60,7 +53,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     // Also check on window resize
     window.addEventListener('resize', checkTruncation);
     return () => window.removeEventListener('resize', checkTruncation);
-  }, [repository, showAISummary, isEditing]);
+  }, [repository, showAISummary]);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -171,48 +164,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
-  const handleSaveEdit = () => {
-    const updatedRepo = {
-      ...repository,
-      custom_description: editForm.description !== repository.description ? editForm.description : undefined,
-      custom_tags: editForm.tags.length > 0 ? editForm.tags : undefined,
-      custom_category: editForm.category ? editForm.category : undefined,
-      last_edited: new Date().toISOString()
-    };
-    
-    updateRepository(updatedRepo);
-    setIsEditing(false);
-  };
-
-  const handleCancelEdit = () => {
-    setEditForm({
-      description: repository.custom_description || repository.description || '',
-      tags: repository.custom_tags || repository.ai_tags || [],
-      category: repository.custom_category || ''
-    });
-    setIsEditing(false);
-  };
-
-  const handleAddTag = () => {
-    if (newTag.trim() && !editForm.tags.includes(newTag.trim())) {
-      setEditForm(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setEditForm(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
   // Convert GitHub URL to DeepWiki URL
   const getDeepWikiUrl = (githubUrl: string) => {
     return githubUrl.replace('github.com', 'deepwiki.com');
+  };
+
+  // Convert GitHub URL to Zread URL
+  const getZreadUrl = (fullName: string) => {
+    return `https://zread.ai/${fullName}`;
   };
 
   // 根据切换状态决定显示的内容
@@ -277,6 +236,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 animate-slide-up flex flex-col h-full">
       {/* Header - Repository Info */}
@@ -324,7 +285,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
           </button>
           <button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={() => setEditModalOpen(true)}
             className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
             title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
           >
@@ -332,14 +293,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </button>
         </div>
 
-        {/* Right side: DeepWiki and GitHub Links */}
+        {/* Right side: Zread/DeepWiki and GitHub Links */}
         <div className="flex items-center space-x-2">
           <a
-            href={getDeepWikiUrl(repository.html_url)}
+            href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
-            title={language === 'zh' ? '在DeepWiki中查看' : 'View on DeepWiki'}
+            title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
           </a>
@@ -354,105 +315,6 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </a>
         </div>
       </div>
-
-      {/* Edit Mode */}
-      {isEditing && (
-        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-            {language === 'zh' ? '编辑仓库信息' : 'Edit Repository Info'}
-          </h4>
-          
-          {/* Description */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {language === 'zh' ? '描述' : 'Description'}
-            </label>
-            <textarea
-              value={editForm.description}
-              onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm resize-none"
-              rows={3}
-              placeholder={language === 'zh' ? '输入仓库描述...' : 'Enter repository description...'}
-            />
-          </div>
-
-          {/* Category */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {language === 'zh' ? '分类' : 'Category'}
-            </label>
-            <select
-              value={editForm.category}
-              onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-            >
-              <option value="">{language === 'zh' ? '选择分类...' : 'Select category...'}</option>
-              {allCategories.filter(cat => cat.id !== 'all').map(category => (
-                <option key={category.id} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tags */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {language === 'zh' ? '标签' : 'Tags'}
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {editForm.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs"
-                >
-                  {tag}
-                  <button
-                    onClick={() => handleRemoveTag(tag)}
-                    className="ml-1 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                className="flex-1 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                placeholder={language === 'zh' ? '添加标签...' : 'Add tag...'}
-              />
-              <button
-                onClick={handleAddTag}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-2">
-            <button
-              onClick={handleSaveEdit}
-              className="flex items-center space-x-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              <span>{language === 'zh' ? '保存' : 'Save'}</span>
-            </button>
-            <button
-              onClick={handleCancelEdit}
-              className="flex items-center space-x-1 px-3 py-1.5 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
-              <span>{language === 'zh' ? '取消' : 'Cancel'}</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Description with Tooltip */}
       <div className="mb-4 flex-1">
@@ -602,6 +464,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </span>
         </div>
       </div>
+      
+      {/* Repository Edit Modal */}
+      <RepositoryEditModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        repository={repository}
+      />
     </div>
   );
 };

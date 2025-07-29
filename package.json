@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:desktop": "node scripts/build-desktop.js",
+    "electron": "electron electron/main.js",
+    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "dist": "electron-builder"
   },
   "dependencies": {
     "lucide-react": "^0.344.0",

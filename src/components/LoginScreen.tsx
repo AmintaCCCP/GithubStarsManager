@@ -7,11 +7,11 @@ export const LoginScreen: React.FC = () => {
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, repositories, lastSync } = useAppStore();
+  const { setUser, setGitHubToken, repositories, lastSync, language } = useAppStore();
 
   const handleConnect = async () => {
     if (!token.trim()) {
-      setError('Please enter a valid GitHub token');
+      setError(language === 'zh' ? '请输入有效的GitHub token' : 'Please enter a valid GitHub token');
       return;
     }
 
@@ -33,7 +33,7 @@ export const LoginScreen: React.FC = () => {
       setError(
         error instanceof Error 
           ? error.message 
-          : 'Failed to authenticate. Please check your token.'
+          : (language === 'zh' ? '认证失败，请检查您的token。' : 'Failed to authenticate. Please check your token.')
       );
     } finally {
       setIsLoading(false);
@@ -46,6 +46,8 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -57,7 +59,7 @@ export const LoginScreen: React.FC = () => {
             GitHub Stars Manager
           </h1>
           <p className="text-gray-600 text-lg">
-            AI-powered repository management
+            {t('AI驱动的仓库管理工具', 'AI-powered repository management')}
           </p>
         </div>
 
@@ -65,10 +67,10 @@ export const LoginScreen: React.FC = () => {
           <div className="text-center mb-6">
             <Github className="w-10 h-10 text-gray-700 mx-auto mb-3" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Connect with GitHub
+              {t('连接GitHub', 'Connect with GitHub')}
             </h2>
             <p className="text-gray-600 text-sm">
-              Enter your GitHub personal access token to get started
+              {t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}
             </p>
           </div>
 
@@ -78,11 +80,11 @@ export const LoginScreen: React.FC = () => {
               <div className="flex items-center space-x-2 text-green-700">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm font-medium">
-                  已缓存 {repositories.length} 个仓库
+                  {t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}
                 </span>
               </div>
               <p className="text-xs text-green-600 mt-1">
-                上次同步: {new Date(lastSync).toLocaleString()}
+                {t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}
               </p>
             </div>
           )}
@@ -124,11 +126,11 @@ export const LoginScreen: React.FC = () => {
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Connecting...</span>
+                  <span>{t('连接中...', 'Connecting...')}</span>
                 </>
               ) : (
                 <>
-                  <span>Connect to GitHub</span>
+                  <span>{t('连接到GitHub', 'Connect to GitHub')}</span>
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -137,13 +139,13 @@ export const LoginScreen: React.FC = () => {
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2 text-sm">
-              How to create a GitHub token:
+              {t('如何创建GitHub token:', 'How to create a GitHub token:')}
             </h3>
             <ol className="text-xs text-gray-600 space-y-1">
-              <li>1. Go to GitHub Settings → Developer settings → Personal access tokens</li>
-              <li>2. Click "Generate new token (classic)"</li>
-              <li>3. Select scopes: <strong>repo</strong> and <strong>user</strong></li>
-              <li>4. Copy the generated token and paste it above</li>
+              <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
+              <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
+              <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong> {t('和', 'and')} <strong>user</strong></li>
+              <li>4. {t('复制生成的token并粘贴到上方', 'Copy the generated token and paste it above')}</li>
             </ol>
             <div className="mt-3">
               <a
@@ -152,7 +154,7 @@ export const LoginScreen: React.FC = () => {
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
               >
-                Create token on GitHub →
+                {t('在GitHub上创建token →', 'Create token on GitHub →')}
               </a>
             </div>
           </div>

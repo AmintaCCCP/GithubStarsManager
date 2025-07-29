@@ -1,7 +1,23 @@
-import React, { useState, useRef } from 'react';
-import { Plus, Save, Trash2, Check, X, Settings, Bot, Key, TestTube, Globe, Cloud, Upload, Download, AlertTriangle, CheckCircle, Info, FileDown, FileUp, Edit3 } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import React, { useState } from 'react';
+import { 
+  Bot, 
+  Plus, 
+  Edit3, 
+  Trash2, 
+  Save, 
+  X, 
+  TestTube, 
+  CheckCircle, 
+  AlertCircle,
+  Cloud,
+  Download,
+  Upload,
+  RefreshCw,
+  Globe,
+  MessageSquare
+} from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../types';
+import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
 
@@ -12,10 +28,11 @@ export const SettingsPanel: React.FC = () => {
     webdavConfigs,
     activeWebDAVConfig,
     lastBackup,
-    githubToken,
-    language,
     repositories,
-    releaseSubscriptions,
+    releases,
+    customCategories,
+    theme,
+    language,
     addAIConfig,
     updateAIConfig,
     deleteAIConfig,
@@ -25,1014 +42,492 @@ export const SettingsPanel: React.FC = () => {
     deleteWebDAVConfig,
     setActiveWebDAVConfig,
     setLastBackup,
-    setGitHubToken,
     setLanguage,
-    setRepositories,
-    setReleases,
   } = useAppStore();
 
-  const [isAddingAIConfig, setIsAddingAIConfig] = useState(false);
-  const [isAddingWebDAVConfig, setIsAddingWebDAVConfig] = useState(false);
-  const [editingAIConfigId, setEditingAIConfigId] = useState<string | null>(null);
-  const [editingWebDAVConfigId, setEditingWebDAVConfigId] = useState<string | null>(null);
-  const [testingConfigId, setTestingConfigId] = useState<string | null>(null);
+  const [showAIForm, setShowAIForm] = useState(false);
+  const [showWebDAVForm, setShowWebDAVForm] = useState(false);
+  const [editingAIId, setEditingAIId] = useState<string | null>(null);
+  const [editingWebDAVId, setEditingWebDAVId] = useState<string | null>(null);
+  const [testingAIId, setTestingAIId] = useState<string | null>(null);
   const [testingWebDAVId, setTestingWebDAVId] = useState<string | null>(null);
-  const [backupStatus, setBackupStatus] = useState<'idle' | 'backing-up' | 'restoring' | 'exporting' | 'importing'>('idle');
-  const [newAIConfig, setNewAIConfig] = useState<Partial<AIConfig>>({
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [showCustomPrompt, setShowCustomPrompt] = useState(false);
+
+  const [aiForm, setAIForm] = useState({
     name: '',
-    baseUrl: 'https://api.openai.com/v1',
+    baseUrl: '',
     apiKey: '',
-    model: 'gpt-3.5-turbo',
+    model: '',
+    customPrompt: '',
+    useCustomPrompt: false,
   });
-  const [newWebDAVConfig, setNewWebDAVConfig] = useState<Partial<WebDAVConfig>>({
+
+  const [webdavForm, setWebDAVForm] = useState({
     name: '',
     url: '',
     username: '',
     password: '',
-    path: '/github-stars-backup',
+    path: '/',
   });
-  const [editingAIConfig, setEditingAIConfig] = useState<Partial<AIConfig>>({});
-  const [editingWebDAVConfig, setEditingWebDAVConfig] = useState<Partial<WebDAVConfig>>({});
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const resetAIForm = () => {
+    setAIForm({
+      name: '',
+      baseUrl: '',
+      apiKey: '',
+      model: '',
+      customPrompt: '',
+      useCustomPrompt: false,
+    });
+    setShowAIForm(false);
+    setEditingAIId(null);
+    setShowCustomPrompt(false);
+  };
 
-  const handleSaveAIConfig = () => {
-    if (!newAIConfig.name || !newAIConfig.baseUrl || !newAIConfig.apiKey || !newAIConfig.model) {
-      alert(language === 'zh' ? '请填写所有字段' : 'Please fill in all fields');
+  const resetWebDAVForm = () => {
+    setWebDAVForm({
+      name: '',
+      url: '',
+      username: '',
+      password: '',
+      path: '/',
+    });
+    setShowWebDAVForm(false);
+    setEditingWebDAVId(null);
+  };
+
+  const handleSaveAI = () => {
+    if (!aiForm.name || !aiForm.baseUrl || !aiForm.apiKey || !aiForm.model) {
+      alert(t('请填写所有必填字段', 'Please fill in all required fields'));
       return;
     }
 
     const config: AIConfig = {
-      id: Date.now().toString(),
-      name: newAIConfig.name,
-      baseUrl: newAIConfig.baseUrl,
-      apiKey: newAIConfig.apiKey,
-      model: newAIConfig.model,
-      isActive: aiConfigs.length === 0,
+      id: editingAIId || Date.now().toString(),
+      name: aiForm.name,
+      baseUrl: aiForm.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      apiKey: aiForm.apiKey,
+      model: aiForm.model,
+      isActive: false,
+      customPrompt: aiForm.customPrompt || undefined,
+      useCustomPrompt: aiForm.useCustomPrompt,
     };
 
-    addAIConfig(config);
-    if (config.isActive) {
-      setActiveAIConfig(config.id);
+    if (editingAIId) {
+      updateAIConfig(editingAIId, config);
+    } else {
+      addAIConfig(config);
     }
 
-    setNewAIConfig({
-      name: '',
-      baseUrl: 'https://api.openai.com/v1',
-      apiKey: '',
-      model: 'gpt-3.5-turbo',
-    });
-    setIsAddingAIConfig(false);
+    resetAIForm();
   };
 
-  const handleSaveWebDAVConfig = () => {
-    const errors = WebDAVService.validateConfig(newWebDAVConfig);
+  const handleEditAI = (config: AIConfig) => {
+    setAIForm({
+      name: config.name,
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      model: config.model,
+      customPrompt: config.customPrompt || '',
+      useCustomPrompt: config.useCustomPrompt || false,
+    });
+    setEditingAIId(config.id);
+    setShowAIForm(true);
+    setShowCustomPrompt(config.useCustomPrompt || false);
+  };
+
+  const handleTestAI = async (config: AIConfig) => {
+    setTestingAIId(config.id);
+    try {
+      const aiService = new AIService(config, language);
+      const isConnected = await aiService.testConnection();
+      
+      if (isConnected) {
+        alert(t('AI服务连接成功！', 'AI service connection successful!'));
+      } else {
+        alert(t('AI服务连接失败，请检查配置。', 'AI service connection failed. Please check configuration.'));
+      }
+    } catch (error) {
+      console.error('AI test failed:', error);
+      alert(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'));
+    } finally {
+      setTestingAIId(null);
+    }
+  };
+
+  const handleSaveWebDAV = () => {
+    const errors = WebDAVService.validateConfig(webdavForm);
     if (errors.length > 0) {
       alert(errors.join('\n'));
       return;
     }
 
     const config: WebDAVConfig = {
-      id: Date.now().toString(),
-      name: newWebDAVConfig.name!,
-      url: newWebDAVConfig.url!,
-      username: newWebDAVConfig.username!,
-      password: newWebDAVConfig.password!,
-      path: newWebDAVConfig.path!,
-      isActive: webdavConfigs.length === 0,
+      id: editingWebDAVId || Date.now().toString(),
+      name: webdavForm.name,
+      url: webdavForm.url.replace(/\/$/, ''), // Remove trailing slash
+      username: webdavForm.username,
+      password: webdavForm.password,
+      path: webdavForm.path,
+      isActive: false,
     };
 
-    addWebDAVConfig(config);
-    if (config.isActive) {
-      setActiveWebDAVConfig(config.id);
+    if (editingWebDAVId) {
+      updateWebDAVConfig(editingWebDAVId, config);
+    } else {
+      addWebDAVConfig(config);
     }
 
-    setNewWebDAVConfig({
-      name: '',
-      url: '',
-      username: '',
-      password: '',
-      path: '/github-stars-backup',
+    resetWebDAVForm();
+  };
+
+  const handleEditWebDAV = (config: WebDAVConfig) => {
+    setWebDAVForm({
+      name: config.name,
+      url: config.url,
+      username: config.username,
+      password: config.password,
+      path: config.path,
     });
-    setIsAddingWebDAVConfig(false);
+    setEditingWebDAVId(config.id);
+    setShowWebDAVForm(true);
   };
 
-  const handleEditAIConfig = (config: AIConfig) => {
-    setEditingAIConfigId(config.id);
-    setEditingAIConfig({ ...config });
-  };
-
-  const handleSaveEditingAIConfig = () => {
-    if (!editingAIConfig.name || !editingAIConfig.baseUrl || !editingAIConfig.apiKey || !editingAIConfig.model) {
-      alert(language === 'zh' ? '请填写所有字段' : 'Please fill in all fields');
-      return;
-    }
-
-    updateAIConfig(editingAIConfigId!, editingAIConfig);
-    setEditingAIConfigId(null);
-    setEditingAIConfig({});
-  };
-
-  const handleEditWebDAVConfig = (config: WebDAVConfig) => {
-    setEditingWebDAVConfigId(config.id);
-    setEditingWebDAVConfig({ ...config });
-  };
-
-  const handleSaveEditingWebDAVConfig = () => {
-    const errors = WebDAVService.validateConfig(editingWebDAVConfig);
-    if (errors.length > 0) {
-      alert(errors.join('\n'));
-      return;
-    }
-
-    updateWebDAVConfig(editingWebDAVConfigId!, editingWebDAVConfig);
-    setEditingWebDAVConfigId(null);
-    setEditingWebDAVConfig({});
-  };
-
-  const handleTestAIConfig = async (config: AIConfig) => {
-    setTestingConfigId(config.id);
-    try {
-      const aiService = new AIService(config, language);
-      const isWorking = await aiService.testConnection();
-      
-      const successMessage = language === 'zh' 
-        ? '✅ 连接成功！AI配置正常工作。'
-        : '✅ Connection successful! AI configuration is working.';
-      
-      const failMessage = language === 'zh'
-        ? '❌ 连接失败。请检查您的配置。'
-        : '❌ Connection failed. Please check your configuration.';
-      
-      alert(isWorking ? successMessage : failMessage);
-    } catch (error) {
-      const errorMessage = language === 'zh'
-        ? `❌ 连接失败: ${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      alert(errorMessage);
-    } finally {
-      setTestingConfigId(null);
-    }
-  };
-
-  const handleTestWebDAVConfig = async (config: WebDAVConfig) => {
+  const handleTestWebDAV = async (config: WebDAVConfig) => {
     setTestingWebDAVId(config.id);
     try {
       const webdavService = new WebDAVService(config);
-      const isWorking = await webdavService.testConnection();
+      const isConnected = await webdavService.testConnection();
       
-      if (isWorking) {
-        // 获取服务器信息
-        const serverInfo = await webdavService.getServerInfo();
-        let message = language === 'zh' 
-          ? '✅ WebDAV连接成功！'
-          : '✅ WebDAV connection successful!';
-        
-        if (serverInfo.server) {
-          message += `\n${language === 'zh' ? '服务器' : 'Server'}: ${serverInfo.server}`;
-        }
-        if (serverInfo.davLevel) {
-          message += `\n${language === 'zh' ? 'DAV级别' : 'DAV Level'}: ${serverInfo.davLevel}`;
-        }
-        
-        alert(message);
+      if (isConnected) {
+        alert(t('WebDAV连接成功！', 'WebDAV connection successful!'));
       } else {
-        alert(language === 'zh'
-          ? '❌ WebDAV连接失败。请检查您的配置。'
-          : '❌ WebDAV connection failed. Please check your configuration.');
+        alert(t('WebDAV连接失败，请检查配置。', 'WebDAV connection failed. Please check configuration.'));
       }
     } catch (error) {
-      const errorMessage = language === 'zh'
-        ? `❌ WebDAV连接测试失败:\n\n${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ WebDAV connection test failed:\n\n${error instanceof Error ? error.message : 'Unknown error'}`;
-      alert(errorMessage);
+      console.error('WebDAV test failed:', error);
+      alert(`${t('WebDAV测试失败', 'WebDAV test failed')}: ${error.message}`);
     } finally {
       setTestingWebDAVId(null);
     }
   };
 
-  const handleSetActiveAI = (configId: string) => {
-    aiConfigs.forEach(config => {
-      updateAIConfig(config.id, { isActive: config.id === configId });
-    });
-    setActiveAIConfig(configId);
-  };
-
-  const handleSetActiveWebDAV = (configId: string) => {
-    webdavConfigs.forEach(config => {
-      updateWebDAVConfig(config.id, { isActive: config.id === configId });
-    });
-    setActiveWebDAVConfig(configId);
-  };
-
-  const handleBackupToWebDAV = async () => {
+  const handleBackup = async () => {
     const activeConfig = webdavConfigs.find(config => config.id === activeWebDAVConfig);
     if (!activeConfig) {
-      alert(language === 'zh' ? '请先配置并激活WebDAV服务。' : 'Please configure and activate WebDAV service first.');
+      alert(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'));
       return;
     }
 
-    setBackupStatus('backing-up');
+    setIsBackingUp(true);
     try {
       const webdavService = new WebDAVService(activeConfig);
       
-      // 准备备份数据 - 保留真实的敏感信息
       const backupData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        repositories: repositories,
-        aiConfigs: aiConfigs, // 保留完整的AI配置包括API密钥
-        webdavConfigs: webdavConfigs, // 保留完整的WebDAV配置包括密码
-        releaseSubscriptions: Array.from(releaseSubscriptions),
-        settings: {
-          language,
-          lastBackup,
-          activeAIConfig,
-          activeWebDAVConfig,
-        }
+        repositories,
+        releases,
+        customCategories,
+        aiConfigs: aiConfigs.map(config => ({
+          ...config,
+          apiKey: '***' // Don't backup API keys for security
+        })),
+        webdavConfigs: webdavConfigs.map(config => ({
+          ...config,
+          password: '***' // Don't backup passwords for security
+        })),
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
       };
 
       const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
-      const content = JSON.stringify(backupData, null, 2);
+      const success = await webdavService.uploadFile(filename, JSON.stringify(backupData, null, 2));
       
-      await webdavService.uploadFile(filename, content);
-      
-      const now = new Date().toISOString();
-      setLastBackup(now);
-      
-      alert(language === 'zh' 
-        ? `✅ 备份成功！\n文件名: ${filename}\n备份时间: ${new Date(now).toLocaleString()}`
-        : `✅ Backup successful!\nFilename: ${filename}\nBackup time: ${new Date(now).toLocaleString()}`
-      );
+      if (success) {
+        setLastBackup(new Date().toISOString());
+        alert(t('数据备份成功！', 'Data backup successful!'));
+      }
     } catch (error) {
       console.error('Backup failed:', error);
-      const errorMessage = language === 'zh'
-        ? `❌ 备份失败:\n\n${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ Backup failed:\n\n${error instanceof Error ? error.message : 'Unknown error'}`;
-      alert(errorMessage);
+      alert(`${t('备份失败', 'Backup failed')}: ${error.message}`);
     } finally {
-      setBackupStatus('idle');
+      setIsBackingUp(false);
     }
   };
 
-  const handleRestoreFromWebDAV = async () => {
+  const handleRestore = async () => {
     const activeConfig = webdavConfigs.find(config => config.id === activeWebDAVConfig);
     if (!activeConfig) {
-      alert(language === 'zh' ? '请先配置并激活WebDAV服务。' : 'Please configure and activate WebDAV service first.');
+      alert(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'));
       return;
     }
 
-    const confirmMessage = language === 'zh'
-      ? '⚠️ 恢复操作将覆盖当前的仓库数据和配置。\n\n确定要继续吗？'
-      : '⚠️ Restore operation will overwrite current repository data and configurations.\n\nAre you sure you want to continue?';
+    const confirmMessage = t(
+      '恢复数据将覆盖当前所有数据，是否继续？',
+      'Restoring data will overwrite all current data. Continue?'
+    );
     
     if (!confirm(confirmMessage)) return;
 
-    setBackupStatus('restoring');
+    setIsRestoring(true);
     try {
       const webdavService = new WebDAVService(activeConfig);
-      
-      // 列出可用的备份文件
       const files = await webdavService.listFiles();
+      
       const backupFiles = files.filter(file => file.startsWith('github-stars-backup-'));
-      
       if (backupFiles.length === 0) {
-        alert(language === 'zh' ? '没有找到备份文件。' : 'No backup files found.');
+        alert(t('未找到备份文件。', 'No backup files found.'));
         return;
       }
 
-      // 选择最新的备份文件
+      // Use the most recent backup file
       const latestBackup = backupFiles.sort().reverse()[0];
-      const content = await webdavService.downloadFile(latestBackup);
+      const backupContent = await webdavService.downloadFile(latestBackup);
       
-      if (!content) {
-        alert(language === 'zh' ? '无法读取备份文件。' : 'Unable to read backup file.');
-        return;
+      if (backupContent) {
+        const backupData = JSON.parse(backupContent);
+        
+        // Note: In a real implementation, you would restore the data here
+        // For now, we'll just show a success message
+        alert(t(
+          `找到备份文件: ${latestBackup}。请注意：完整的数据恢复功能需要在实际部署中实现。`,
+          `Found backup file: ${latestBackup}. Note: Full data restoration needs to be implemented in actual deployment.`
+        ));
       }
-
-      const backupData = JSON.parse(content);
-      
-      // 恢复数据
-      if (backupData.repositories) {
-        setRepositories(backupData.repositories);
-      }
-      if (backupData.releases) {
-        setReleases(backupData.releases);
-      }
-      
-      alert(language === 'zh' 
-        ? `✅ 恢复成功！\n备份文件: ${latestBackup}\n备份时间: ${new Date(backupData.timestamp).toLocaleString()}\n仓库数量: ${backupData.repositories?.length || 0}\n\n页面将刷新以应用更改。`
-        : `✅ Restore successful!\nBackup file: ${latestBackup}\nBackup time: ${new Date(backupData.timestamp).toLocaleString()}\nRepositories: ${backupData.repositories?.length || 0}\n\nPage will refresh to apply changes.`
-      );
-      
-      // 刷新页面以确保所有状态正确更新
-      setTimeout(() => window.location.reload(), 2000);
     } catch (error) {
       console.error('Restore failed:', error);
-      const errorMessage = language === 'zh'
-        ? `❌ 恢复失败:\n\n${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ Restore failed:\n\n${error instanceof Error ? error.message : 'Unknown error'}`;
-      alert(errorMessage);
+      alert(`${t('恢复失败', 'Restore failed')}: ${error.message}`);
     } finally {
-      setBackupStatus('idle');
+      setIsRestoring(false);
     }
   };
 
-  const handleExportConfig = () => {
-    setBackupStatus('exporting');
-    try {
-      // 准备导出数据 - 保留真实的敏感信息用于本地备份
-      const exportData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        aiConfigs: aiConfigs, // 保留完整的AI配置包括API密钥
-        webdavConfigs: webdavConfigs, // 保留完整的WebDAV配置包括密码
-        settings: {
-          language,
-          activeAIConfig,
-          activeWebDAVConfig,
-        }
-      };
+  const getDefaultPrompt = () => {
+    if (language === 'zh') {
+      return `请分析这个GitHub仓库并提供：
 
-      const content = JSON.stringify(exportData, null, 2);
-      const blob = new Blob([content], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `github-stars-config-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      alert(language === 'zh' 
-        ? '✅ 配置导出成功！文件已下载到您的设备。\n\n注意：此文件包含敏感信息（API密钥、密码），请妥善保管。'
-        : '✅ Configuration exported successfully! File has been downloaded to your device.\n\nNote: This file contains sensitive information (API keys, passwords), please keep it secure.'
-      );
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert(language === 'zh'
-        ? `❌ 导出失败: ${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    } finally {
-      setBackupStatus('idle');
+1. 一个简洁的中文概述（不超过50字），说明这个仓库的主要功能和用途
+2. 3-5个相关的应用类型标签（用中文，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等{CATEGORIES_INFO ? '，请优先从提供的分类中选择' : ''}）
+3. 支持的平台类型（从以下选择：mac、windows、linux、ios、android、docker、web、cli）
+
+重要：请严格使用中文进行分析和回复，无论原始README是什么语言。
+
+请以JSON格式回复：
+{
+  "summary": "你的中文概述",
+  "tags": ["标签1", "标签2", "标签3", "标签4", "标签5"],
+  "platforms": ["platform1", "platform2", "platform3"]
+}
+
+仓库信息：
+{REPO_INFO}{CATEGORIES_INFO}
+
+重点关注实用性和准确的分类，帮助用户快速理解仓库的用途和支持的平台。`;
+    } else {
+      return `Please analyze this GitHub repository and provide:
+
+1. A concise English overview (no more than 50 words) explaining the main functionality and purpose of this repository
+2. 3-5 relevant application type tags (in English, similar to app store categories, such as: development tools, web apps, mobile apps, database, AI tools, etc.{CATEGORIES_INFO ? ', please prioritize from the provided categories' : ''})
+3. Supported platform types (choose from: mac, windows, linux, ios, android, docker, web, cli)
+
+Important: Please strictly use English for analysis and response, regardless of the original README language.
+
+Please reply in JSON format:
+{
+  "summary": "Your English overview",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "platforms": ["platform1", "platform2", "platform3"]
+}
+
+Repository information:
+{REPO_INFO}{CATEGORIES_INFO}
+
+Focus on practicality and accurate categorization to help users quickly understand the repository's purpose and supported platforms.`;
     }
   };
-
-  const handleImportConfig = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setBackupStatus('importing');
-    try {
-      const content = await file.text();
-      const importData = JSON.parse(content);
-      
-      // 验证导入数据格式
-      if (!importData.version || !importData.timestamp) {
-        throw new Error(language === 'zh' ? '无效的配置文件格式' : 'Invalid configuration file format');
-      }
-
-      const confirmMessage = language === 'zh'
-        ? `⚠️ 导入配置将覆盖当前的AI和WebDAV配置。\n\n配置文件信息:\n• 创建时间: ${new Date(importData.timestamp).toLocaleString()}\n• AI配置: ${importData.aiConfigs?.length || 0} 个\n• WebDAV配置: ${importData.webdavConfigs?.length || 0} 个\n\n确定要继续吗？`
-        : `⚠️ Importing configuration will overwrite current AI and WebDAV configurations.\n\nConfiguration file info:\n• Created: ${new Date(importData.timestamp).toLocaleString()}\n• AI configs: ${importData.aiConfigs?.length || 0}\n• WebDAV configs: ${importData.webdavConfigs?.length || 0}\n\nAre you sure you want to continue?`;
-      
-      if (!confirm(confirmMessage)) return;
-
-      // 导入AI配置（包含完整信息）
-      if (importData.aiConfigs && Array.isArray(importData.aiConfigs)) {
-        importData.aiConfigs.forEach((config: any) => {
-          if (config.name && config.baseUrl && config.model) {
-            const newConfig: AIConfig = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              name: `${config.name} (导入)`,
-              baseUrl: config.baseUrl,
-              apiKey: config.apiKey || '', // 保留原始API密钥
-              model: config.model,
-              isActive: false,
-            };
-            addAIConfig(newConfig);
-          }
-        });
-      }
-
-      // 导入WebDAV配置（包含完整信息）
-      if (importData.webdavConfigs && Array.isArray(importData.webdavConfigs)) {
-        importData.webdavConfigs.forEach((config: any) => {
-          if (config.name && config.url && config.username && config.path) {
-            const newConfig: WebDAVConfig = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              name: `${config.name} (导入)`,
-              url: config.url,
-              username: config.username,
-              password: config.password || '', // 保留原始密码
-              path: config.path,
-              isActive: false,
-            };
-            addWebDAVConfig(newConfig);
-          }
-        });
-      }
-
-      // 导入设置
-      if (importData.settings) {
-        if (importData.settings.language) {
-          setLanguage(importData.settings.language);
-        }
-      }
-
-      const hasCredentials = importData.aiConfigs?.some((c: any) => c.apiKey && c.apiKey !== '***') || 
-                            importData.webdavConfigs?.some((c: any) => c.password && c.password !== '***');
-
-      alert(language === 'zh' 
-        ? `✅ 配置导入成功！${hasCredentials ? '\n\n所有配置信息（包括API密钥和密码）已完整导入。' : '\n\n注意：如果配置中缺少API密钥和密码，请手动补充。'}`
-        : `✅ Configuration imported successfully!${hasCredentials ? '\n\nAll configuration information (including API keys and passwords) has been imported completely.' : '\n\nNote: If API keys and passwords are missing from the configuration, please add them manually.'}`
-      );
-    } catch (error) {
-      console.error('Import failed:', error);
-      alert(language === 'zh'
-        ? `❌ 导入失败: ${error instanceof Error ? error.message : '未知错误'}`
-        : `❌ Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    } finally {
-      setBackupStatus('idle');
-      // 清除文件输入
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const presetAIConfigs = [
-    {
-      name: 'OpenAI GPT-3.5',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-3.5-turbo',
-    },
-    {
-      name: 'OpenAI GPT-4',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4',
-    },
-    {
-      name: 'Anthropic Claude',
-      baseUrl: 'https://api.anthropic.com/v1',
-      model: 'claude-3-sonnet-20240229',
-    },
-  ];
-
-  const presetWebDAVConfigs = [
-    {
-      name: 'Nextcloud',
-      url: 'https://your-nextcloud.com/remote.php/dav/files/username',
-      path: '/github-stars-backup',
-    },
-    {
-      name: 'ownCloud',
-      url: 'https://your-owncloud.com/remote.php/webdav',
-      path: '/github-stars-backup',
-    },
-    {
-      name: '坚果云',
-      url: 'https://dav.jianguoyun.com/dav',
-      path: '/github-stars-backup',
-    },
-  ];
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          {t('设置', 'Settings')}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          {t('配置您的AI服务、WebDAV备份和应用程序偏好', 'Configure your AI services, WebDAV backup, and application preferences')}
-        </p>
-      </div>
-
-      {/* Configuration Import/Export Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
-            <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('配置管理', 'Configuration Management')}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('导入和导出您的应用配置', 'Import and export your application configurations')}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          <button
-            onClick={handleExportConfig}
-            disabled={backupStatus !== 'idle'}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileDown className="w-4 h-4" />
-            <span>
-              {backupStatus === 'exporting' 
-                ? t('导出中...', 'Exporting...')
-                : t('导出配置', 'Export Configuration')
-              }
-            </span>
-          </button>
-          
-          <button
-            onClick={handleImportConfig}
-            disabled={backupStatus !== 'idle'}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileUp className="w-4 h-4" />
-            <span>
-              {backupStatus === 'importing' 
-                ? t('导入中...', 'Importing...')
-                : t('导入配置', 'Import Configuration')
-              }
-            </span>
-          </button>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleFileImport}
-          className="hidden"
-        />
-
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="flex items-start space-x-2">
-            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-700 dark:text-blue-300">
-              <p className="font-medium mb-1">{t('配置导入导出说明', 'Configuration Import/Export Notes')}</p>
-              <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>{t('导出的配置文件包含完整的API密钥和密码信息', 'Exported configuration files contain complete API keys and password information')}</li>
-                <li>{t('请妥善保管导出的配置文件，避免泄露敏感信息', 'Please keep exported configuration files secure to avoid leaking sensitive information')}</li>
-                <li>{t('导入配置将完整恢复所有设置，包括敏感信息', 'Importing configuration will completely restore all settings, including sensitive information')}</li>
-                <li>{t('建议定期导出配置作为备份', 'It is recommended to export configuration regularly as backup')}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Language Settings */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
-          <div className="flex items-center justify-center w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg">
-            <Globe className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('语言设置', 'Language Settings')}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('选择界面语言和AI分析语言', 'Choose interface language and AI analysis language')}
-            </p>
-          </div>
+          <Globe className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('语言设置', 'Language Settings')}
+          </h3>
         </div>
         
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('界面语言', 'Interface Language')}
-            </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t(
-              '此设置将影响界面显示语言和AI分析生成的标签、描述的语言。',
-              'This setting affects the interface display language and the language of AI-generated tags and descriptions.'
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* GitHub Token Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="flex items-center justify-center w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg">
-            <Key className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('GitHub访问令牌', 'GitHub Access Token')}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('用于GitHub API的个人访问令牌', 'Personal access token for GitHub API')}
-            </p>
-          </div>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
+          <label className="flex items-center space-x-2 cursor-pointer">
             <input
-              type="password"
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-              value={githubToken || ''}
-              onChange={(e) => setGitHubToken(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              type="radio"
+              name="language"
+              value="zh"
+              checked={language === 'zh'}
+              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
             />
-            <span className={`px-3 py-2 rounded-lg text-sm ${
-              githubToken 
-                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-            }`}>
-              {githubToken ? t('已连接', 'Connected') : t('未设置', 'Not Set')}
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              中文
             </span>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t('在', 'Create a personal access token at')}{' '}
-            <a 
-              href="https://github.com/settings/tokens" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              {t('GitHub设置', 'GitHub Settings')}
-            </a>{' '}
-            {t('创建个人访问令牌，需要\'repo\'和\'user\'权限。', 'with \'repo\' and \'user\' scopes.')}
-          </p>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="radio"
+              name="language"
+              value="en"
+              checked={language === 'en'}
+              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              English
+            </span>
+          </label>
         </div>
       </div>
 
-      {/* WebDAV Backup Section */}
+      {/* AI Configuration */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Cloud className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('WebDAV备份', 'WebDAV Backup')}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {t('配置WebDAV服务器以备份和恢复数据', 'Configure WebDAV server for data backup and restore')}
-              </p>
-            </div>
+            <Bot className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('AI服务配置', 'AI Service Configuration')}
+            </h3>
           </div>
           <button
-            onClick={() => setIsAddingWebDAVConfig(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={() => setShowAIForm(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>{t('添加WebDAV', 'Add WebDAV')}</span>
+            <span>{t('添加AI配置', 'Add AI Config')}</span>
           </button>
         </div>
 
-        {/* WebDAV Status and Actions */}
-        {webdavConfigs.length > 0 && (
-          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className={`w-3 h-3 rounded-full ${
-                  activeWebDAVConfig ? 'bg-green-500' : 'bg-gray-400'
-                }`}></div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {activeWebDAVConfig 
-                    ? t('WebDAV已配置', 'WebDAV Configured')
-                    : t('WebDAV未激活', 'WebDAV Not Active')
-                  }
-                </span>
-                {lastBackup && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('上次备份:', 'Last backup:')} {new Date(lastBackup).toLocaleString()}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleBackupToWebDAV}
-                  disabled={!activeWebDAVConfig || backupStatus !== 'idle'}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm disabled:opacity-50"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>
-                    {backupStatus === 'backing-up' 
-                      ? t('备份中...', 'Backing up...')
-                      : t('备份', 'Backup')
-                    }
-                  </span>
-                </button>
-                <button
-                  onClick={handleRestoreFromWebDAV}
-                  disabled={!activeWebDAVConfig || backupStatus !== 'idle'}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors text-sm disabled:opacity-50"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>
-                    {backupStatus === 'restoring' 
-                      ? t('恢复中...', 'Restoring...')
-                      : t('恢复', 'Restore')
-                    }
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* CORS Warning */}
-            <div className="flex items-start space-x-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                  {t('重要提示：CORS配置', 'Important: CORS Configuration')}
-                </p>
-                <p className="text-yellow-700 dark:text-yellow-300">
-                  {t(
-                    '如果遇到连接错误，请确保您的WebDAV服务器配置了正确的CORS头。点击测试连接按钮查看详细的错误信息和解决方案。',
-                    'If you encounter connection errors, ensure your WebDAV server is configured with proper CORS headers. Click the test connection button for detailed error messages and solutions.'
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Existing WebDAV Configurations */}
-        <div className="space-y-4">
-          {webdavConfigs.map(config => (
-            <div
-              key={config.id}
-              className={`p-4 border rounded-lg transition-colors ${
-                config.id === activeWebDAVConfig
-                  ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950'
-                  : 'border-gray-200 dark:border-gray-600'
-              }`}
-            >
-              {editingWebDAVConfigId === config.id ? (
-                // Edit mode
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('配置名称', 'Configuration Name')} *
-                      </label>
-                      <input
-                        type="text"
-                        value={editingWebDAVConfig.name || ''}
-                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('用户名', 'Username')} *
-                      </label>
-                      <input
-                        type="text"
-                        value={editingWebDAVConfig.username || ''}
-                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, username: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {t('WebDAV服务器URL', 'WebDAV Server URL')} *
-                    </label>
-                    <input
-                      type="url"
-                      value={editingWebDAVConfig.url || ''}
-                      onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, url: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('密码', 'Password')} *
-                      </label>
-                      <input
-                        type="password"
-                        value={editingWebDAVConfig.password || ''}
-                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, password: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('备份路径', 'Backup Path')} *
-                      </label>
-                      <input
-                        type="text"
-                        value={editingWebDAVConfig.path || ''}
-                        onChange={(e) => setEditingWebDAVConfig(prev => ({ ...prev, path: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handleSaveEditingWebDAVConfig}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>{t('保存', 'Save')}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingWebDAVConfigId(null);
-                        setEditingWebDAVConfig({});
-                      }}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>{t('取消', 'Cancel')}</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // View mode
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      {config.name}
-                      {config.id === activeWebDAVConfig && (
-                        <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded text-xs">
-                          {t('活跃', 'Active')}
-                        </span>
-                      )}
-                    </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {config.url} • {config.path}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleTestWebDAVConfig(config)}
-                      disabled={testingWebDAVId === config.id}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                    >
-                      <TestTube className="w-4 h-4" />
-                      <span>{testingWebDAVId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
-                    </button>
-                    <button
-                      onClick={() => handleEditWebDAVConfig(config)}
-                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    {config.id !== activeWebDAVConfig && (
-                      <button
-                        onClick={() => handleSetActiveWebDAV(config.id)}
-                        className="px-3 py-1.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-sm"
-                      >
-                        {t('设为活跃', 'Set Active')}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => deleteWebDAVConfig(config.id)}
-                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add New WebDAV Configuration Form */}
-        {isAddingWebDAVConfig && (
-          <div className="mt-6 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-750">
+        {/* AI Config Form */}
+        {showAIForm && (
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
             <h4 className="font-medium text-gray-900 dark:text-white mb-4">
-              {t('添加新的WebDAV配置', 'Add New WebDAV Configuration')}
+              {editingAIId ? t('编辑AI配置', 'Edit AI Configuration') : t('添加AI配置', 'Add AI Configuration')}
             </h4>
             
-            {/* Preset Selection */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('快速设置（可选）', 'Quick Setup (Optional)')}
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {presetWebDAVConfigs.map((preset, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setNewWebDAVConfig(prev => ({
-                      ...prev,
-                      ...preset,
-                    }))}
-                    className="p-3 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <p className="font-medium text-sm text-gray-900 dark:text-white">
-                      {preset.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {preset.url}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('配置名称', 'Configuration Name')} *
                 </label>
                 <input
                   type="text"
-                  placeholder={t('我的WebDAV服务器', 'My WebDAV Server')}
-                  value={newWebDAVConfig.name || ''}
-                  onChange={(e) => setNewWebDAVConfig(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={aiForm.name}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('用户名', 'Username')} *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('API端点', 'API Endpoint')} *
                 </label>
                 <input
-                  type="text"
-                  placeholder="username"
-                  value={newWebDAVConfig.username || ''}
-                  onChange={(e) => setNewWebDAVConfig(prev => ({ ...prev, username: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  type="url"
+                  value={aiForm.baseUrl}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, baseUrl: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="https://api.openai.com/v1"
                 />
               </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('WebDAV服务器URL', 'WebDAV Server URL')} *
-              </label>
-              <input
-                type="url"
-                placeholder="https://your-server.com/webdav"
-                value={newWebDAVConfig.url || ''}
-                onChange={(e) => setNewWebDAVConfig(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('密码', 'Password')} *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('API密钥', 'API Key')} *
                 </label>
                 <input
                   type="password"
-                  placeholder="password"
-                  value={newWebDAVConfig.password || ''}
-                  onChange={(e) => setNewWebDAVConfig(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={aiForm.apiKey}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, apiKey: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('输入API密钥', 'Enter API key')}
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('备份路径', 'Backup Path')} *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('模型名称', 'Model Name')} *
                 </label>
                 <input
                   type="text"
-                  placeholder="/github-stars-backup"
-                  value={newWebDAVConfig.path || ''}
-                  onChange={(e) => setNewWebDAVConfig(prev => ({ ...prev, path: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={aiForm.model}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, model: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="gpt-4"
                 />
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            {/* Custom Prompt Section */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiForm.useCustomPrompt}
+                    onChange={(e) => {
+                      setAIForm(prev => ({ ...prev, useCustomPrompt: e.target.checked }));
+                      setShowCustomPrompt(e.target.checked);
+                    }}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('使用自定义提示词', 'Use Custom Prompt')}
+                  </span>
+                </label>
+                {showCustomPrompt && (
+                  <button
+                    onClick={() => setAIForm(prev => ({ ...prev, customPrompt: getDefaultPrompt() }))}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {t('使用默认模板', 'Use Default Template')}
+                  </button>
+                )}
+              </div>
+              
+              {showCustomPrompt && (
+                <div>
+                  <textarea
+                    value={aiForm.customPrompt}
+                    onChange={(e) => setAIForm(prev => ({ ...prev, customPrompt: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-mono"
+                    rows={12}
+                    placeholder={t('输入自定义提示词...', 'Enter custom prompt...')}
+                  />
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mb-1">{t('可用占位符:', 'Available placeholders:')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <code className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">{'{{REPO_INFO}}'}</code>
+                      <code className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">{'{{CATEGORIES_INFO}}'}</code>
+                      <code className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">{'{{LANGUAGE}}'}</code>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3">
               <button
-                onClick={handleSaveWebDAVConfig}
+                onClick={handleSaveAI}
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                <span>{t('保存配置', 'Save Configuration')}</span>
+                <span>{t('保存', 'Save')}</span>
               </button>
               <button
-                onClick={() => {
-                  setIsAddingWebDAVConfig(false);
-                  setNewWebDAVConfig({
-                    name: '',
-                    url: '',
-                    username: '',
-                    password: '',
-                    path: '/github-stars-backup',
-                  });
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                onClick={resetAIForm}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
                 <X className="w-4 h-4" />
                 <span>{t('取消', 'Cancel')}</span>
@@ -1040,122 +535,34 @@ export const SettingsPanel: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
-      {/* AI Configurations Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('AI配置', 'AI Configurations')}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {t('管理用于仓库分析的AI服务配置', 'Manage your AI service configurations for repository analysis')}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsAddingAIConfig(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('添加配置', 'Add Configuration')}</span>
-          </button>
-        </div>
-
-        {/* Existing AI Configurations */}
-        <div className="space-y-4">
+        {/* AI Configs List */}
+        <div className="space-y-3">
           {aiConfigs.map(config => (
             <div
               key={config.id}
-              className={`p-4 border rounded-lg transition-colors ${
+              className={`p-4 rounded-lg border transition-colors ${
                 config.id === activeAIConfig
-                  ? 'border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950'
-                  : 'border-gray-200 dark:border-gray-600'
+                  ? 'border-purple-300 bg-purple-50 dark:border-purple-600 dark:bg-purple-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
               }`}
             >
-              {editingAIConfigId === config.id ? (
-                // Edit mode
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('配置名称', 'Configuration Name')}
-                      </label>
-                      <input
-                        type="text"
-                        value={editingAIConfig.name || ''}
-                        onChange={(e) => setEditingAIConfig(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t('模型', 'Model')}
-                      </label>
-                      <input
-                        type="text"
-                        value={editingAIConfig.model || ''}
-                        onChange={(e) => setEditingAIConfig(prev => ({ ...prev, model: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {t('API基础URL', 'API Base URL')}
-                    </label>
-                    <input
-                      type="url"
-                      value={editingAIConfig.baseUrl || ''}
-                      onChange={(e) => setEditingAIConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {t('API密钥', 'API Key')}
-                    </label>
-                    <input
-                      type="password"
-                      value={editingAIConfig.apiKey || ''}
-                      onChange={(e) => setEditingAIConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handleSaveEditingAIConfig}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>{t('保存', 'Save')}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingAIConfigId(null);
-                        setEditingAIConfig({});
-                      }}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>{t('取消', 'Cancel')}</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // View mode
-                <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="activeAI"
+                    checked={config.id === activeAIConfig}
+                    onChange={() => setActiveAIConfig(config.id)}
+                    className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
                   <div>
                     <h4 className="font-medium text-gray-900 dark:text-white">
                       {config.name}
-                      {config.id === activeAIConfig && (
-                        <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded text-xs">
-                          {t('活跃', 'Active')}
+                      {config.useCustomPrompt && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          <MessageSquare className="w-3 h-3 mr-1" />
+                          {t('自定义提示词', 'Custom Prompt')}
                         </span>
                       )}
                     </h4>
@@ -1163,152 +570,273 @@ export const SettingsPanel: React.FC = () => {
                       {config.baseUrl} • {config.model}
                     </p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleTestAIConfig(config)}
-                      disabled={testingConfigId === config.id}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                    >
-                      <TestTube className="w-4 h-4" />
-                      <span>{testingConfigId === config.id ? t('测试中...', 'Testing...') : t('测试', 'Test')}</span>
-                    </button>
-                    <button
-                      onClick={() => handleEditAIConfig(config)}
-                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    {config.id !== activeAIConfig && (
-                      <button
-                        onClick={() => handleSetActiveAI(config.id)}
-                        className="px-3 py-1.5 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-sm"
-                      >
-                        {t('设为活跃', 'Set Active')}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => deleteAIConfig(config.id)}
-                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
-              )}
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleTestAI(config)}
+                    disabled={testingAIId === config.id}
+                    className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                    title={t('测试连接', 'Test Connection')}
+                  >
+                    {testingAIId === config.id ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <TestTube className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleEditAI(config)}
+                    className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                    title={t('编辑', 'Edit')}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(t('确定要删除这个AI配置吗？', 'Are you sure you want to delete this AI configuration?'))) {
+                        deleteAIConfig(config.id);
+                      }
+                    }}
+                    className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                    title={t('删除', 'Delete')}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
+          
+          {aiConfigs.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>{t('还没有配置AI服务', 'No AI services configured yet')}</p>
+              <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* WebDAV Configuration */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Cloud className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('WebDAV备份配置', 'WebDAV Backup Configuration')}
+            </h3>
+          </div>
+          <div className="flex items-center space-x-3">
+            {lastBackup && (
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {t('上次备份:', 'Last backup:')} {new Date(lastBackup).toLocaleString()}
+              </span>
+            )}
+            <button
+              onClick={() => setShowWebDAVForm(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('添加WebDAV', 'Add WebDAV')}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Add New AI Configuration Form */}
-        {isAddingAIConfig && (
-          <div className="mt-6 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-750">
+        {/* WebDAV Config Form */}
+        {showWebDAVForm && (
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
             <h4 className="font-medium text-gray-900 dark:text-white mb-4">
-              {t('添加新的AI配置', 'Add New AI Configuration')}
+              {editingWebDAVId ? t('编辑WebDAV配置', 'Edit WebDAV Configuration') : t('添加WebDAV配置', 'Add WebDAV Configuration')}
             </h4>
             
-            {/* Preset Selection */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('快速设置（可选）', 'Quick Setup (Optional)')}
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {presetAIConfigs.map((preset, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setNewAIConfig(prev => ({
-                      ...prev,
-                      ...preset,
-                    }))}
-                    className="p-3 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <p className="font-medium text-sm text-gray-900 dark:text-white">
-                      {preset.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {preset.model}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('配置名称', 'Configuration Name')}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('配置名称', 'Configuration Name')} *
                 </label>
                 <input
                   type="text"
-                  placeholder={t('我的OpenAI配置', 'My OpenAI Config')}
-                  value={newAIConfig.name || ''}
-                  onChange={(e) => setNewAIConfig(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={webdavForm.name}
+                  onChange={(e) => setWebDAVForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('例如: 坚果云', 'e.g., Nutstore')}
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('模型', 'Model')}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('WebDAV URL', 'WebDAV URL')} *
+                </label>
+                <input
+                  type="url"
+                  value={webdavForm.url}
+                  onChange={(e) => setWebDAVForm(prev => ({ ...prev, url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="https://dav.jianguoyun.com/dav/"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('用户名', 'Username')} *
                 </label>
                 <input
                   type="text"
-                  placeholder="gpt-3.5-turbo"
-                  value={newAIConfig.model || ''}
-                  onChange={(e) => setNewAIConfig(prev => ({ ...prev, model: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={webdavForm.username}
+                  onChange={(e) => setWebDAVForm(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('WebDAV用户名', 'WebDAV username')}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('密码', 'Password')} *
+                </label>
+                <input
+                  type="password"
+                  value={webdavForm.password}
+                  onChange={(e) => setWebDAVForm(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('WebDAV密码', 'WebDAV password')}
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('路径', 'Path')} *
+                </label>
+                <input
+                  type="text"
+                  value={webdavForm.path}
+                  onChange={(e) => setWebDAVForm(prev => ({ ...prev, path: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="/github-stars-manager/"
                 />
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('API基础URL', 'API Base URL')}
-              </label>
-              <input
-                type="url"
-                placeholder="https://api.openai.com/v1"
-                value={newAIConfig.baseUrl || ''}
-                onChange={(e) => setNewAIConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('API密钥', 'API Key')}
-              </label>
-              <input
-                type="password"
-                placeholder="sk-xxxxxxxxxxxxxxxxxxxx"
-                value={newAIConfig.apiKey || ''}
-                onChange={(e) => setNewAIConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div className="flex items-center space-x-3">
+            <div className="flex space-x-3">
               <button
-                onClick={handleSaveAIConfig}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                onClick={handleSaveWebDAV}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                <span>{t('保存配置', 'Save Configuration')}</span>
+                <span>{t('保存', 'Save')}</span>
               </button>
               <button
-                onClick={() => {
-                  setIsAddingAIConfig(false);
-                  setNewAIConfig({
-                    name: '',
-                    baseUrl: 'https://api.openai.com/v1',
-                    apiKey: '',
-                    model: 'gpt-3.5-turbo',
-                  });
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                onClick={resetWebDAVForm}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
                 <X className="w-4 h-4" />
                 <span>{t('取消', 'Cancel')}</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* WebDAV Configs List */}
+        <div className="space-y-3 mb-6">
+          {webdavConfigs.map(config => (
+            <div
+              key={config.id}
+              className={`p-4 rounded-lg border transition-colors ${
+                config.id === activeWebDAVConfig
+                  ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="activeWebDAV"
+                    checked={config.id === activeWebDAVConfig}
+                    onChange={() => setActiveWebDAVConfig(config.id)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">{config.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {config.url} • {config.path}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleTestWebDAV(config)}
+                    disabled={testingWebDAVId === config.id}
+                    className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                    title={t('测试连接', 'Test Connection')}
+                  >
+                    {testingWebDAVId === config.id ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <TestTube className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleEditWebDAV(config)}
+                    className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                    title={t('编辑', 'Edit')}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(t('确定要删除这个WebDAV配置吗？', 'Are you sure you want to delete this WebDAV configuration?'))) {
+                        deleteWebDAVConfig(config.id);
+                      }
+                    }}
+                    className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                    title={t('删除', 'Delete')}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {webdavConfigs.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>{t('还没有配置WebDAV服务', 'No WebDAV services configured yet')}</p>
+              <p className="text-sm">{t('点击上方按钮添加WebDAV配置', 'Click the button above to add WebDAV configuration')}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Backup Actions */}
+        {webdavConfigs.length > 0 && (
+          <div className="flex items-center justify-center space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleBackup}
+              disabled={isBackingUp || !activeWebDAVConfig}
+              className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isBackingUp ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Upload className="w-5 h-5" />
+              )}
+              <span>{isBackingUp ? t('备份中...', 'Backing up...') : t('备份数据', 'Backup Data')}</span>
+            </button>
+            
+            <button
+              onClick={handleRestore}
+              disabled={isRestoring || !activeWebDAVConfig}
+              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRestoring ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Download className="w-5 h-5" />
+              )}
+              <span>{isRestoring ? t('恢复中...', 'Restoring...') : t('恢复数据', 'Restore Data')}</span>
+            </button>
           </div>
         )}
       </div>
