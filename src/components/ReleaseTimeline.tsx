@@ -605,7 +605,25 @@ export const ReleaseTimeline: React.FC = () => {
                     <div className="mb-4 relative download-dropdown">
                       <div className="flex items-center justify-between mb-2">
                         <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {t('下载:', 'Downloads:')} ({downloadLinks.length})
+                          {(() => {
+                            // 计算过滤后的文件数量
+                            let filteredCount = downloadLinks.length;
+                            if (selectedFilters.length > 0) {
+                              const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+                              const filteredLinks = downloadLinks.filter(link => 
+                                activeFilters.some(filter => 
+                                  filter.keywords.some(keyword => 
+                                    link.name.toLowerCase().includes(keyword.toLowerCase())
+                                  )
+                                )
+                              );
+                              filteredCount = filteredLinks.length;
+                            }
+                            
+                            return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
+                              ? `${t('下载:', 'Downloads:')} (${filteredCount}/${downloadLinks.length})`
+                              : `${t('下载:', 'Downloads:')} (${downloadLinks.length})`;
+                          })()}
                         </h6>
                         <button
                           onClick={(e) => {
@@ -622,43 +640,67 @@ export const ReleaseTimeline: React.FC = () => {
                       
                       {openDropdowns.has(release.id) && (
                         <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-                          {downloadLinks.map((link, index) => {
-                            const asset = release.assets.find(asset => asset.name === link.name);
-                            return (
-                              <a
-                                key={index}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleReleaseClick(release.id);
-                                  toggleDropdown(release.id);
-                                }}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                    {link.name}
+                          {(() => {
+                            // 如果有激活的过滤器，只显示匹配的文件
+                            let filteredLinks = downloadLinks;
+                            if (selectedFilters.length > 0) {
+                              const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+                              filteredLinks = downloadLinks.filter(link => 
+                                activeFilters.some(filter => 
+                                  filter.keywords.some(keyword => 
+                                    link.name.toLowerCase().includes(keyword.toLowerCase())
+                                  )
+                                )
+                              );
+                            }
+                            
+                            return filteredLinks.length > 0 ? filteredLinks.map((link, index) => {
+                              const asset = release.assets.find(asset => asset.name === link.name);
+                              return (
+                                <a
+                                  key={index}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReleaseClick(release.id);
+                                    toggleDropdown(release.id);
+                                  }}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                      {link.name}
+                                    </div>
+                                    <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {link.size > 0 && (
+                                        <span>{formatFileSize(link.size)}</span>
+                                      )}
+                                      {asset?.updated_at && (
+                                        <span>
+                                          {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
+                                        </span>
+                                      )}
+                                      {link.downloadCount > 0 && (
+                                        <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {link.size > 0 && (
-                                      <span>{formatFileSize(link.size)}</span>
-                                    )}
-                                    {asset?.updated_at && (
-                                      <span>
-                                        {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
-                                      </span>
-                                    )}
-                                    {link.downloadCount > 0 && (
-                                      <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
-                                    )}
-                                  </div>
+                                  <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
+                                </a>
+                              );
+                            }) : (
+                              <div className="px-4 py-6 text-center text-gray-500 dark:text-gray-400">
+                                <div className="text-sm">
+                                  {t('没有匹配过滤器的文件', 'No files match the selected filters')}
                                 </div>
-                                <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
-                              </a>
+                                <div className="text-xs mt-1">
+                                  {t('尝试调整过滤器设置', 'Try adjusting your filter settings')}
+                                </div>
+                              </div>
                             );
-                          })}
+                          })()}
                         </div>
                       )}
                     </div>
@@ -731,50 +773,94 @@ export const ReleaseTimeline: React.FC = () => {
                           >
                             <div className="flex items-center space-x-2">
                               <Download className="w-4 h-4" />
-                              <span>{downloadLinks.length} {t('个文件', 'files')}</span>
+                              <span>
+                                {(() => {
+                                  // 计算过滤后的文件数量
+                                  let filteredCount = downloadLinks.length;
+                                  if (selectedFilters.length > 0) {
+                                    const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+                                    const filteredLinks = downloadLinks.filter(link => 
+                                      activeFilters.some(filter => 
+                                        filter.keywords.some(keyword => 
+                                          link.name.toLowerCase().includes(keyword.toLowerCase())
+                                        )
+                                      )
+                                    );
+                                    filteredCount = filteredLinks.length;
+                                  }
+                                  
+                                  return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
+                                    ? `${filteredCount}/${downloadLinks.length} ${t('个文件', 'files')}`
+                                    : `${downloadLinks.length} ${t('个文件', 'files')}`;
+                                })()}
+                              </span>
                             </div>
                             <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
                           </button>
                           
                           {openDropdowns.has(release.id) && (
                             <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                              {downloadLinks.map((link, index) => {
-                                const asset = release.assets.find(asset => asset.name === link.name);
-                                return (
-                                  <a
-                                    key={index}
-                                    href={link.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleReleaseClick(release.id);
-                                      toggleDropdown(release.id);
-                                    }}
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <div className="text-xs font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                        {link.name}
+                              {(() => {
+                                // 如果有激活的过滤器，只显示匹配的文件
+                                let filteredLinks = downloadLinks;
+                                if (selectedFilters.length > 0) {
+                                  const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+                                  filteredLinks = downloadLinks.filter(link => 
+                                    activeFilters.some(filter => 
+                                      filter.keywords.some(keyword => 
+                                        link.name.toLowerCase().includes(keyword.toLowerCase())
+                                      )
+                                    )
+                                  );
+                                }
+                                
+                                return filteredLinks.length > 0 ? filteredLinks.map((link, index) => {
+                                  const asset = release.assets.find(asset => asset.name === link.name);
+                                  return (
+                                    <a
+                                      key={index}
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReleaseClick(release.id);
+                                        toggleDropdown(release.id);
+                                      }}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                          {link.name}
+                                        </div>
+                                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                          {link.size > 0 && (
+                                            <span>{formatFileSize(link.size)}</span>
+                                          )}
+                                          {asset?.updated_at && (
+                                            <span>
+                                              {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
+                                            </span>
+                                          )}
+                                          {link.downloadCount > 0 && (
+                                            <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
+                                          )}
+                                        </div>
                                       </div>
-                                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        {link.size > 0 && (
-                                          <span>{formatFileSize(link.size)}</span>
-                                        )}
-                                        {asset?.updated_at && (
-                                          <span>
-                                            {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
-                                          </span>
-                                        )}
-                                        {link.downloadCount > 0 && (
-                                          <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
-                                        )}
-                                      </div>
+                                      <Download className="w-3 h-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
+                                    </a>
+                                  );
+                                }) : (
+                                  <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+                                    <div className="text-xs">
+                                      {t('没有匹配过滤器的文件', 'No files match the selected filters')}
                                     </div>
-                                    <Download className="w-3 h-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
-                                  </a>
+                                    <div className="text-xs mt-1 opacity-75">
+                                      {t('尝试调整过滤器设置', 'Try adjusting your filter settings')}
+                                    </div>
+                                  </div>
                                 );
-                              })}
+                              })()}
                             </div>
                           )}
                         </div>
