@@ -72,7 +72,7 @@ export const SearchBar: React.FC = () => {
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.minStars, searchFilters.maxStars, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {

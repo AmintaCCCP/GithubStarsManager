@@ -509,22 +509,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </div>
         </div>
 
-        {/* Update Time and Starred Time - Separate Row */}
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
+        {/* Update Time - Single Row */}
+        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
           <div className="flex items-center space-x-1">
             <Calendar className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">
               {language === 'zh' ? '更新于' : 'Updated'} {formatDistanceToNow(new Date(repository.updated_at), { addSuffix: true })}
             </span>
           </div>
-          {repository.starred_at && (
-            <div className="flex items-center space-x-1">
-              <Star className="w-4 h-4 flex-shrink-0 text-yellow-500" />
-              <span className="truncate text-xs">
-                {language === 'zh' ? '加星于' : 'Starred'} {formatDistanceToNow(new Date(repository.starred_at), { addSuffix: true })}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
