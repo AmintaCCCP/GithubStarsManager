@@ -344,58 +344,84 @@ Focus on practicality and accurate categorization to help users quickly understa
     console.log('🤖 AI Service: Starting enhanced search for:', query);
     if (!query.trim()) return repositories;
 
-    try {
-      // Step 1: Get AI-enhanced search terms and semantic understanding
-      const searchPrompt = this.createEnhancedSearchPrompt(query);
-      console.log('📝 AI Service: Created search prompt');
+    // 直接使用增强的基础搜索，提供智能排序
+    console.log('🔄 AI Service: Using enhanced basic search with intelligent ranking');
+    const results = this.performEnhancedBasicSearch(repositories, query);
+    console.log('✨ AI Service: Enhanced search completed, results:', results.length);
+    
+    return results;
+  }
+
+  // Enhanced basic search with intelligent ranking (fallback when AI fails)
+  private performEnhancedBasicSearch(repositories: Repository[], query: string): Repository[] {
+    const normalizedQuery = query.toLowerCase();
+    const queryWords = normalizedQuery.split(/\s+/).filter(word => word.length > 0);
+    
+    // Score repositories based on relevance
+    const scoredRepos = repositories.map(repo => {
+      let score = 0;
       
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: 'system',
-              content: this.language === 'zh'
-                ? '你是一个专业的仓库搜索和排序助手。请理解用户的搜索意图，提供多语言关键词匹配，并对搜索结果进行智能排序。'
-                : 'You are a professional repository search and ranking assistant. Please understand user search intent, provide multilingual keyword matching, and intelligently rank search results.',
-            },
-            {
-              role: 'user',
-              content: searchPrompt,
-            },
-          ],
-          temperature: 0.1,
-          max_tokens: 300,
-        }),
+      const searchableFields = {
+        name: repo.name.toLowerCase(),
+        fullName: repo.full_name.toLowerCase(),
+        description: (repo.description || '').toLowerCase(),
+        language: (repo.language || '').toLowerCase(),
+        topics: (repo.topics || []).join(' ').toLowerCase(),
+        aiSummary: (repo.ai_summary || '').toLowerCase(),
+        aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
+        aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
+        customDescription: (repo.custom_description || '').toLowerCase(),
+        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
+      };
+
+      // Check if any query word matches any field
+      const hasMatch = queryWords.some(word => {
+        return Object.values(searchableFields).some(fieldValue => {
+          return fieldValue.includes(word);
+        });
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        console.log('🎯 AI Service: Received AI response');
-        
-        if (content) {
-          const searchAnalysis = this.parseEnhancedSearchResponse(content);
-          console.log('📊 AI Service: Parsed search analysis:', searchAnalysis);
-          const results = this.performSemanticSearchWithReranking(repositories, query, searchAnalysis);
-          console.log('✨ AI Service: Semantic search completed, results:', results.length);
-          return results;
-        }
-      } else {
-        console.error('❌ AI Service: API response not ok:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.warn('💥 AI enhanced search failed, falling back to basic search:', error);
-    }
+      if (!hasMatch) return { repo, score: 0 };
 
-    // Fallback to basic search
-    console.log('🔄 AI Service: Using basic search fallback');
-    return this.performBasicSearch(repositories, query);
+      // Calculate relevance score
+      queryWords.forEach(word => {
+        // Name matches (highest weight)
+        if (searchableFields.name.includes(word)) score += 0.4;
+        if (searchableFields.fullName.includes(word)) score += 0.35;
+        
+        // Description matches
+        if (searchableFields.description.includes(word)) score += 0.3;
+        if (searchableFields.customDescription.includes(word)) score += 0.32;
+        
+        // Tags and topics matches
+        if (searchableFields.topics.includes(word)) score += 0.25;
+        if (searchableFields.aiTags.includes(word)) score += 0.22;
+        if (searchableFields.customTags.includes(word)) score += 0.24;
+        
+        // AI summary matches
+        if (searchableFields.aiSummary.includes(word)) score += 0.15;
+        
+        // Platform and language matches
+        if (searchableFields.aiPlatforms.includes(word)) score += 0.18;
+        if (searchableFields.language.includes(word)) score += 0.12;
+      });
+
+      // Boost for exact matches
+      if (searchableFields.name === normalizedQuery) score += 0.5;
+      if (searchableFields.name.includes(normalizedQuery)) score += 0.3;
+      
+      // Popularity boost (logarithmic to avoid overwhelming other factors)
+      const popularityScore = Math.log10(repo.stargazers_count + 1) * 0.05;
+      score += popularityScore;
+
+      return { repo, score };
+    });
+
+    // Filter out repositories with no matches and sort by relevance
+    return scoredRepos
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.repo);
   }
 
   private createSearchPrompt(query: string): string {
