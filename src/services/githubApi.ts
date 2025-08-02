@@ -27,7 +27,23 @@ export class GitHubApiService {
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // 如果是starred repositories的响应，需要处理特殊格式
+    if (endpoint.includes('/user/starred') && Array.isArray(data)) {
+      return data.map((item: any) => {
+        // 如果使用了star+json格式，数据结构会不同
+        if (item.starred_at && item.repo) {
+          return {
+            ...item.repo,
+            starred_at: item.starred_at
+          };
+        }
+        return item;
+      }) as T;
+    }
+    
+    return data;
   }
 
   async getCurrentUser(): Promise<GitHubUser> {
@@ -36,7 +52,12 @@ export class GitHubApiService {
 
   async getStarredRepositories(page = 1, perPage = 100): Promise<Repository[]> {
     const repos = await this.makeRequest<Repository[]>(
-      `/user/starred?page=${page}&per_page=${perPage}&sort=updated`
+      `/user/starred?page=${page}&per_page=${perPage}&sort=updated`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github.star+json'
+        }
+      }
     );
     return repos;
   }

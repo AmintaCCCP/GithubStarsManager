@@ -168,6 +168,10 @@ export const SearchBar: React.FC = () => {
           aValue = a.name.toLowerCase();
           bValue = b.name.toLowerCase();
           break;
+        case 'starred':
+          aValue = a.starred_at ? new Date(a.starred_at).getTime() : 0;
+          bValue = b.starred_at ? new Date(b.starred_at).getTime() : 0;
+          break;
         default:
           aValue = new Date(a.updated_at).getTime();
           bValue = new Date(b.updated_at).getTime();
@@ -361,13 +365,14 @@ export const SearchBar: React.FC = () => {
           <select
             value={searchFilters.sortBy}
             onChange={(e) => setSearchFilters({ 
-              sortBy: e.target.value as 'stars' | 'updated' | 'name' | 'created' 
+              sortBy: e.target.value as 'stars' | 'updated' | 'name' | 'starred'
             })}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
           >
             <option value="stars">{t('按星标排序', 'Sort by Stars')}</option>
             <option value="updated">{t('按更新排序', 'Sort by Updated')}</option>
             <option value="name">{t('按名称排序', 'Sort by Name')}</option>
+            <option value="starred">{t('按加星时间排序', 'Sort by Starred Time')}</option>
           </select>
           <button
             onClick={() => setSearchFilters({ 

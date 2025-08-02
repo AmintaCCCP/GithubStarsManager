@@ -6,8 +6,10 @@ export interface Repository {
   html_url: string;
   stargazers_count: number;
   language: string | null;
+  created_at: string;
   updated_at: string;
   pushed_at: string;
+  starred_at?: string; // 新增：加入星标的时间
   owner: {
     login: string;
     avatar_url: string;
@@ -89,7 +91,7 @@ export interface SearchFilters {
   tags: string[];
   languages: string[];
   platforms: string[]; // 新增：平台过滤
-  sortBy: 'stars' | 'updated' | 'name' | 'created';
+  sortBy: 'stars' | 'updated' | 'name' | 'starred';
   sortOrder: 'desc' | 'asc';
   minStars?: number;
   maxStars?: number;
