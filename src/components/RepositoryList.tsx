@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
+import { SearchResultStats } from './SearchResultStats';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -30,6 +31,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
   const [isPaused, setIsPaused] = useState(false);
+  const [searchTime, setSearchTime] = useState<number | undefined>(undefined);
   
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
@@ -261,6 +263,15 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Search Result Statistics */}
+      <SearchResultStats
+        repositories={repositories}
+        filteredRepositories={filteredRepositories}
+        searchQuery={useAppStore.getState().searchFilters.query}
+        isRealTimeSearch={useAppStore.getState().searchFilters.query === ''}
+        searchTime={searchTime}
+      />
+
       {/* AI Analysis Controls */}
       <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center space-x-4">
@@ -409,6 +420,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             key={repo.id} 
             repository={repo} 
             showAISummary={showAISummary}
+            searchQuery={useAppStore.getState().searchFilters.query}
           />
         ))}
       </div>

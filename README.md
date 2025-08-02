@@ -2,8 +2,6 @@
 
 An app for managing github starred repositories.
 
-> demo: https://soft-stroopwafel-2b73d1.netlify.app/
-
 ## ✨ Features
 
 ### Starred Repo Manager
@@ -31,6 +29,7 @@ Use your own AI model API that supports OpenAI-compatible interfaces.
 2. Navigate to the directory, and open a Terminal window at the downloaded folder.
 3. Run `npm install` to install dependencies and `npm run dev` to build
 
+> 💡 When running the project locally using `npm run dev`, calls to AI services and WebDAV may fail due to CORS restrictions. To avoid this issue, use the prebuilt client application or build the client yourself.
 > You can also download desktop client for MacOS:
 > https://github.com/AmintaCCCP/GithubStarsManager/releases
 

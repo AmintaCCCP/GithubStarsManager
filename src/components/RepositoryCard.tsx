@@ -10,15 +10,17 @@ import { RepositoryEditModal } from './RepositoryEditModal';
 interface RepositoryCardProps {
   repository: Repository;
   showAISummary?: boolean;
+  searchQuery?: string; // 新增：用于高亮搜索关键词
 }
 
-export const RepositoryCard: React.FC<RepositoryCardProps> = ({ 
-  repository, 
-  showAISummary = true 
+export const RepositoryCard: React.FC<RepositoryCardProps> = ({
+  repository,
+  showAISummary = true,
+  searchQuery = ''
 }) => {
-  const { 
-    releaseSubscriptions, 
-    toggleReleaseSubscription, 
+  const {
+    releaseSubscriptions,
+    toggleReleaseSubscription,
     githubToken,
     aiConfigs,
     activeAIConfig,
@@ -28,14 +30,36 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     customCategories,
     updateRepository
   } = useAppStore();
-  
+
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
-  
+
   const descriptionRef = useRef<HTMLParagraphElement>(null);
-  
+
   const isSubscribed = releaseSubscriptions.has(repository.id);
+
+  // 高亮搜索关键词的工具函数
+  const highlightSearchTerm = (text: string, searchTerm: string) => {
+    if (!searchTerm.trim() || !text) return text;
+
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (regex.test(part)) {
+        return (
+          <mark
+            key={index}
+            className="bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100 px-1 rounded"
+          >
+            {part}
+          </mark>
+        );
+      }
+      return part;
+    });
+  };
 
   // Check if text is actually truncated by comparing scroll height with client height
   useEffect(() => {
@@ -49,7 +73,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
     // Check truncation after component mounts and when content changes
     checkTruncation();
-    
+
     // Also check on window resize
     window.addEventListener('resize', checkTruncation);
     return () => window.removeEventListener('resize', checkTruncation);
@@ -88,7 +112,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const getPlatformIcon = (platform: string) => {
     const platformLower = platform.toLowerCase();
-    
+
     switch (platformLower) {
       case 'mac':
       case 'macos':
@@ -146,7 +170,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       const confirmMessage = language === 'zh'
         ? `此仓库已于 ${new Date(repository.analyzed_at).toLocaleString()} 进行过AI分析。\n\n是否要重新分析？这将覆盖现有的分析结果。`
         : `This repository was analyzed on ${new Date(repository.analyzed_at).toLocaleString()}.\n\nDo you want to re-analyze? This will overwrite the existing analysis results.`;
-      
+
       if (!confirm(confirmMessage)) {
         return;
       }
@@ -156,17 +180,17 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     try {
       const githubApi = new GitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
-      
+
       // 获取README内容
       const [owner, name] = repository.full_name.split('/');
       const readmeContent = await githubApi.getRepositoryReadme(owner, name);
-      
+
       // 获取自定义分类名称列表
       const customCategoryNames = customCategories.map(cat => cat.name);
-      
+
       // AI分析
       const analysis = await aiService.analyzeRepository(repository, readmeContent, customCategoryNames);
-      
+
       // 更新仓库信息
       const updatedRepo = {
         ...repository,
@@ -175,13 +199,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         ai_platforms: analysis.platforms,
         analyzed_at: new Date().toISOString()
       };
-      
+
       updateRepository(updatedRepo);
-      
+
       const successMessage = repository.analyzed_at
         ? (language === 'zh' ? 'AI重新分析完成！' : 'AI re-analysis completed!')
         : (language === 'zh' ? 'AI分析完成！' : 'AI analysis completed!');
-      
+
       alert(successMessage);
     } catch (error) {
       console.error('AI analysis failed:', error);
@@ -255,7 +279,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const getAIButtonTitle = () => {
     if (repository.analyzed_at) {
       const analyzeTime = new Date(repository.analyzed_at).toLocaleString();
-      return language === 'zh' 
+      return language === 'zh'
         ? `已于 ${analyzeTime} 分析过，点击重新分析`
         : `Analyzed on ${analyzeTime}, click to re-analyze`;
     } else {
@@ -276,7 +300,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         />
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-            {repository.name}
+            {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
             {repository.owner.login}
@@ -291,22 +315,20 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           <button
             onClick={handleAIAnalyze}
             disabled={isLoading}
-            className={`p-2 rounded-lg transition-colors ${
-              repository.analyzed_at
-                ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
-                : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
-            } disabled:opacity-50`}
+            className={`p-2 rounded-lg transition-colors ${repository.analyzed_at
+              ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
+              : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+              } disabled:opacity-50`}
             title={getAIButtonTitle()}
           >
             <Bot className="w-4 h-4" />
           </button>
           <button
             onClick={() => toggleReleaseSubscription(repository.id)}
-            className={`p-2 rounded-lg transition-colors ${
-              isSubscribed
-                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
+            className={`p-2 rounded-lg transition-colors ${isSubscribed
+              ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
+              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
             title={isSubscribed ? 'Unsubscribe from releases' : 'Subscribe to releases'}
           >
             {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
@@ -345,30 +367,30 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
       {/* Description with Tooltip */}
       <div className="mb-4 flex-1">
-        <div 
+        <div
           className="relative"
           onMouseEnter={() => isTextTruncated && setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          <p 
+          <p
             ref={descriptionRef}
             className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-3 mb-2"
           >
-            {displayContent.content}
+            {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
-          
+
           {/* Tooltip - Only show when text is actually truncated */}
           {isTextTruncated && showTooltip && (
             <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 max-h-48 overflow-y-auto">
               <div className="whitespace-pre-wrap break-words">
-                {displayContent.content}
+                {highlightSearchTerm(displayContent.content, searchQuery)}
               </div>
               {/* Arrow */}
               <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900 dark:border-t-gray-700"></div>
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center space-x-2">
           {displayContent.isCustom && (
             <div className="flex items-center space-x-1 text-xs text-orange-600 dark:text-orange-400">
@@ -401,15 +423,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.slice(0, 3).map((tag, index) => (
             <span
               key={index}
-              className={`px-2 py-1 rounded-md text-xs font-medium ${
-                displayTags.isCustom
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                  : 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-              }`}
+              className={`px-2 py-1 rounded-md text-xs font-medium ${displayTags.isCustom
+                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+                : 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+                }`}
             >
               {displayTags.isCustom && <Edit3 className="w-3 h-3 inline mr-1" />}
               {!displayTags.isCustom && <Tag className="w-3 h-3 inline mr-1" />}
-              {tag}
+              {highlightSearchTerm(tag, searchQuery)}
             </span>
           ))}
           {repository.topics && repository.topics.length > 0 && !displayTags.isCustom && (
@@ -437,7 +458,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             {repository.ai_platforms.slice(0, 6).map((platform, index) => {
               const IconComponent = getPlatformIcon(platform);
               const displayName = getPlatformDisplayName(platform);
-              
+
               return (
                 <div
                   key={index}
@@ -471,7 +492,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
               <span>{formatNumber(repository.stargazers_count)}</span>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             {repository.last_edited && (
               <div className="flex items-center space-x-1 text-xs">
@@ -488,15 +509,25 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </div>
         </div>
 
-        {/* Update Time - Separate Row */}
-        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
-          <Calendar className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate">
-            {language === 'zh' ? '更新于' : 'Updated'} {formatDistanceToNow(new Date(repository.updated_at), { addSuffix: true })}
-          </span>
+        {/* Update Time and Starred Time - Separate Row */}
+        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <div className="flex items-center space-x-1">
+            <Calendar className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">
+              {language === 'zh' ? '更新于' : 'Updated'} {formatDistanceToNow(new Date(repository.updated_at), { addSuffix: true })}
+            </span>
+          </div>
+          {repository.starred_at && (
+            <div className="flex items-center space-x-1">
+              <Star className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+              <span className="truncate text-xs">
+                {language === 'zh' ? '加星于' : 'Starred'} {formatDistanceToNow(new Date(repository.starred_at), { addSuffix: true })}
+              </span>
+            </div>
+          )}
         </div>
       </div>
-      
+
       {/* Repository Edit Modal */}
       <RepositoryEditModal
         isOpen={editModalOpen}

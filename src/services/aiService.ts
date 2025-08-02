@@ -341,11 +341,13 @@ Focus on practicality and accurate categorization to help users quickly understa
   }
 
   async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
+    console.log('🤖 AI Service: Starting enhanced search for:', query);
     if (!query.trim()) return repositories;
 
     try {
       // Step 1: Get AI-enhanced search terms and semantic understanding
       const searchPrompt = this.createEnhancedSearchPrompt(query);
+      console.log('📝 AI Service: Created search prompt');
       
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -375,17 +377,24 @@ Focus on practicality and accurate categorization to help users quickly understa
       if (response.ok) {
         const data = await response.json();
         const content = data.choices[0]?.message?.content;
+        console.log('🎯 AI Service: Received AI response');
         
         if (content) {
           const searchAnalysis = this.parseEnhancedSearchResponse(content);
-          return this.performSemanticSearchWithReranking(repositories, query, searchAnalysis);
+          console.log('📊 AI Service: Parsed search analysis:', searchAnalysis);
+          const results = this.performSemanticSearchWithReranking(repositories, query, searchAnalysis);
+          console.log('✨ AI Service: Semantic search completed, results:', results.length);
+          return results;
         }
+      } else {
+        console.error('❌ AI Service: API response not ok:', response.status, response.statusText);
       }
     } catch (error) {
-      console.warn('AI enhanced search failed, falling back to basic search:', error);
+      console.warn('💥 AI enhanced search failed, falling back to basic search:', error);
     }
 
     // Fallback to basic search
+    console.log('🔄 AI Service: Using basic search fallback');
     return this.performBasicSearch(repositories, query);
   }
 

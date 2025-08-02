@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
+import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
+import { SearchShortcutsHelp } from './SearchShortcutsHelp';
 
 export const SearchBar: React.FC = () => {
   const {
@@ -64,10 +66,13 @@ export const SearchBar: React.FC = () => {
   useEffect(() => {
     // Perform search when filters change (except query)
     const performSearch = async () => {
-      if (searchFilters.query && !isSearching && !isRealTimeSearch) {
-        setIsSearching(true);
-        await performAdvancedSearch();
-        setIsSearching(false);
+      if (searchFilters.query && !isSearching) {
+        // Only perform AI search if not in real-time search mode
+        if (!isRealTimeSearch) {
+          setIsSearching(true);
+          await performAdvancedSearch();
+          setIsSearching(false);
+        }
       } else if (!searchFilters.query) {
         performBasicFilter();
       }
@@ -105,6 +110,8 @@ export const SearchBar: React.FC = () => {
   };
 
   const performRealTimeSearch = (query: string) => {
+    const startTime = performance.now();
+    
     if (!query.trim()) {
       performBasicFilter();
       return;
@@ -120,9 +127,13 @@ export const SearchBar: React.FC = () => {
     // Apply other filters
     const finalFiltered = applyFilters(filtered);
     setSearchResults(finalFiltered);
+    
+    const endTime = performance.now();
+    console.log(`Real-time search completed in ${(endTime - startTime).toFixed(2)}ms`);
   };
 
   const performAdvancedSearch = async () => {
+    const startTime = performance.now();
     let filtered = repositories;
 
     // AI-powered natural language search with semantic understanding and re-ranking
@@ -147,6 +158,15 @@ export const SearchBar: React.FC = () => {
     // Apply other filters
     filtered = applyFilters(filtered);
     setSearchResults(filtered);
+    
+    const endTime = performance.now();
+    const searchTime = endTime - startTime;
+    console.log(`AI search completed in ${searchTime.toFixed(2)}ms`);
+    
+    // 通知搜索完成时间（可以通过store或其他方式传递给统计组件）
+    if (searchFilters.query) {
+      localStorage.setItem('lastSearchTime', searchTime.toString());
+    }
   };
 
   const performBasicFilter = () => {
@@ -259,10 +279,13 @@ export const SearchBar: React.FC = () => {
     return filtered;
   };
 
-  const handleAISearch = () => {
+  const handleAISearch = async () => {
+    if (!searchQuery.trim()) return;
+    
     // Switch to AI search mode and trigger advanced search
     setIsRealTimeSearch(false);
-    setSearchFilters({ query: searchQuery });
+    setShowSearchHistory(false);
+    setShowSuggestions(false);
     
     // Add to search history if not empty and not already in history
     if (searchQuery.trim() && !searchHistory.includes(searchQuery.trim())) {
@@ -271,7 +294,48 @@ export const SearchBar: React.FC = () => {
       localStorage.setItem('github-stars-search-history', JSON.stringify(newHistory));
     }
     
-    setShowSearchHistory(false);
+    // Trigger AI search immediately
+    setIsSearching(true);
+    console.log('🔍 Starting AI search for query:', searchQuery);
+    
+    try {
+      let filtered = repositories;
+      
+      const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
+      console.log('🤖 AI Config found:', !!activeConfig, 'Active AI Config ID:', activeAIConfig);
+      console.log('📋 Available AI Configs:', aiConfigs.length);
+      console.log('🔧 AI Configs:', aiConfigs.map(c => ({ id: c.id, name: c.name, hasApiKey: !!c.apiKey })));
+      
+      if (activeConfig) {
+        try {
+          console.log('🚀 Calling AI service...');
+          const aiService = new AIService(activeConfig, language);
+          filtered = await aiService.searchRepositoriesWithReranking(filtered, searchQuery);
+          console.log('✅ AI search completed, results:', filtered.length);
+        } catch (error) {
+          console.warn('❌ AI search failed, falling back to basic search:', error);
+          filtered = performBasicTextSearch(filtered, searchQuery);
+          console.log('🔄 Basic search fallback results:', filtered.length);
+        }
+      } else {
+        console.log('⚠️ No AI config found, using basic text search');
+        // Basic text search if no AI config
+        filtered = performBasicTextSearch(filtered, searchQuery);
+        console.log('📝 Basic search results:', filtered.length);
+      }
+      
+      // Apply other filters and update results
+      const finalFiltered = applyFilters(filtered);
+      console.log('🎯 Final filtered results:', finalFiltered.length);
+      setSearchResults(finalFiltered);
+      
+      // Update search filters to reflect the AI search
+      setSearchFilters({ query: searchQuery });
+    } catch (error) {
+      console.error('💥 Search failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleClearSearch = () => {
@@ -346,6 +410,28 @@ export const SearchBar: React.FC = () => {
     localStorage.removeItem('github-stars-search-history');
     setShowSearchHistory(false);
   };
+
+  // 搜索快捷键
+  const { pauseListening, resumeListening } = useSearchShortcuts({
+    onFocusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    onClearSearch: () => {
+      handleClearSearch();
+    },
+    onToggleFilters: () => {
+      setShowFilters(!showFilters);
+    }
+  });
+
+  // 在模态框打开时暂停快捷键监听
+  useEffect(() => {
+    if (showSearchHistory || showSuggestions) {
+      pauseListening();
+    } else {
+      resumeListening();
+    }
+  }, [showSearchHistory, showSuggestions, pauseListening, resumeListening]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -597,6 +683,8 @@ export const SearchBar: React.FC = () => {
               <span>{t('清除全部', 'Clear all')}</span>
             </button>
           )}
+          
+          <SearchShortcutsHelp />
         </div>
 
         {/* Sort Controls */}
@@ -799,6 +887,9 @@ export const SearchBar: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Search Shortcuts Help */}
+      <SearchShortcutsHelp />
     </div>
   );
 };
