@@ -340,6 +340,55 @@ Focus on practicality and accurate categorization to help users quickly understa
     return this.performBasicSearch(repositories, query);
   }
 
+  async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
+    if (!query.trim()) return repositories;
+
+    try {
+      // Step 1: Get AI-enhanced search terms and semantic understanding
+      const searchPrompt = this.createEnhancedSearchPrompt(query);
+      
+      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: 'system',
+              content: this.language === 'zh'
+                ? '你是一个专业的仓库搜索和排序助手。请理解用户的搜索意图，提供多语言关键词匹配，并对搜索结果进行智能排序。'
+                : 'You are a professional repository search and ranking assistant. Please understand user search intent, provide multilingual keyword matching, and intelligently rank search results.',
+            },
+            {
+              role: 'user',
+              content: searchPrompt,
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 300,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content;
+        
+        if (content) {
+          const searchAnalysis = this.parseEnhancedSearchResponse(content);
+          return this.performSemanticSearchWithReranking(repositories, query, searchAnalysis);
+        }
+      }
+    } catch (error) {
+      console.warn('AI enhanced search failed, falling back to basic search:', error);
+    }
+
+    // Fallback to basic search
+    return this.performBasicSearch(repositories, query);
+  }
+
   private createSearchPrompt(query: string): string {
     if (this.language === 'zh') {
       return `
@@ -376,6 +425,74 @@ Reply in JSON format:
     }
   }
 
+  private createEnhancedSearchPrompt(query: string): string {
+    if (this.language === 'zh') {
+      return `
+用户搜索查询: "${query}"
+
+请深度分析这个搜索查询并提供：
+1. 核心搜索意图和目标
+2. 多语言关键词（中文、英文、技术术语）
+3. 相关的应用类型、技术栈、平台类型
+4. 同义词和相关概念
+5. 重要性权重（用于排序）
+
+以JSON格式回复：
+{
+  "intent": "用户的核心搜索意图",
+  "keywords": {
+    "primary": ["主要关键词1", "primary keyword1"],
+    "secondary": ["次要关键词1", "secondary keyword1"],
+    "technical": ["技术术语1", "technical term1"]
+  },
+  "categories": ["应用分类1", "category1"],
+  "platforms": ["平台类型1", "platform1"],
+  "synonyms": ["同义词1", "synonym1"],
+  "weights": {
+    "name_match": 0.4,
+    "description_match": 0.3,
+    "tags_match": 0.2,
+    "summary_match": 0.1
+  }
+}
+
+注意：请确保能够跨语言匹配，即使用户用中文搜索，也要能匹配到英文仓库，反之亦然。
+      `.trim();
+    } else {
+      return `
+User search query: "${query}"
+
+Please deeply analyze this search query and provide:
+1. Core search intent and objectives
+2. Multilingual keywords (Chinese, English, technical terms)
+3. Related application types, tech stacks, platform types
+4. Synonyms and related concepts
+5. Importance weights (for ranking)
+
+Reply in JSON format:
+{
+  "intent": "User's core search intent",
+  "keywords": {
+    "primary": ["primary keyword1", "主要关键词1"],
+    "secondary": ["secondary keyword1", "次要关键词1"],
+    "technical": ["technical term1", "技术术语1"]
+  },
+  "categories": ["category1", "应用分类1"],
+  "platforms": ["platform1", "平台类型1"],
+  "synonyms": ["synonym1", "同义词1"],
+  "weights": {
+    "name_match": 0.4,
+    "description_match": 0.3,
+    "tags_match": 0.2,
+    "summary_match": 0.1
+  }
+}
+
+Note: Ensure cross-language matching, so Chinese queries can match English repositories and vice versa.
+      `.trim();
+    }
+  }
+
   private parseSearchResponse(content: string): string[] {
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -392,6 +509,61 @@ Reply in JSON format:
       console.warn('Failed to parse AI search response:', error);
     }
     return [];
+  }
+
+  private parseEnhancedSearchResponse(content: string): {
+    intent: string;
+    keywords: {
+      primary: string[];
+      secondary: string[];
+      technical: string[];
+    };
+    categories: string[];
+    platforms: string[];
+    synonyms: string[];
+    weights: {
+      name_match: number;
+      description_match: number;
+      tags_match: number;
+      summary_match: number;
+    };
+  } {
+    const defaultResponse = {
+      intent: '',
+      keywords: { primary: [], secondary: [], technical: [] },
+      categories: [],
+      platforms: [],
+      synonyms: [],
+      weights: { name_match: 0.4, description_match: 0.3, tags_match: 0.2, summary_match: 0.1 }
+    };
+
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          intent: parsed.intent || '',
+          keywords: {
+            primary: Array.isArray(parsed.keywords?.primary) ? parsed.keywords.primary : [],
+            secondary: Array.isArray(parsed.keywords?.secondary) ? parsed.keywords.secondary : [],
+            technical: Array.isArray(parsed.keywords?.technical) ? parsed.keywords.technical : []
+          },
+          categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+          platforms: Array.isArray(parsed.platforms) ? parsed.platforms : [],
+          synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
+          weights: {
+            name_match: parsed.weights?.name_match || 0.4,
+            description_match: parsed.weights?.description_match || 0.3,
+            tags_match: parsed.weights?.tags_match || 0.2,
+            summary_match: parsed.weights?.summary_match || 0.1
+          }
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to parse enhanced AI search response:', error);
+    }
+    
+    return defaultResponse;
   }
 
   private performEnhancedSearch(repositories: Repository[], originalQuery: string, aiTerms: string[]): Repository[] {
@@ -417,6 +589,145 @@ Reply in JSON format:
                normalizedTerm.split(/\s+/).every(word => searchableText.includes(word));
       });
     });
+  }
+
+  private performSemanticSearchWithReranking(
+    repositories: Repository[], 
+    originalQuery: string, 
+    searchAnalysis: any
+  ): Repository[] {
+    // Collect all search terms from the analysis
+    const allSearchTerms = [
+      originalQuery,
+      ...searchAnalysis.keywords.primary,
+      ...searchAnalysis.keywords.secondary,
+      ...searchAnalysis.keywords.technical,
+      ...searchAnalysis.categories,
+      ...searchAnalysis.platforms,
+      ...searchAnalysis.synonyms
+    ].filter(term => term && typeof term === 'string');
+
+    // First, filter repositories that match any search terms
+    const matchedRepos = repositories.filter(repo => {
+      const searchableFields = {
+        name: repo.name.toLowerCase(),
+        fullName: repo.full_name.toLowerCase(),
+        description: (repo.description || '').toLowerCase(),
+        language: (repo.language || '').toLowerCase(),
+        topics: (repo.topics || []).join(' ').toLowerCase(),
+        aiSummary: (repo.ai_summary || '').toLowerCase(),
+        aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
+        aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
+        customDescription: (repo.custom_description || '').toLowerCase(),
+        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
+      };
+
+      // Check if any search term matches any field
+      return allSearchTerms.some(term => {
+        const normalizedTerm = term.toLowerCase();
+        return Object.values(searchableFields).some(fieldValue => {
+          return fieldValue.includes(normalizedTerm) ||
+                 // Fuzzy matching for partial matches
+                 normalizedTerm.split(/\s+/).every(word => fieldValue.includes(word));
+        });
+      });
+    });
+
+    // If no matches found, return empty array (don't show irrelevant results)
+    if (matchedRepos.length === 0) {
+      return [];
+    }
+
+    // Calculate relevance scores for matched repositories
+    const scoredRepos = matchedRepos.map(repo => {
+      let score = 0;
+      const weights = searchAnalysis.weights;
+
+      const searchableFields = {
+        name: repo.name.toLowerCase(),
+        fullName: repo.full_name.toLowerCase(),
+        description: (repo.description || '').toLowerCase(),
+        language: (repo.language || '').toLowerCase(),
+        topics: (repo.topics || []).join(' ').toLowerCase(),
+        aiSummary: (repo.ai_summary || '').toLowerCase(),
+        aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
+        aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
+        customDescription: (repo.custom_description || '').toLowerCase(),
+        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
+      };
+
+      // Score based on different types of matches
+      allSearchTerms.forEach(term => {
+        const normalizedTerm = term.toLowerCase();
+        
+        // Name matches (highest weight)
+        if (searchableFields.name.includes(normalizedTerm) || searchableFields.fullName.includes(normalizedTerm)) {
+          score += weights.name_match;
+        }
+
+        // Description matches
+        if (searchableFields.description.includes(normalizedTerm) || searchableFields.customDescription.includes(normalizedTerm)) {
+          score += weights.description_match;
+        }
+
+        // Tags and topics matches
+        if (searchableFields.topics.includes(normalizedTerm) || 
+            searchableFields.aiTags.includes(normalizedTerm) || 
+            searchableFields.customTags.includes(normalizedTerm)) {
+          score += weights.tags_match;
+        }
+
+        // AI summary matches
+        if (searchableFields.aiSummary.includes(normalizedTerm)) {
+          score += weights.summary_match;
+        }
+
+        // Platform matches
+        if (searchableFields.aiPlatforms.includes(normalizedTerm)) {
+          score += weights.tags_match * 0.8; // Slightly lower than tags
+        }
+
+        // Language matches
+        if (searchableFields.language.includes(normalizedTerm)) {
+          score += weights.tags_match * 0.6;
+        }
+      });
+
+      // Boost score for primary keywords
+      searchAnalysis.keywords.primary.forEach(primaryTerm => {
+        const normalizedTerm = primaryTerm.toLowerCase();
+        Object.values(searchableFields).forEach(fieldValue => {
+          if (fieldValue.includes(normalizedTerm)) {
+            score += 0.2; // Additional boost for primary keywords
+          }
+        });
+      });
+
+      // Boost score for exact matches
+      const exactMatch = allSearchTerms.some(term => {
+        const normalizedTerm = term.toLowerCase();
+        return searchableFields.name === normalizedTerm || 
+               searchableFields.name.includes(` ${normalizedTerm} `) ||
+               searchableFields.name.startsWith(`${normalizedTerm} `) ||
+               searchableFields.name.endsWith(` ${normalizedTerm}`);
+      });
+      
+      if (exactMatch) {
+        score += 0.5;
+      }
+
+      // Consider repository popularity as a tie-breaker
+      const popularityScore = Math.log10(repo.stargazers_count + 1) * 0.05;
+      score += popularityScore;
+
+      return { repo, score };
+    });
+
+    // Sort by relevance score (descending) and return only repositories with meaningful scores
+    return scoredRepos
+      .filter(item => item.score > 0.1) // Filter out very low relevance matches
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.repo);
   }
 
   private performBasicSearch(repositories: Repository[], query: string): Repository[] {

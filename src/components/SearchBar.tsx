@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 
@@ -21,6 +21,12 @@ export const SearchBar: React.FC = () => {
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
+  const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
@@ -34,12 +40,31 @@ export const SearchBar: React.FC = () => {
     setAvailableLanguages(languages);
     setAvailableTags(tags);
     setAvailablePlatforms(platforms);
+
+    // Generate search suggestions from available data
+    const suggestions = [
+      ...languages.slice(0, 5),
+      ...tags.slice(0, 10),
+      ...platforms.slice(0, 5)
+    ].filter(Boolean);
+    setSearchSuggestions([...new Set(suggestions)]);
+
+    // Load search history from localStorage
+    const savedHistory = localStorage.getItem('github-stars-search-history');
+    if (savedHistory) {
+      try {
+        const history = JSON.parse(savedHistory);
+        setSearchHistory(Array.isArray(history) ? history.slice(0, 10) : []);
+      } catch (error) {
+        console.warn('Failed to load search history:', error);
+      }
+    }
   }, [repositories]);
 
   useEffect(() => {
     // Perform search when filters change (except query)
     const performSearch = async () => {
-      if (searchFilters.query && !isSearching) {
+      if (searchFilters.query && !isSearching && !isRealTimeSearch) {
         setIsSearching(true);
         await performAdvancedSearch();
         setIsSearching(false);
@@ -51,16 +76,63 @@ export const SearchBar: React.FC = () => {
     performSearch();
   }, [searchFilters, repositories, releaseSubscriptions]);
 
+  // Real-time search effect for repository name matching
+  useEffect(() => {
+    if (searchQuery && isRealTimeSearch) {
+      const timeoutId = setTimeout(() => {
+        performRealTimeSearch(searchQuery);
+      }, 300); // 300ms debounce to avoid too frequent searches
+
+      return () => clearTimeout(timeoutId);
+    } else if (!searchQuery) {
+      // Reset to show all repositories when search is empty
+      performBasicFilter();
+    }
+  }, [searchQuery, isRealTimeSearch, repositories]);
+
+  // Handle composition events for better IME support (Chinese input)
+  const handleCompositionStart = () => {
+    // Pause real-time search during IME composition
+    setIsRealTimeSearch(false);
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    // Resume real-time search after IME composition ends
+    const value = e.currentTarget.value;
+    if (value) {
+      setIsRealTimeSearch(true);
+    }
+  };
+
+  const performRealTimeSearch = (query: string) => {
+    if (!query.trim()) {
+      performBasicFilter();
+      return;
+    }
+
+    // Real-time search only matches repository names for fast response
+    const normalizedQuery = query.toLowerCase();
+    const filtered = repositories.filter(repo => {
+      return repo.name.toLowerCase().includes(normalizedQuery) ||
+             repo.full_name.toLowerCase().includes(normalizedQuery);
+    });
+
+    // Apply other filters
+    const finalFiltered = applyFilters(filtered);
+    setSearchResults(finalFiltered);
+  };
+
   const performAdvancedSearch = async () => {
     let filtered = repositories;
 
-    // AI-powered natural language search
+    // AI-powered natural language search with semantic understanding and re-ranking
     if (searchFilters.query) {
       const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
       if (activeConfig) {
         try {
           const aiService = new AIService(activeConfig, language);
-          filtered = await aiService.searchRepositories(filtered, searchFilters.query);
+          // Use enhanced AI search with semantic understanding and relevance scoring
+          filtered = await aiService.searchRepositoriesWithReranking(filtered, searchFilters.query);
         } catch (error) {
           console.warn('AI search failed, falling back to basic search:', error);
           // Fallback to basic text search
@@ -187,18 +259,97 @@ export const SearchBar: React.FC = () => {
     return filtered;
   };
 
-  const handleSearch = () => {
+  const handleAISearch = () => {
+    // Switch to AI search mode and trigger advanced search
+    setIsRealTimeSearch(false);
     setSearchFilters({ query: searchQuery });
+    
+    // Add to search history if not empty and not already in history
+    if (searchQuery.trim() && !searchHistory.includes(searchQuery.trim())) {
+      const newHistory = [searchQuery.trim(), ...searchHistory.slice(0, 9)];
+      setSearchHistory(newHistory);
+      localStorage.setItem('github-stars-search-history', JSON.stringify(newHistory));
+    }
+    
+    setShowSearchHistory(false);
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
+    setIsRealTimeSearch(false);
     setSearchFilters({ query: '' });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Enable real-time search mode when user starts typing
+    if (value && !isRealTimeSearch) {
+      setIsRealTimeSearch(true);
+    } else if (!value && isRealTimeSearch) {
+      setIsRealTimeSearch(false);
+    }
+
+    // Show search history when input is focused and empty
+    if (!value && searchHistory.length > 0) {
+      setShowSearchHistory(true);
+      setShowSuggestions(false);
+    } else if (value && value.length >= 2) {
+      // Show suggestions when user types 2+ characters
+      const filteredSuggestions = searchSuggestions.filter(suggestion =>
+        suggestion.toLowerCase().includes(value.toLowerCase()) && 
+        suggestion.toLowerCase() !== value.toLowerCase()
+      ).slice(0, 5);
+      
+      if (filteredSuggestions.length > 0) {
+        setShowSuggestions(true);
+        setShowSearchHistory(false);
+      } else {
+        setShowSuggestions(false);
+      }
+    } else {
+      setShowSearchHistory(false);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (!searchQuery && searchHistory.length > 0) {
+      setShowSearchHistory(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Delay hiding to allow clicking on history/suggestion items
+    setTimeout(() => {
+      setShowSearchHistory(false);
+      setShowSuggestions(false);
+    }, 200);
+  };
+
+  const handleHistoryItemClick = (historyQuery: string) => {
+    setSearchQuery(historyQuery);
+    setIsRealTimeSearch(false);
+    setSearchFilters({ query: historyQuery });
+    setShowSearchHistory(false);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSearchQuery(suggestion);
+    setIsRealTimeSearch(true);
+    setShowSuggestions(false);
+  };
+
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+    localStorage.removeItem('github-stars-search-history');
+    setShowSearchHistory(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      handleAISearch();
     }
   };
 
@@ -225,6 +376,7 @@ export const SearchBar: React.FC = () => {
 
   const clearFilters = () => {
     setSearchQuery('');
+    setIsRealTimeSearch(false);
     setSearchFilters({
       query: '',
       tags: [],
@@ -299,16 +451,77 @@ export const SearchBar: React.FC = () => {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
+          ref={searchInputRef}
           type="text"
           placeholder={t(
-            "使用自然语言搜索仓库 (例如: '查找所有笔记应用')",
-            "Search repositories with natural language (e.g., 'find all note-taking apps')"
+            "输入关键词实时搜索，或使用AI搜索进行语义理解",
+            "Type keywords for real-time search, or use AI search for semantic understanding"
           )}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={handleInputChange}
           onKeyPress={handleKeyPress}
-          className="w-full pl-10 pr-32 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          className="w-full pl-10 pr-40 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
         />
+
+        {/* Search History Dropdown */}
+        {showSearchHistory && searchHistory.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('搜索历史', 'Search History')}
+              </span>
+              <button
+                onClick={clearSearchHistory}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              >
+                {t('清除', 'Clear')}
+              </button>
+            </div>
+            {searchHistory.map((historyQuery, index) => (
+              <button
+                key={index}
+                onClick={() => handleHistoryItemClick(historyQuery)}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2"
+              >
+                <Search className="w-4 h-4 text-gray-400" />
+                <span className="truncate">{historyQuery}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Search Suggestions Dropdown */}
+        {showSuggestions && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('搜索建议', 'Search Suggestions')}
+              </span>
+            </div>
+            {searchSuggestions
+              .filter(suggestion =>
+                suggestion.toLowerCase().includes(searchQuery.toLowerCase()) && 
+                suggestion.toLowerCase() !== searchQuery.toLowerCase()
+              )
+              .slice(0, 5)
+              .map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  </div>
+                  <span className="truncate">{suggestion}</span>
+                </button>
+              ))}
+          </div>
+        )}
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
           {searchQuery && (
             <button
@@ -320,14 +533,40 @@ export const SearchBar: React.FC = () => {
             </button>
           )}
           <button
-            onClick={handleSearch}
+            onClick={handleAISearch}
             disabled={isSearching}
-            className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+            className="flex items-center space-x-1 px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
+            title={t('使用AI进行语义搜索和智能排序', 'Use AI for semantic search and intelligent ranking')}
           >
-            {isSearching ? t('搜索中...', 'Searching...') : t('搜索', 'Search')}
+            <Bot className="w-4 h-4" />
+            <span>{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
           </button>
         </div>
       </div>
+
+      {/* Search Status Indicator */}
+      {searchQuery && (
+        <div className="mb-4 flex items-center justify-between text-sm">
+          <div className="flex items-center space-x-2">
+            {isRealTimeSearch ? (
+              <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span>{t('实时搜索模式 - 匹配仓库名称', 'Real-time search mode - matching repository names')}</span>
+              </div>
+            ) : searchFilters.query ? (
+              <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+                <Bot className="w-4 h-4" />
+                <span>{t('AI语义搜索模式 - 智能匹配和排序', 'AI semantic search mode - intelligent matching and ranking')}</span>
+              </div>
+            ) : null}
+          </div>
+          {isRealTimeSearch && (
+            <div className="text-gray-500 dark:text-gray-400">
+              {t('按回车键或点击AI搜索进行深度搜索', 'Press Enter or click AI Search for deep search')}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter Controls */}
       <div className="flex items-center justify-between">

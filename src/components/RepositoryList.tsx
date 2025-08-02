@@ -221,11 +221,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   if (filteredRepositories.length === 0) {
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     const categoryName = selectedCategoryObj?.name || selectedCategory;
+    const { searchFilters } = useAppStore();
     
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-gray-400">
-          {selectedCategory === 'all' 
+        <p className="text-gray-500 dark:text-gray-400 mb-4">
+          {searchFilters.query ? (
+            language === 'zh' 
+              ? `未找到与"${searchFilters.query}"相关的仓库。`
+              : `No repositories found for "${searchFilters.query}".`
+          ) : selectedCategory === 'all' 
             ? (language === 'zh' ? '未找到仓库。点击同步加载您的星标仓库。' : 'No repositories found. Click sync to load your starred repositories.')
             : (language === 'zh' 
                 ? `在"${categoryName}"分类中未找到仓库。`
@@ -233,6 +238,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               )
           }
         </p>
+        {searchFilters.query && (
+          <div className="text-sm text-gray-400 dark:text-gray-500">
+            <p className="mb-2">
+              {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
+            </p>
+            <ul className="space-y-1">
+              <li>• {language === 'zh' ? '尝试使用不同的关键词' : 'Try different keywords'}</li>
+              <li>• {language === 'zh' ? '使用AI搜索进行语义匹配' : 'Use AI search for semantic matching'}</li>
+              <li>• {language === 'zh' ? '检查拼写或尝试英文/中文关键词' : 'Check spelling or try English/Chinese keywords'}</li>
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
@@ -360,17 +377,28 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics */}
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          {t(`显示 ${filteredRepositories.length} 个仓库`, `Showing ${filteredRepositories.length} repositories`)}
-          {analyzedCount > 0 && (
-            <span className="ml-2">
-              • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
-            </span>
-          )}
-          {unanalyzedCount > 0 && (
-            <span className="ml-2">
-              • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
-            </span>
-          )}
+          <div className="flex items-center justify-between">
+            <div>
+              {t(`显示 ${filteredRepositories.length} 个仓库`, `Showing ${filteredRepositories.length} repositories`)}
+              {repositories.length !== filteredRepositories.length && (
+                <span className="ml-2 text-blue-600 dark:text-blue-400">
+                  {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
+                </span>
+              )}
+            </div>
+            <div>
+              {analyzedCount > 0 && (
+                <span className="mr-3">
+                  • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
+                </span>
+              )}
+              {unanalyzedCount > 0 && (
+                <span>
+                  • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
