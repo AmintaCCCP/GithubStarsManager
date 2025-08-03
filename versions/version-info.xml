@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<versions>
+  <version>
+    <number>0.1.2</number>
+    <releaseDate>2025-08-02</releaseDate>
+    <changelog>
+      <item>The custom filter for releases can now filter out irrelevant downloaded files at the same time.</item>
+      <item>Added sorting by the time a repository is starred.</item>
+      <item>Adjusted repository search: currently, entering a keyword triggers real-time repository name matching, while clicking AI Search will retrieve AI-analyzed content, tags, etc., speeding up search. Natural language search is temporarily disabled due to unsatisfactory results.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.2-fix</downloadUrl>
+  </version>
+  <version>
+    <number>0.1.3</number>
+    <releaseDate>2025-08-03</releaseDate>
+    <changelog>
+      <item>Add a check for updates feature.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.3</downloadUrl>
+  </version>
+</versions>
