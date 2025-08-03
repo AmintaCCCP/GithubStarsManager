@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter } from '../types';
+import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification } from '../types';
 
 interface AppActions {
   // Auth actions
@@ -52,6 +52,10 @@ interface AppActions {
   setTheme: (theme: 'light' | 'dark') => void;
   setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
   setLanguage: (language: 'zh' | 'en') => void;
+  
+  // Update actions
+  setUpdateNotification: (notification: UpdateNotification | null) => void;
+  dismissUpdateNotification: () => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -177,6 +181,7 @@ export const useAppStore = create<AppState & AppActions>()(
       theme: 'light',
       currentView: 'repositories',
       language: 'zh',
+      updateNotification: null,
 
       // Auth actions
       setUser: (user) => {
@@ -307,6 +312,10 @@ export const useAppStore = create<AppState & AppActions>()(
       setTheme: (theme) => set({ theme }),
       setCurrentView: (currentView) => set({ currentView }),
       setLanguage: (language) => set({ language }),
+      
+      // Update actions
+      setUpdateNotification: (notification) => set({ updateNotification: notification }),
+      dismissUpdateNotification: () => set({ updateNotification: null }),
     }),
     {
       name: 'github-stars-manager',

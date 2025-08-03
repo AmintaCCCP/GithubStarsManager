@@ -152,4 +152,15 @@ export interface AppState {
   theme: 'light' | 'dark';
   currentView: 'repositories' | 'releases' | 'settings';
   language: 'zh' | 'en';
+  
+  // Update
+  updateNotification: UpdateNotification | null;
+}
+
+export interface UpdateNotification {
+  version: string;
+  releaseDate: string;
+  changelog: string[];
+  downloadUrl: string;
+  dismissed: boolean;
 }

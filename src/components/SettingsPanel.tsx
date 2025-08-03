@@ -14,12 +14,18 @@ import {
   Upload,
   RefreshCw,
   Globe,
-  MessageSquare
+  MessageSquare,
+  Package,
+  ExternalLink,
+  Mail,
+  Github,
+  Twitter
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
+import { UpdateChecker } from './UpdateChecker';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -351,6 +357,28 @@ Focus on practicality and accurate categorization to help users quickly understa
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* Update Check */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('检查更新', 'Check for Updates')}
+          </h3>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+              {t('当前版本: v0.1.3', 'Current Version: v0.1.3')}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              {t('检查是否有新版本可用', 'Check if a new version is available')}
+            </p>
+          </div>
+          <UpdateChecker />
+        </div>
+      </div>
+
       {/* Language Settings */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
@@ -387,6 +415,42 @@ Focus on practicality and accurate categorization to help users quickly understa
               English
             </span>
           </label>
+        </div>
+      </div>
+
+      {/* Contact Information */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('联系方式', 'Contact Information')}
+          </h3>
+        </div>
+        
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => window.open('https://x.com/GoodMan_Lee', '_blank')}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            >
+              <Twitter className="w-5 h-5" />
+              <span>Twitter</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+            
+            <button
+              onClick={() => window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank')}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
+            >
+              <Github className="w-5 h-5" />
+              <span>GitHub</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

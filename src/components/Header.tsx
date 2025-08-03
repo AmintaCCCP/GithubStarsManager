@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Github } from 'lucide-react';
+import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -159,17 +159,6 @@ export const Header: React.FC = () => {
 
           {/* User Actions */}
           <div className="flex items-center space-x-3">
-            {/* GitHub Repository Link */}
-            <a
-              href="https://github.com/AmintaCCCP/GithubStarsManager"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title={t('查看项目源码', 'View project source code')}
-            >
-              <Github className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-            </a>
-
             {/* Sync Status */}
             <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>

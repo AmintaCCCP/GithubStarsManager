@@ -7,6 +7,8 @@ import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useAppStore } from './store/useAppStore';
+import { useAutoUpdateCheck } from './components/UpdateChecker';
+import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 
 function App() {
   const { 
@@ -18,6 +20,9 @@ function App() {
   } = useAppStore();
 
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // 自动检查更新
+  useAutoUpdateCheck();
 
   // Apply theme to document
   useEffect(() => {
@@ -64,6 +69,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <UpdateNotificationBanner />
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderCurrentView()}
