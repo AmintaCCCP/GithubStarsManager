@@ -38,3 +38,6 @@ Use your own AI model API that supports OpenAI-compatible interfaces.
 1. There is no backend for this app, so save your important data on your own.
 2. I can't write code, this app is entirely written by the AI, mainly for my personal requirment. If you have a new feature or meet a bug, I can only try to do it, but I can't guarantee it, because it depends on the AI to do it successfully.😹
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=AmintaCCCP/GithubStarsManager&type=Date)](https://www.star-history.com/#AmintaCCCP/GithubStarsManager&Date)
