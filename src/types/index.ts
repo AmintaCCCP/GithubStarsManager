@@ -74,6 +74,7 @@ export interface AIConfig {
   isActive: boolean;
   customPrompt?: string; // 自定义提示词
   useCustomPrompt?: boolean; // 是否使用自定义提示词
+  concurrency?: number; // AI分析并发数，默认为1
 }
 
 export interface WebDAVConfig {

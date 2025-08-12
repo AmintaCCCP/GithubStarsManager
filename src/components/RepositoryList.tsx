@@ -126,12 +126,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const customCategoryNames = customCategories.map(cat => cat.name);
       
       let analyzed = 0;
+      const concurrency = activeConfig.concurrency || 1;
       
-      for (let i = 0; i < targetRepos.length; i++) {
+      // 并发分析函数
+      const analyzeRepository = async (repo: Repository, index: number) => {
         // 检查是否需要停止
         if (shouldStopRef.current) {
-          console.log('Analysis stopped by user');
-          break;
+          return false;
         }
 
         // 处理暂停
@@ -141,13 +142,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         // 再次检查停止状态（暂停期间可能被停止）
         if (shouldStopRef.current) {
-          console.log('Analysis stopped during pause');
-          break;
+          return false;
         }
 
-        const repo = targetRepos[i];
-        setAnalysisProgress({ current: i + 1, total: targetRepos.length });
-        
         try {
           // 获取README内容
           const [owner, name] = repo.full_name.split('/');
@@ -167,11 +164,32 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           
           updateRepository(updatedRepo);
           analyzed++;
+          setAnalysisProgress({ current: analyzed, total: targetRepos.length });
           
-          // 避免API限制
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          return true;
         } catch (error) {
           console.warn(`Failed to analyze ${repo.full_name}:`, error);
+          return false;
+        }
+      };
+
+      // 分批处理，支持并发
+      for (let i = 0; i < targetRepos.length; i += concurrency) {
+        if (shouldStopRef.current) {
+          console.log('Analysis stopped by user');
+          break;
+        }
+
+        const batch = targetRepos.slice(i, i + concurrency);
+        const promises = batch.map((repo, batchIndex) => 
+          analyzeRepository(repo, i + batchIndex)
+        );
+
+        await Promise.all(promises);
+        
+        // 避免API限制，批次间稍作延迟
+        if (i + concurrency < targetRepos.length && !shouldStopRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       

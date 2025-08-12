@@ -68,6 +68,7 @@ export const SettingsPanel: React.FC = () => {
     model: '',
     customPrompt: '',
     useCustomPrompt: false,
+    concurrency: 1,
   });
 
   const [webdavForm, setWebDAVForm] = useState({
@@ -86,6 +87,7 @@ export const SettingsPanel: React.FC = () => {
       model: '',
       customPrompt: '',
       useCustomPrompt: false,
+      concurrency: 1,
     });
     setShowAIForm(false);
     setEditingAIId(null);
@@ -119,6 +121,7 @@ export const SettingsPanel: React.FC = () => {
       isActive: false,
       customPrompt: aiForm.customPrompt || undefined,
       useCustomPrompt: aiForm.useCustomPrompt,
+      concurrency: aiForm.concurrency,
     };
 
     if (editingAIId) {
@@ -138,6 +141,7 @@ export const SettingsPanel: React.FC = () => {
       model: config.model,
       customPrompt: config.customPrompt || '',
       useCustomPrompt: config.useCustomPrompt || false,
+      concurrency: config.concurrency || 1,
     });
     setEditingAIId(config.id);
     setShowAIForm(true);
@@ -531,6 +535,24 @@ Focus on practicality and accurate categorization to help users quickly understa
                   placeholder="gpt-4"
                 />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('并发数', 'Concurrency')}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={aiForm.concurrency}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, concurrency: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="1"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
+                </p>
+              </div>
             </div>
 
             {/* Custom Prompt Section */}
@@ -631,7 +653,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       )}
                     </h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {config.baseUrl} • {config.model}
+                      {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     </p>
                   </div>
                 </div>
