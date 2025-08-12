@@ -75,7 +75,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     );
   });
 
-  const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false) => {
+  const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
       alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
       return;
@@ -87,21 +87,27 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       return;
     }
 
-    const targetRepos = analyzeUnanalyzedOnly 
-      ? filteredRepositories.filter(repo => !repo.analyzed_at)
-      : filteredRepositories;
+    const targetRepos = analyzeFailedOnly
+      ? filteredRepositories.filter(repo => repo.analysis_failed)
+      : analyzeUnanalyzedOnly 
+        ? filteredRepositories.filter(repo => !repo.analyzed_at)
+        : filteredRepositories;
 
     if (targetRepos.length === 0) {
-      alert(language === 'zh' 
-        ? (analyzeUnanalyzedOnly ? '所有仓库都已经分析过了！' : '没有可分析的仓库！')
-        : (analyzeUnanalyzedOnly ? 'All repositories have been analyzed!' : 'No repositories to analyze!')
-      );
+      const message = analyzeFailedOnly
+        ? (language === 'zh' ? '没有分析失败的仓库！' : 'No failed repositories to re-analyze!')
+        : analyzeUnanalyzedOnly
+          ? (language === 'zh' ? '所有仓库都已经分析过了！' : 'All repositories have been analyzed!')
+          : (language === 'zh' ? '没有可分析的仓库！' : 'No repositories to analyze!');
+      alert(message);
       return;
     }
 
-    const actionText = language === 'zh' 
-      ? (analyzeUnanalyzedOnly ? '未分析' : '全部')
-      : (analyzeUnanalyzedOnly ? 'unanalyzed' : 'all');
+    const actionText = analyzeFailedOnly
+      ? (language === 'zh' ? '失败' : 'failed')
+      : analyzeUnanalyzedOnly 
+        ? (language === 'zh' ? '未分析' : 'unanalyzed')
+        : (language === 'zh' ? '全部' : 'all');
     
     const confirmMessage = language === 'zh'
       ? `将对 ${targetRepos.length} 个${actionText}仓库进行AI分析，这可能需要几分钟时间。是否继续？`
@@ -159,7 +165,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ai_summary: analysis.summary,
             ai_tags: analysis.tags,
             ai_platforms: analysis.platforms,
-            analyzed_at: new Date().toISOString()
+            analyzed_at: new Date().toISOString(),
+            analysis_failed: false // 分析成功，清除失败标记
           };
           
           updateRepository(updatedRepo);
@@ -169,6 +176,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           return true;
         } catch (error) {
           console.warn(`Failed to analyze ${repo.full_name}:`, error);
+          
+          // 标记为分析失败
+          const failedRepo = {
+            ...repo,
+            analyzed_at: new Date().toISOString(),
+            analysis_failed: true
+          };
+          
+          updateRepository(failedRepo);
+          analyzed++;
+          setAnalysisProgress({ current: analyzed, total: targetRepos.length });
+          
           return false;
         }
       };
@@ -275,7 +294,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   }
 
   const unanalyzedCount = filteredRepositories.filter(r => !r.analyzed_at).length;
-  const analyzedCount = filteredRepositories.filter(r => r.analyzed_at).length;
+  const analyzedCount = filteredRepositories.filter(r => r.analyzed_at && !r.analysis_failed).length;
+  const failedCount = filteredRepositories.filter(r => r.analysis_failed).length;
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
@@ -320,13 +340,25 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 <button
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-gray-600"
                 >
                   <div className="font-medium text-gray-900 dark:text-white">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleAIAnalyze(false, true)}
+                  disabled={failedCount === 0}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {t('重新分析失败的', 'Re-analyze Failed')}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
                   </div>
                 </button>
               </div>
@@ -412,6 +444,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               {analyzedCount > 0 && (
                 <span className="mr-3">
                   • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
+                </span>
+              )}
+              {failedCount > 0 && (
+                <span className="mr-3">
+                  • {failedCount} {t('个分析失败', 'analysis failed')}
                 </span>
               )}
               {unanalyzedCount > 0 && (

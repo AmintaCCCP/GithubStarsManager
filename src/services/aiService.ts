@@ -58,8 +58,8 @@ export class AIService {
       return this.parseAIResponse(content);
     } catch (error) {
       console.error('AI analysis failed:', error);
-      // Fallback to basic analysis
-      return this.fallbackAnalysis(repository);
+      // 抛出错误，让调用方处理失败状态
+      throw error;
     }
   }
 

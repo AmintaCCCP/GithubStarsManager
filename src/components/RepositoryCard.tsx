@@ -197,7 +197,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         ai_summary: analysis.summary,
         ai_tags: analysis.tags,
         ai_platforms: analysis.platforms,
-        analyzed_at: new Date().toISOString()
+        analyzed_at: new Date().toISOString(),
+        analysis_failed: false // 分析成功，清除失败标记
       };
 
       updateRepository(updatedRepo);
@@ -209,6 +210,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       alert(successMessage);
     } catch (error) {
       console.error('AI analysis failed:', error);
+      
+      // 标记为分析失败
+      const failedRepo = {
+        ...repository,
+        analyzed_at: new Date().toISOString(),
+        analysis_failed: true
+      };
+      
+      updateRepository(failedRepo);
+      
       alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
     } finally {
       setLoading(false);
@@ -231,6 +242,12 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       return {
         content: repository.custom_description,
         isCustom: true
+      };
+    } else if (showAISummary && repository.analysis_failed) {
+      return {
+        content: repository.description || (language === 'zh' ? '暂无描述' : 'No description available'),
+        isAI: false,
+        isFailed: true
       };
     } else if (showAISummary && repository.ai_summary) {
       return {
@@ -277,7 +294,12 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   // 获取AI分析按钮的提示文本
   const getAIButtonTitle = () => {
-    if (repository.analyzed_at) {
+    if (repository.analysis_failed) {
+      const analyzeTime = new Date(repository.analyzed_at!).toLocaleString();
+      return language === 'zh'
+        ? `分析失败于 ${analyzeTime}，点击重新分析`
+        : `Analysis failed on ${analyzeTime}, click to retry`;
+    } else if (repository.analyzed_at) {
       const analyzeTime = new Date(repository.analyzed_at).toLocaleString();
       return language === 'zh'
         ? `已于 ${analyzeTime} 分析过，点击重新分析`
@@ -315,9 +337,12 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           <button
             onClick={handleAIAnalyze}
             disabled={isLoading}
-            className={`p-2 rounded-lg transition-colors ${repository.analyzed_at
-              ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
-              : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+            className={`p-2 rounded-lg transition-colors ${
+              repository.analysis_failed
+                ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
+                : repository.analyzed_at
+                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
+                  : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
               } disabled:opacity-50`}
             title={getAIButtonTitle()}
           >
@@ -398,7 +423,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
               <span>{language === 'zh' ? '自定义' : 'Custom'}</span>
             </div>
           )}
-          {displayContent.isAI && (
+          {displayContent.isFailed && (
+            <div className="flex items-center space-x-1 text-xs text-red-600 dark:text-red-400">
+              <Bot className="w-3 h-3" />
+              <span>{language === 'zh' ? '分析失败' : 'Analysis Failed'}</span>
+            </div>
+          )}
+          {displayContent.isAI && !displayContent.isFailed && (
             <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400">
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? 'AI总结' : 'AI Summary'}</span>
@@ -494,7 +525,12 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 <span>{language === 'zh' ? '已编辑' : 'Edited'}</span>
               </div>
             )}
-            {repository.analyzed_at && (
+            {repository.analysis_failed ? (
+              <div className="flex items-center space-x-1 text-xs">
+                <div className="w-2 h-2 bg-red-500 rounded-full" />
+                <span>{language === 'zh' ? '分析失败' : 'Analysis failed'}</span>
+              </div>
+            ) : repository.analyzed_at && (
               <div className="flex items-center space-x-1 text-xs">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
                 <span>{language === 'zh' ? 'AI已分析' : 'AI analyzed'}</span>

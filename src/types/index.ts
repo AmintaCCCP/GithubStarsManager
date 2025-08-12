@@ -20,6 +20,7 @@ export interface Repository {
   ai_tags?: string[];
   ai_platforms?: string[]; // 新增：支持的平台类型
   analyzed_at?: string;
+  analysis_failed?: boolean; // 新增：AI分析是否失败
   // Release subscription
   subscribed_to_releases?: boolean;
   // Manual editing fields
