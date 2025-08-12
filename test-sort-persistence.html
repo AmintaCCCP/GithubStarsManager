@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序持久化测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        .info {
+            color: #3b82f6;
+        }
+        code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 仓库排序持久化功能测试</h1>
+    
+    <div class="test-section">
+        <h2>✅ 功能实现完成</h2>
+        <p class="success">已成功实现仓库页面排序设置的持久化功能！</p>
+        
+        <h3>🔧 实现的修改：</h3>
+        <ul>
+            <li><strong>状态持久化</strong>：在 <code>useAppStore.ts</code> 的 <code>partialize</code> 函数中添加了排序设置的持久化</li>
+            <li><strong>状态恢复</strong>：在 <code>onRehydrateStorage</code> 中保留用户上次设置的排序方式，而不是每次都重置为默认值</li>
+            <li><strong>向下兼容</strong>：如果没有保存的排序设置，会使用默认的"按星标排序"</li>
+        </ul>
+        
+        <h3>📋 具体修改内容：</h3>
+        <ol>
+            <li><strong>持久化配置</strong>：
+                <pre><code>// 持久化搜索排序设置
+searchFilters: {
+  sortBy: state.searchFilters.sortBy,
+  sortOrder: state.searchFilters.sortOrder,
+},</code></pre>
+            </li>
+            <li><strong>状态恢复逻辑</strong>：
+                <pre><code>// 重置搜索过滤器，但保留排序设置
+const savedSortBy = state.searchFilters?.sortBy || 'stars';
+const savedSortOrder = state.searchFilters?.sortOrder || 'desc';
+state.searchFilters = {
+  ...initialSearchFilters,
+  sortBy: savedSortBy,
+  sortOrder: savedSortOrder,
+};</code></pre>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎮 如何测试功能</h2>
+        <ol>
+            <li>启动应用：<code>npm run dev</code></li>
+            <li>进入仓库页面</li>
+            <li>修改排序方式（例如：从"按星标排序"改为"按更新排序"）</li>
+            <li>修改排序顺序（点击 ↓/↑ 按钮）</li>
+            <li>刷新页面或重新打开应用</li>
+            <li class="success">✅ 应该看到排序设置被保留了！</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>🚀 功能特点</h2>
+        <ul>
+            <li class="info"><strong>智能持久化</strong>：只保存排序相关设置，其他搜索条件仍然会重置</li>
+            <li class="info"><strong>用户友好</strong>：记住用户的偏好设置，提升使用体验</li>
+            <li class="info"><strong>向下兼容</strong>：对于没有保存设置的用户，使用合理的默认值</li>
+            <li class="info"><strong>轻量级</strong>：只增加了最小必要的存储内容</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>📝 支持的排序选项</h2>
+        <ul>
+            <li><strong>按星标排序</strong> (stars) - 默认选项</li>
+            <li><strong>按更新排序</strong> (updated) - 按最后更新时间</li>
+            <li><strong>按名称排序</strong> (name) - 按仓库名称字母顺序</li>
+            <li><strong>按加星时间排序</strong> (starred) - 按用户加星的时间</li>
+        </ul>
+        <p>每种排序都支持升序 (↑) 和降序 (↓) 两种顺序。</p>
+    </div>
+    
+    <p class="success">🎉 功能已完成！现在用户的排序偏好会被记住，不再每次都重置为按星标排序了。</p>
+</body>
+</html>

@@ -352,6 +352,12 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化UI设置
         theme: state.theme,
         language: state.language,
+        
+        // 持久化搜索排序设置
+        searchFilters: {
+          sortBy: state.searchFilters.sortBy,
+          sortOrder: state.searchFilters.sortOrder,
+        },
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -374,8 +380,14 @@ export const useAppStore = create<AppState & AppActions>()(
           // 初始化搜索结果为所有仓库
           state.searchResults = state.repositories || [];
           
-          // 重置搜索过滤器
-          state.searchFilters = initialSearchFilters;
+          // 重置搜索过滤器，但保留排序设置
+          const savedSortBy = state.searchFilters?.sortBy || 'stars';
+          const savedSortOrder = state.searchFilters?.sortOrder || 'desc';
+          state.searchFilters = {
+            ...initialSearchFilters,
+            sortBy: savedSortBy,
+            sortOrder: savedSortOrder,
+          };
           
           // 确保语言设置存在
           if (!state.language) {
