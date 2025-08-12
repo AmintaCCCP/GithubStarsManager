@@ -410,8 +410,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       {/* Category Display */}
       {displayCategory && (
         <div className="mb-3">
-          <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 rounded-md text-xs font-medium">
-            <Tag className="w-3 h-3 mr-1" />
+          <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-md text-xs font-medium">
             {displayCategory}
           </span>
         </div>
@@ -423,13 +422,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.slice(0, 3).map((tag, index) => (
             <span
               key={index}
-              className={`px-2 py-1 rounded-md text-xs font-medium ${displayTags.isCustom
-                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                : 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                }`}
+              className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
             >
-              {displayTags.isCustom && <Edit3 className="w-3 h-3 inline mr-1" />}
-              {!displayTags.isCustom && <Tag className="w-3 h-3 inline mr-1" />}
               {highlightSearchTerm(tag, searchQuery)}
             </span>
           ))}
@@ -438,7 +432,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
               {repository.topics.slice(0, 2).map((topic, index) => (
                 <span
                   key={`topic-${index}`}
-                  className="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-md text-xs"
+                  className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-md text-xs font-medium"
                 >
                   {topic}
                 </span>
