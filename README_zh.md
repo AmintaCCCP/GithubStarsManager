@@ -143,6 +143,9 @@ npm run build
 - Cloudflare Pages
 - 自建服务器
 
+### Docker 部署
+您也可以使用 Docker 来运行此应用程序。请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
+
 ## 贡献 / Contributing
 
 欢迎提交Issue和Pull Request！

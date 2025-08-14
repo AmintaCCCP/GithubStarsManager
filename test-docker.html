@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Stars Manager Docker Test</title>
+</head>
+<body>
+    <h1>GitHub Stars Manager Docker Test</h1>
+    <p>This is a simple test page to verify the Docker deployment.</p>
+    
+    <h2>Test Results:</h2>
+    <div id="results"></div>
+
+    <script>
+        // This script tests that the app is accessible
+        fetch('http://localhost:8080')
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('results').innerHTML = '<p style="color: green;">✓ Application is accessible</p>';
+                } else {
+                    document.getElementById('results').innerHTML = '<p style="color: red;">✗ Application is not accessible</p>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('results').innerHTML = '<p style="color: orange;">⚠️ Test cannot be completed from this context: ' + error.message + '</p>';
+            });
+    </script>
+</body>
+</html>

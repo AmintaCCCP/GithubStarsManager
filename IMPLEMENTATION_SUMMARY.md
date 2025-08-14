@@ -146,4 +146,19 @@ if (selectedFilters.length > 0) {
    - 点击文件名直接下载
    - 查看文件详细信息
 
+## Docker 部署支持
+
+### 新增文件
+1. **Dockerfile** - 多阶段构建配置
+2. **nginx.conf** - Nginx 服务器配置，包含 CORS 头设置
+3. **docker-compose.yml** - Docker Compose 配置文件
+4. **DOCKER.md** - 详细部署文档
+5. **DOCKER_IMPLEMENTATION_SUMMARY.md** - 实现总结
+
+### 功能特点
+- 通过 Nginx 正确处理 CORS，支持任意 AI/WebDAV 服务 URL
+- 不影响现有的桌面应用打包流程
+- 支持 Docker 和 Docker Compose 两种部署方式
+- 静态文件优化服务
+
 这个实现完全满足了用户的需求，提供了更灵活、更直观的 Release 文件管理和下载体验。

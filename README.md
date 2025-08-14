@@ -60,6 +60,10 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 > 💡 When running the project locally using `npm run dev`, calls to AI services and WebDAV may fail due to CORS restrictions. To avoid this issue, use the prebuilt client application or build the client yourself.
 
+### 🐳 Run With Docker
+
+You can also run this application using Docker. See [DOCKER.md](DOCKER.md) for detailed instructions on how to build and deploy using Docker. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
+
 
 ## Who it’s for
 
