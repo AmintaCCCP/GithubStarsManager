@@ -25,11 +25,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     updateRepository,
     language,
     customCategories,
+    analysisProgress,
+    setAnalysisProgress
   } = useAppStore();
 
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
   const [isPaused, setIsPaused] = useState(false);
   const [searchTime, setSearchTime] = useState<number | undefined>(undefined);
   

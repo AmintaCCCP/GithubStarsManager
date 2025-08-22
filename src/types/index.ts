@@ -157,6 +157,9 @@ export interface AppState {
   
   // Update
   updateNotification: UpdateNotification | null;
+
+  // Analysis Progress
+  analysisProgress: AnalysisProgress
 }
 
 export interface UpdateNotification {
@@ -165,4 +168,9 @@ export interface UpdateNotification {
   changelog: string[];
   downloadUrl: string;
   dismissed: boolean;
+}
+
+export interface AnalysisProgress {
+  current: number;
+  total: number;
 }

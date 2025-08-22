@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification } from '../types';
+import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress } from '../types';
 
 interface AppActions {
   // Auth actions
@@ -56,6 +56,9 @@ interface AppActions {
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
   dismissUpdateNotification: () => void;
+
+  // Update Analysis Progress
+  setAnalysisProgress: (newProgress: AnalysisProgress) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -182,6 +185,7 @@ export const useAppStore = create<AppState & AppActions>()(
       currentView: 'repositories',
       language: 'zh',
       updateNotification: null,
+      analysisProgress: { current: 0, total: 0 },
 
       // Auth actions
       setUser: (user) => {
@@ -316,6 +320,7 @@ export const useAppStore = create<AppState & AppActions>()(
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
+      setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress })
     }),
     {
       name: 'github-stars-manager',
