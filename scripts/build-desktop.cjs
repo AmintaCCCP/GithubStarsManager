@@ -8,7 +8,7 @@ console.log('🚀 开始构建桌面应用...');
 
 // 1. 构建Web应用
 console.log('📦 构建Web应用...');
-execSync('npm run build', { stdio: 'inherit' });
+execSync('pnpm run build', { stdio: 'inherit' });
 
 // 2. 创建Electron目录和文件
 console.log('⚡ 设置Electron环境...');
@@ -37,7 +37,7 @@ function createWindow() {
       enableRemoteModule: false,
       webSecurity: true
     },
-    icon: path.join(__dirname, '../dist/vite.svg'),
+    icon: path.join(__dirname, '../dist/icon.svg'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false
   });
@@ -162,7 +162,7 @@ fs.writeFileSync(
 // 5. 安装Electron依赖
 console.log('📥 安装Electron依赖...');
 try {
-  execSync('npm install --save-dev electron electron-builder', { stdio: 'inherit' });
+  execSync('pnpm install --save-dev electron electron-builder', { stdio: 'inherit' });
 } catch (error) {
   console.error('安装依赖失败:', error.message);
   process.exit(1);

@@ -10,3 +10,13 @@
     overflow: hidden;
   }
 }
+
+.hd-drag {
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.hd-btns {
+  -webkit-app-region: no-drag;
+}

@@ -98,7 +98,7 @@ export const Header: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 hd-drag">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Title */}
@@ -121,7 +121,7 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Navigation */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden md:flex items-center space-x-1 hd-btns">
             <button
               onClick={() => setCurrentView('repositories')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -158,7 +158,7 @@ export const Header: React.FC = () => {
           </nav>
 
           {/* User Actions */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 hd-btns">
             {/* Sync Status */}
             <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
