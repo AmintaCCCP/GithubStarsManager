@@ -8,7 +8,7 @@ console.log('🚀 开始构建桌面应用...');
 
 // 1. 构建Web应用
 console.log('📦 构建Web应用...');
-execSync('pnpm run build', { stdio: 'inherit' });
+execSync('npm run build', { stdio: 'inherit' });
 
 // 2. 创建Electron目录和文件
 console.log('⚡ 设置Electron环境...');
@@ -162,7 +162,7 @@ fs.writeFileSync(
 // 5. 安装Electron依赖
 console.log('📥 安装Electron依赖...');
 try {
-  execSync('pnpm install --save-dev electron electron-builder', { stdio: 'inherit' });
+  execSync('npm install --save-dev electron electron-builder', { stdio: 'inherit' });
 } catch (error) {
   console.error('安装依赖失败:', error.message);
   process.exit(1);
