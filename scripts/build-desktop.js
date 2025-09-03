@@ -37,7 +37,7 @@ function createWindow() {
       enableRemoteModule: false,
       webSecurity: true
     },
-    icon: path.join(__dirname, '../dist/vite.svg'),
+    icon: path.join(__dirname, '../dist/icon.svg'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false
   });
