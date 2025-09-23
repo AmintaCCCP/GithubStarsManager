@@ -409,7 +409,8 @@ jobs:
             icon: 'build/icon.png',
             category: 'public.app-category.productivity',
             hardenedRuntime: true,
-            gatekeeperAssess: false
+            gatekeeperAssess: false,
+            identity: null
           };
           packageJson.build.dmg = {
             title: 'GitHub Stars Manager',
