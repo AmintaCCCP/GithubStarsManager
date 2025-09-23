@@ -29,4 +29,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.4</downloadUrl>
   </version>
+  <version>
+    <number>0.1.5</number>
+    <releaseDate>2025-09-23</releaseDate>
+    <changelog>
+      <item>fix: Fixed the issue where the analysis progress becomes 0 due to switching headers during AI analysis</item>
+      <item>Add drag and no-drag regions for desktop app</item>
+      <item>switch to infinite scroll with consistent card widths</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.1.5/github-stars-manager-0.1.5.dmg</downloadUrl>
+  </version>
 </versions>
