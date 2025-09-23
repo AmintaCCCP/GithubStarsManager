@@ -37,6 +37,6 @@
       <item>Add drag and no-drag regions for desktop app</item>
       <item>switch to infinite scroll with consistent card widths</item>
     </changelog>
-    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.1.5/github-stars-manager-0.1.5.dmg</downloadUrl>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.5</downloadUrl>
   </version>
 </versions>
