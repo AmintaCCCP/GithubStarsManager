@@ -12,14 +12,9 @@ files:
   - electron/**/*
   - node_modules/**/*
   - package.json
-  - "!node_modules/.cache/**/*"
-  - "!**/*.map"
 
 extraMetadata:
   main: electron/main.js
-
-compression: normal
-asar: false
 
 # Windows配置
 win:
@@ -27,7 +22,8 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: build/icon.png
+        - ia32
+  icon: dist/vite.svg
   
 nsis:
   oneClick: false
@@ -43,15 +39,26 @@ mac:
       arch:
         - x64
         - arm64
-  icon: build/icon.png
+  icon: dist/vite.svg
   category: public.app-category.productivity
-  hardenedRuntime: false
-  gatekeeperAssess: false
-  identity: null
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
 
 dmg:
   title: GitHub Stars Manager
-  icon: build/icon.png
+  icon: dist/vite.svg
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 410
+      y: 230
+      type: link
+      path: /Applications
+    - x: 130
+      y: 230
+      type: file
 
 # Linux配置
 linux:
@@ -59,8 +66,21 @@ linux:
     - target: AppImage
       arch:
         - x64
-  icon: build/icon.png
+    - target: deb
+      arch:
+        - x64
+    - target: rpm
+      arch:
+        - x64
+  icon: dist/vite.svg
   category: Office
+  synopsis: AI-powered GitHub starred repositories management tool
+  description: >
+    GitHub Stars Manager is an intelligent tool for organizing and managing 
+    your GitHub starred repositories with AI-powered analysis and release tracking.
 
-# 发布配置 - 禁用自动发布
-publish: null
+# 发布配置
+publish:
+  provider: github
+  owner: your-username
+  repo: your-repo-name

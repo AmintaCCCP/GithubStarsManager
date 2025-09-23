@@ -3,8 +3,6 @@
   "private": true,
   "version": "0.1.5",
   "type": "module",
-  "main": "electron/main.js",
-  "homepage": "./",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,8 +11,7 @@
     "build:desktop": "node scripts/build-desktop.js",
     "electron": "electron electron/main.js",
     "electron:dev": "NODE_ENV=development electron electron/main.js",
-    "dist": "node scripts/build-electron.js",
-    "dist:direct": "electron-builder",
+    "dist": "electron-builder",
     "update-version": "node scripts/update-version.cjs"
   },
   "dependencies": {
@@ -31,67 +28,15 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
-    "electron": "^38.1.2",
-    "electron-builder": "^26.0.12",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
     "postcss": "^8.4.35",
-    "sharp": "^0.34.4",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2",
     "xml2js": "^0.6.2"
-  },
-  "build": {
-    "appId": "com.github-stars-manager.app",
-    "productName": "GitHub Stars Manager",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "build/**/*",
-      "electron/**/*",
-      "node_modules/**/*",
-      "package.json",
-      "!node_modules/.cache/**/*",
-      "!**/*.map"
-    ],
-    "extraResources": [
-      {
-        "from": "dist",
-        "to": "dist",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "compression": "normal",
-    "asar": false,
-    "publish": null,
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "icon": "build/icon.png",
-      "category": "public.app-category.productivity",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
-      "identity": null
-    },
-    "dmg": {
-      "title": "GitHub Stars Manager",
-      "icon": "build/icon.png"
-    }
   }
 }
