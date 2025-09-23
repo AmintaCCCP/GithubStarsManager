@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 
@@ -32,7 +32,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [searchTime, setSearchTime] = useState<number | undefined>(undefined);
   
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
@@ -75,6 +74,43 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       repoText.includes(keyword.toLowerCase())
     );
   });
+
+  // Infinite scroll (瀑布流按需加载)
+  const LOAD_BATCH = 50;
+  const [visibleCount, setVisibleCount] = useState(LOAD_BATCH);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const startIndex = filteredRepositories.length === 0 ? 0 : 1;
+  const endIndex = Math.min(visibleCount, filteredRepositories.length);
+  const visibleRepositories = filteredRepositories.slice(0, visibleCount);
+
+  // Reset visible count when filters or data change
+  useEffect(() => {
+    setVisibleCount(LOAD_BATCH);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, repositories, filteredRepositories.length]);
+
+  // IntersectionObserver to load more on demand
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          setVisibleCount((count) => {
+            if (count >= filteredRepositories.length) return count;
+            return Math.min(count + LOAD_BATCH, filteredRepositories.length);
+          });
+        }
+      },
+      { root: null, rootMargin: '200px', threshold: 0 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [filteredRepositories.length]);
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
@@ -136,7 +172,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const concurrency = activeConfig.concurrency || 1;
       
       // 并发分析函数
-      const analyzeRepository = async (repo: Repository, index: number) => {
+      const analyzeRepository = async (repo: Repository) => {
         // 检查是否需要停止
         if (shouldStopRef.current) {
           return false;
@@ -201,9 +237,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         }
 
         const batch = targetRepos.slice(i, i + concurrency);
-        const promises = batch.map((repo, batchIndex) => 
-          analyzeRepository(repo, i + batchIndex)
-        );
+        const promises = batch.map((repo) => analyzeRepository(repo));
 
         await Promise.all(promises);
         
@@ -434,7 +468,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         <div className="text-sm text-gray-500 dark:text-gray-400">
           <div className="flex items-center justify-between">
             <div>
-              {t(`显示 ${filteredRepositories.length} 个仓库`, `Showing ${filteredRepositories.length} repositories`)}
+              {t(
+                `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
+                `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
+              )}
               {repositories.length !== filteredRepositories.length && (
                 <span className="ml-2 text-blue-600 dark:text-blue-400">
                   {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
@@ -462,17 +499,22 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         </div>
       </div>
 
-      {/* Repository Grid */}
+      {/* Repository Grid with consistent card widths */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredRepositories.map(repo => (
+        {visibleRepositories.map(repo => (
           <RepositoryCard 
-            key={repo.id} 
+            key={repo.id}
             repository={repo} 
             showAISummary={showAISummary}
             searchQuery={useAppStore.getState().searchFilters.query}
           />
         ))}
       </div>
+
+      {/* Sentinel for on-demand loading */}
+      {visibleCount < filteredRepositories.length && (
+        <div ref={sentinelRef} className="h-8" />
+      )}
     </div>
   );
 };
