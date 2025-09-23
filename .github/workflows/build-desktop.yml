@@ -399,9 +399,6 @@ jobs:
             shortcutName: 'GitHub Stars Manager'
           };
         } else if ('${{ matrix.os }}' === 'macos-latest') {
-          // Check if signing certificates are available
-          const hasSigningCerts = '${{ secrets.CSC_LINK }}' && '${{ secrets.CSC_KEY_PASSWORD }}';
-          
           packageJson.build.mac = {
             target: [
               {
@@ -411,19 +408,13 @@ jobs:
             ],
             icon: 'build/icon.png',
             category: 'public.app-category.productivity',
-            hardenedRuntime: hasSigningCerts,
-            gatekeeperAssess: false,
-            identity: hasSigningCerts ? undefined : null // Skip code signing if no certs
+            hardenedRuntime: true,
+            gatekeeperAssess: false
           };
           packageJson.build.dmg = {
             title: 'GitHub Stars Manager',
             icon: 'build/icon.png'
           };
-          
-          // Add afterSign hook to skip notarization if no credentials
-          if (!hasSigningCerts) {
-            console.log('No signing certificates found, building unsigned app');
-          }
         } else {
           packageJson.build.linux = {
             target: 'AppImage',
@@ -452,25 +443,6 @@ jobs:
         echo "Build directory contents:"
         ls -la build/ || echo "No build directory"
         echo ""
-        
-        # Ensure build directory and icon exist
-        if [ ! -d "build" ]; then
-          mkdir -p build
-          echo "Created build directory"
-        fi
-        
-        if [ ! -f "build/icon.png" ]; then
-          if [ -f "assets/icon.png" ]; then
-            cp assets/icon.png build/icon.png
-            echo "Copied icon from assets/"
-          elif [ -f "public/icon.png" ]; then
-            cp public/icon.png build/icon.png
-            echo "Copied icon from public/"
-          else
-            echo "Warning: No icon file found, electron-builder may fail"
-          fi
-        fi
-        
         echo "Package.json build config:"
         node -e "console.log(JSON.stringify(require('./package.json').build, null, 2))"
         echo ""
@@ -487,21 +459,15 @@ jobs:
         chmod -R 755 electron/ || echo "Could not set electron permissions"
         chmod -R 755 build/ || echo "Could not set build permissions"
         
-    - name: Make build script executable
-      shell: bash
-      run: chmod +x scripts/build-electron.js
-      
     - name: Build Electron app
-      run: node scripts/build-electron.js
+      run: npm run dist
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
         DEBUG: electron-builder
         # Linux 特定环境变量
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-        # Disable code signing for unsigned builds
-        CSC_IDENTITY_AUTO_DISCOVERY: false
-        # Only set signing vars if they exist
+        # macOS signing and notarization
         CSC_LINK: ${{ secrets.CSC_LINK }}
         CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         APPLE_ID: ${{ secrets.APPLE_ID }}
