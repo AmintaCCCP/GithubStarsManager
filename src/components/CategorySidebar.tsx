@@ -102,7 +102,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   return (
     <>
-      <div className="w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 h-fit sticky top-24">
+      <div className="w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 max-h-[calc(100vh-8rem)] sticky top-24 overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {t('应用分类', 'Categories')}
