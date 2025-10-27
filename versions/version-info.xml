@@ -39,4 +39,12 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.5</downloadUrl>
   </version>
+  <version>
+    <number>0.1.6</number>
+    <releaseDate>2025-10-27</releaseDate>
+    <changelog>
+      <item>fix: Sidebar now scrolls vertically when its content exceeds the screen height, preventing hidden or inaccessible items and improving navigation on smaller screens or long lists.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.6</downloadUrl>
+  </version>
 </versions>
