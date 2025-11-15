@@ -49,6 +49,10 @@ export const SettingsPanel: React.FC = () => {
     setActiveWebDAVConfig,
     setLastBackup,
     setLanguage,
+    setRepositories,
+    setReleases,
+    addCustomCategory,
+    deleteCustomCategory,
   } = useAppStore();
 
   const [showAIForm, setShowAIForm] = useState(false);
@@ -297,12 +301,106 @@ export const SettingsPanel: React.FC = () => {
       
       if (backupContent) {
         const backupData = JSON.parse(backupContent);
-        
-        // Note: In a real implementation, you would restore the data here
-        // For now, we'll just show a success message
+
+        // 1) 恢复仓库与发布
+        if (Array.isArray(backupData.repositories)) {
+          setRepositories(backupData.repositories);
+        }
+        if (Array.isArray(backupData.releases)) {
+          setReleases(backupData.releases);
+        }
+
+        // 2) 恢复自定义分类（全部替换）
+        try {
+          // 先清空现有自定义分类
+          if (Array.isArray(customCategories)) {
+            for (const cat of customCategories) {
+              if (cat && cat.id) {
+                deleteCustomCategory(cat.id);
+              }
+            }
+          }
+          // 再添加备份中的自定义分类
+          if (Array.isArray(backupData.customCategories)) {
+            for (const cat of backupData.customCategories) {
+              if (cat && cat.id && cat.name) {
+                addCustomCategory({ ...cat, isCustom: true });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('恢复自定义分类时发生问题：', e);
+        }
+
+        // 3) 合并 AI 配置（保留现有密钥；备份中密钥为***时不覆盖）
+        try {
+          if (Array.isArray(backupData.aiConfigs)) {
+            const currentMap = new Map(aiConfigs.map((c: AIConfig) => [c.id, c]));
+            for (const cfg of backupData.aiConfigs as AIConfig[]) {
+              if (!cfg || !cfg.id) continue;
+              const existing = currentMap.get(cfg.id);
+              const isMasked = cfg.apiKey === '***';
+              if (existing) {
+                updateAIConfig(cfg.id, {
+                  name: cfg.name,
+                  baseUrl: cfg.baseUrl,
+                  model: cfg.model,
+                  customPrompt: cfg.customPrompt,
+                  useCustomPrompt: cfg.useCustomPrompt,
+                  concurrency: cfg.concurrency,
+                  // 仅当备份未掩码时才覆盖 apiKey
+                  apiKey: isMasked ? existing.apiKey : cfg.apiKey,
+                  // 保留现有 isActive 状态
+                  isActive: existing.isActive,
+                });
+              } else {
+                addAIConfig({
+                  ...cfg,
+                  apiKey: isMasked ? '' : cfg.apiKey,
+                  isActive: false,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('恢复 AI 配置时发生问题：', e);
+        }
+
+        // 4) 合并 WebDAV 配置（保留现有密码；备份中密码为***时不覆盖）
+        try {
+          if (Array.isArray(backupData.webdavConfigs)) {
+            const currentMap = new Map(webdavConfigs.map((c: WebDAVConfig) => [c.id, c]));
+            for (const cfg of backupData.webdavConfigs as WebDAVConfig[]) {
+              if (!cfg || !cfg.id) continue;
+              const existing = currentMap.get(cfg.id);
+              const isMasked = cfg.password === '***';
+              if (existing) {
+                updateWebDAVConfig(cfg.id, {
+                  name: cfg.name,
+                  url: cfg.url,
+                  username: cfg.username,
+                  path: cfg.path,
+                  // 仅当备份未掩码时才覆盖密码
+                  password: isMasked ? existing.password : cfg.password,
+                  // 保留现有 isActive 状态
+                  isActive: existing.isActive,
+                });
+              } else {
+                addWebDAVConfig({
+                  ...cfg,
+                  password: isMasked ? '' : cfg.password,
+                  isActive: false,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('恢复 WebDAV 配置时发生问题：', e);
+        }
+
         alert(t(
-          `找到备份文件: ${latestBackup}。请注意：完整的数据恢复功能需要在实际部署中实现。`,
-          `Found backup file: ${latestBackup}. Note: Full data restoration needs to be implemented in actual deployment.`
+          `已从备份恢复数据：仓库 ${backupData.repositories?.length ?? 0}，发布 ${backupData.releases?.length ?? 0}，自定义分类 ${backupData.customCategories?.length ?? 0}。`,
+          `Data restored from backup: repositories ${backupData.repositories?.length ?? 0}, releases ${backupData.releases?.length ?? 0}, custom categories ${backupData.customCategories?.length ?? 0}.`
         ));
       }
     } catch (error) {
