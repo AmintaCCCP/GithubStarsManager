@@ -47,4 +47,12 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.6</downloadUrl>
   </version>
+  <version>
+    <number>0.1.7</number>
+    <releaseDate>2025-11-16</releaseDate>
+    <changelog>
+      <item>fix: Fixed webdav backup recovery issue.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.7</downloadUrl>
+  </version>
 </versions>
