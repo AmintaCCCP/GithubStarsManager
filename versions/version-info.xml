@@ -55,4 +55,12 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.7</downloadUrl>
   </version>
+  <version>
+    <number>0.1.8</number>
+    <releaseDate>2026-02-15</releaseDate>
+    <changelog>
+      <item>feat: Supports multiple AI API formats and fixes connectivity testing.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.8</downloadUrl>
+  </version>
 </versions>
