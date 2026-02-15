@@ -486,7 +486,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              {t('当前版本: v0.1.7', 'Current Version: v0.1.7')}
+              {t('当前版本: v0.1.8', 'Current Version: v0.1.8')}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-500">
               {t('检查是否有新版本可用', 'Check if a new version is available')}
