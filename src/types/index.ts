@@ -69,6 +69,7 @@ export interface GitHubUser {
 export interface AIConfig {
   id: string;
   name: string;
+  apiType?: 'openai' | 'claude' | 'gemini'; // API 格式/兼容协议（默认 openai）
   baseUrl: string;
   apiKey: string;
   model: string;

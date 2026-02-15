@@ -65,8 +65,20 @@ export const SettingsPanel: React.FC = () => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
 
-  const [aiForm, setAIForm] = useState({
+  type AIFormState = {
+    name: string;
+    apiType: 'openai' | 'claude' | 'gemini';
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    customPrompt: string;
+    useCustomPrompt: boolean;
+    concurrency: number;
+  };
+
+  const [aiForm, setAIForm] = useState<AIFormState>({
     name: '',
+    apiType: 'openai',
     baseUrl: '',
     apiKey: '',
     model: '',
@@ -86,6 +98,7 @@ export const SettingsPanel: React.FC = () => {
   const resetAIForm = () => {
     setAIForm({
       name: '',
+      apiType: 'openai',
       baseUrl: '',
       apiKey: '',
       model: '',
@@ -119,6 +132,7 @@ export const SettingsPanel: React.FC = () => {
     const config: AIConfig = {
       id: editingAIId || Date.now().toString(),
       name: aiForm.name,
+      apiType: aiForm.apiType,
       baseUrl: aiForm.baseUrl.replace(/\/$/, ''), // Remove trailing slash
       apiKey: aiForm.apiKey,
       model: aiForm.model,
@@ -140,6 +154,7 @@ export const SettingsPanel: React.FC = () => {
   const handleEditAI = (config: AIConfig) => {
     setAIForm({
       name: config.name,
+      apiType: config.apiType || 'openai',
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
       model: config.model,
@@ -594,6 +609,21 @@ Focus on practicality and accurate categorization to help users quickly understa
                   placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('接口格式', 'API Format')} *
+                </label>
+                <select
+                  value={aiForm.apiType}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, apiType: e.target.value as 'openai' | 'claude' | 'gemini' }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -604,8 +634,20 @@ Focus on practicality and accurate categorization to help users quickly understa
                   value={aiForm.baseUrl}
                   onChange={(e) => setAIForm(prev => ({ ...prev, baseUrl: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="https://api.openai.com/v1"
+                  placeholder={
+                    aiForm.apiType === 'openai'
+                      ? 'https://api.openai.com/v1'
+                      : aiForm.apiType === 'claude'
+                        ? 'https://api.anthropic.com/v1'
+                        : 'https://generativelanguage.googleapis.com/v1beta'
+                  }
                 />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t(
+                    '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/messages 或 :generateContent',
+                    'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /messages, or :generateContent.'
+                  )}
+                </p>
               </div>
               
               <div>
@@ -751,7 +793,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       )}
                     </h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
+                      {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     </p>
                   </div>
                 </div>

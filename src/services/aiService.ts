@@ -9,6 +9,176 @@ export class AIService {
     this.language = language;
   }
 
+  private getApiType(): 'openai' | 'claude' | 'gemini' {
+    return this.config.apiType || 'openai';
+  }
+
+  private buildApiUrl(pathWithVersion: string): string {
+    const baseUrlWithSlash = this.config.baseUrl.endsWith('/')
+      ? this.config.baseUrl
+      : `${this.config.baseUrl}/`;
+
+    const versionPrefix = pathWithVersion.split('/')[0] || '';
+
+    try {
+      const base = new URL(baseUrlWithSlash);
+      const basePath = base.pathname.replace(/\/$/, '');
+
+      // 兼容用户把 baseUrl 写成 .../v1 或 .../v1beta 的情况，避免拼成 /v1/v1/...
+      if (versionPrefix) {
+        const versionRe = new RegExp(`/${versionPrefix}$`);
+        if (versionRe.test(basePath) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
+          const rest = pathWithVersion.slice(versionPrefix.length + 1); // remove "v1/"
+          return new URL(rest, baseUrlWithSlash).toString();
+        }
+      }
+
+      return new URL(pathWithVersion, baseUrlWithSlash).toString();
+    } catch {
+      // baseUrl 非绝对 URL 时这里会抛错；上层会在 testConnection/调用处处理失败
+      return `${baseUrlWithSlash}${pathWithVersion}`;
+    }
+  }
+
+  private async requestText(options: {
+    system: string;
+    user: string;
+    temperature: number;
+    maxTokens: number;
+    signal?: AbortSignal;
+  }): Promise<string> {
+    const apiType = this.getApiType();
+
+    if (apiType === 'openai') {
+      const url = this.buildApiUrl('v1/chat/completions');
+      const messages = [
+        ...(options.system.trim()
+          ? [{ role: 'system', content: options.system }]
+          : []),
+        { role: 'user', content: options.user },
+      ];
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages,
+          temperature: options.temperature,
+          max_tokens: options.maxTokens,
+        }),
+        signal: options.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error('No content received from AI service');
+      }
+      return content;
+    }
+
+    if (apiType === 'claude') {
+      const url = this.buildApiUrl('v1/messages');
+      const body = {
+        model: this.config.model,
+        ...(options.system.trim() ? { system: options.system } : {}),
+        messages: [{ role: 'user', content: options.user }],
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+      };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-api-key': this.config.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(body),
+        signal: options.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data: unknown = await response.json();
+      const contentBlocks = (data as { content?: unknown }).content;
+      if (Array.isArray(contentBlocks)) {
+        const text = contentBlocks
+          .map((b) => {
+            if (!b || typeof b !== 'object') return '';
+            const block = b as { type?: unknown; text?: unknown };
+            return block.type === 'text' && typeof block.text === 'string' ? block.text : '';
+          })
+          .join('');
+
+        if (text) return text;
+      }
+
+      throw new Error('No content received from AI service');
+    }
+
+    // gemini
+    const rawModel = this.config.model.trim();
+    const model = rawModel.startsWith('models/') ? rawModel.slice('models/'.length) : rawModel;
+    const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const urlObj = new URL(this.buildApiUrl(path));
+    urlObj.searchParams.set('key', this.config.apiKey);
+
+    const prompt = options.system ? `${options.system}\n\n${options.user}` : options.user;
+    const response = await fetch(urlObj.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: options.temperature,
+          maxOutputTokens: options.maxTokens,
+        },
+      }),
+      signal: options.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data: unknown = await response.json();
+    const candidates = (data as { candidates?: unknown }).candidates;
+    if (Array.isArray(candidates) && candidates.length > 0) {
+      const parts = (candidates[0] as { content?: { parts?: unknown } }).content?.parts;
+      if (Array.isArray(parts)) {
+        const text = parts
+          .map((p) => {
+            if (!p || typeof p !== 'object') return '';
+            const part = p as { text?: unknown };
+            return typeof part.text === 'string' ? part.text : '';
+          })
+          .join('');
+        if (text) return text;
+      }
+    }
+
+    throw new Error('No content received from AI service');
+  }
+
   async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[]): Promise<{
     summary: string;
     tags: string[];
@@ -19,41 +189,16 @@ export class AIService {
       : this.createAnalysisPrompt(repository, readmeContent, customCategories);
     
     try {
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: 'system',
-              content: this.language === 'zh' 
-                ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。'
-                : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 400,
-        }),
+      const system = this.language === 'zh'
+        ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。'
+        : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types.';
+
+      const content = await this.requestText({
+        system,
+        user: prompt,
+        temperature: 0.3,
+        maxTokens: 400,
       });
-
-      if (!response.ok) {
-        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const content = data.choices[0]?.message?.content;
-      
-      if (!content) {
-        throw new Error('No content received from AI service');
-      }
 
       return this.parseAIResponse(content);
     } catch (error) {
@@ -279,13 +424,23 @@ Focus on practicality and accurate categorization to help users quickly understa
 
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-      });
-      return response.ok;
+      const base = new URL(this.config.baseUrl);
+      if (base.protocol !== 'http:' && base.protocol !== 'https:') return false;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 秒超时，避免长时间卡住
+      try {
+        const content = await this.requestText({
+          system: 'You are a connection test assistant.',
+          user: 'Reply with exactly one word: OK',
+          temperature: 0,
+          maxTokens: 10,
+          signal: controller.signal,
+        });
+        return !!content;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     } catch (error) {
       return false;
     }
@@ -297,40 +452,21 @@ Focus on practicality and accurate categorization to help users quickly understa
     try {
       // Use AI to understand and translate the search query
       const searchPrompt = this.createSearchPrompt(query);
-      
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: 'system',
-              content: this.language === 'zh'
-                ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
-                : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.',
-            },
-            {
-              role: 'user',
-              content: searchPrompt,
-            },
-          ],
-          temperature: 0.1,
-          max_tokens: 200,
-        }),
+
+      const system = this.language === 'zh'
+        ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
+        : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
+
+      const content = await this.requestText({
+        system,
+        user: searchPrompt,
+        temperature: 0.1,
+        maxTokens: 200,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        
-        if (content) {
-          const searchTerms = this.parseSearchResponse(content);
-          return this.performEnhancedSearch(repositories, query, searchTerms);
-        }
+      if (content) {
+        const searchTerms = this.parseSearchResponse(content);
+        return this.performEnhancedSearch(repositories, query, searchTerms);
       }
     } catch (error) {
       console.warn('AI search failed, falling back to basic search:', error);
