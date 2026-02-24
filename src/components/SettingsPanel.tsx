@@ -57,6 +57,8 @@ export const SettingsPanel: React.FC = () => {
     deleteCustomCategory,
     backendApiSecret,
     setBackendApiSecret,
+    setAIConfigs,
+    setWebDAVConfigs,
   } = useAppStore();
 
   const [showAIForm, setShowAIForm] = useState(false);
@@ -524,9 +526,11 @@ Focus on practicality and accurate categorization to help users quickly understa
     try {
       await backend.syncRepositories(repositories);
       await backend.syncReleases(releases);
+      await backend.syncAIConfigs(aiConfigs);
+      await backend.syncWebDAVConfigs(webdavConfigs);
       alert(t(
-        `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}`,
-        `Synced to backend: repositories ${repositories.length}, releases ${releases.length}`
+        `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
+        `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
       ));
     } catch (error) {
       console.error('Sync to backend failed:', error);
@@ -551,6 +555,8 @@ Focus on practicality and accurate categorization to help users quickly understa
     try {
       const repoData = await backend.fetchRepositories();
       const releaseData = await backend.fetchReleases();
+      const aiConfigData = await backend.fetchAIConfigs();
+      const webdavConfigData = await backend.fetchWebDAVConfigs();
       
       if (repoData.repositories.length > 0) {
         setRepositories(repoData.repositories);
@@ -558,10 +564,16 @@ Focus on practicality and accurate categorization to help users quickly understa
       if (releaseData.releases.length > 0) {
         setReleases(releaseData.releases);
       }
+      if (aiConfigData.length > 0) {
+        setAIConfigs(aiConfigData);
+      }
+      if (webdavConfigData.length > 0) {
+        setWebDAVConfigs(webdavConfigData);
+      }
       
       alert(t(
-        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}`,
-        `Synced from backend: repositories ${repoData.repositories.length}, releases ${releaseData.releases.length}`
+        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}，AI配置 ${aiConfigData.length}，WebDAV配置 ${webdavConfigData.length}`,
+        `Synced from backend: repos ${repoData.repositories.length}, releases ${releaseData.releases.length}, AI configs ${aiConfigData.length}, WebDAV configs ${webdavConfigData.length}`
       ));
     } catch (error) {
       console.error('Sync from backend failed:', error);

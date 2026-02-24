@@ -1,6 +1,6 @@
 import { translateBackendError } from '../utils/backendErrors';
 
-import { Repository, Release } from '../types';
+import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
@@ -231,6 +231,49 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
     return res.json() as Promise<{ releases: Release[]; total: number }>;
   }
+
+  async syncAIConfigs(configs: AIConfig[]): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await fetch(`${this._backendUrl}/configs/ai/bulk`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ configs })
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync AI configs error');
+  }
+
+  async fetchAIConfigs(): Promise<AIConfig[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await fetch(`${this._backendUrl}/configs/ai?decrypt=true`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch AI configs error');
+    return res.json() as Promise<AIConfig[]>;
+  }
+
+  async syncWebDAVConfigs(configs: WebDAVConfig[]): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await fetch(`${this._backendUrl}/configs/webdav/bulk`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ configs })
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync WebDAV configs error');
+  }
+
+  async fetchWebDAVConfigs(): Promise<WebDAVConfig[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await fetch(`${this._backendUrl}/configs/webdav?decrypt=true`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch WebDAV configs error');
+    return res.json() as Promise<WebDAVConfig[]>;
+  }
+
 
   async exportData(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
