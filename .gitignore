@@ -26,3 +26,11 @@ dist-ssr
 .env
 release
 electron
+
+# Backend server data
+server/data/*.db
+server/data/.encryption-key
+server/dist/
+
+ # Orchestrator internal files
+.sisyphus/

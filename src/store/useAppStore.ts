@@ -59,6 +59,9 @@ interface AppActions {
 
   // Update Analysis Progress
   setAnalysisProgress: (newProgress: AnalysisProgress) => void;
+
+  // Backend actions
+  setBackendApiSecret: (secret: string | null) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -186,6 +189,7 @@ export const useAppStore = create<AppState & AppActions>()(
       language: 'zh',
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
+      backendApiSecret: null,
 
       // Auth actions
       setUser: (user) => {
@@ -320,7 +324,8 @@ export const useAppStore = create<AppState & AppActions>()(
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
-      setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress })
+      setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
+      setBackendApiSecret: (backendApiSecret) => set({ backendApiSecret }),
     }),
     {
       name: 'github-stars-manager',
@@ -357,6 +362,9 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化UI设置
         theme: state.theme,
         language: state.language,
+
+        // 持久化后端设置
+        backendApiSecret: state.backendApiSecret,
         
         // 持久化搜索排序设置
         searchFilters: {

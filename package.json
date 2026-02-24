@@ -12,7 +12,11 @@
     "electron": "electron electron/main.js",
     "electron:dev": "NODE_ENV=development electron electron/main.js",
     "dist": "electron-builder",
-    "update-version": "node scripts/update-version.cjs"
+    "update-version": "node scripts/update-version.cjs",
+    "dev:server": "cd server && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "build:server": "cd server && npm run build",
+    "build:all": "npm run build && npm run build:server"
   },
   "dependencies": {
     "date-fns": "^3.3.1",
@@ -37,6 +41,7 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "concurrently": "^8.2.0"
   }
 }

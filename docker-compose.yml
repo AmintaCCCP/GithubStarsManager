@@ -1,6 +1,29 @@
 version: '3.8'
 
 services:
+  frontend:
+    build: .
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      - API_SECRET=${API_SECRET:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+
+services:
   github-stars-manager:
     build: .
     ports:
