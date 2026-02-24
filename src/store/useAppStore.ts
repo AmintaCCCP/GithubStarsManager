@@ -19,12 +19,14 @@ interface AppActions {
   updateAIConfig: (id: string, updates: Partial<AIConfig>) => void;
   deleteAIConfig: (id: string) => void;
   setActiveAIConfig: (id: string | null) => void;
+  setAIConfigs: (configs: AIConfig[]) => void;
   
   // WebDAV actions
   addWebDAVConfig: (config: WebDAVConfig) => void;
   updateWebDAVConfig: (id: string, updates: Partial<WebDAVConfig>) => void;
   deleteWebDAVConfig: (id: string) => void;
   setActiveWebDAVConfig: (id: string | null) => void;
+  setWebDAVConfigs: (configs: WebDAVConfig[]) => void;
   setLastBackup: (timestamp: string) => void;
   
   // Search actions
@@ -238,6 +240,7 @@ export const useAppStore = create<AppState & AppActions>()(
         activeAIConfig: state.activeAIConfig === id ? null : state.activeAIConfig
       })),
       setActiveAIConfig: (activeAIConfig) => set({ activeAIConfig }),
+      setAIConfigs: (aiConfigs) => set({ aiConfigs }),
 
       // WebDAV actions
       addWebDAVConfig: (config) => set((state) => ({
@@ -253,6 +256,7 @@ export const useAppStore = create<AppState & AppActions>()(
         activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig
       })),
       setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
+      setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       // Search actions
