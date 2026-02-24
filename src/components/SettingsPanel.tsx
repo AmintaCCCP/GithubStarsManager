@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bot, 
   Plus, 
@@ -19,13 +19,15 @@ import {
   ExternalLink,
   Mail,
   Github,
-  Twitter
+  Twitter,
+  Server,
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
 import { UpdateChecker } from './UpdateChecker';
+import { backend } from '../services/backendAdapter';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -53,6 +55,8 @@ export const SettingsPanel: React.FC = () => {
     setReleases,
     addCustomCategory,
     deleteCustomCategory,
+    backendApiSecret,
+    setBackendApiSecret,
   } = useAppStore();
 
   const [showAIForm, setShowAIForm] = useState(false);
@@ -64,6 +68,27 @@ export const SettingsPanel: React.FC = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'connected' | 'disconnected' | 'checking'>('disconnected');
+  const [backendHealth, setBackendHealth] = useState<{ version: string; timestamp: string } | null>(null);
+  const [isSyncingToBackend, setIsSyncingToBackend] = useState(false);
+  const [isSyncingFromBackend, setIsSyncingFromBackend] = useState(false);
+  const [backendSecretInput, setBackendSecretInput] = useState(backendApiSecret || '');
+
+  // Check backend status on mount
+  useEffect(() => {
+    const checkBackend = async () => {
+      setBackendStatus('checking');
+      const health = await backend.checkHealth();
+      if (health) {
+        setBackendStatus('connected');
+        setBackendHealth({ version: health.version, timestamp: health.timestamp });
+      } else {
+        setBackendStatus('disconnected');
+        setBackendHealth(null);
+      }
+    };
+    checkBackend();
+  }, []);
 
   type AIFormState = {
     name: string;
@@ -471,6 +496,81 @@ Focus on practicality and accurate categorization to help users quickly understa
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const handleTestBackendConnection = async () => {
+    setBackendStatus('checking');
+    // Save the secret first
+    setBackendApiSecret(backendSecretInput || null);
+    // Re-init and check
+    await backend.init();
+    const health = await backend.checkHealth();
+    if (health) {
+      setBackendStatus('connected');
+      setBackendHealth({ version: health.version, timestamp: health.timestamp });
+      alert(t('后端连接成功！', 'Backend connection successful!'));
+    } else {
+      setBackendStatus('disconnected');
+      setBackendHealth(null);
+      alert(t('后端连接失败，请检查服务器是否运行。', 'Backend connection failed. Please check if the server is running.'));
+    }
+  };
+
+  const handleSyncToBackend = async () => {
+    if (!backend.isAvailable) {
+      alert(t('后端不可用', 'Backend not available'));
+      return;
+    }
+    setIsSyncingToBackend(true);
+    try {
+      await backend.syncRepositories(repositories);
+      await backend.syncReleases(releases);
+      alert(t(
+        `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}`,
+        `Synced to backend: repositories ${repositories.length}, releases ${releases.length}`
+      ));
+    } catch (error) {
+      console.error('Sync to backend failed:', error);
+      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
+    } finally {
+      setIsSyncingToBackend(false);
+    }
+  };
+
+  const handleSyncFromBackend = async () => {
+    if (!backend.isAvailable) {
+      alert(t('后端不可用', 'Backend not available'));
+      return;
+    }
+    
+    if (!confirm(t(
+      '从后端同步将覆盖本地数据，是否继续？',
+      'Syncing from backend will overwrite local data. Continue?'
+    ))) return;
+
+    setIsSyncingFromBackend(true);
+    try {
+      const repoData = await backend.fetchRepositories();
+      const releaseData = await backend.fetchReleases();
+      
+      if (repoData.repositories.length > 0) {
+        setRepositories(repoData.repositories);
+      }
+      if (releaseData.releases.length > 0) {
+        setReleases(releaseData.releases);
+      }
+      
+      alert(t(
+        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}`,
+        `Synced from backend: repositories ${repoData.repositories.length}, releases ${releaseData.releases.length}`
+      ));
+    } catch (error) {
+      console.error('Sync from backend failed:', error);
+      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
+    } finally {
+      setIsSyncingFromBackend(false);
+    }
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -1066,6 +1166,100 @@ Focus on practicality and accurate categorization to help users quickly understa
           </div>
         )}
       </div>
+      {/* Backend Server Configuration */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Server className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('后端服务器', 'Backend Server')}
+            </h3>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              backendStatus === 'connected'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : backendStatus === 'checking'
+                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}>
+              {backendStatus === 'connected' ? '🟢 ' + t('已连接', 'Connected')
+                : backendStatus === 'checking' ? '🟡 ' + t('检查中...', 'Checking...')
+                  : '🔴 ' + t('未连接', 'Not Connected')}
+            </span>
+          </div>
+        </div>
+
+        {backendHealth && (
+          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-800 dark:text-green-200">
+            <p>{t('版本', 'Version')}: {backendHealth.version}</p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('API 密钥', 'API Secret')}
+            </label>
+            <div className="flex space-x-3">
+              <input
+                type="password"
+                value={backendSecretInput}
+                onChange={(e) => setBackendSecretInput(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
+              />
+              <button
+                onClick={handleTestBackendConnection}
+                disabled={backendStatus === 'checking'}
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {backendStatus === 'checking' ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <TestTube className="w-4 h-4" />
+                )}
+                <span>{t('测试连接', 'Test Connection')}</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t(
+                '如果后端设置了 API_SECRET 环境变量，在此输入相同的值。未设置则留空。',
+                'If the backend has API_SECRET env var set, enter the same value here. Leave empty if not set.'
+              )}
+            </p>
+          </div>
+
+          {backend.isAvailable && (
+            <div className="flex items-center justify-center space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={handleSyncToBackend}
+                disabled={isSyncingToBackend}
+                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSyncingToBackend ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5" />
+                )}
+                <span>{isSyncingToBackend ? t('同步中...', 'Syncing...') : t('同步到后端', 'Sync to Backend')}</span>
+              </button>
+
+              <button
+                onClick={handleSyncFromBackend}
+                disabled={isSyncingFromBackend}
+                className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSyncingFromBackend ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Download className="w-5 h-5" />
+                )}
+                <span>{isSyncingFromBackend ? t('同步中...', 'Syncing...') : t('从后端同步', 'Sync from Backend')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 };
