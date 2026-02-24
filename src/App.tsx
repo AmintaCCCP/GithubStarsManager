@@ -9,6 +9,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { backend } from './services/backendAdapter';
 
 function App() {
   const { 
@@ -32,6 +33,11 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Initialize backend adapter
+  useEffect(() => {
+    backend.init();
+  }, []);
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
