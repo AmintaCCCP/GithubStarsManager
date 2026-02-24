@@ -161,6 +161,9 @@ export interface AppState {
 
   // Analysis Progress
   analysisProgress: AnalysisProgress
+
+  // Backend
+  backendApiSecret: string | null;
 }
 
 export interface UpdateNotification {
