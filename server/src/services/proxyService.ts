@@ -15,7 +15,7 @@ export interface ProxyResponse {
 function redactUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
-    for (const key of ['key', 'api_key', 'token', 'access_token']) {
+    for (const key of ['key', 'api_key', 'apikey', 'token', 'access_token', 'secret', 'client_secret', 'password', 'auth']) {
       if (url.searchParams.has(key)) url.searchParams.set(key, '***');
     }
     return url.toString();
@@ -40,7 +40,10 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
     if (body && method !== 'GET' && method !== 'HEAD') {
       fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
-      if (!headers['Content-Type']) {
+      const hasContentType = Object.keys(headers).some(
+        k => k.toLowerCase() === 'content-type'
+      );
+      if (!hasContentType) {
         (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/json';
       }
     }
@@ -57,10 +60,15 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
     let data: unknown;
     const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      data = await response.json();
+    const text = await response.text();
+    if (contentType.includes('application/json') && text.length > 0) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
     } else {
-      data = await response.text();
+      data = text;
     }
 
     return { status: response.status, headers: responseHeaders, data };
