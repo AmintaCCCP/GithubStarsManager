@@ -138,6 +138,7 @@ export async function syncFromBackend(): Promise<void> {
       _hasPendingPush = false;
       void syncToBackend();
     }
+  }
 }
 
 /**
@@ -214,6 +215,10 @@ export function startAutoSync(): () => void {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
+  // Reset in-flight state flags to prevent permanent sync blocking
+  _isPushingToBackend = false;
+  _isSyncingFromBackendActive = false;
+  _hasPendingPush = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (_isSyncingFromBackend) return;
@@ -265,5 +270,10 @@ export function stopAutoSync(unsubscribe: () => void): void {
   } else {
     unsubscribe();
   }
+  // Reset in-flight state flags
+  _isPushingToBackend = false;
+  _isSyncingFromBackendActive = false;
+  _isSyncingFromBackend = false;
+  _hasPendingPush = false;
   console.log('🔄 Auto-sync stopped');
 }
