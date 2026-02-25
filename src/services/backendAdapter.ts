@@ -10,8 +10,11 @@ class BackendAdapter {
       // Try common backend URLs
       const urls = [
         window.location.origin + '/api',
-        'http://localhost:3000/api',
       ];
+      // Only probe localhost in development
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        urls.push('http://localhost:3000/api');
+      }
 
       for (const baseUrl of urls) {
         const controller = new AbortController();
