@@ -6,7 +6,10 @@ const router = Router();
 // Helper to parse JSON columns safely
 function parseJsonColumn(value: unknown): unknown[] {
   if (typeof value !== 'string' || !value) return [];
-  try { return JSON.parse(value); } catch { return []; }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
 }
 
 // Helper to transform DB row to API response
@@ -106,15 +109,15 @@ router.put('/api/repositories', (req, res) => {
           repo.created_at ?? null, repo.updated_at ?? null, repo.pushed_at ?? null,
           repo.starred_at ?? null,
           owner?.login ?? '', owner?.avatar_url ?? null,
-          JSON.stringify(repo.topics ?? []),
+          JSON.stringify(Array.isArray(repo.topics) ? repo.topics : []),
           repo.ai_summary ?? null,
-          JSON.stringify(repo.ai_tags ?? []),
-          JSON.stringify(repo.ai_platforms ?? []),
-          repo.analyzed_at ?? null, repo.analysis_failed ? 1 : 0,
+          JSON.stringify(Array.isArray(repo.ai_tags) ? repo.ai_tags : []),
+          JSON.stringify(Array.isArray(repo.ai_platforms) ? repo.ai_platforms : []),
+          repo.analyzed_at ?? null, (repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0,
           repo.custom_description ?? null,
-          JSON.stringify(repo.custom_tags ?? []),
+          JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, repo.last_edited ?? null,
-          repo.subscribed_to_releases ? 1 : 0
+          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0
         );
         count++;
       }
@@ -138,15 +141,15 @@ router.patch('/api/repositories/:id', (req, res) => {
 
     const allowedFields: Record<string, (v: unknown) => unknown> = {
       ai_summary: (v) => v,
-      ai_tags: (v) => JSON.stringify(v),
-      ai_platforms: (v) => JSON.stringify(v),
+      ai_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
+      ai_platforms: (v) => JSON.stringify(Array.isArray(v) ? v : []),
       analyzed_at: (v) => v,
-      analysis_failed: (v) => v ? 1 : 0,
+      analysis_failed: (v) => (v === true || v === 1) ? 1 : 0,
       custom_description: (v) => v,
-      custom_tags: (v) => JSON.stringify(v),
+      custom_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
       custom_category: (v) => v,
       last_edited: (v) => v,
-      subscribed_to_releases: (v) => v ? 1 : 0,
+      subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       description: (v) => v,
       name: (v) => v,
     };

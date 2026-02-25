@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
 let _isSyncingFromBackend = false;
+let _isSyncingFromBackendActive = false;
 
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -33,7 +34,9 @@ function quickHash(data: unknown): string {
  * Silent: errors logged to console only.
  */
 export async function syncFromBackend(): Promise<void> {
-  if (!backend.isAvailable) return;
+  if (!backend.isAvailable || _isSyncingFromBackendActive) return;
+
+  _isSyncingFromBackendActive = true;
 
   try {
     const [reposResult, releasesResult, aiResult, webdavResult, settingsResult] = await Promise.allSettled([
@@ -121,6 +124,7 @@ export async function syncFromBackend(): Promise<void> {
     console.error('Failed to sync from backend:', err);
   } finally {
     _isSyncingFromBackend = false;
+    _isSyncingFromBackendActive = false;
   }
 }
 
@@ -162,6 +166,15 @@ export async function syncToBackend(): Promise<void> {
  * Returns an unsubscribe function for cleanup.
  */
 export function startAutoSync(): () => void {
+  // Guard: if already running, stop previous instance first
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
+  }
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (_isSyncingFromBackend) return;
