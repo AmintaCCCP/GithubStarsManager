@@ -8,6 +8,12 @@ let _isSyncingFromBackend = false;
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Polling timer for pull-from-backend
+let _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+// Polling interval in milliseconds
+const POLL_INTERVAL = 5000;
+
 /**
  * Pull all data from backend and update local store.
  * Backend-first strategy: backend data overwrites local data.
@@ -81,6 +87,7 @@ export async function syncToBackend(): Promise<void> {
  * Returns an unsubscribe function for cleanup.
  */
 export function startAutoSync(): () => void {
+  // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (_isSyncingFromBackend) return;
 
@@ -101,7 +108,12 @@ export function startAutoSync(): () => void {
     }, 2000);
   });
 
-  console.log('🔄 Auto-sync started');
+  // 2. Poll backend every 5s → pull fresh data for cross-device sync
+  _pollTimer = setInterval(() => {
+    syncFromBackend();
+  }, POLL_INTERVAL);
+
+  console.log('🔄 Auto-sync started (push debounce: 2s, poll: 5s)');
   return unsubscribe;
 }
 
@@ -112,6 +124,10 @@ export function stopAutoSync(unsubscribe: () => void): void {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
+  }
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
   }
   unsubscribe();
   console.log('🔄 Auto-sync stopped');
