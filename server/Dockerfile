@@ -10,7 +10,8 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
-RUN mkdir -p data
+RUN mkdir -p data && chown -R node:node /app
+USER node
 VOLUME /app/data
 EXPOSE 3000
 CMD ["node", "dist/index.js"]

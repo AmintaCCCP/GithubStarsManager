@@ -126,7 +126,9 @@ class BackendAdapter {
       if (!res.ok) return '';
       const data = await res.json() as { encoding?: string; content?: string };
       if (data.encoding === 'base64' && data.content) {
-        return atob(data.content);
+        const binaryStr = atob(data.content);
+        const bytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0));
+        return new TextDecoder().decode(bytes);
       }
       return data.content || '';
     } catch {

@@ -11,8 +11,8 @@ services:
 
   backend:
     build: ./server
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - API_SECRET=${API_SECRET:-}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
