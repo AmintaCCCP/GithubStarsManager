@@ -54,8 +54,9 @@ router.get('/api/repositories', (req, res) => {
     const params: unknown[] = [];
 
     if (search) {
-      sql += ' WHERE name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?';
-      const searchPattern = `%${search}%`;
+      const escaped = search.replace(/[%_\\]/g, '\\$&');
+      sql += " WHERE name LIKE ? ESCAPE '\\' OR full_name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' OR ai_tags LIKE ? ESCAPE '\\'";
+      const searchPattern = `%${escaped}%`;
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
