@@ -156,6 +156,15 @@ export async function syncToBackend(): Promise<void> {
     } else {
       console.log('✅ Synced to backend');
     }
+
+    // Update _lastHash so the next poll won't see a false "change"
+    _lastHash = {
+      repos: quickHash(state.repositories),
+      releases: quickHash(state.releases),
+      ai: quickHash(state.aiConfigs),
+      webdav: quickHash(state.webdavConfigs),
+      settings: quickHash({ activeAIConfig: state.activeAIConfig, activeWebDAVConfig: state.activeWebDAVConfig }),
+    };
   } catch (err) {
     console.error('Failed to sync to backend:', err);
   }
