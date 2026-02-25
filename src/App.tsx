@@ -10,6 +10,7 @@ import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
+import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
 
 function App() {
   const { 
@@ -34,9 +35,25 @@ function App() {
     }
   }, [theme]);
 
-  // Initialize backend adapter
+  // Initialize backend adapter and auto-sync
   useEffect(() => {
-    backend.init();
+    let unsubscribe: (() => void) | null = null;
+
+    const initBackend = async () => {
+      await backend.init();
+      if (backend.isAvailable) {
+        await syncFromBackend();
+        unsubscribe = startAutoSync();
+      }
+    };
+
+    initBackend();
+
+    return () => {
+      if (unsubscribe) {
+        stopAutoSync(unsubscribe);
+      }
+    };
   }, []);
 
   // Show login screen if not authenticated
