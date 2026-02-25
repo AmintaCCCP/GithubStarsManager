@@ -152,14 +152,14 @@ router.post('/api/sync/import', (req, res) => {
       const cats = data.categories as Record<string, unknown>[] | undefined;
       if (Array.isArray(cats) && cats.length > 0) {
         const catStmt = db.prepare(`
-          INSERT OR REPLACE INTO categories (id, name, icon, keywords, is_custom)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO categories (id, name, description, icon, keywords, color, sort_order, is_custom)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const c of cats) {
           catStmt.run(
-            c.id, c.name ?? '', c.icon ?? '📁',
+            c.id, c.name ?? '', c.description ?? null, c.icon ?? '📁',
             typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
-            c.is_custom ? 1 : 0
+            c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0
           );
         }
         counts.categories = cats.length;
@@ -169,13 +169,14 @@ router.post('/api/sync/import', (req, res) => {
       const filters = data.asset_filters as Record<string, unknown>[] | undefined;
       if (Array.isArray(filters) && filters.length > 0) {
         const filterStmt = db.prepare(`
-          INSERT OR REPLACE INTO asset_filters (id, name, keywords)
-          VALUES (?, ?, ?)
+          INSERT OR REPLACE INTO asset_filters (id, name, description, keywords, platform, sort_order)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
         for (const f of filters) {
           filterStmt.run(
-            f.id, f.name ?? '',
-            typeof f.keywords === 'string' ? f.keywords : JSON.stringify(f.keywords ?? [])
+            f.id, f.name ?? '', f.description ?? null,
+            typeof f.keywords === 'string' ? f.keywords : JSON.stringify(f.keywords ?? []),
+            f.platform ?? null, f.sort_order ?? 0
           );
         }
         counts.asset_filters = filters.length;

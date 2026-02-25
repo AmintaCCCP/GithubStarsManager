@@ -135,7 +135,7 @@ export async function syncToBackend(): Promise<void> {
   try {
     const state = useAppStore.getState();
 
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       backend.syncRepositories(state.repositories),
       backend.syncReleases(state.releases),
       backend.syncAIConfigs(state.aiConfigs),
@@ -146,7 +146,12 @@ export async function syncToBackend(): Promise<void> {
       }),
     ]);
 
-    console.log('✅ Synced to backend');
+    const failures = results.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      console.warn(`⚠️ Synced to backend with ${failures.length} error(s):`, failures.map(f => (f as PromiseRejectedResult).reason));
+    } else {
+      console.log('✅ Synced to backend');
+    }
   } catch (err) {
     console.error('Failed to sync to backend:', err);
   }

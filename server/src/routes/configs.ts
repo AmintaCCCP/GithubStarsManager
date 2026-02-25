@@ -92,6 +92,13 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     }
 
     const bulkSync = db.transaction(() => {
+      // Read existing keys BEFORE delete
+      const existingKeys = new Map<string, string>();
+      const existingRows = db.prepare('SELECT id, api_key_encrypted FROM ai_configs').all() as Array<{ id: string; api_key_encrypted: string }>;
+      for (const row of existingRows) {
+        if (row.api_key_encrypted) existingKeys.set(String(row.id), row.api_key_encrypted);
+      }
+
       db.prepare('DELETE FROM ai_configs').run();
 
       const stmt = db.prepare(`
@@ -100,7 +107,12 @@ router.put('/api/configs/ai/bulk', (req, res) => {
       `);
 
       for (const c of configs) {
-        const encryptedKey = c.apiKey ? encrypt(c.apiKey, config.encryptionKey) : '';
+        let encryptedKey = '';
+        if (c.apiKey && !c.apiKey.startsWith('***')) {
+          encryptedKey = encrypt(c.apiKey, config.encryptionKey);
+        } else {
+          encryptedKey = existingKeys.get(String(c.id)) ?? '';
+        }
         stmt.run(
           c.id, c.name ?? '', c.apiType ?? 'openai', c.baseUrl ?? '',
           encryptedKey, c.model ?? '', c.isActive ? 1 : 0,
@@ -133,10 +145,14 @@ router.put('/api/configs/ai/:id', (req, res) => {
       encryptedKey = (existing?.api_key_encrypted as string) ?? null;
     }
 
-    db.prepare(
+    const result = db.prepare(
       'UPDATE ai_configs SET name = ?, api_type = ?, model = ?, base_url = ?, api_key_encrypted = ?, is_active = ?, custom_prompt = ?, use_custom_prompt = ?, concurrency = ? WHERE id = ?'
     ).run(name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null, encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, id);
 
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
+      return;
+    }
     let maskedKey = '';
     if (encryptedKey) {
       try { maskedKey = maskApiKey(decrypt(encryptedKey, config.encryptionKey)); } catch { maskedKey = '****'; }
@@ -247,6 +263,13 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
     }
 
     const bulkSync = db.transaction(() => {
+      // Read existing passwords BEFORE delete
+      const existingPwds = new Map<string, string>();
+      const existingRows = db.prepare('SELECT id, password_encrypted FROM webdav_configs').all() as Array<{ id: string; password_encrypted: string }>;
+      for (const row of existingRows) {
+        if (row.password_encrypted) existingPwds.set(String(row.id), row.password_encrypted);
+      }
+
       db.prepare('DELETE FROM webdav_configs').run();
 
       const stmt = db.prepare(`
@@ -255,7 +278,12 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       `);
 
       for (const c of configs) {
-        const encryptedPwd = c.password ? encrypt(c.password, config.encryptionKey) : '';
+        let encryptedPwd = '';
+        if (c.password && !c.password.startsWith('***')) {
+          encryptedPwd = encrypt(c.password, config.encryptionKey);
+        } else {
+          encryptedPwd = existingPwds.get(String(c.id)) ?? '';
+        }
         stmt.run(
           c.id, c.name ?? '', c.url ?? '', c.username ?? '',
           encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
@@ -286,10 +314,14 @@ router.put('/api/configs/webdav/:id', (req, res) => {
       encryptedPwd = (existing?.password_encrypted as string) ?? null;
     }
 
-    db.prepare(
+    const result = db.prepare(
       'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ? WHERE id = ?'
     ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, id);
 
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
+      return;
+    }
     let maskedPwd = '';
     if (encryptedPwd) {
       try { maskedPwd = maskPassword(decrypt(encryptedPwd, config.encryptionKey)); } catch { maskedPwd = '****'; }

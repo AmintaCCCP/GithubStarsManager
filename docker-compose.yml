@@ -22,13 +22,3 @@ services:
 
 volumes:
   backend-data:
-
-services:
-  github-stars-manager:
-    build: .
-    ports:
-      - "8080:80"
-    restart: unless-stopped
-    # Environment variables can be set here if needed
-    # environment:
-    #   - NODE_ENV=production

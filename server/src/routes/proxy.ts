@@ -163,9 +163,10 @@ router.post('/api/proxy/webdav', async (req, res) => {
     const targetUrl = `${baseUrl}${path}`;
     const credentials = Buffer.from(`${username}:${password}`).toString('base64');
 
+    const { Authorization: _ignored, ...safeHeaders } = extraHeaders || {};
     const headers: Record<string, string> = {
+      ...safeHeaders,
       'Authorization': `Basic ${credentials}`,
-      ...(extraHeaders || {}),
     };
 
     if (method === 'PROPFIND') {

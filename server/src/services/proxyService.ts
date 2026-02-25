@@ -24,12 +24,30 @@ function redactUrl(rawUrl: string): string {
   }
 }
 
+const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254']);
+const PRIVATE_IP_PATTERNS = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./];
+
+function validateUrl(rawUrl: string): void {
+  const parsed = new URL(rawUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Blocked proxy request: unsupported protocol '${parsed.protocol}'`);
+  }
+  const hostname = parsed.hostname;
+  if (BLOCKED_HOSTS.has(hostname)) {
+    throw new Error(`Blocked proxy request: hostname '${hostname}' is not allowed`);
+  }
+  if (PRIVATE_IP_PATTERNS.some(p => p.test(hostname))) {
+    throw new Error(`Blocked proxy request: private IP '${hostname}' is not allowed`);
+  }
+}
+
 export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyResponse> {
   const { url, method, headers = {}, body, timeout = 30000 } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
+    validateUrl(url);
     console.log(`[Proxy] ${method} ${redactUrl(url)}`);
 
     const fetchOptions: RequestInit = {
@@ -49,7 +67,6 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
     }
 
     const response = await fetch(url, fetchOptions);
-    clearTimeout(timeoutId);
 
     console.log(`[Proxy] ${method} ${redactUrl(url)} -> ${response.status}`);
 
@@ -73,11 +90,12 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
     return { status: response.status, headers: responseHeaders, data };
   } catch (error) {
-    clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
       return { status: 504, headers: {}, data: { error: 'Gateway Timeout', code: 'GATEWAY_TIMEOUT' } };
     }
     console.error(`[Proxy] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return { status: 502, headers: {}, data: { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: error instanceof Error ? error.message : 'Unknown error' } };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

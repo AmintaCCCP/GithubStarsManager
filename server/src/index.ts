@@ -76,7 +76,7 @@ function startServer(): void {
 }
 
 // Only start server when run directly (not imported for tests)
-const isMainModule = process.argv[1] && new URL(import.meta.url).pathname === (process.platform === 'win32' ? process.argv[1].replace(/\\/g, '/') : process.argv[1]);
+const isMainModule = process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
 if (isMainModule) {
   startServer();
 }

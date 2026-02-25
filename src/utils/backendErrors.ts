@@ -62,7 +62,8 @@ function getCurrentLanguage(): 'zh' | 'en' {
     const storeData = localStorage.getItem('github-stars-manager');
     if (storeData) {
       const parsed = JSON.parse(storeData);
-      return parsed.state?.language || 'zh';
+      const lang = parsed.state?.language;
+      if (lang === 'en') return 'en';
     }
   } catch { /* ignore */ }
   return 'zh';

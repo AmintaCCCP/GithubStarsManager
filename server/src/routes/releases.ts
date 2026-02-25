@@ -32,8 +32,8 @@ function transformRelease(row: Record<string, unknown>) {
 router.get('/api/releases', (req, res) => {
   try {
     const db = getDb();
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
     const repoId = req.query.repo_id as string | undefined;
     const unread = req.query.unread as string | undefined;
     const offset = (page - 1) * limit;
@@ -83,6 +83,13 @@ router.put('/api/releases', (req, res) => {
     if (!Array.isArray(releases)) {
       res.status(400).json({ error: 'releases array required', code: 'RELEASES_ARRAY_REQUIRED' });
       return;
+    }
+
+    for (const release of releases) {
+      if (!release.id) {
+        res.status(400).json({ error: 'Each release must have an id', code: 'RELEASE_ID_REQUIRED' });
+        return;
+      }
     }
 
     const stmt = db.prepare(`

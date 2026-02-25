@@ -38,18 +38,26 @@ function App() {
   // Initialize backend adapter and auto-sync
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
 
     const initBackend = async () => {
-      await backend.init();
-      if (backend.isAvailable) {
-        await syncFromBackend();
-        unsubscribe = startAutoSync();
+      try {
+        await backend.init();
+        if (backend.isAvailable && !cancelled) {
+          await syncFromBackend();
+          if (!cancelled) {
+            unsubscribe = startAutoSync();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to initialize backend:', err);
       }
     };
 
     initBackend();
 
     return () => {
+      cancelled = true;
       if (unsubscribe) {
         stopAutoSync(unsubscribe);
       }

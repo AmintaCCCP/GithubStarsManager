@@ -5,6 +5,9 @@ const IV_LENGTH = 12;
 
 export function encrypt(plaintext: string, key: string): string {
   const keyBuffer = Buffer.from(key, 'hex');
+  if (keyBuffer.length !== 32) {
+    throw new Error(`Invalid encryption key: expected 32 bytes (64 hex chars), got ${keyBuffer.length} bytes`);
+  }
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, keyBuffer, iv);
 
@@ -30,6 +33,9 @@ export function decrypt(encryptedStr: string, key: string): string {
 
   const [ivB64, ciphertextB64, authTagB64] = parts;
   const keyBuffer = Buffer.from(key, 'hex');
+  if (keyBuffer.length !== 32) {
+    throw new Error(`Invalid encryption key: expected 32 bytes (64 hex chars), got ${keyBuffer.length} bytes`);
+  }
   const iv = Buffer.from(ivB64, 'base64');
   const ciphertext = Buffer.from(ciphertextB64, 'base64');
   const authTag = Buffer.from(authTagB64, 'base64');
