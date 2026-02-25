@@ -1,4 +1,5 @@
 import { Repository, AIConfig } from '../types';
+import { backend } from './backendAdapter';
 
 export class AIService {
   private config: AIConfig;
@@ -50,34 +51,40 @@ export class AIService {
     const apiType = this.getApiType();
 
     if (apiType === 'openai') {
-      const url = this.buildApiUrl('v1/chat/completions');
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
           : []),
         { role: 'user', content: options.user },
       ];
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages,
-          temperature: options.temperature,
-          max_tokens: options.maxTokens,
-        }),
-        signal: options.signal,
-      });
+      const requestBody = {
+        model: this.config.model,
+        messages,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+      };
 
-      if (!response.ok) {
-        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+      let data: any;
+      if (backend.isAvailable && this.config.id) {
+        data = await backend.proxyAIRequest(this.config.id, requestBody);
+      } else {
+        const url = this.buildApiUrl('v1/chat/completions');
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+          signal: options.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+        }
+        data = await response.json();
       }
 
-      const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
       if (!content) {
         throw new Error('No content received from AI service');
@@ -86,31 +93,36 @@ export class AIService {
     }
 
     if (apiType === 'claude') {
-      const url = this.buildApiUrl('v1/messages');
-      const body = {
+      const requestBody = {
         model: this.config.model,
         ...(options.system.trim() ? { system: options.system } : {}),
         messages: [{ role: 'user', content: options.user }],
         temperature: options.temperature,
         max_tokens: options.maxTokens,
       };
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-api-key': this.config.apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-        signal: options.signal,
-      });
 
-      if (!response.ok) {
-        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+      let data: unknown;
+      if (backend.isAvailable && this.config.id) {
+        data = await backend.proxyAIRequest(this.config.id, requestBody);
+      } else {
+        const url = this.buildApiUrl('v1/messages');
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'x-api-key': this.config.apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(requestBody),
+          signal: options.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+        }
+        data = await response.json();
       }
 
-      const data: unknown = await response.json();
       const contentBlocks = (data as { content?: unknown }).content;
       if (Array.isArray(contentBlocks)) {
         const text = contentBlocks
@@ -120,47 +132,52 @@ export class AIService {
             return block.type === 'text' && typeof block.text === 'string' ? block.text : '';
           })
           .join('');
-
         if (text) return text;
       }
-
       throw new Error('No content received from AI service');
     }
 
     // gemini
     const rawModel = this.config.model.trim();
     const model = rawModel.startsWith('models/') ? rawModel.slice('models/'.length) : rawModel;
-    const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const urlObj = new URL(this.buildApiUrl(path));
-    urlObj.searchParams.set('key', this.config.apiKey);
+    const prompt = options.system ? `${options.system}
 
-    const prompt = options.system ? `${options.system}\n\n${options.user}` : options.user;
-    const response = await fetch(urlObj.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: options.temperature,
-          maxOutputTokens: options.maxTokens,
+${options.user}` : options.user;
+    const requestBody = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
         },
-      }),
-      signal: options.signal,
-    });
+      ],
+      generationConfig: {
+        temperature: options.temperature,
+        maxOutputTokens: options.maxTokens,
+      },
+    };
 
-    if (!response.ok) {
-      throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+    let data: unknown;
+    if (backend.isAvailable && this.config.id) {
+      data = await backend.proxyAIRequest(this.config.id, requestBody);
+    } else {
+      const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const urlObj = new URL(this.buildApiUrl(path));
+      urlObj.searchParams.set('key', this.config.apiKey);
+      const response = await fetch(urlObj.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: options.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+      }
+      data = await response.json();
     }
 
-    const data: unknown = await response.json();
     const candidates = (data as { candidates?: unknown }).candidates;
     if (Array.isArray(candidates) && candidates.length > 0) {
       const parts = (candidates[0] as { content?: { parts?: unknown } }).content?.parts;
@@ -175,7 +192,6 @@ export class AIService {
         if (text) return text;
       }
     }
-
     throw new Error('No content received from AI service');
   }
 
