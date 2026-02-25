@@ -6,7 +6,7 @@ let warnedOnce = false;
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Skip auth for health check
-  if (req.method === 'GET' && req.path === '/api/health') {
+  if (req.method === 'GET' && req.path === '/health') {
     next();
     return;
   }

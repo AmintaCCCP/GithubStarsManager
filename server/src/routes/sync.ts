@@ -192,8 +192,8 @@ router.post('/api/sync/import', (req, res) => {
             INSERT OR REPLACE INTO ai_configs (id, name, api_type, base_url, api_key_encrypted, model, is_active, custom_prompt, use_custom_prompt, concurrency)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
-            c.id, c.name ?? '', c.api_type ?? c.apiType ?? 'openai', c.model ?? '', c.base_url ?? c.baseUrl ?? null,
-            existingKey,
+            c.id, c.name ?? '', c.api_type ?? c.apiType ?? 'openai', c.base_url ?? c.baseUrl ?? null,
+            existingKey, c.model ?? '',
             (c.is_active ?? c.isActive) ? 1 : 0, c.custom_prompt ?? c.customPrompt ?? null,
             (c.use_custom_prompt ?? c.useCustomPrompt) ? 1 : 0, c.concurrency ?? 1
           );

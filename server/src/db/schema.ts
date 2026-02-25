@@ -45,6 +45,8 @@ export function initializeSchema(db: Database.Database): void {
       repo_id INTEGER NOT NULL,
       repo_full_name TEXT NOT NULL,
       repo_name TEXT NOT NULL,
+      prerelease INTEGER DEFAULT 0,
+      draft INTEGER DEFAULT 0,
       is_read INTEGER DEFAULT 0
     );
 
