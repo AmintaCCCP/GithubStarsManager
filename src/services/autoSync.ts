@@ -6,6 +6,9 @@ import { useAppStore } from '../store/useAppStore';
 let _isSyncingFromBackend = false;
 let _isSyncingFromBackendActive = false;
 
+// Track store subscription for cleanup on restart
+let _storeUnsubscribe: (() => void) | null = null;
+
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -47,14 +50,14 @@ export async function syncFromBackend(): Promise<void> {
       backend.fetchSettings(),
     ]);
 
-    let hasChanges = false;
+    const changed = { repos: false, releases: false, ai: false, webdav: false, settings: false };
 
     // Compare each result against last known hash — only update if backend data actually changed
     if (reposResult.status === 'fulfilled') {
       const hash = quickHash(reposResult.value.repositories);
       if (hash !== _lastHash.repos) {
         _lastHash.repos = hash;
-        hasChanges = true;
+        changed.repos = true;
       }
     }
 
@@ -62,7 +65,7 @@ export async function syncFromBackend(): Promise<void> {
       const hash = quickHash(releasesResult.value.releases);
       if (hash !== _lastHash.releases) {
         _lastHash.releases = hash;
-        hasChanges = true;
+        changed.releases = true;
       }
     }
 
@@ -70,7 +73,7 @@ export async function syncFromBackend(): Promise<void> {
       const hash = quickHash(aiResult.value);
       if (hash !== _lastHash.ai) {
         _lastHash.ai = hash;
-        hasChanges = true;
+        changed.ai = true;
       }
     }
 
@@ -78,7 +81,7 @@ export async function syncFromBackend(): Promise<void> {
       const hash = quickHash(webdavResult.value);
       if (hash !== _lastHash.webdav) {
         _lastHash.webdav = hash;
-        hasChanges = true;
+        changed.webdav = true;
       }
     }
 
@@ -86,30 +89,30 @@ export async function syncFromBackend(): Promise<void> {
       const hash = quickHash(settingsResult.value);
       if (hash !== _lastHash.settings) {
         _lastHash.settings = hash;
-        hasChanges = true;
+        changed.settings = true;
       }
     }
 
     // Only update store if backend data actually changed
-    if (!hasChanges) return;
+    if (!Object.values(changed).some(Boolean)) return;
 
     _isSyncingFromBackend = true;
     const state = useAppStore.getState();
 
-    if (reposResult.status === 'fulfilled') {
+    if (changed.repos && reposResult.status === 'fulfilled') {
       state.setRepositories(reposResult.value.repositories);
     }
-    if (releasesResult.status === 'fulfilled') {
+    if (changed.releases && releasesResult.status === 'fulfilled') {
       state.setReleases(releasesResult.value.releases);
     }
-    if (aiResult.status === 'fulfilled') {
+    if (changed.ai && aiResult.status === 'fulfilled') {
       state.setAIConfigs(aiResult.value);
     }
-    if (webdavResult.status === 'fulfilled') {
+    if (changed.webdav && webdavResult.status === 'fulfilled') {
       state.setWebDAVConfigs(webdavResult.value);
     }
     // Sync active selections from settings
-    if (settingsResult.status === 'fulfilled') {
+    if (changed.settings && settingsResult.status === 'fulfilled') {
       const settings = settingsResult.value;
       if (typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null) {
         state.setActiveAIConfig(settings.activeAIConfig as string | null);
@@ -149,6 +152,7 @@ export async function syncToBackend(): Promise<void> {
         activeWebDAVConfig: state.activeWebDAVConfig,
       }),
     ]);
+    const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
@@ -157,14 +161,17 @@ export async function syncToBackend(): Promise<void> {
       console.log('✅ Synced to backend');
     }
 
-    // Update _lastHash so the next poll won't see a false "change"
-    _lastHash = {
-      repos: quickHash(state.repositories),
-      releases: quickHash(state.releases),
-      ai: quickHash(state.aiConfigs),
-      webdav: quickHash(state.webdavConfigs),
-      settings: quickHash({ activeAIConfig: state.activeAIConfig, activeWebDAVConfig: state.activeWebDAVConfig }),
-    };
+    // Only update _lastHash for successfully synced slices
+    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(state.repositories);
+    if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
+    if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
+    if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
+    if (settingsSync.status === 'fulfilled') {
+      _lastHash.settings = quickHash({
+        activeAIConfig: state.activeAIConfig,
+        activeWebDAVConfig: state.activeWebDAVConfig,
+      });
+    }
   } catch (err) {
     console.error('Failed to sync to backend:', err);
   }
@@ -176,6 +183,10 @@ export async function syncToBackend(): Promise<void> {
  */
 export function startAutoSync(): () => void {
   // Guard: if already running, stop previous instance first
+  if (_storeUnsubscribe) {
+    _storeUnsubscribe();
+    _storeUnsubscribe = null;
+  }
   if (_pollTimer) {
     clearInterval(_pollTimer);
     _pollTimer = null;
@@ -206,6 +217,7 @@ export function startAutoSync(): () => void {
       syncToBackend();
     }, 2000);
   });
+  _storeUnsubscribe = unsubscribe;
 
   // 2. Poll backend every 5s → pull fresh data for cross-device sync
   _pollTimer = setInterval(() => {
