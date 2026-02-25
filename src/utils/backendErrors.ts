@@ -48,6 +48,9 @@ const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   CREATE_WEBDAV_CONFIG_FAILED: { zh: '创建 WebDAV 配置失败', en: 'Failed to create WebDAV config' },
   UPDATE_WEBDAV_CONFIG_FAILED: { zh: '更新 WebDAV 配置失败', en: 'Failed to update WebDAV config' },
   DELETE_WEBDAV_CONFIG_FAILED: { zh: '删除 WebDAV 配置失败', en: 'Failed to delete WebDAV config' },
+  SYNC_AI_CONFIGS_FAILED: { zh: '同步 AI 配置失败', en: 'Failed to sync AI configs' },
+  SYNC_WEBDAV_CONFIGS_FAILED: { zh: '同步 WebDAV 配置失败', en: 'Failed to sync WebDAV configs' },
+  INVALID_REQUEST: { zh: '无效的请求', en: 'Invalid request' },
   FETCH_SETTINGS_FAILED: { zh: '获取设置失败', en: 'Failed to fetch settings' },
   UPDATE_SETTINGS_FAILED: { zh: '更新设置失败', en: 'Failed to update settings' },
   // Sync

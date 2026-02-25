@@ -74,6 +74,15 @@ class BackendAdapter {
     }
     return headers;
   }
+  private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
     try {
@@ -88,7 +97,7 @@ class BackendAdapter {
   async fetchStarredRepos(page = 1, perPage = 100): Promise<Repository[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/proxy/github/user/starred?page=${page}&per_page=${perPage}&sort=updated`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/user/starred?page=${page}&per_page=${perPage}&sort=updated`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({
@@ -108,7 +117,7 @@ class BackendAdapter {
   async getCurrentUser(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/proxy/github/user`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/user`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ method: 'GET' })
@@ -121,7 +130,7 @@ class BackendAdapter {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     try {
-      const res = await fetch(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/readme`, {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/readme`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ method: 'GET' })
@@ -143,7 +152,7 @@ class BackendAdapter {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     try {
-      const res = await fetch(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`, {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ method: 'GET' })
@@ -158,7 +167,7 @@ class BackendAdapter {
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/proxy/github/rate_limit`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/rate_limit`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ method: 'GET' })
@@ -173,7 +182,7 @@ class BackendAdapter {
   async proxyAIRequest(configId: string, body: object): Promise<unknown> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/proxy/ai`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configId, body })
@@ -187,7 +196,7 @@ class BackendAdapter {
   async proxyWebDAV(configId: string, method: string, path: string, body?: string, headers?: Record<string, string>): Promise<Response> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    return fetch(`${this._backendUrl}/proxy/webdav`, {
+    return this.fetchWithTimeout(`${this._backendUrl}/proxy/webdav`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configId, method, path, body, headers })
@@ -199,7 +208,7 @@ class BackendAdapter {
   async syncRepositories(repos: Repository[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await fetch(`${this._backendUrl}/repositories`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ repositories: repos })
@@ -210,7 +219,7 @@ class BackendAdapter {
   async fetchRepositories(): Promise<{ repositories: Repository[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/repositories?limit=10000`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories?limit=10000`, {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
@@ -220,7 +229,7 @@ class BackendAdapter {
   async syncReleases(releases: Release[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await fetch(`${this._backendUrl}/releases`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ releases })
@@ -231,7 +240,7 @@ class BackendAdapter {
   async fetchReleases(): Promise<{ releases: Release[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/releases?limit=10000`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases?limit=10000`, {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
@@ -241,7 +250,7 @@ class BackendAdapter {
   async syncAIConfigs(configs: AIConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await fetch(`${this._backendUrl}/configs/ai/bulk`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/ai/bulk`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configs })
@@ -252,7 +261,7 @@ class BackendAdapter {
   async fetchAIConfigs(): Promise<AIConfig[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/configs/ai?decrypt=true`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/ai?decrypt=true`, {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch AI configs error');
@@ -262,7 +271,7 @@ class BackendAdapter {
   async syncWebDAVConfigs(configs: WebDAVConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await fetch(`${this._backendUrl}/configs/webdav/bulk`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/webdav/bulk`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configs })
@@ -273,7 +282,7 @@ class BackendAdapter {
   async fetchWebDAVConfigs(): Promise<WebDAVConfig[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/configs/webdav?decrypt=true`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/webdav?decrypt=true`, {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch WebDAV configs error');
@@ -286,7 +295,7 @@ class BackendAdapter {
   async syncSettings(settings: Record<string, unknown>): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await fetch(`${this._backendUrl}/settings`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(settings)
@@ -297,7 +306,7 @@ class BackendAdapter {
   async fetchSettings(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/settings`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch settings error');
@@ -307,7 +316,7 @@ class BackendAdapter {
   async exportData(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/sync/export`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/sync/export`, {
       method: 'POST',
       headers: this.getAuthHeaders()
     });
@@ -318,7 +327,7 @@ class BackendAdapter {
   async importData(data: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await fetch(`${this._backendUrl}/sync/import`, {
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/sync/import`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data)
@@ -333,7 +342,7 @@ class BackendAdapter {
     if (!this._backendUrl) return null;
 
     try {
-      const res = await fetch(`${this._backendUrl}/health`);
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/health`, undefined, 5000);
       if (res.ok) return res.json() as Promise<{ status: string; version: string; timestamp: string }>;
       return null;
     } catch {
