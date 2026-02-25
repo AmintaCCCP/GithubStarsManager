@@ -275,6 +275,28 @@ class BackendAdapter {
   }
 
 
+  // === Settings (active selections) ===
+
+  async syncSettings(settings: Record<string, unknown>): Promise<void> {
+    if (!this._backendUrl) return;
+
+    await fetch(`${this._backendUrl}/settings`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(settings)
+    });
+  }
+
+  async fetchSettings(): Promise<Record<string, unknown>> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await fetch(`${this._backendUrl}/settings`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch settings error');
+    return res.json() as Promise<Record<string, unknown>>;
+  }
+
   async exportData(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
