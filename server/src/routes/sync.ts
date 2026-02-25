@@ -152,14 +152,14 @@ router.post('/api/sync/import', (req, res) => {
       const cats = data.categories as Record<string, unknown>[] | undefined;
       if (Array.isArray(cats) && cats.length > 0) {
         const catStmt = db.prepare(`
-          INSERT OR REPLACE INTO categories (id, name, description, keywords, color, icon, sort_order)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO categories (id, name, icon, keywords, is_custom)
+          VALUES (?, ?, ?, ?, ?)
         `);
         for (const c of cats) {
           catStmt.run(
-            c.id, c.name ?? '', c.description ?? null,
+            c.id, c.name ?? '', c.icon ?? '📁',
             typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
-            c.color ?? null, c.icon ?? null, c.sort_order ?? 0
+            c.is_custom ? 1 : 0
           );
         }
         counts.categories = cats.length;
@@ -169,14 +169,13 @@ router.post('/api/sync/import', (req, res) => {
       const filters = data.asset_filters as Record<string, unknown>[] | undefined;
       if (Array.isArray(filters) && filters.length > 0) {
         const filterStmt = db.prepare(`
-          INSERT OR REPLACE INTO asset_filters (id, name, description, keywords, platform, sort_order)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO asset_filters (id, name, keywords)
+          VALUES (?, ?, ?)
         `);
         for (const f of filters) {
           filterStmt.run(
-            f.id, f.name ?? '', f.description ?? null,
-            typeof f.keywords === 'string' ? f.keywords : JSON.stringify(f.keywords ?? []),
-            f.platform ?? null, f.sort_order ?? 0
+            f.id, f.name ?? '',
+            typeof f.keywords === 'string' ? f.keywords : JSON.stringify(f.keywords ?? [])
           );
         }
         counts.asset_filters = filters.length;
@@ -190,12 +189,13 @@ router.post('/api/sync/import', (req, res) => {
           const existingKey = (existing?.api_key_encrypted as string) ?? null;
           // Skip masked keys, keep existing encrypted value
           db.prepare(`
-            INSERT OR REPLACE INTO ai_configs (id, name, provider, model, base_url, api_key_encrypted, is_default, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO ai_configs (id, name, api_type, base_url, api_key_encrypted, model, is_active, custom_prompt, use_custom_prompt, concurrency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
-            c.id, c.name ?? '', c.provider ?? '', c.model ?? '', c.base_url ?? null,
+            c.id, c.name ?? '', c.api_type ?? c.apiType ?? 'openai', c.model ?? '', c.base_url ?? c.baseUrl ?? null,
             existingKey,
-            c.is_default ? 1 : 0, c.created_at ?? null, c.updated_at ?? null
+            (c.is_active ?? c.isActive) ? 1 : 0, c.custom_prompt ?? c.customPrompt ?? null,
+            (c.use_custom_prompt ?? c.useCustomPrompt) ? 1 : 0, c.concurrency ?? 1
           );
         }
         counts.ai_configs = aiConfigs.length;
@@ -208,12 +208,12 @@ router.post('/api/sync/import', (req, res) => {
           const existing = db.prepare('SELECT password_encrypted FROM webdav_configs WHERE id = ?').get(c.id) as Record<string, unknown> | undefined;
           const existingPwd = (existing?.password_encrypted as string) ?? null;
           db.prepare(`
-            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_default, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
           `).run(
             c.id, c.name ?? '', c.url ?? '', c.username ?? '',
             existingPwd,
-            c.path ?? '/', c.is_default ? 1 : 0, c.created_at ?? null, c.updated_at ?? null
+            c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0
           );
         }
         counts.webdav_configs = webdavConfigs.length;
