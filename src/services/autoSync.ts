@@ -9,6 +9,9 @@ let _isSyncingFromBackendActive = false;
 // Track store subscription for cleanup on restart
 let _storeUnsubscribe: (() => void) | null = null;
 
+// Prevent overlapping pushes to backend
+let _isPushingToBackend = false;
+
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -138,7 +141,9 @@ export async function syncFromBackend(): Promise<void> {
 export async function syncToBackend(): Promise<void> {
   if (!backend.isAvailable) return;
   if (_isSyncingFromBackend) return;
+  if (_isPushingToBackend) return;
 
+  _isPushingToBackend = true;
   try {
     const state = useAppStore.getState();
 
@@ -174,6 +179,8 @@ export async function syncToBackend(): Promise<void> {
     }
   } catch (err) {
     console.error('Failed to sync to backend:', err);
+  } finally {
+    _isPushingToBackend = false;
   }
 }
 
@@ -240,6 +247,11 @@ export function stopAutoSync(unsubscribe: () => void): void {
     clearInterval(_pollTimer);
     _pollTimer = null;
   }
-  unsubscribe();
+  if (_storeUnsubscribe) {
+    _storeUnsubscribe();
+    _storeUnsubscribe = null;
+  } else {
+    unsubscribe();
+  }
   console.log('🔄 Auto-sync stopped');
 }
