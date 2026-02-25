@@ -7,9 +7,6 @@ class BackendAdapter {
 
   async init(): Promise<void> {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
       // Try common backend URLs
       const urls = [
         window.location.origin + '/api',
@@ -17,6 +14,8 @@ class BackendAdapter {
       ];
 
       for (const baseUrl of urls) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
         try {
           const res = await fetch(`${baseUrl}/health`, {
             signal: controller.signal,
@@ -27,16 +26,16 @@ class BackendAdapter {
             if (data.status === 'ok') {
               this._backendUrl = baseUrl;
               console.log(`✅ Backend connected: ${baseUrl}`);
-              clearTimeout(timeoutId);
               return;
             }
           }
         } catch {
           // Try next URL
+        } finally {
+          clearTimeout(timeoutId);
         }
       }
 
-      clearTimeout(timeoutId);
       this._backendUrl = null;
       console.log('ℹ️ Backend not available, using local-only mode');
     } catch {
@@ -195,11 +194,12 @@ class BackendAdapter {
   async syncRepositories(repos: Repository[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    await fetch(`${this._backendUrl}/repositories`, {
+    const res = await fetch(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ repositories: repos })
     });
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync repositories error');
   }
 
   async fetchRepositories(): Promise<{ repositories: Repository[]; total: number }> {
@@ -215,11 +215,12 @@ class BackendAdapter {
   async syncReleases(releases: Release[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    await fetch(`${this._backendUrl}/releases`, {
+    const res = await fetch(`${this._backendUrl}/releases`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ releases })
     });
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync releases error');
   }
 
   async fetchReleases(): Promise<{ releases: Release[]; total: number }> {
@@ -280,11 +281,12 @@ class BackendAdapter {
   async syncSettings(settings: Record<string, unknown>): Promise<void> {
     if (!this._backendUrl) return;
 
-    await fetch(`${this._backendUrl}/settings`, {
+    const res = await fetch(`${this._backendUrl}/settings`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(settings)
     });
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
   }
 
   async fetchSettings(): Promise<Record<string, unknown>> {

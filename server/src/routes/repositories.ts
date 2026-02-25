@@ -42,8 +42,8 @@ function transformRepo(row: Record<string, unknown>) {
 router.get('/api/repositories', (req, res) => {
   try {
     const db = getDb();
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 100;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
     const search = req.query.search as string | undefined;
     const offset = (page - 1) * limit;
 

@@ -367,8 +367,7 @@ export const useAppStore = create<AppState & AppActions>()(
         theme: state.theme,
         language: state.language,
 
-        // 持久化后端设置
-        backendApiSecret: state.backendApiSecret,
+        // backendApiSecret: 保留在内存中，不持久化（安全考虑）
         
         // 持久化搜索排序设置
         searchFilters: {

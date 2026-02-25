@@ -8,11 +8,17 @@ export function errorHandler(
 ): void {
   console.error('Unhandled error:', err.stack || err.message);
 
-  const statusCode = (err as Error & { statusCode?: number }).statusCode || 500;
+  if (res.headersSent) {
+    return _next(err);
+  }
+
+  const errWithMeta = err as Error & { statusCode?: number; code?: string };
+  const statusCode = errWithMeta.statusCode || 500;
   const message =
     process.env.NODE_ENV === 'production'
       ? 'Internal Server Error'
       : err.message || 'Internal Server Error';
+  const code = errWithMeta.code || 'INTERNAL_SERVER_ERROR';
 
-  res.status(statusCode).json({ error: message, code: 'INTERNAL_SERVER_ERROR' });
+  res.status(statusCode).json({ error: message, code });
 }
