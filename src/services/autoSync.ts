@@ -47,7 +47,7 @@ export async function syncFromBackend(): Promise<void> {
     let hasChanges = false;
 
     // Compare each result against last known hash — only update if backend data actually changed
-    if (reposResult.status === 'fulfilled' && reposResult.value.repositories.length > 0) {
+    if (reposResult.status === 'fulfilled') {
       const hash = quickHash(reposResult.value.repositories);
       if (hash !== _lastHash.repos) {
         _lastHash.repos = hash;
@@ -55,7 +55,7 @@ export async function syncFromBackend(): Promise<void> {
       }
     }
 
-    if (releasesResult.status === 'fulfilled' && releasesResult.value.releases.length > 0) {
+    if (releasesResult.status === 'fulfilled') {
       const hash = quickHash(releasesResult.value.releases);
       if (hash !== _lastHash.releases) {
         _lastHash.releases = hash;
@@ -63,7 +63,7 @@ export async function syncFromBackend(): Promise<void> {
       }
     }
 
-    if (aiResult.status === 'fulfilled' && aiResult.value.length > 0) {
+    if (aiResult.status === 'fulfilled') {
       const hash = quickHash(aiResult.value);
       if (hash !== _lastHash.ai) {
         _lastHash.ai = hash;
@@ -71,7 +71,7 @@ export async function syncFromBackend(): Promise<void> {
       }
     }
 
-    if (webdavResult.status === 'fulfilled' && webdavResult.value.length > 0) {
+    if (webdavResult.status === 'fulfilled') {
       const hash = quickHash(webdavResult.value);
       if (hash !== _lastHash.webdav) {
         _lastHash.webdav = hash;
@@ -93,16 +93,16 @@ export async function syncFromBackend(): Promise<void> {
     _isSyncingFromBackend = true;
     const state = useAppStore.getState();
 
-    if (reposResult.status === 'fulfilled' && reposResult.value.repositories.length > 0) {
+    if (reposResult.status === 'fulfilled') {
       state.setRepositories(reposResult.value.repositories);
     }
-    if (releasesResult.status === 'fulfilled' && releasesResult.value.releases.length > 0) {
+    if (releasesResult.status === 'fulfilled') {
       state.setReleases(releasesResult.value.releases);
     }
-    if (aiResult.status === 'fulfilled' && aiResult.value.length > 0) {
+    if (aiResult.status === 'fulfilled') {
       state.setAIConfigs(aiResult.value);
     }
-    if (webdavResult.status === 'fulfilled' && webdavResult.value.length > 0) {
+    if (webdavResult.status === 'fulfilled') {
       state.setWebDAVConfigs(webdavResult.value);
     }
     // Sync active selections from settings

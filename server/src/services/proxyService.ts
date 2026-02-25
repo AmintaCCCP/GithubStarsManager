@@ -12,13 +12,25 @@ export interface ProxyResponse {
   data: unknown;
 }
 
+function redactUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    for (const key of ['key', 'api_key', 'token', 'access_token']) {
+      if (url.searchParams.has(key)) url.searchParams.set(key, '***');
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyResponse> {
   const { url, method, headers = {}, body, timeout = 30000 } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    console.log(`[Proxy] ${method} ${url}`);
+    console.log(`[Proxy] ${method} ${redactUrl(url)}`);
 
     const fetchOptions: RequestInit = {
       method,
@@ -36,7 +48,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
     const response = await fetch(url, fetchOptions);
     clearTimeout(timeoutId);
 
-    console.log(`[Proxy] ${method} ${url} -> ${response.status}`);
+    console.log(`[Proxy] ${method} ${redactUrl(url)} -> ${response.status}`);
 
     const responseHeaders: Record<string, string> = {};
     response.headers.forEach((value, key) => {
