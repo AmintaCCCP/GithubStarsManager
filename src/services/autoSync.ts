@@ -11,6 +11,8 @@ let _storeUnsubscribe: (() => void) | null = null;
 
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
+// Queue a push if one is requested while a pull is in-flight
+let _hasPendingPush = false;
 
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,7 +42,7 @@ function quickHash(data: unknown): string {
  * Silent: errors logged to console only.
  */
 export async function syncFromBackend(): Promise<void> {
-  if (!backend.isAvailable || _isSyncingFromBackendActive) return;
+  if (!backend.isAvailable || _isSyncingFromBackendActive || _isPushingToBackend) return;
 
   _isSyncingFromBackendActive = true;
 
@@ -131,7 +133,11 @@ export async function syncFromBackend(): Promise<void> {
   } finally {
     _isSyncingFromBackend = false;
     _isSyncingFromBackendActive = false;
-  }
+    // Drain pending push that was queued during pull
+    if (_hasPendingPush) {
+      _hasPendingPush = false;
+      void syncToBackend();
+    }
 }
 
 /**
@@ -140,10 +146,16 @@ export async function syncFromBackend(): Promise<void> {
  */
 export async function syncToBackend(): Promise<void> {
   if (!backend.isAvailable) return;
+  // If a pull is in-flight, queue this push for after pull completes
+  if (_isSyncingFromBackendActive) {
+    _hasPendingPush = true;
+    return;
+  }
   if (_isSyncingFromBackend) return;
   if (_isPushingToBackend) return;
 
   _isPushingToBackend = true;
+  _hasPendingPush = false;
   try {
     const state = useAppStore.getState();
 
