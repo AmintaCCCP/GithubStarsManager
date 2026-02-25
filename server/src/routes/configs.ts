@@ -14,9 +14,10 @@ function maskApiKey(key: string | null | undefined): string {
 }
 
 // GET /api/configs/ai
-router.get('/api/configs/ai', (_req, res) => {
+router.get('/api/configs/ai', (req, res) => {
   try {
     const db = getDb();
+    const shouldDecrypt = req.query.decrypt === 'true';
     const rows = db.prepare('SELECT * FROM ai_configs ORDER BY id ASC').all() as Record<string, unknown>[];
     const configs = rows.map((row) => {
       let decryptedKey = '';
@@ -28,13 +29,14 @@ router.get('/api/configs/ai', (_req, res) => {
       return {
         id: row.id,
         name: row.name,
-        provider: row.provider,
+        apiType: row.api_type,
         model: row.model,
-        base_url: row.base_url,
-        api_key: maskApiKey(decryptedKey),
-        is_default: !!row.is_default,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+        baseUrl: row.base_url,
+        apiKey: shouldDecrypt ? decryptedKey : maskApiKey(decryptedKey),
+        isActive: !!row.is_active,
+        customPrompt: row.custom_prompt ?? null,
+        useCustomPrompt: !!row.use_custom_prompt,
+        concurrency: row.concurrency ?? 1,
       };
     });
     res.json(configs);
@@ -48,22 +50,70 @@ router.get('/api/configs/ai', (_req, res) => {
 router.post('/api/configs/ai', (req, res) => {
   try {
     const db = getDb();
-    const { name, provider, model, base_url, apiKey, is_default } = req.body as Record<string, unknown>;
+    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency } = req.body as Record<string, unknown>;
 
     const encryptedKey = apiKey && typeof apiKey === 'string' ? encrypt(apiKey, config.encryptionKey) : null;
-    const now = new Date().toISOString();
 
     const result = db.prepare(
-      'INSERT INTO ai_configs (name, provider, model, base_url, api_key_encrypted, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO ai_configs (name, api_type, model, base_url, api_key_encrypted, is_active, custom_prompt, use_custom_prompt, concurrency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
-      name ?? '', provider ?? '', model ?? '', base_url ?? null,
-      encryptedKey, is_default ? 1 : 0, now, now
+      name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null,
+      encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, provider, model, base_url, api_key: maskApiKey(apiKey as string), is_default: !!is_default });
+    res.status(201).json({ id: result.lastInsertRowid, name, apiType, model, baseUrl, apiKey: maskApiKey(apiKey as string), isActive: !!isActive });
   } catch (err) {
     console.error('POST /api/configs/ai error:', err);
     res.status(500).json({ error: 'Failed to create AI config', code: 'CREATE_AI_CONFIG_FAILED' });
+  }
+});
+
+// PUT /api/configs/ai/bulk — replace all AI configs (for sync)
+// MUST be registered before :id route to avoid matching 'bulk' as an id
+router.put('/api/configs/ai/bulk', (req, res) => {
+  try {
+    const db = getDb();
+    const configs = req.body.configs as Array<{
+      id: string;
+      name: string;
+      apiType?: string;
+      baseUrl: string;
+      apiKey: string;
+      model: string;
+      isActive: boolean;
+      customPrompt?: string;
+      useCustomPrompt?: boolean;
+      concurrency?: number;
+    }>;
+
+    if (!Array.isArray(configs)) {
+      res.status(400).json({ error: 'configs array required', code: 'INVALID_REQUEST' });
+      return;
+    }
+
+    const bulkSync = db.transaction(() => {
+      db.prepare('DELETE FROM ai_configs').run();
+
+      const stmt = db.prepare(`
+        INSERT INTO ai_configs (id, name, api_type, base_url, api_key_encrypted, model, is_active, custom_prompt, use_custom_prompt, concurrency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const c of configs) {
+        const encryptedKey = c.apiKey ? encrypt(c.apiKey, config.encryptionKey) : '';
+        stmt.run(
+          c.id, c.name ?? '', c.apiType ?? 'openai', c.baseUrl ?? '',
+          encryptedKey, c.model ?? '', c.isActive ? 1 : 0,
+          c.customPrompt ?? null, c.useCustomPrompt ? 1 : 0, c.concurrency ?? 1
+        );
+      }
+    });
+
+    bulkSync();
+    res.json({ synced: configs.length });
+  } catch (err) {
+    console.error('PUT /api/configs/ai/bulk error:', err);
+    res.status(500).json({ error: 'Failed to sync AI configs', code: 'SYNC_AI_CONFIGS_FAILED' });
   }
 });
 
@@ -71,8 +121,8 @@ router.post('/api/configs/ai', (req, res) => {
 router.put('/api/configs/ai/:id', (req, res) => {
   try {
     const db = getDb();
-    const id = parseInt(req.params.id);
-    const { name, provider, model, base_url, apiKey, is_default } = req.body as Record<string, unknown>;
+    const id = req.params.id;
+    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency } = req.body as Record<string, unknown>;
 
     let encryptedKey: string | null = null;
     if (apiKey && typeof apiKey === 'string' && !apiKey.startsWith('***')) {
@@ -83,17 +133,16 @@ router.put('/api/configs/ai/:id', (req, res) => {
       encryptedKey = (existing?.api_key_encrypted as string) ?? null;
     }
 
-    const now = new Date().toISOString();
     db.prepare(
-      'UPDATE ai_configs SET name = ?, provider = ?, model = ?, base_url = ?, api_key_encrypted = ?, is_default = ?, updated_at = ? WHERE id = ?'
-    ).run(name ?? '', provider ?? '', model ?? '', base_url ?? null, encryptedKey, is_default ? 1 : 0, now, id);
+      'UPDATE ai_configs SET name = ?, api_type = ?, model = ?, base_url = ?, api_key_encrypted = ?, is_active = ?, custom_prompt = ?, use_custom_prompt = ?, concurrency = ? WHERE id = ?'
+    ).run(name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null, encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, id);
 
     let maskedKey = '';
     if (encryptedKey) {
       try { maskedKey = maskApiKey(decrypt(encryptedKey, config.encryptionKey)); } catch { maskedKey = '****'; }
     }
 
-    res.json({ id, name, provider, model, base_url, api_key: maskedKey, is_default: !!is_default });
+    res.json({ id, name, apiType, model, baseUrl, apiKey: maskedKey, isActive: !!isActive });
   } catch (err) {
     console.error('PUT /api/configs/ai error:', err);
     res.status(500).json({ error: 'Failed to update AI config', code: 'UPDATE_AI_CONFIG_FAILED' });
@@ -104,7 +153,7 @@ router.put('/api/configs/ai/:id', (req, res) => {
 router.delete('/api/configs/ai/:id', (req, res) => {
   try {
     const db = getDb();
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const result = db.prepare('DELETE FROM ai_configs WHERE id = ?').run(id);
     if (result.changes === 0) {
       res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
@@ -126,9 +175,10 @@ function maskPassword(pwd: string | null | undefined): string {
 }
 
 // GET /api/configs/webdav
-router.get('/api/configs/webdav', (_req, res) => {
+router.get('/api/configs/webdav', (req, res) => {
   try {
     const db = getDb();
+    const shouldDecrypt = req.query.decrypt === 'true';
     const rows = db.prepare('SELECT * FROM webdav_configs ORDER BY id ASC').all() as Record<string, unknown>[];
     const configs = rows.map((row) => {
       let decryptedPwd = '';
@@ -142,11 +192,9 @@ router.get('/api/configs/webdav', (_req, res) => {
         name: row.name,
         url: row.url,
         username: row.username,
-        password: maskPassword(decryptedPwd),
+        password: shouldDecrypt ? decryptedPwd : maskPassword(decryptedPwd),
         path: row.path,
-        is_default: !!row.is_default,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+        isActive: !!row.is_active,
       };
     });
     res.json(configs);
@@ -160,22 +208,66 @@ router.get('/api/configs/webdav', (_req, res) => {
 router.post('/api/configs/webdav', (req, res) => {
   try {
     const db = getDb();
-    const { name, url, username, password, path, is_default } = req.body as Record<string, unknown>;
+    const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
 
     const encryptedPwd = password && typeof password === 'string' ? encrypt(password, config.encryptionKey) : null;
-    const now = new Date().toISOString();
 
     const result = db.prepare(
-      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(
       name ?? '', url ?? '', username ?? '', encryptedPwd,
-      path ?? '/', is_default ? 1 : 0, now, now
+      path ?? '/', isActive ? 1 : 0
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, is_default: !!is_default });
+    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive });
   } catch (err) {
     console.error('POST /api/configs/webdav error:', err);
     res.status(500).json({ error: 'Failed to create WebDAV config', code: 'CREATE_WEBDAV_CONFIG_FAILED' });
+  }
+});
+
+// PUT /api/configs/webdav/bulk — replace all WebDAV configs (for sync)
+// MUST be registered before :id route to avoid matching 'bulk' as an id
+router.put('/api/configs/webdav/bulk', (req, res) => {
+  try {
+    const db = getDb();
+    const configs = req.body.configs as Array<{
+      id: string;
+      name: string;
+      url: string;
+      username: string;
+      password: string;
+      path: string;
+      isActive: boolean;
+    }>;
+
+    if (!Array.isArray(configs)) {
+      res.status(400).json({ error: 'configs array required', code: 'INVALID_REQUEST' });
+      return;
+    }
+
+    const bulkSync = db.transaction(() => {
+      db.prepare('DELETE FROM webdav_configs').run();
+
+      const stmt = db.prepare(`
+        INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const c of configs) {
+        const encryptedPwd = c.password ? encrypt(c.password, config.encryptionKey) : '';
+        stmt.run(
+          c.id, c.name ?? '', c.url ?? '', c.username ?? '',
+          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
+        );
+      }
+    });
+
+    bulkSync();
+    res.json({ synced: configs.length });
+  } catch (err) {
+    console.error('PUT /api/configs/webdav/bulk error:', err);
+    res.status(500).json({ error: 'Failed to sync WebDAV configs', code: 'SYNC_WEBDAV_CONFIGS_FAILED' });
   }
 });
 
@@ -183,8 +275,8 @@ router.post('/api/configs/webdav', (req, res) => {
 router.put('/api/configs/webdav/:id', (req, res) => {
   try {
     const db = getDb();
-    const id = parseInt(req.params.id);
-    const { name, url, username, password, path, is_default } = req.body as Record<string, unknown>;
+    const id = req.params.id;
+    const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
 
     let encryptedPwd: string | null = null;
     if (password && typeof password === 'string' && !password.startsWith('***')) {
@@ -194,17 +286,16 @@ router.put('/api/configs/webdav/:id', (req, res) => {
       encryptedPwd = (existing?.password_encrypted as string) ?? null;
     }
 
-    const now = new Date().toISOString();
     db.prepare(
-      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_default = ?, updated_at = ? WHERE id = ?'
-    ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', is_default ? 1 : 0, now, id);
+      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ? WHERE id = ?'
+    ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, id);
 
     let maskedPwd = '';
     if (encryptedPwd) {
       try { maskedPwd = maskPassword(decrypt(encryptedPwd, config.encryptionKey)); } catch { maskedPwd = '****'; }
     }
 
-    res.json({ id, name, url, username, password: maskedPwd, path, is_default: !!is_default });
+    res.json({ id, name, url, username, password: maskedPwd, path, isActive: !!isActive });
   } catch (err) {
     console.error('PUT /api/configs/webdav error:', err);
     res.status(500).json({ error: 'Failed to update WebDAV config', code: 'UPDATE_WEBDAV_CONFIG_FAILED' });
@@ -215,7 +306,7 @@ router.put('/api/configs/webdav/:id', (req, res) => {
 router.delete('/api/configs/webdav/:id', (req, res) => {
   try {
     const db = getDb();
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const result = db.prepare('DELETE FROM webdav_configs WHERE id = ?').run(id);
     if (result.changes === 0) {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
