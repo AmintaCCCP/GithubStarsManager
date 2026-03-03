@@ -1,11 +1,24 @@
 version: '3.8'
 
 services:
-  github-stars-manager:
+  frontend:
     build: .
     ports:
       - "8080:80"
+    depends_on:
+      - backend
     restart: unless-stopped
-    # Environment variables can be set here if needed
-    # environment:
-    #   - NODE_ENV=production
+
+  backend:
+    build: ./server
+    expose:
+      - "3000"
+    environment:
+      - API_SECRET=${API_SECRET:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  backend-data:
