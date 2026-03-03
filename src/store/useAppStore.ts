@@ -19,12 +19,14 @@ interface AppActions {
   updateAIConfig: (id: string, updates: Partial<AIConfig>) => void;
   deleteAIConfig: (id: string) => void;
   setActiveAIConfig: (id: string | null) => void;
+  setAIConfigs: (configs: AIConfig[]) => void;
   
   // WebDAV actions
   addWebDAVConfig: (config: WebDAVConfig) => void;
   updateWebDAVConfig: (id: string, updates: Partial<WebDAVConfig>) => void;
   deleteWebDAVConfig: (id: string) => void;
   setActiveWebDAVConfig: (id: string | null) => void;
+  setWebDAVConfigs: (configs: WebDAVConfig[]) => void;
   setLastBackup: (timestamp: string) => void;
   
   // Search actions
@@ -59,6 +61,9 @@ interface AppActions {
 
   // Update Analysis Progress
   setAnalysisProgress: (newProgress: AnalysisProgress) => void;
+
+  // Backend actions
+  setBackendApiSecret: (secret: string | null) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -186,6 +191,7 @@ export const useAppStore = create<AppState & AppActions>()(
       language: 'zh',
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
+      backendApiSecret: null,
 
       // Auth actions
       setUser: (user) => {
@@ -234,6 +240,7 @@ export const useAppStore = create<AppState & AppActions>()(
         activeAIConfig: state.activeAIConfig === id ? null : state.activeAIConfig
       })),
       setActiveAIConfig: (activeAIConfig) => set({ activeAIConfig }),
+      setAIConfigs: (aiConfigs) => set({ aiConfigs }),
 
       // WebDAV actions
       addWebDAVConfig: (config) => set((state) => ({
@@ -249,6 +256,7 @@ export const useAppStore = create<AppState & AppActions>()(
         activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig
       })),
       setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
+      setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       // Search actions
@@ -320,7 +328,8 @@ export const useAppStore = create<AppState & AppActions>()(
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
-      setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress })
+      setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
+      setBackendApiSecret: (backendApiSecret) => set({ backendApiSecret }),
     }),
     {
       name: 'github-stars-manager',
@@ -357,6 +366,8 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化UI设置
         theme: state.theme,
         language: state.language,
+
+        // backendApiSecret: 保留在内存中，不持久化（安全考虑）
         
         // 持久化搜索排序设置
         searchFilters: {

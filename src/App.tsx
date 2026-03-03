@@ -9,6 +9,8 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { backend } from './services/backendAdapter';
+import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
 
 function App() {
   const { 
@@ -32,6 +34,35 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Initialize backend adapter and auto-sync
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+
+    const initBackend = async () => {
+      try {
+        await backend.init();
+        if (backend.isAvailable && !cancelled) {
+          await syncFromBackend();
+          if (!cancelled) {
+            unsubscribe = startAutoSync();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to initialize backend:', err);
+      }
+    };
+
+    initBackend();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) {
+        stopAutoSync(unsubscribe);
+      }
+    };
+  }, []);
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
