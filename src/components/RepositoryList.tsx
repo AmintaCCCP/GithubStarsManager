@@ -26,7 +26,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     language,
     customCategories,
     analysisProgress,
-    setAnalysisProgress
+    setAnalysisProgress,
+    searchFilters
   } = useAppStore();
 
   const [showAISummary, setShowAISummary] = useState(true);
@@ -295,7 +296,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   if (filteredRepositories.length === 0) {
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     const categoryName = selectedCategoryObj?.name || selectedCategory;
-    const { searchFilters } = useAppStore();
     
     return (
       <div className="text-center py-12">
