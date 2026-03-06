@@ -6,6 +6,37 @@ const DB_VERSION = 1;
 
 const canUseIndexedDB = () => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
 
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 2000): Promise<T> => {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('IndexedDB timeout')), timeoutMs)),
+  ]);
+};
+
+const safeLocalStorageGet = (key: string): string | null => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeLocalStorageSet = (key: string, value: string): void => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Quota/security errors are expected in some environments; ignore.
+  }
+};
+
+const safeLocalStorageRemove = (key: string): void => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+};
+
 const openDb = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
@@ -85,23 +116,23 @@ export const indexedDBStorage: StateStorage = {
 
     // Hard fallback for environments without IndexedDB
     if (!canUseIndexedDB()) {
-      return window.localStorage.getItem(name);
+      return safeLocalStorageGet(name);
     }
 
     try {
-      const idbValue = await idbGet(name);
+      const idbValue = await withTimeout(idbGet(name));
       if (idbValue !== null) return idbValue;
 
       // Migration path: restore existing localStorage snapshot into IndexedDB
-      const legacyValue = window.localStorage.getItem(name);
+      const legacyValue = safeLocalStorageGet(name);
       if (legacyValue !== null) {
-        await idbSet(name, legacyValue);
+        await withTimeout(idbSet(name, legacyValue));
         console.info('[storage] migrated state from localStorage to IndexedDB');
       }
       return legacyValue;
     } catch (error) {
       console.warn('[storage] IndexedDB get failed, fallback to localStorage:', error);
-      return window.localStorage.getItem(name);
+      return safeLocalStorageGet(name);
     }
   },
 
@@ -111,30 +142,25 @@ export const indexedDBStorage: StateStorage = {
     // Primary path: IndexedDB first (large data friendly)
     if (canUseIndexedDB()) {
       try {
-        await idbSet(name, value);
+        await withTimeout(idbSet(name, value));
       } catch (error) {
         console.warn('[storage] IndexedDB set failed:', error);
       }
     }
 
     // Secondary compatibility backup (best effort only)
-    try {
-      window.localStorage.setItem(name, value);
-    } catch (error) {
-      // Expected for large users (QuotaExceededError). Do not fail persistence.
-      console.warn('[storage] localStorage backup set failed (ignored):', error);
-    }
+    safeLocalStorageSet(name, value);
   },
 
   removeItem: async (name: string): Promise<void> => {
     if (typeof window === 'undefined') return;
 
-    window.localStorage.removeItem(name);
+    safeLocalStorageRemove(name);
 
     if (!canUseIndexedDB()) return;
 
     try {
-      await idbDelete(name);
+      await withTimeout(idbDelete(name));
     } catch (error) {
       console.warn('[storage] IndexedDB remove failed:', error);
     }
