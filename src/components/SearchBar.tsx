@@ -246,8 +246,8 @@ export const SearchBar: React.FC = () => {
           bValue = b.stargazers_count;
           break;
         case 'updated':
-          aValue = new Date(a.updated_at).getTime();
-          bValue = new Date(b.updated_at).getTime();
+          aValue = new Date(a.pushed_at || a.updated_at).getTime();
+          bValue = new Date(b.pushed_at || b.updated_at).getTime();
           break;
         case 'name':
           aValue = a.name.toLowerCase();
@@ -258,8 +258,8 @@ export const SearchBar: React.FC = () => {
           bValue = b.starred_at ? new Date(b.starred_at).getTime() : 0;
           break;
         default:
-          aValue = new Date(a.updated_at).getTime();
-          bValue = new Date(b.updated_at).getTime();
+          aValue = new Date(a.pushed_at || a.updated_at).getTime();
+          bValue = new Date(b.pushed_at || b.updated_at).getTime();
       }
 
       if (searchFilters.sortOrder === 'desc') {

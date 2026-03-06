@@ -36,7 +36,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       : 0,
     aiAnalyzed: filteredRepositories.filter(r => r.analyzed_at).length,
     recentlyUpdated: filteredRepositories.filter(r => {
-      const updatedDate = new Date(r.updated_at);
+      const updatedDate = new Date(r.pushed_at || r.updated_at);
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       return updatedDate > thirtyDaysAgo;
