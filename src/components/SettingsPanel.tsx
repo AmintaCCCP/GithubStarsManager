@@ -94,7 +94,7 @@ export const SettingsPanel: React.FC = () => {
 
   type AIFormState = {
     name: string;
-    apiType: 'openai' | 'claude' | 'gemini';
+    apiType: 'openai' | 'openai-responses' | 'claude' | 'gemini';
     baseUrl: string;
     apiKey: string;
     model: string;
@@ -728,10 +728,11 @@ Focus on practicality and accurate categorization to help users quickly understa
                 </label>
                 <select
                   value={aiForm.apiType}
-                  onChange={(e) => setAIForm(prev => ({ ...prev, apiType: e.target.value as 'openai' | 'claude' | 'gemini' }))}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, apiType: e.target.value as 'openai' | 'openai-responses' | 'claude' | 'gemini' }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
-                  <option value="openai">OpenAI</option>
+                  <option value="openai">OpenAI (Chat Completions)</option>
+                  <option value="openai-responses">OpenAI (Responses)</option>
                   <option value="claude">Claude</option>
                   <option value="gemini">Gemini</option>
                 </select>
@@ -747,7 +748,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                   onChange={(e) => setAIForm(prev => ({ ...prev, baseUrl: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   placeholder={
-                    aiForm.apiType === 'openai'
+                    aiForm.apiType === 'openai' || aiForm.apiType === 'openai-responses'
                       ? 'https://api.openai.com/v1'
                       : aiForm.apiType === 'claude'
                         ? 'https://api.anthropic.com/v1'
@@ -756,8 +757,8 @@ Focus on practicality and accurate categorization to help users quickly understa
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t(
-                    '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/messages 或 :generateContent',
-                    'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /messages, or :generateContent.'
+                    '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
+                    'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
                   )}
                 </p>
               </div>

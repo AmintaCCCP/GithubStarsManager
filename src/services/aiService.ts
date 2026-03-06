@@ -10,8 +10,8 @@ export class AIService {
     this.language = language;
   }
 
-  private getApiType(): 'openai' | 'claude' | 'gemini' {
-    return this.config.apiType || 'openai';
+  private getApiType(): 'openai' | 'openai-responses' | 'claude' | 'gemini' {
+    return (this.config.apiType as 'openai' | 'openai-responses' | 'claude' | 'gemini') || 'openai';
   }
 
   private buildApiUrl(pathWithVersion: string): string {
@@ -50,25 +50,33 @@ export class AIService {
   }): Promise<string> {
     const apiType = this.getApiType();
 
-    if (apiType === 'openai') {
+    if (apiType === 'openai' || apiType === 'openai-responses') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
           : []),
         { role: 'user', content: options.user },
       ];
-      const requestBody = {
-        model: this.config.model,
-        messages,
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-      };
+
+      const requestBody = apiType === 'openai-responses'
+        ? {
+            model: this.config.model,
+            input: messages,
+            temperature: options.temperature,
+            max_output_tokens: options.maxTokens,
+          }
+        : {
+            model: this.config.model,
+            messages,
+            temperature: options.temperature,
+            max_tokens: options.maxTokens,
+          };
 
       let data: any;
       if (backend.isAvailable && this.config.id) {
         data = await backend.proxyAIRequest(this.config.id, requestBody);
       } else {
-        const url = this.buildApiUrl('v1/chat/completions');
+        const url = this.buildApiUrl(apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -85,11 +93,24 @@ export class AIService {
         data = await response.json();
       }
 
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new Error('No content received from AI service');
+      if (apiType === 'openai-responses') {
+        const outputText = typeof data?.output_text === 'string' ? data.output_text : '';
+        if (outputText) return outputText;
+
+        const output = data?.output;
+        if (Array.isArray(output)) {
+          const text = output
+            .flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
+            .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+            .join('');
+          if (text) return text;
+        }
+      } else {
+        const content = data?.choices?.[0]?.message?.content;
+        if (content) return content;
       }
-      return content;
+
+      throw new Error('No content received from AI service');
     }
 
     if (apiType === 'claude') {
