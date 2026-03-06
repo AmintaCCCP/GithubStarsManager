@@ -100,8 +100,8 @@ router.post('/api/proxy/ai', async (req, res) => {
       'Accept': 'application/json',
     };
 
-    if (apiType === 'openai') {
-      targetUrl = buildApiUrl(baseUrl, 'v1/chat/completions');
+    if (apiType === 'openai' || apiType === 'openai-responses') {
+      targetUrl = buildApiUrl(baseUrl, apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
       headers['Authorization'] = `Bearer ${apiKey}`;
     } else if (apiType === 'claude') {
       targetUrl = buildApiUrl(baseUrl, 'v1/messages');
