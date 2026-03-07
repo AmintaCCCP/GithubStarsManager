@@ -221,13 +221,46 @@ export const SearchBar: React.FC = () => {
       });
     }
 
-    // Category filter (by manual category name first)
+    // Category filter (manual category first, then inferred matching)
     if (searchFilters.categories.length > 0) {
+      const allCategoryObjects = getAllCategories(customCategories, language).filter(cat => cat.id !== 'all');
+      const selectedCategoryObjects = allCategoryObjects.filter(cat => searchFilters.categories.includes(cat.name));
+
       filtered = filtered.filter(repo => {
-        if (repo.custom_category) {
-          return searchFilters.categories.includes(repo.custom_category);
+        // 1) manual category takes priority
+        if (repo.custom_category && searchFilters.categories.includes(repo.custom_category)) {
+          return true;
         }
-        return false;
+
+        if (selectedCategoryObjects.length === 0) {
+          return false;
+        }
+
+        // 2) infer from AI tags
+        if (repo.ai_tags && repo.ai_tags.length > 0) {
+          const matchedByTags = selectedCategoryObjects.some(category =>
+            repo.ai_tags!.some(tag =>
+              category.keywords.some(keyword =>
+                tag.toLowerCase().includes(keyword.toLowerCase()) ||
+                keyword.toLowerCase().includes(tag.toLowerCase())
+              )
+            )
+          );
+          if (matchedByTags) return true;
+        }
+
+        // 3) fallback text matching
+        const repoText = [
+          repo.name,
+          repo.description || '',
+          repo.language || '',
+          ...(repo.topics || []),
+          repo.ai_summary || ''
+        ].join(' ').toLowerCase();
+
+        return selectedCategoryObjects.some(category =>
+          category.keywords.some(keyword => repoText.includes(keyword.toLowerCase()))
+        );
       });
     }
 
