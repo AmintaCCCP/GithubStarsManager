@@ -95,6 +95,7 @@ export interface SearchFilters {
   tags: string[];
   languages: string[];
   platforms: string[]; // 新增：平台过滤
+  categories: string[]; // 分类过滤（按分类名称）
   sortBy: 'stars' | 'updated' | 'name' | 'starred';
   sortOrder: 'desc' | 'asc';
   minStars?: number;

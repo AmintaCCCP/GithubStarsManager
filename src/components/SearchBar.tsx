@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 
 
@@ -12,6 +12,7 @@ export const SearchBar: React.FC = () => {
     aiConfigs,
     activeAIConfig,
     language,
+    customCategories,
     setSearchFilters,
     setSearchResults,
   } = useAppStore();
@@ -22,6 +23,7 @@ export const SearchBar: React.FC = () => {
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
@@ -42,6 +44,11 @@ export const SearchBar: React.FC = () => {
     setAvailableTags(tags);
     setAvailablePlatforms(platforms);
 
+    const allCategories = getAllCategories(customCategories, language)
+      .filter(cat => cat.id !== 'all')
+      .map(cat => cat.name);
+    setAvailableCategories(allCategories);
+
     // Generate search suggestions from available data
     const suggestions = [
       ...languages.slice(0, 5),
@@ -60,7 +67,7 @@ export const SearchBar: React.FC = () => {
         console.warn('Failed to load search history:', error);
       }
     }
-  }, [repositories]);
+  }, [repositories, customCategories, language]);
 
   useEffect(() => {
     // Only perform search when filters change (not when query changes from AI search)
@@ -72,7 +79,7 @@ export const SearchBar: React.FC = () => {
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.categories, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -211,6 +218,16 @@ export const SearchBar: React.FC = () => {
       filtered = filtered.filter(repo => {
         const repoPlatforms = repo.ai_platforms || [];
         return searchFilters.platforms.some(platform => repoPlatforms.includes(platform));
+      });
+    }
+
+    // Category filter (by manual category name first)
+    if (searchFilters.categories.length > 0) {
+      filtered = filtered.filter(repo => {
+        if (repo.custom_category) {
+          return searchFilters.categories.includes(repo.custom_category);
+        }
+        return false;
       });
     }
 
@@ -438,6 +455,13 @@ export const SearchBar: React.FC = () => {
     setSearchFilters({ platforms: newPlatforms });
   };
 
+  const handleCategoryToggle = (category: string) => {
+    const newCategories = searchFilters.categories.includes(category)
+      ? searchFilters.categories.filter(c => c !== category)
+      : [...searchFilters.categories, category];
+    setSearchFilters({ categories: newCategories });
+  };
+
   const clearFilters = () => {
     setSearchQuery('');
     setIsRealTimeSearch(false);
@@ -446,6 +470,7 @@ export const SearchBar: React.FC = () => {
       tags: [],
       languages: [],
       platforms: [],
+      categories: [],
       sortBy: 'stars',
       sortOrder: 'desc',
       minStars: undefined,
@@ -459,6 +484,7 @@ export const SearchBar: React.FC = () => {
     searchFilters.languages.length + 
     searchFilters.tags.length + 
     searchFilters.platforms.length +
+    searchFilters.categories.length +
     (searchFilters.minStars !== undefined ? 1 : 0) +
     (searchFilters.maxStars !== undefined ? 1 : 0) +
     (searchFilters.isAnalyzed !== undefined ? 1 : 0) +
@@ -796,6 +822,30 @@ export const SearchBar: React.FC = () => {
                   >
                     {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
                     <span>{getPlatformDisplayName(platform)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Category */}
+          {availableCategories.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                {t('分类', 'Categories')}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map(category => (
+                  <button
+                    key={category}
+                    onClick={() => handleCategoryToggle(category)}
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      searchFilters.categories.includes(category)
+                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {category}
                   </button>
                 ))}
               </div>

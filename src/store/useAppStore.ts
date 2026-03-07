@@ -72,6 +72,7 @@ const initialSearchFilters: SearchFilters = {
   tags: [],
   languages: [],
   platforms: [],
+  categories: [],
   sortBy: 'stars',
   sortOrder: 'desc',
   isAnalyzed: undefined,
