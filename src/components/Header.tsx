@@ -48,6 +48,12 @@ export const Header: React.FC = () => {
             ai_tags: existing.ai_tags,
             ai_platforms: existing.ai_platforms,
             analyzed_at: existing.analyzed_at,
+            analysis_failed: existing.analysis_failed,
+            custom_description: existing.custom_description,
+            custom_tags: existing.custom_tags,
+            custom_category: existing.custom_category,
+            category_locked: existing.category_locked,
+            last_edited: existing.last_edited,
           };
         }
         return newRepo;

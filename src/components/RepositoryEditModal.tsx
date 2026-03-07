@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, Plus } from 'lucide-react';
+import { Save, X, Plus, Lock, Unlock } from 'lucide-react';
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
@@ -20,7 +20,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   const [formData, setFormData] = useState({
     description: '',
     tags: [] as string[],
-    category: ''
+    category: '',
+    categoryLocked: false
   });
   const [newTag, setNewTag] = useState('');
 
@@ -76,7 +77,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       setFormData({
         description: repository.custom_description || repository.description || '',
         tags: repository.custom_tags || repository.ai_tags || repository.topics || [],
-        category: currentCategory
+        category: currentCategory,
+        categoryLocked: !!repository.category_locked
       });
     }
   }, [repository, isOpen]);
@@ -84,11 +86,16 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   const handleSave = () => {
     if (!repository) return;
 
+    const originalCategory = getCurrentCategory(repository);
+    const categoryChanged = formData.category !== originalCategory;
+
     const updatedRepo = {
       ...repository,
       custom_description: formData.description !== repository.description ? formData.description : undefined,
       custom_tags: formData.tags.length > 0 ? formData.tags : undefined,
       custom_category: formData.category ? formData.category : undefined,
+      // 手动修改分类时，默认自动锁定；用户仍可手动取消
+      category_locked: categoryChanged ? true : formData.categoryLocked,
       last_edited: new Date().toISOString()
     };
     
@@ -100,7 +107,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     setFormData({
       description: '',
       tags: [],
-      category: ''
+      category: '',
+      categoryLocked: false
     });
     setNewTag('');
     onClose();
@@ -202,6 +210,36 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               {t('当前分类:', 'Current category:')} {formData.category}
             </p>
           )}
+
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-2">
+            <div className="flex items-center space-x-2">
+              {formData.categoryLocked ? (
+                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <Unlock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              )}
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {t('分类锁定', 'Category Lock')}
+              </span>
+            </div>
+            <label
+              className="inline-flex items-center cursor-pointer"
+              title={t(
+                '开启后，同步时不会自动修改该仓库分类。手动修改分类会自动开启此开关。',
+                'When enabled, sync will not auto-change this repository category. Manually changing category will enable this lock by default.'
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={formData.categoryLocked}
+                onChange={(e) => setFormData(prev => ({ ...prev, categoryLocked: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="relative w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:bg-blue-600">
+                <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform peer-checked:translate-x-full"></div>
+              </div>
+            </label>
+          </div>
         </div>
 
         {/* Tags */}
