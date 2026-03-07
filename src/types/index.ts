@@ -27,6 +27,7 @@ export interface Repository {
   custom_description?: string;
   custom_tags?: string[];
   custom_category?: string;
+  category_locked?: boolean; // 是否锁定分类（锁定后同步不自动改分类）
   last_edited?: string;
 }
 
