@@ -75,7 +75,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     if (repository && isOpen) {
       const currentCategory = getCurrentCategory(repository);
       setFormData({
-        description: repository.custom_description || repository.description || '',
+        description: repository.custom_description || repository.ai_summary || repository.description || '',
         tags: repository.custom_tags || repository.ai_tags || repository.topics || [],
         category: currentCategory,
         categoryLocked: !!repository.category_locked
