@@ -187,7 +187,7 @@ jobs:
           fs.mkdirSync('electron', { recursive: true });
         }
         
-        const mainJsContent = 'const { app, BrowserWindow, Menu, shell } = require(\\'electron\\');\\n' +
+        const mainJsContent = 'const { app, BrowserWindow, Menu, shell, globalShortcut } = require(\\'electron\\');\\n' +
           'const path = require(\\'path\\');\\n' +
           'const fs = require(\\'fs\\');\\n' +
           'const isDev = process.env.NODE_ENV === \\'development\\';\\n\\n' +
@@ -204,7 +204,7 @@ jobs:
           '      enableRemoteModule: false,\\n' +
           '      webSecurity: false,\\n' +
           '      allowRunningInsecureContent: true,\\n' +
-          '      devTools: isDev // 只在开发模式下启用 DevTools\\n' +
+          '      devTools: true // 生产环境也允许 DevTools 便于排障\\n' +
           '    },\\n' +
           '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
           '    titleBarStyle: \\'default\\', // 使用默认标题栏，避免重叠问题\\n' +
@@ -281,6 +281,24 @@ jobs:
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
           '  });\\n\\n' +
+          '  // 提供稳定的 DevTools 入口（生产环境）\\n' +
+          '  const menuTemplate = [\\n' +
+          '    {\\n' +
+          '      label: \\'View\\',\\n' +
+          '      submenu: [\\n' +
+          '        { role: \\'reload\\' },\\n' +
+          '        { role: \\'forceReload\\' },\\n' +
+          '        { type: \\'separator\\' },\\n' +
+          '        { role: \\'toggleDevTools\\' },\\n' +
+          '        { type: \\'separator\\' },\\n' +
+          '        { role: \\'resetZoom\\' },\\n' +
+          '        { role: \\'zoomIn\\' },\\n' +
+          '        { role: \\'zoomOut\\' },\\n' +
+          '        { role: \\'togglefullscreen\\' }\\n' +
+          '      ]\\n' +
+          '    }\\n' +
+          '  ];\\n' +
+          '  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));\\n\\n' +
           '  mainWindow.webContents.setWindowOpenHandler(({ url }) => {\\n' +
           '    shell.openExternal(url);\\n' +
           '    return { action: \\'deny\\' };\\n' +
@@ -289,11 +307,22 @@ jobs:
           '    mainWindow = null;\\n' +
           '  });\\n' +
           '}\\n\\n' +
-          'app.whenReady().then(createWindow);\\n\\n' +
+          'app.whenReady().then(() => {\\n' +
+          '  createWindow();\\n' +
+          '  globalShortcut.register(\\'CommandOrControl+Shift+I\\', () => {\\n' +
+          '    const focused = BrowserWindow.getFocusedWindow();\\n' +
+          '    if (focused && !focused.isDestroyed()) {\\n' +
+          '      focused.webContents.toggleDevTools();\\n' +
+          '    }\\n' +
+          '  });\\n' +
+          '});\\n\\n' +
           'app.on(\\'window-all-closed\\', () => {\\n' +
           '  if (process.platform !== \\'darwin\\') {\\n' +
           '    app.quit();\\n' +
           '  }\\n' +
+          '});\\n\\n' +
+          'app.on(\\'will-quit\\', () => {\\n' +
+          '  globalShortcut.unregisterAll();\\n' +
           '});\\n\\n' +
           'app.on(\\'activate\\', () => {\\n' +
           '  if (BrowserWindow.getAllWindows().length === 0) {\\n' +
