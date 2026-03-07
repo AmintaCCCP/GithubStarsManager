@@ -91,4 +91,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.1</downloadUrl>
   </version>
+  <version>
+    <number>0.2.2</number>
+    <releaseDate>2026-03-07</releaseDate>
+    <changelog>
+      <item>Added category lock support in repository edit panel to prevent sync from overwriting manual category choices.</item>
+      <item>Manual category changes now auto-enable lock by default, and users can still manually unlock later.</item>
+      <item>Improved edit modal defaults by preferring AI summary as editable custom description content.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.2</downloadUrl>
+  </version>
 </versions>
