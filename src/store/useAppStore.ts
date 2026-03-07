@@ -78,6 +78,76 @@ const initialSearchFilters: SearchFilters = {
   isSubscribed: undefined,
 };
 
+type PersistedAppState = Partial<
+  Pick<
+    AppState,
+    | 'user'
+    | 'githubToken'
+    | 'isAuthenticated'
+    | 'repositories'
+    | 'lastSync'
+    | 'aiConfigs'
+    | 'activeAIConfig'
+    | 'webdavConfigs'
+    | 'activeWebDAVConfig'
+    | 'lastBackup'
+    | 'releases'
+    | 'customCategories'
+    | 'assetFilters'
+    | 'theme'
+    | 'language'
+    | 'searchFilters'
+  >
+> & {
+  releaseSubscriptions?: unknown;
+  readReleases?: unknown;
+};
+
+const normalizeNumberSet = (value: unknown): Set<number> => {
+  if (value instanceof Set) {
+    return new Set(Array.from(value).filter((item): item is number => typeof item === 'number'));
+  }
+
+  if (Array.isArray(value)) {
+    return new Set(value.filter((item): item is number => typeof item === 'number'));
+  }
+
+  return new Set<number>();
+};
+
+const normalizePersistedState = (
+  persisted: PersistedAppState | undefined,
+  currentState: AppState & AppActions
+): Partial<AppState & AppActions> => {
+  const safePersisted = persisted ?? {};
+
+  const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
+  const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
+
+  const savedSortBy = safePersisted.searchFilters?.sortBy || 'stars';
+  const savedSortOrder = safePersisted.searchFilters?.sortOrder || 'desc';
+
+  return {
+    ...currentState,
+    ...safePersisted,
+    repositories,
+    releases,
+    searchResults: repositories,
+    releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
+    readReleases: normalizeNumberSet(safePersisted.readReleases),
+    searchFilters: {
+      ...initialSearchFilters,
+      sortBy: savedSortBy,
+      sortOrder: savedSortOrder,
+    },
+    webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
+    customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
+    assetFilters: Array.isArray(safePersisted.assetFilters) ? safePersisted.assetFilters : [],
+    language: safePersisted.language || 'zh',
+    isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
+  };
+};
+
 const defaultCategories: Category[] = [
   {
     id: 'all',
@@ -334,108 +404,70 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
+      version: 1,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
         user: state.user,
         githubToken: state.githubToken,
         isAuthenticated: state.isAuthenticated,
-        
+
         // 持久化仓库数据
         repositories: state.repositories,
         lastSync: state.lastSync,
-        
+
         // 持久化AI配置
         aiConfigs: state.aiConfigs,
         activeAIConfig: state.activeAIConfig,
-        
+
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
         activeWebDAVConfig: state.activeWebDAVConfig,
         lastBackup: state.lastBackup,
-        
+
         // 持久化Release订阅和已读状态
         releaseSubscriptions: Array.from(state.releaseSubscriptions),
         readReleases: Array.from(state.readReleases),
         releases: state.releases,
-        
+
         // 持久化自定义分类
         customCategories: state.customCategories,
-        
+
         // 持久化资源过滤器
         assetFilters: state.assetFilters,
-        
+
         // 持久化UI设置
         theme: state.theme,
         language: state.language,
 
         // backendApiSecret: 保留在内存中，不持久化（安全考虑）
-        
+
         // 持久化搜索排序设置
         searchFilters: {
           sortBy: state.searchFilters.sortBy,
           sortOrder: state.searchFilters.sortOrder,
         },
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Convert arrays back to Sets
-          if (Array.isArray(state.releaseSubscriptions)) {
-            state.releaseSubscriptions = new Set(state.releaseSubscriptions as number[]);
-          } else {
-            state.releaseSubscriptions = new Set<number>();
-          }
-          
-          if (Array.isArray(state.readReleases)) {
-            state.readReleases = new Set(state.readReleases as number[]);
-          } else {
-            state.readReleases = new Set<number>();
-          }
-          
-          // 确保认证状态正确
-          state.isAuthenticated = !!(state.user && state.githubToken);
-          
-          // 初始化搜索结果为所有仓库
-          state.searchResults = state.repositories || [];
-          
-          // 重置搜索过滤器，但保留排序设置
-          const savedSortBy = state.searchFilters?.sortBy || 'stars';
-          const savedSortOrder = state.searchFilters?.sortOrder || 'desc';
-          state.searchFilters = {
-            ...initialSearchFilters,
-            sortBy: savedSortBy,
-            sortOrder: savedSortOrder,
-          };
-          
-          // 确保语言设置存在
-          if (!state.language) {
-            state.language = 'zh';
-          }
-          
-          // 初始化WebDAV配置数组
-          if (!state.webdavConfigs) {
-            state.webdavConfigs = [];
-          }
-          
-          // 初始化自定义分类
-          if (!state.customCategories) {
-            state.customCategories = [];
-          }
-          
-          // 初始化资源过滤器
-          if (!state.assetFilters) {
-            state.assetFilters = [];
-          }
-          
-          console.log('Store rehydrated:', {
-            isAuthenticated: state.isAuthenticated,
-            repositoriesCount: state.repositories?.length || 0,
-            lastSync: state.lastSync,
-            language: state.language,
-            webdavConfigsCount: state.webdavConfigs?.length || 0,
-            customCategoriesCount: state.customCategories?.length || 0
-          });
-        }
+      migrate: (persistedState) => persistedState as PersistedAppState,
+      merge: (persistedState, currentState) => {
+        const normalized = normalizePersistedState(
+          persistedState as PersistedAppState | undefined,
+          currentState as AppState & AppActions
+        );
+
+        console.log('Store rehydrated:', {
+          isAuthenticated: normalized.isAuthenticated,
+          repositoriesCount: normalized.repositories?.length || 0,
+          lastSync: normalized.lastSync,
+          language: normalized.language,
+          webdavConfigsCount: normalized.webdavConfigs?.length || 0,
+          customCategoriesCount: normalized.customCategories?.length || 0,
+        });
+
+        return {
+          ...currentState,
+          ...normalized,
+        };
       },
     }
   )
