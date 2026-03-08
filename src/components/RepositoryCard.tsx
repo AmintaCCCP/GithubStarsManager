@@ -349,7 +349,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 animate-slide-up flex flex-col h-full">
+    <div className="soft-card rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-400/50 animate-slide-up flex flex-col h-full">
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
         <img
@@ -358,10 +358,10 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           className="w-8 h-8 rounded-full flex-shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+          <h3 className="font-semibold text-[var(--text)] truncate font-display tracking-tight">
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-sm text-[var(--muted)] truncate">
             {repository.owner.login}
           </p>
         </div>
@@ -410,7 +410,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-xl premium-btn text-indigo-600 dark:text-indigo-300"
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -419,7 +419,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             href={repository.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-xl premium-btn text-[var(--muted)]"
             title="View on GitHub"
           >
             <ExternalLink className="w-4 h-4" />

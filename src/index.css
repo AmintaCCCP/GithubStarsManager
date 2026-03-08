@@ -1,6 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --brand: #2563eb;
+  --brand-2: #0ea5e9;
+  --ring: rgba(37, 99, 235, 0.24);
+}
+
+.dark {
+  --bg: #0b1220;
+  --surface: #101a2d;
+  --surface-soft: #16233a;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #24324a;
+  --brand: #60a5fa;
+  --brand-2: #22d3ee;
+  --ring: rgba(96, 165, 250, 0.28);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background:
+    radial-gradient(1100px 560px at -8% -20%, rgba(37, 99, 235, 0.10), transparent 55%),
+    radial-gradient(900px 480px at 110% -10%, rgba(14, 165, 233, 0.08), transparent 52%),
+    var(--bg);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-display {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+@layer base {
+  * {
+    @apply antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 28%, transparent);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 30px rgba(2, 8, 23, 0.05);
+    backdrop-filter: blur(8px);
+  }
+
+  .dark .glass-panel {
+    box-shadow: 0 10px 36px rgba(2, 8, 23, 0.35);
+  }
+
+  .soft-card {
+    background: linear-gradient(
+      165deg,
+      color-mix(in oklab, var(--surface) 96%, transparent),
+      color-mix(in oklab, var(--surface-soft) 92%, transparent)
+    );
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 18px rgba(15, 23, 42, 0.05);
+  }
+
+  .dark .soft-card {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 14px 28px rgba(2, 8, 23, 0.35);
+  }
+
+  .premium-btn {
+    @apply transition-all duration-200;
+    border: 1px solid color-mix(in oklab, var(--brand) 18%, var(--border));
+    background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 96%, transparent), color-mix(in oklab, var(--surface-soft) 90%, transparent));
+  }
+
+  .premium-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -12px var(--ring);
+  }
+}
 
 @layer utilities {
   .line-clamp-3 {
@@ -8,6 +108,13 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .text-gradient {
+    background: linear-gradient(115deg, var(--brand), var(--brand-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }
 

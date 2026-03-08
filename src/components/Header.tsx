@@ -104,7 +104,7 @@ export const Header: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 hd-drag">
+    <header className="sticky top-0 z-50 hd-drag border-b border-[var(--border)]/80 bg-[color:var(--surface)]/85 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Title */}
@@ -117,10 +117,10 @@ export const Header: React.FC = () => {
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-[var(--text)] font-display tracking-tight">
                 GitHub Stars Manager
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-[var(--muted)]">
                 AI-powered repository management
               </p>
             </div>
@@ -130,10 +130,10 @@ export const Header: React.FC = () => {
           <nav className="hidden md:flex items-center space-x-1 hd-btns">
             <button
               onClick={() => setCurrentView('repositories')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl font-medium transition-all premium-btn ${
                 currentView === 'repositories'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'text-white border-blue-500/70 bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25'
+                  : 'text-[var(--text)] hover:bg-[var(--surface-soft)]'
               }`}
             >
               <Search className="w-4 h-4 inline mr-2" />
@@ -141,10 +141,10 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('releases')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl font-medium transition-all premium-btn ${
                 currentView === 'releases'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'text-white border-blue-500/70 bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25'
+                  : 'text-[var(--text)] hover:bg-[var(--surface-soft)]'
               }`}
             >
               <Calendar className="w-4 h-4 inline mr-2" />
@@ -152,10 +152,10 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('settings')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl font-medium transition-all premium-btn ${
                 currentView === 'settings'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'text-white border-blue-500/70 bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25'
+                  : 'text-[var(--text)] hover:bg-[var(--surface-soft)]'
               }`}
             >
               <Settings className="w-4 h-4 inline mr-2" />
@@ -166,12 +166,12 @@ export const Header: React.FC = () => {
           {/* User Actions */}
           <div className="flex items-center space-x-3 hd-btns">
             {/* Sync Status */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="hidden sm:flex items-center space-x-2 text-sm text-[var(--muted)] rounded-full px-3 py-1 soft-card">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
               <button
                 onClick={handleSync}
                 disabled={isLoading}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                className="p-1.5 rounded-full hover:bg-[var(--surface-soft)] transition-colors disabled:opacity-50"
                 title={t('同步仓库', 'Sync repositories')}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -181,7 +181,7 @@ export const Header: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-xl premium-btn text-[var(--text)]"
               title={t('切换主题', 'Toggle theme')}
             >
               {theme === 'light' ? (
@@ -206,10 +206,10 @@ export const Header: React.FC = () => {
                 </div>
                 <button
                   onClick={logout}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="p-2 rounded-xl premium-btn text-[var(--text)]"
                   title={t('退出登录', 'Logout')}
                 >
-                  <LogOut className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             )}
