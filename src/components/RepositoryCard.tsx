@@ -315,7 +315,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const handleUnstar = async () => {
     if (!githubToken) {
-      alert('GitHub token not found. Please login again.');
+      alert(t('未找到 GitHub Token，请重新登录。', 'GitHub token not found. Please login again.'));
       return;
     }
 
