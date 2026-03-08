@@ -27,8 +27,8 @@ export class GitHubApiService {
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
-    
+    const data = response.status === 204 ? null : await response.json();
+
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
       return data.map((item: any) => {
@@ -189,6 +189,12 @@ export class GitHubApiService {
       console.warn(`Failed to fetch incremental releases for ${owner}/${repo}:`, error);
       return [];
     }
+  }
+
+  async unstarRepository(owner: string, repo: string): Promise<void> {
+    await this.makeRequest<void>(`/user/starred/${owner}/${repo}`, {
+      method: 'DELETE',
+    });
   }
 
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
