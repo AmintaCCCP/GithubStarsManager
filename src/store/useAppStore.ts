@@ -14,6 +14,7 @@ interface AppActions {
   updateRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
   setLastSync: (timestamp: string) => void;
+  deleteRepository: (repoId: number) => void;
   
   // AI actions
   addAIConfig: (config: AIConfig) => void;
@@ -296,6 +297,10 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       setLoading: (isLoading) => set({ isLoading }),
       setLastSync: (lastSync) => set({ lastSync }),
+      deleteRepository: (repoId) => set((state) => ({
+        repositories: state.repositories.filter(r => r.id !== repoId),
+        searchResults: state.searchResults.filter(r => r.id !== repoId),
+      })),
 
       // AI actions
       addAIConfig: (config) => set((state) => ({
