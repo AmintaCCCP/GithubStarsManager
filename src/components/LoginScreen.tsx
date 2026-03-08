@@ -40,9 +40,24 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isLoading) {
       handleConnect();
+      return;
+    }
+
+    // 兼容桌面端首次登录场景下 Ctrl/Cmd + V 无法触发默认粘贴的问题
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && !isLoading) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          setToken(text.trim());
+          setError('');
+        }
+      } catch (error) {
+        // 忽略读取剪贴板失败，让浏览器/系统默认行为继续兜底
+        console.warn('Clipboard read failed:', error);
+      }
     }
   };
 
