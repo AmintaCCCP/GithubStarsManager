@@ -209,7 +209,7 @@ jobs:
           '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
           '    titleBarStyle: \\'default\\', // 使用默认标题栏，避免重叠问题\\n' +
           '    show: false,\\n' +
-          '    autoHideMenuBar: true, // 隐藏菜单栏\\n' +
+          '    autoHideMenuBar: false, // 显示菜单栏，确保编辑快捷键行为一致\\n' +
           '    frame: true, // 保持窗口框架\\n' +
           '    backgroundColor: \\'#ffffff\\', // 设置背景色，避免白屏闪烁\\n' +
           '    titleBarOverlay: false, // 禁用标题栏覆盖\\n' +
@@ -281,8 +281,20 @@ jobs:
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
           '  });\\n\\n' +
-          '  // 提供稳定的 DevTools 入口（生产环境）\\n' +
+          '  // 提供稳定的菜单与编辑快捷键（生产环境）\\n' +
           '  const menuTemplate = [\\n' +
+          '    {\\n' +
+          '      label: \\'Edit\\',\\n' +
+          '      submenu: [\\n' +
+          '        { role: \\'undo\\' },\\n' +
+          '        { role: \\'redo\\' },\\n' +
+          '        { type: \\'separator\\' },\\n' +
+          '        { role: \\'cut\\' },\\n' +
+          '        { role: \\'copy\\' },\\n' +
+          '        { role: \\'paste\\' },\\n' +
+          '        { role: \\'selectAll\\' }\\n' +
+          '      ]\\n' +
+          '    },\\n' +
           '    {\\n' +
           '      label: \\'View\\',\\n' +
           '      submenu: [\\n' +
