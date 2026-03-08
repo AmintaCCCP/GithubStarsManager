@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
+import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 
 
 export const SearchBar: React.FC = () => {
@@ -508,6 +509,23 @@ export const SearchBar: React.FC = () => {
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  // 全局快捷键支持（Ctrl/Cmd+K、Ctrl/Cmd+Shift+F、/、Escape）
+  useSearchShortcuts({
+    onFocusSearch: () => {
+      searchInputRef.current?.focus();
+      if (!searchQuery && searchHistory.length > 0) {
+        setShowSearchHistory(true);
+      }
+    },
+    onClearSearch: () => {
+      handleClearSearch();
+      searchInputRef.current?.focus();
+    },
+    onToggleFilters: () => {
+      setShowFilters(prev => !prev);
+    },
+  });
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
