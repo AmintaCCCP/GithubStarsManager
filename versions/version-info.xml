@@ -101,4 +101,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.2</downloadUrl>
   </version>
+  <version>
+    <number>0.2.3</number>
+    <releaseDate>2026-03-08</releaseDate>
+    <changelog>
+      <item>Added repository unstar support and improved delete flow stability by handling 204 No Content responses and cleaning related release/subscription state.</item>
+      <item>Fixed desktop first-login token paste issue (Ctrl/Cmd + V) in v0.2.0-v0.2.2 builds.</item>
+      <item>Restored global search shortcuts and desktop Edit menu roles (cut/copy/paste/select all) for consistent keyboard behavior.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.3</downloadUrl>
+  </version>
 </versions>
