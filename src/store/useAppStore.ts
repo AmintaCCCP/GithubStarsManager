@@ -14,6 +14,7 @@ interface AppActions {
   updateRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
   setLastSync: (timestamp: string) => void;
+  deleteRepository: (repoId: number) => void;
   
   // AI actions
   addAIConfig: (config: AIConfig) => void;
@@ -296,6 +297,24 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       setLoading: (isLoading) => set({ isLoading }),
       setLastSync: (lastSync) => set({ lastSync }),
+      deleteRepository: (repoId) => set((state) => {
+        const nextReleaseSubscriptions = new Set(state.releaseSubscriptions);
+        nextReleaseSubscriptions.delete(repoId);
+
+        const filteredReleases = state.releases.filter(release => release.repository.id !== repoId);
+        const remainingReleaseIds = new Set(filteredReleases.map(release => release.id));
+        const nextReadReleases = new Set(
+          Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))
+        );
+
+        return {
+          repositories: state.repositories.filter(r => r.id !== repoId),
+          searchResults: state.searchResults.filter(r => r.id !== repoId),
+          releases: filteredReleases,
+          releaseSubscriptions: nextReleaseSubscriptions,
+          readReleases: nextReadReleases,
+        };
+      }),
 
       // AI actions
       addAIConfig: (config) => set((state) => ({

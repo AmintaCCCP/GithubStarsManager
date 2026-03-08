@@ -28,12 +28,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     setLoading,
     language,
     customCategories,
-    updateRepository
+    updateRepository,
+    deleteRepository
   } = useAppStore();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
+  const [unstarring, setUnstarring] = useState(false);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
 
@@ -311,6 +313,41 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
+  const handleUnstar = async () => {
+    if (!githubToken) {
+      alert(t('未找到 GitHub Token，请重新登录。', 'GitHub token not found. Please login again.'));
+      return;
+    }
+
+    const confirmMessage = language === 'zh'
+      ? `确定要取消 Star "${repository.full_name}" 吗？\n\n这将会从您的 GitHub 收藏中移除该仓库。`
+      : `Are you sure you want to unstar "${repository.full_name}"?\n\nThis will remove the repository from your GitHub stars.`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setUnstarring(true);
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const [owner, repo] = repository.full_name.split('/');
+      await githubApi.unstarRepository(owner, repo);
+      deleteRepository(repository.id);
+      const successMessage = language === 'zh'
+        ? '已成功取消 Star'
+        : 'Successfully unstarred';
+      alert(successMessage);
+    } catch (error) {
+      console.error('Failed to unstar repository:', error);
+      const errorMessage = language === 'zh'
+        ? '取消 Star 失败，请检查网络连接或重新登录。'
+        : 'Failed to unstar repository. Please check your network connection or login again.';
+      alert(errorMessage);
+    } finally {
+      setUnstarring(false);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 animate-slide-up flex flex-col h-full">
       {/* Header - Repository Info */}
@@ -367,7 +404,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </button>
         </div>
 
-        {/* Right side: Zread/DeepWiki and GitHub Links */}
+        {/* Right side: Zread/DeepWiki, GitHub Links, and Unstar */}
         <div className="flex items-center space-x-2">
           <a
             href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
@@ -387,6 +424,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           >
             <ExternalLink className="w-4 h-4" />
           </a>
+          <button
+            onClick={handleUnstar}
+            disabled={unstarring}
+            className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={language === 'zh' ? '取消 Star' : 'Unstar'}
+          >
+            <Star className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
+          </button>
         </div>
       </div>
 
