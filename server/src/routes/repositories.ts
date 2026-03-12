@@ -44,18 +44,21 @@ function transformRepo(row: Record<string, unknown>) {
 // GET /api/repositories
 router.get('/api/repositories', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
     const search = req.query.search as string | undefined;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM repositories';
-    const params: unknown[] = [];
+    let sql = 'SELECT * FROM repositories WHERE user_id = ?';
+    const params: unknown[] = [userId];
 
     if (search) {
       const escaped = search.replace(/[%_\\]/g, '\\$&');
-      sql += " WHERE name LIKE ? ESCAPE '\\' OR full_name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' OR ai_tags LIKE ? ESCAPE '\\'";
+      sql += " AND (name LIKE ? ESCAPE '\\' OR full_name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' OR ai_tags LIKE ? ESCAPE '\\')";
       const searchPattern = `%${escaped}%`;
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
@@ -67,9 +70,9 @@ router.get('/api/repositories', (req, res) => {
     const repositories = rows.map(transformRepo);
 
     const countSql = search
-      ? 'SELECT COUNT(*) as total FROM repositories WHERE name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?'
-      : 'SELECT COUNT(*) as total FROM repositories';
-    const countParams = search ? Array(5).fill(`%${search}%`) : [];
+      ? 'SELECT COUNT(*) as total FROM repositories WHERE user_id = ? AND (name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?)'
+      : 'SELECT COUNT(*) as total FROM repositories WHERE user_id = ?';
+    const countParams = search ? [userId, ...Array(5).fill(`%${search}%`)] : [userId];
     const countRow = db.prepare(countSql).get(...countParams) as { total: number };
 
     res.json({ repositories, total: countRow.total, page, limit });
@@ -82,6 +85,9 @@ router.get('/api/repositories', (req, res) => {
 // PUT /api/repositories (bulk upsert)
 router.put('/api/repositories', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const { repositories } = req.body as { repositories: Record<string, unknown>[] };
     if (!Array.isArray(repositories)) {
@@ -91,13 +97,13 @@ router.put('/api/repositories', (req, res) => {
 
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO repositories (
-        id, name, full_name, description, html_url, stargazers_count, language,
+        id, user_id, name, full_name, description, html_url, stargazers_count, language,
         created_at, updated_at, pushed_at, starred_at,
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, last_edited,
         subscribed_to_releases
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const upsert = db.transaction(() => {
@@ -105,7 +111,7 @@ router.put('/api/repositories', (req, res) => {
       for (const repo of repositories) {
         const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
         stmt.run(
-          repo.id, repo.name, repo.full_name, repo.description ?? null,
+          repo.id, userId, repo.name, repo.full_name, repo.description ?? null,
           repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
           repo.created_at ?? null, repo.updated_at ?? null, repo.pushed_at ?? null,
           repo.starred_at ?? null,
@@ -136,6 +142,9 @@ router.put('/api/repositories', (req, res) => {
 // PATCH /api/repositories/:id
 router.patch('/api/repositories/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const id = parseInt(req.params.id);
     const updates = req.body as Record<string, unknown>;
@@ -170,10 +179,15 @@ router.patch('/api/repositories/:id', (req, res) => {
       return;
     }
 
-    values.push(id);
-    db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+    values.push(id, userId);
+    const result = db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE id = ? AND user_id = ?`).run(...values);
 
-    const row = db.prepare('SELECT * FROM repositories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
+      return;
+    }
+
+    const row = db.prepare('SELECT * FROM repositories WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;

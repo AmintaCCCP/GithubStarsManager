@@ -3,52 +3,15 @@ import { translateBackendError } from '../utils/backendErrors';
 import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
 
 class BackendAdapter {
-  private _backendUrl: string | null = null;
+  private _backendUrl: string = '/api';
 
   async init(): Promise<void> {
-    try {
-      // Try common backend URLs
-      const urls = [
-        window.location.origin + '/api',
-      ];
-      // Only probe localhost in development
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        urls.push('http://localhost:3000/api');
-      }
-
-      for (const baseUrl of urls) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        try {
-          const res = await fetch(`${baseUrl}/health`, {
-            signal: controller.signal,
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.status === 'ok') {
-              this._backendUrl = baseUrl;
-              console.log(`✅ Backend connected: ${baseUrl}`);
-              return;
-            }
-          }
-        } catch {
-          // Try next URL
-        } finally {
-          clearTimeout(timeoutId);
-        }
-      }
-
-      this._backendUrl = null;
-      console.log('ℹ️ Backend not available, using local-only mode');
-    } catch {
-      this._backendUrl = null;
-      console.log('ℹ️ Backend not available, using local-only mode');
-    }
+    // In monolith, we just use /api which is proxied in dev or same-origin in prod
+    console.log('✅ Backend initialized at /api');
   }
 
   get isAvailable(): boolean {
-    return this._backendUrl !== null;
+    return true; // Assume available in monolith
   }
 
   get backendUrl(): string | null {
@@ -175,6 +138,37 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy error');
     const data = await res.json() as { rate: { remaining: number; reset: number } };
     return { remaining: data.rate.remaining, reset: data.rate.reset };
+  }
+
+  // === Admin API ===
+
+  async fetchUsers(): Promise<Record<string, unknown>[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/admin/users`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch users error');
+    return res.json() as Promise<Record<string, unknown>[]>;
+  }
+
+  async createUser(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/admin/users`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Create user error');
+    return res.json() as Promise<Record<string, unknown>>;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Delete user error');
   }
 
   // === AI Proxy ===

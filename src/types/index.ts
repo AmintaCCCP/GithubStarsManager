@@ -154,7 +154,7 @@ export interface AppState {
   
   // UI
   theme: 'light' | 'dark';
-  currentView: 'repositories' | 'releases' | 'settings';
+  currentView: 'repositories' | 'releases' | 'settings' | 'admin';
   language: 'zh' | 'en';
   
   // Update
@@ -165,6 +165,8 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+  backendUser: { id: number; username: string; role: string; apprise_url: string | null } | null;
+  isBackendAvailable: boolean;
 }
 
 export interface UpdateNotification {

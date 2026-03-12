@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
+import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Shield } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -10,7 +10,6 @@ export const Header: React.FC = () => {
     currentView,
     isLoading,
     lastSync,
-    githubToken,
     repositories,
     setTheme,
     setCurrentView,
@@ -20,17 +19,13 @@ export const Header: React.FC = () => {
     setLastSync,
     logout,
     language,
+    backendUser,
   } = useAppStore();
 
   const handleSync = async () => {
-    if (!githubToken) {
-      alert('GitHub token not found. Please login again.');
-      return;
-    }
-    
     setLoading(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = new GitHubApiService();
       
       // 1. 获取所有starred仓库
       console.log('Fetching starred repositories...');
@@ -161,6 +156,19 @@ export const Header: React.FC = () => {
               <Settings className="w-4 h-4 inline mr-2" />
               {t('设置', 'Settings')}
             </button>
+            {backendUser?.role === 'SuperAdmin' && (
+              <button
+                onClick={() => setCurrentView('admin')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  currentView === 'admin'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Shield className="w-4 h-4 inline mr-2" />
+                {t('用户', 'Users')}
+              </button>
+            )}
           </nav>
 
           {/* User Actions */}

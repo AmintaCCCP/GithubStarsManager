@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { getDb } from '../db/connection.js';
 
 const router = Router();
@@ -23,10 +24,13 @@ function transformCategory(row: Record<string, unknown>) {
 }
 
 // GET /api/categories
-router.get('/api/categories', (_req, res) => {
+router.get('/api/categories', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const rows = db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC').all() as Record<string, unknown>[];
+    const rows = db.prepare('SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order ASC, name ASC').all(userId) as Record<string, unknown>[];
     res.json(rows.map(transformCategory));
   } catch (err) {
     console.error('GET /api/categories error:', err);
@@ -37,13 +41,16 @@ router.get('/api/categories', (_req, res) => {
 // POST /api/categories
 router.post('/api/categories', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const { name, description, keywords, color, icon, sort_order } = req.body as Record<string, unknown>;
+    const { id, name, description, keywords, color, icon, sort_order } = req.body as Record<string, unknown>;
 
     const result = db.prepare(
-      'INSERT INTO categories (name, description, keywords, color, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO categories (id, user_id, name, description, keywords, color, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
-      name ?? '', description ?? null,
+      id ?? crypto.randomUUID(), userId, name ?? '', description ?? null,
       JSON.stringify(keywords ?? []),
       color ?? null, icon ?? null, sort_order ?? 0
     );
@@ -59,19 +66,22 @@ router.post('/api/categories', (req, res) => {
 // PUT /api/categories/:id
 router.put('/api/categories/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const id = parseInt(req.params.id);
+    const id = req.params.id; // changed to string since schema uses TEXT PRIMARY KEY for categories
     const { name, description, keywords, color, icon, sort_order } = req.body as Record<string, unknown>;
 
     db.prepare(
-      'UPDATE categories SET name = ?, description = ?, keywords = ?, color = ?, icon = ?, sort_order = ? WHERE id = ?'
+      'UPDATE categories SET name = ?, description = ?, keywords = ?, color = ?, icon = ?, sort_order = ? WHERE id = ? AND user_id = ?'
     ).run(
       name ?? '', description ?? null,
       JSON.stringify(keywords ?? []),
-      color ?? null, icon ?? null, sort_order ?? 0, id
+      color ?? null, icon ?? null, sort_order ?? 0, id, userId
     );
 
-    const row = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Category not found', code: 'CATEGORY_NOT_FOUND' });
       return;
@@ -86,9 +96,12 @@ router.put('/api/categories/:id', (req, res) => {
 // DELETE /api/categories/:id
 router.delete('/api/categories/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const id = parseInt(req.params.id);
-    const result = db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    const id = req.params.id;
+    const result = db.prepare('DELETE FROM categories WHERE id = ? AND user_id = ?').run(id, userId);
     if (result.changes === 0) {
       res.status(404).json({ error: 'Category not found', code: 'CATEGORY_NOT_FOUND' });
       return;
@@ -114,10 +127,13 @@ function transformAssetFilter(row: Record<string, unknown>) {
 }
 
 // GET /api/asset-filters
-router.get('/api/asset-filters', (_req, res) => {
+router.get('/api/asset-filters', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const rows = db.prepare('SELECT * FROM asset_filters ORDER BY sort_order ASC, name ASC').all() as Record<string, unknown>[];
+    const rows = db.prepare('SELECT * FROM asset_filters WHERE user_id = ? ORDER BY sort_order ASC, name ASC').all(userId) as Record<string, unknown>[];
     res.json(rows.map(transformAssetFilter));
   } catch (err) {
     console.error('GET /api/asset-filters error:', err);
@@ -128,13 +144,16 @@ router.get('/api/asset-filters', (_req, res) => {
 // POST /api/asset-filters
 router.post('/api/asset-filters', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const { name, description, keywords, platform, sort_order } = req.body as Record<string, unknown>;
+    const { id, name, description, keywords, platform, sort_order } = req.body as Record<string, unknown>;
 
     const result = db.prepare(
-      'INSERT INTO asset_filters (name, description, keywords, platform, sort_order) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO asset_filters (id, user_id, name, description, keywords, platform, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
-      name ?? '', description ?? null,
+      id ?? crypto.randomUUID(), userId, name ?? '', description ?? null,
       JSON.stringify(keywords ?? []),
       platform ?? null, sort_order ?? 0
     );
@@ -150,19 +169,22 @@ router.post('/api/asset-filters', (req, res) => {
 // PUT /api/asset-filters/:id
 router.put('/api/asset-filters/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const id = parseInt(req.params.id);
+    const id = req.params.id; // It's TEXT PRIMARY KEY
     const { name, description, keywords, platform, sort_order } = req.body as Record<string, unknown>;
 
     db.prepare(
-      'UPDATE asset_filters SET name = ?, description = ?, keywords = ?, platform = ?, sort_order = ? WHERE id = ?'
+      'UPDATE asset_filters SET name = ?, description = ?, keywords = ?, platform = ?, sort_order = ? WHERE id = ? AND user_id = ?'
     ).run(
       name ?? '', description ?? null,
       JSON.stringify(keywords ?? []),
-      platform ?? null, sort_order ?? 0, id
+      platform ?? null, sort_order ?? 0, id, userId
     );
 
-    const row = db.prepare('SELECT * FROM asset_filters WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = db.prepare('SELECT * FROM asset_filters WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Asset filter not found', code: 'ASSET_FILTER_NOT_FOUND' });
       return;
@@ -177,9 +199,12 @@ router.put('/api/asset-filters/:id', (req, res) => {
 // DELETE /api/asset-filters/:id
 router.delete('/api/asset-filters/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const id = parseInt(req.params.id);
-    const result = db.prepare('DELETE FROM asset_filters WHERE id = ?').run(id);
+    const id = req.params.id;
+    const result = db.prepare('DELETE FROM asset_filters WHERE id = ? AND user_id = ?').run(id, userId);
     if (result.changes === 0) {
       res.status(404).json({ error: 'Asset filter not found', code: 'ASSET_FILTER_NOT_FOUND' });
       return;

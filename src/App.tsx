@@ -6,6 +6,7 @@ import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
+import { UserManagement } from './components/Admin/UserManagement';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
@@ -93,6 +94,8 @@ function App() {
         return <ReleaseTimeline />;
       case 'settings':
         return <SettingsPanel />;
+      case 'admin':
+        return <UserManagement />;
       default:
         return null;
     }

@@ -36,7 +36,13 @@ router.post('/api/proxy/github/*', async (req, res) => {
     const githubPath = (req.params as Record<string, string>)[0]; // wildcard capture
     
     // Read and decrypt GitHub token from settings
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+      return;
+    }
+
+    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ? AND user_id = ?').get('github_token', userId) as { value: string } | undefined;
     if (!tokenRow?.value) {
       res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
       return;

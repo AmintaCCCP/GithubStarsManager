@@ -31,6 +31,9 @@ function transformRelease(row: Record<string, unknown>) {
 // GET /api/releases
 router.get('/api/releases', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
@@ -38,9 +41,9 @@ router.get('/api/releases', (req, res) => {
     const unread = req.query.unread as string | undefined;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM releases';
+    let sql = 'SELECT * FROM releases WHERE user_id = ?';
     const conditions: string[] = [];
-    const params: unknown[] = [];
+    const params: unknown[] = [userId];
 
     if (repoId) {
       conditions.push('repo_id = ?');
@@ -51,7 +54,7 @@ router.get('/api/releases', (req, res) => {
     }
 
     if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
+      sql += ' AND ' + conditions.join(' AND ');
     }
 
     sql += ' ORDER BY published_at DESC LIMIT ? OFFSET ?';
@@ -60,10 +63,10 @@ router.get('/api/releases', (req, res) => {
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
     const releases = rows.map(transformRelease);
 
-    let countSql = 'SELECT COUNT(*) as total FROM releases';
-    const countParams: unknown[] = [];
+    let countSql = 'SELECT COUNT(*) as total FROM releases WHERE user_id = ?';
+    const countParams: unknown[] = [userId];
     if (conditions.length > 0) {
-      countSql += ' WHERE ' + conditions.join(' AND ');
+      countSql += ' AND ' + conditions.join(' AND ');
       if (repoId) countParams.push(parseInt(repoId));
     }
     const countRow = db.prepare(countSql).get(...countParams) as { total: number };
@@ -78,6 +81,9 @@ router.get('/api/releases', (req, res) => {
 // PUT /api/releases (bulk upsert)
 router.put('/api/releases', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const { releases } = req.body as { releases: Record<string, unknown>[] };
     if (!Array.isArray(releases)) {
@@ -94,10 +100,10 @@ router.put('/api/releases', (req, res) => {
 
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO releases (
-        id, tag_name, name, body, html_url, published_at,
+        id, user_id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const upsert = db.transaction(() => {
@@ -106,6 +112,7 @@ router.put('/api/releases', (req, res) => {
         const repository = release.repository as { id?: number; full_name?: string; name?: string } | undefined;
         stmt.run(
           release.id,
+          userId,
           release.tag_name ?? null,
           release.name ?? null,
           release.body ?? null,
@@ -135,6 +142,9 @@ router.put('/api/releases', (req, res) => {
 // PATCH /api/releases/:id
 router.patch('/api/releases/:id', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
     const id = parseInt(req.params.id);
     const { is_read } = req.body as { is_read?: boolean };
@@ -144,9 +154,9 @@ router.patch('/api/releases/:id', (req, res) => {
       return;
     }
 
-    db.prepare('UPDATE releases SET is_read = ? WHERE id = ?').run(is_read ? 1 : 0, id);
+    db.prepare('UPDATE releases SET is_read = ? WHERE id = ? AND user_id = ?').run(is_read ? 1 : 0, id, userId);
 
-    const row = db.prepare('SELECT * FROM releases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = db.prepare('SELECT * FROM releases WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
@@ -159,10 +169,13 @@ router.patch('/api/releases/:id', (req, res) => {
 });
 
 // POST /api/releases/mark-all-read
-router.post('/api/releases/mark-all-read', (_req, res) => {
+router.post('/api/releases/mark-all-read', (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const db = getDb();
-    const result = db.prepare('UPDATE releases SET is_read = 1').run();
+    const result = db.prepare('UPDATE releases SET is_read = 1 WHERE user_id = ?').run(userId);
     res.json({ updated: result.changes });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);

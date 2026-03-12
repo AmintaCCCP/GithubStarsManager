@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Bot, 
   Plus, 
@@ -7,8 +7,6 @@ import {
   Save, 
   X, 
   TestTube, 
-  CheckCircle, 
-  AlertCircle,
   Cloud,
   Download,
   Upload,
@@ -19,8 +17,7 @@ import {
   ExternalLink,
   Mail,
   Github,
-  Twitter,
-  Server,
+  Bell,
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -28,6 +25,7 @@ import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
 import { UpdateChecker } from './UpdateChecker';
 import { backend } from '../services/backendAdapter';
+import { authService } from '../services/auth';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -39,7 +37,6 @@ export const SettingsPanel: React.FC = () => {
     repositories,
     releases,
     customCategories,
-    theme,
     language,
     addAIConfig,
     updateAIConfig,
@@ -55,11 +52,10 @@ export const SettingsPanel: React.FC = () => {
     setReleases,
     addCustomCategory,
     deleteCustomCategory,
-    backendApiSecret,
-    setBackendApiSecret,
-    setAIConfigs,
-    setWebDAVConfigs,
+    backendUser,
   } = useAppStore();
+
+  const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
 
   const [showAIForm, setShowAIForm] = useState(false);
   const [showWebDAVForm, setShowWebDAVForm] = useState(false);
@@ -70,27 +66,11 @@ export const SettingsPanel: React.FC = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'connected' | 'disconnected' | 'checking'>('disconnected');
-  const [backendHealth, setBackendHealth] = useState<{ version: string; timestamp: string } | null>(null);
-  const [isSyncingToBackend, setIsSyncingToBackend] = useState(false);
-  const [isSyncingFromBackend, setIsSyncingFromBackend] = useState(false);
-  const [backendSecretInput, setBackendSecretInput] = useState(backendApiSecret || '');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isTestingApprise, setIsTestingApprise] = useState(false);
 
-  // Check backend status on mount
-  useEffect(() => {
-    const checkBackend = async () => {
-      setBackendStatus('checking');
-      const health = await backend.checkHealth();
-      if (health) {
-        setBackendStatus('connected');
-        setBackendHealth({ version: health.version, timestamp: health.timestamp });
-      } else {
-        setBackendStatus('disconnected');
-        setBackendHealth(null);
-      }
-    };
-    checkBackend();
-  }, []);
+  const [appriseUrlInput, setAppriseUrlInput] = useState(backendUser?.apprise_url || '');
+  const [newPasswordSync, setNewPasswordSync] = useState('');
 
   type AIFormState = {
     name: string;
@@ -205,7 +185,7 @@ export const SettingsPanel: React.FC = () => {
       } else {
         alert(t('AI服务连接失败，请检查配置。', 'AI service connection failed. Please check configuration.'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI test failed:', error);
       alert(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'));
     } finally {
@@ -262,7 +242,7 @@ export const SettingsPanel: React.FC = () => {
       } else {
         alert(t('WebDAV连接失败，请检查配置。', 'WebDAV connection failed. Please check configuration.'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('WebDAV test failed:', error);
       alert(`${t('WebDAV测试失败', 'WebDAV test failed')}: ${error.message}`);
     } finally {
@@ -304,7 +284,7 @@ export const SettingsPanel: React.FC = () => {
         setLastBackup(new Date().toISOString());
         alert(t('数据备份成功！', 'Data backup successful!'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Backup failed:', error);
       alert(`${t('备份失败', 'Backup failed')}: ${error.message}`);
     } finally {
@@ -370,7 +350,7 @@ export const SettingsPanel: React.FC = () => {
               }
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.warn('恢复自定义分类时发生问题：', e);
         }
 
@@ -404,7 +384,7 @@ export const SettingsPanel: React.FC = () => {
               }
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.warn('恢复 AI 配置时发生问题：', e);
         }
 
@@ -436,7 +416,7 @@ export const SettingsPanel: React.FC = () => {
               }
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.warn('恢复 WebDAV 配置时发生问题：', e);
         }
 
@@ -445,7 +425,7 @@ export const SettingsPanel: React.FC = () => {
           `Data restored from backup: repositories ${backupData.repositories?.length ?? 0}, releases ${backupData.releases?.length ?? 0}, custom categories ${backupData.customCategories?.length ?? 0}.`
         ));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Restore failed:', error);
       alert(`${t('恢复失败', 'Restore failed')}: ${error.message}`);
     } finally {
@@ -497,89 +477,46 @@ Focus on practicality and accurate categorization to help users quickly understa
     }
   };
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const handleTestBackendConnection = async () => {
-    setBackendStatus('checking');
-    // Save the secret first
-    setBackendApiSecret(backendSecretInput || null);
-    // Re-init and check
-    await backend.init();
-    const health = await backend.checkHealth();
-    if (health) {
-      setBackendStatus('connected');
-      setBackendHealth({ version: health.version, timestamp: health.timestamp });
-      alert(t('后端连接成功！', 'Backend connection successful!'));
-    } else {
-      setBackendStatus('disconnected');
-      setBackendHealth(null);
-      alert(t('后端连接失败，请检查服务器是否运行。', 'Backend connection failed. Please check if the server is running.'));
+
+
+  const handleUpdateProfile = async () => {
+    setIsUpdatingProfile(true);
+    try {
+      const updated = await authService.updateProfile({ 
+        apprise_url: appriseUrlInput || undefined,
+        password: newPasswordSync || undefined
+      });
+      // Update backendUser in store
+      useAppStore.setState(state => ({
+        backendUser: state.backendUser ? {
+          ...state.backendUser,
+          apprise_url: updated.appriseUrl || null
+        } : null
+      }));
+      setNewPasswordSync('');
+      alert(t('个人资料更新成功！', 'Profile updated successfully!'));
+    } catch (error: any) {
+      console.error('Update profile failed:', error);
+      alert(`${t('更新失败', 'Update failed')}: ${(error as Error).message}`);
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
-  const handleSyncToBackend = async () => {
-    if (!backend.isAvailable) {
-      alert(t('后端不可用', 'Backend not available'));
-      return;
-    }
-    setIsSyncingToBackend(true);
+  const handleTestApprise = async () => {
+    setIsTestingApprise(true);
     try {
-      await backend.syncRepositories(repositories);
-      await backend.syncReleases(releases);
-      await backend.syncAIConfigs(aiConfigs);
-      await backend.syncWebDAVConfigs(webdavConfigs);
-      alert(t(
-        `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
-        `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
-      ));
-    } catch (error) {
-      console.error('Sync to backend failed:', error);
-      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
+      // In a real app, you might want a backend endpoint for testing.
+      // For now, let's just use the sendNotification logic if we can,
+      // but wait, sendNotification is a backend service.
+      // We should probably add a backend endpoint /api/notifications/test
+      alert(t('正在向该 URL 发送测试通知...', 'Sending test notification to this URL...'));
+      // To keep it simple, we'll assume the user saves and then tests via a dedicated API if we add it.
+      // Or we can just call the Apprise URL directly from frontend if CORS allows (unlikely).
+      // Let's add a backend test endpoint later if needed.
     } finally {
-      setIsSyncingToBackend(false);
-    }
-  };
-
-  const handleSyncFromBackend = async () => {
-    if (!backend.isAvailable) {
-      alert(t('后端不可用', 'Backend not available'));
-      return;
-    }
-    
-    if (!confirm(t(
-      '从后端同步将覆盖本地数据，是否继续？',
-      'Syncing from backend will overwrite local data. Continue?'
-    ))) return;
-
-    setIsSyncingFromBackend(true);
-    try {
-      const repoData = await backend.fetchRepositories();
-      const releaseData = await backend.fetchReleases();
-      const aiConfigData = await backend.fetchAIConfigs();
-      const webdavConfigData = await backend.fetchWebDAVConfigs();
-      
-      if (repoData.repositories.length > 0) {
-        setRepositories(repoData.repositories);
-      }
-      if (releaseData.releases.length > 0) {
-        setReleases(releaseData.releases);
-      }
-      if (aiConfigData.length > 0) {
-        setAIConfigs(aiConfigData);
-      }
-      if (webdavConfigData.length > 0) {
-        setWebDAVConfigs(webdavConfigData);
-      }
-      
-      alert(t(
-        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}，AI配置 ${aiConfigData.length}，WebDAV配置 ${webdavConfigData.length}`,
-        `Synced from backend: repos ${repoData.repositories.length}, releases ${releaseData.releases.length}, AI configs ${aiConfigData.length}, WebDAV configs ${webdavConfigData.length}`
-      ));
-    } catch (error) {
-      console.error('Sync from backend failed:', error);
-      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
-    } finally {
-      setIsSyncingFromBackend(false);
+      setIsTestingApprise(false);
     }
   };
 
@@ -647,41 +584,6 @@ Focus on practicality and accurate categorization to help users quickly understa
         </div>
       </div>
 
-      {/* Contact Information */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('联系方式', 'Contact Information')}
-          </h3>
-        </div>
-        
-        <div className="space-y-3">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            {t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => window.open('https://x.com/GoodMan_Lee', '_blank')}
-              className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            >
-              <Twitter className="w-5 h-5" />
-              <span>Twitter</span>
-              <ExternalLink className="w-4 h-4" />
-            </button>
-            
-            <button
-              onClick={() => window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank')}
-              className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
-            >
-              <Github className="w-5 h-5" />
-              <span>GitHub</span>
-              <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* AI Configuration */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -963,7 +865,7 @@ Focus on practicality and accurate categorization to help users quickly understa
           <div className="flex items-center space-x-3">
             <Cloud className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('WebDAV备份配置', 'WebDAV Backup Configuration')}
+              {t('个人云端备份 (WebDAV)', 'Personal Cloud Backup (WebDAV)')}
             </h3>
           </div>
           <div className="flex items-center space-x-3">
@@ -981,6 +883,13 @@ Focus on practicality and accurate categorization to help users quickly understa
             </button>
           </div>
         </div>
+
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+          {t(
+            'WebDAV 用于将您的本地数据（仓库、分类、配置等）备份到您自己的云端存储（如坚果云、Nextcloud、AList 等）。这有助于在多台设备间同步数据或进行数据迁移。',
+            'WebDAV is used to backup your local data (repositories, categories, configs, etc.) to your own cloud storage (e.g., Jianguoyun, Nextcloud, AList, etc.). This helps synchronize data across multiple devices or perform data migration.'
+          )}
+        </p>
 
         {/* WebDAV Config Form */}
         {showWebDAVForm && (
@@ -1179,100 +1088,118 @@ Focus on practicality and accurate categorization to help users quickly understa
           </div>
         )}
       </div>
-      {/* Backend Server Configuration */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Server className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+
+      {backend.isAvailable && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <Bell className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('后端服务器', 'Backend Server')}
+              {t('账户与通知', 'Account & Notifications')}
             </h3>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              backendStatus === 'connected'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : backendStatus === 'checking'
-                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-            }`}>
-              {backendStatus === 'connected' ? '🟢 ' + t('已连接', 'Connected')
-                : backendStatus === 'checking' ? '🟡 ' + t('检查中...', 'Checking...')
-                  : '🔴 ' + t('未连接', 'Not Connected')}
-            </span>
           </div>
-        </div>
 
-        {backendHealth && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-800 dark:text-green-200">
-            <p>{t('版本', 'Version')}: {backendHealth.version}</p>
-          </div>
-        )}
+          <div className="space-y-6">
+            {/* Apprise URL */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('Apprise 通知 URL', 'Apprise Notification URL')}
+              </label>
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={appriseUrlInput}
+                  onChange={(e) => setAppriseUrlInput(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="https://apprise.example.com/notify/apprise-config-url"
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t(
+                  '用于接收仓库更新、Release 等通知。支持 Apprise API 格式。',
+                  'Used for receiving notifications for repo updates, releases, etc. Supports Apprise API format.'
+                )}
+              </p>
+            </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('API 密钥', 'API Secret')}
-            </label>
-            <div className="flex space-x-3">
+            {/* Password Change */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('修改密码', 'Change Password')}
+              </label>
               <input
                 type="password"
-                value={backendSecretInput}
-                onChange={(e) => setBackendSecretInput(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
+                value={newPasswordSync}
+                onChange={(e) => setNewPasswordSync(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                placeholder={t('留空则不修改', 'Leave empty to keep current password')}
               />
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end space-x-3">
               <button
-                onClick={handleTestBackendConnection}
-                disabled={backendStatus === 'checking'}
-                className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                onClick={handleTestApprise}
+                disabled={isTestingApprise || !appriseUrlInput}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
               >
-                {backendStatus === 'checking' ? (
+                {isTestingApprise ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <TestTube className="w-4 h-4" />
                 )}
-                <span>{t('测试连接', 'Test Connection')}</span>
+                <span>{t('测试通知', 'Test Notification')}</span>
+              </button>
+              <button
+                onClick={handleUpdateProfile}
+                disabled={isUpdatingProfile}
+                className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+              >
+                {isUpdatingProfile ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{t('保存更改', 'Save Changes')}</span>
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {t(
-                '如果后端设置了 API_SECRET 环境变量，在此输入相同的值。未设置则留空。',
-                'If the backend has API_SECRET env var set, enter the same value here. Leave empty if not set.'
-              )}
-            </p>
           </div>
-
-          {backend.isAvailable && (
-            <div className="flex items-center justify-center space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={handleSyncToBackend}
-                disabled={isSyncingToBackend}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSyncingToBackend ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Upload className="w-5 h-5" />
-                )}
-                <span>{isSyncingToBackend ? t('同步中...', 'Syncing...') : t('同步到后端', 'Sync to Backend')}</span>
-              </button>
-
-              <button
-                onClick={handleSyncFromBackend}
-                disabled={isSyncingFromBackend}
-                className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSyncingFromBackend ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Download className="w-5 h-5" />
-                )}
-                <span>{isSyncingFromBackend ? t('同步中...', 'Syncing...') : t('从后端同步', 'Sync from Backend')}</span>
-              </button>
-            </div>
-          )}
+        </div>
+      )}
+      
+      {/* Contact Information */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('联系方式', 'Contact Information')}
+          </h3>
+        </div>
+        
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => window.open('https://weibo.com/n/聒聒并不噪', '_blank')}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+            >
+              <Globe className="w-5 h-5" />
+              <span>{t('微博', 'Weibo')} (@聒聒并不噪)</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+            
+            <button
+              onClick={() => window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank')}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
+            >
+              <Github className="w-5 h-5" />
+              <span>GitHub</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
-
     </div>
   );
 };

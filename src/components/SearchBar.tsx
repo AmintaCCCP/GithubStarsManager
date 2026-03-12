@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
@@ -32,12 +32,12 @@ export const SearchBar: React.FC = () => {
 
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
-    const languages = [...new Set(repositories.map(r => r.language).filter(Boolean))];
+    const languages = [...new Set(repositories.map(r => r.language).filter((l): l is string => !!l))];
     const tags = [...new Set([
       ...repositories.flatMap(r => r.ai_tags || []),
       ...repositories.flatMap(r => r.topics || [])
-    ])];
-    const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))];
+    ])].filter((t): t is string => !!t);
+    const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))].filter((p): p is string => !!p);
     
     setAvailableLanguages(languages);
     setAvailableTags(tags);
@@ -347,12 +347,12 @@ export const SearchBar: React.FC = () => {
     const value = e.target.value;
     setSearchQuery(value);
     
-    // Enable real-time search mode when user starts typing
-    if (value && !isRealTimeSearch) {
-      setIsRealTimeSearch(true);
-    } else if (!value && isRealTimeSearch) {
-      setIsRealTimeSearch(false);
-    }
+    // Disable real-time search mode (following user request #5)
+    // if (value && !isRealTimeSearch) {
+    //   setIsRealTimeSearch(true);
+    // } else if (!value && isRealTimeSearch) {
+    //   setIsRealTimeSearch(false);
+    // }
 
     // Show search history when input is focused and empty
     if (!value && searchHistory.length > 0) {
@@ -414,6 +414,7 @@ export const SearchBar: React.FC = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      // Trigger AI search or basic search on Enter
       handleAISearch();
     }
   };
@@ -536,8 +537,8 @@ export const SearchBar: React.FC = () => {
           ref={searchInputRef}
           type="text"
           placeholder={t(
-            "输入关键词实时搜索，或使用AI搜索进行语义理解",
-            "Type keywords for real-time search, or use AI search for semantic understanding"
+            "输入关键词并回车搜索，或使用AI搜索",
+            "Type keywords and press Enter to search, or use AI search"
           )}
           value={searchQuery}
           onChange={handleInputChange}
@@ -644,7 +645,7 @@ export const SearchBar: React.FC = () => {
           </div>
           {isRealTimeSearch && (
             <div className="text-gray-500 dark:text-gray-400">
-              {t('按回车键或点击AI搜索进行深度搜索', 'Press Enter or click AI Search for deep search')}
+              {t('按回车键或点击AI搜索进行搜索', 'Press Enter or click AI Search to search')}
             </div>
           )}
         </div>

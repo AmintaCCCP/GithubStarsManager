@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
-import { Star, Github, Key, ArrowRight, AlertCircle } from 'lucide-react';
+import { Star, Github, Key, User, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
+import { authService } from '../services/auth';
 
 export const LoginScreen: React.FC = () => {
-  const [token, setToken] = useState('');
+  const [isLoginView, setIsLoginView] = useState(true);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [githubToken, setGithubTokenForm] = useState('');
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, repositories, lastSync, language } = useAppStore();
+  
+  const { setBackendApiSecret, setBackendUser, language } = useAppStore();
 
-  const handleConnect = async () => {
-    if (!token.trim()) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setError(language === 'zh' ? '请输入用户名和密码' : 'Please enter username and password');
+      return;
+    }
+    if (!isLoginView && !githubToken.trim()) {
       setError(language === 'zh' ? '请输入有效的GitHub token' : 'Please enter a valid GitHub token');
       return;
     }
@@ -19,21 +29,23 @@ export const LoginScreen: React.FC = () => {
     setError('');
 
     try {
-      // Test the token by fetching user info
-      const githubApi = new GitHubApiService(token);
-      const user = await githubApi.getCurrentUser();
-      
-      // If successful, save the token and user info
-      setGitHubToken(token);
-      setUser(user);
-      
-      console.log('Successfully authenticated user:', user);
-    } catch (error) {
-      console.error('Authentication failed:', error);
+      if (isLoginView) {
+        // Login
+        const response = await authService.login(username, password);
+        setBackendApiSecret(response.token);
+        setBackendUser(response.user);
+      } else {
+        // Register
+        const response = await authService.register(username, password, githubToken);
+        setBackendApiSecret(response.token);
+        setBackendUser(response.user);
+      }
+    } catch (err) {
+      console.error('Authentication failed:', err);
       setError(
-        error instanceof Error 
-          ? error.message 
-          : (language === 'zh' ? '认证失败，请检查您的token。' : 'Failed to authenticate. Please check your token.')
+        err instanceof Error 
+          ? err.message 
+          : (language === 'zh' ? '认证失败，请检查您的输入。' : 'Failed to authenticate. Please check your inputs.')
       );
     } finally {
       setIsLoading(false);
@@ -42,21 +54,9 @@ export const LoginScreen: React.FC = () => {
 
   const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isLoading) {
-      handleConnect();
-      return;
-    }
-
-    // 兼容桌面端首次登录场景下 Ctrl/Cmd + V 无法触发默认粘贴的问题
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && !isLoading) {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          setToken(text.trim());
-          setError('');
-        }
-      } catch (error) {
-        // 忽略读取剪贴板失败，让浏览器/系统默认行为继续兜底
-        console.warn('Clipboard read failed:', error);
+      if (document.activeElement?.tagName === 'INPUT') {
+        const form = (e.target as HTMLElement).closest('form');
+        form?.requestSubmit();
       }
     }
   };
@@ -78,79 +78,121 @@ export const LoginScreen: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
-          <div className="text-center mb-6">
-            <Github className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {t('连接GitHub', 'Connect with GitHub')}
-            </h2>
-            <p className="text-gray-600 text-sm">
-              {t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}
-            </p>
-          </div>
-
-          {/* 显示缓存状态 */}
-          {repositories.length > 0 && lastSync && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center space-x-2 text-green-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-medium">
-                  {t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}
-                </span>
-              </div>
-              <p className="text-xs text-green-600 mt-1">
-                {t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                GitHub Personal Access Token
-              </label>
-              <div className="relative">
-                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="password"
-                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                  value={token}
-                  onChange={(e) => {
-                    setToken(e.target.value);
-                    setError(''); // Clear error when user types
-                  }}
-                  onKeyPress={handleKeyPress}
-                  disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            <button 
-              onClick={handleConnect}
-              disabled={isLoading || !token.trim()}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`flex-1 py-4 text-sm font-medium transition-colors ${isLoginView ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+              onClick={() => { setIsLoginView(true); setError(''); }}
             >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{t('连接中...', 'Connecting...')}</span>
-                </>
-              ) : (
-                <>
-                  <span>{t('连接到GitHub', 'Connect to GitHub')}</span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
+              {t('登录', 'Login')}
+            </button>
+            <button
+              className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLoginView ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+              onClick={() => { setIsLoginView(false); setError(''); }}
+            >
+              {t('注册', 'Register')}
             </button>
           </div>
+
+          <div className="p-8">
+            <div className="text-center mb-6">
+              <Github className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                {isLoginView ? t('欢迎回来', 'Welcome Back') : t('创建账号', 'Create Account')}
+              </h2>
+              <p className="text-gray-600 text-sm">
+                {isLoginView 
+                  ? t('登录以管理您的GitHub Stars', 'Login to manage your GitHub Stars')
+                  : t('注册新账号（首个用户将自动成为管理员）', 'Register a new account (First user becomes admin)')}
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('用户名', 'Username')}
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => { setUsername(e.target.value); setError(''); }}
+                    onKeyPress={handleKeyPress}
+                    disabled={isLoading}
+                    autoComplete="username"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('密码', 'Password')}
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    onKeyPress={handleKeyPress}
+                    disabled={isLoading}
+                    autoComplete={isLoginView ? "current-password" : "new-password"}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                </div>
+              </div>
+
+              {!isLoginView && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    GitHub Personal Access Token
+                  </label>
+                  <div className="relative">
+                    <Github className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="password"
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      value={githubToken}
+                      onChange={(e) => { setGithubTokenForm(e.target.value); setError(''); }}
+                      onKeyPress={handleKeyPress}
+                      disabled={isLoading}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                disabled={isLoading || !username.trim() || !password.trim() || (!isLoginView && !githubToken.trim())}
+                className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors mt-6"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>{t('处理中...', 'Processing...')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{isLoginView ? t('登录', 'Login') : t('注册', 'Register')}</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2 text-sm">

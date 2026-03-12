@@ -1,66 +1,73 @@
-# Docker Deployment
+# Docker Deployment (Monolith)
 
-This application can be deployed using Docker with minimal configuration. The Docker setup serves the static frontend files via Nginx and handles CORS properly.
+GitHub Stars Manager is deployed as a single-container **Monolith**. The backend (Express) serves both the API and the static frontend UI.
 
-## Prerequisites
+## 🚀 Quick Start (Docker Hub)
 
-- Docker installed on your system
-- Docker Compose (optional, but recommended)
+The easiest way to run the application is to pull the pre-built image.
 
-## Building and Running with Docker
-
-### Using Docker Compose (Recommended)
+### Using Docker CLI
 
 ```bash
-# Build and start the container
-docker-compose up -d
-
-# The application will be available at http://localhost:8080
+docker run -d \
+  -p 8080:3000 \
+  -v gsm-data:/app/data \
+  --name gsm \
+  banjuer/github-stars-manager:latest
 ```
 
-### Using Docker directly
+### Using Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  app:
+    image: banjuer/github-stars-manager:latest
+    ports:
+      - "8080:3000"
+    volumes:
+      - gsm-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  gsm-data:
+```
+
+---
+
+## 🛠 Advanced Usage
+
+### Local Build
+
+If you want to build the image yourself from source:
 
 ```bash
-# Build the image
 docker build -t github-stars-manager .
-
-# Run the container
-docker run -d -p 8080:80 --name github-stars-manager github-stars-manager
-
-# The application will be available at http://localhost:8080
+docker run -d -p 8080:3000 -v $(pwd)/data:/app/data github-stars-manager
 ```
 
-## CORS Handling
+### Persistence & Volumes
 
-This Docker setup handles CORS in two ways:
+The application stores all data in a SQLite database located at `/app/data/data.db`.
+- **Always** mount a volume to `/app/data` to ensure your library, users, and settings are preserved across container restarts.
 
-1. **Nginx CORS Headers**: The Nginx configuration adds appropriate CORS headers to allow API calls to external services.
+### Environment Variables
 
-2. **Client-Side Handling**: The application is designed to work with any AI or WebDAV service URL configured by the user, without requiring proxying.
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Port internal to container (default: 3000). Usually mapped to 8080. |
+| `API_SECRET` | JWT signing secret (optional). |
+| `ENCRYPTION_KEY` | 32-byte key for sensitive data (auto-generated if missing). |
+| `DB_PATH` | Path to the SQLite DB file (default: `/app/data/data.db`). |
 
-## Configuration
+### Multi-Platform Support
 
-No special configuration is needed for the Docker container itself. All application settings (API URLs, credentials, etc.) are configured through the application UI.
+The Docker Hub image (`banjuer/github-stars-manager`) is built for both `linux/amd64` and `linux/arm64` (Apple Silicon, Raspberry Pi, etc.).
 
-## Environment Variables
+---
 
-While not required, you can pass environment variables to the container if needed:
+## 🔒 Security
 
-```bash
-docker run -d -p 8080:80 -e NODE_ENV=production --name github-stars-manager github-stars-manager
-```
-
-## Stopping the Container
-
-```bash
-# With Docker Compose
-docker-compose down
-
-# With Docker directly
-docker stop github-stars-manager
-docker rm github-stars-manager
-```
-
-## Note on Desktop Packaging
-
-This Docker setup does not affect the existing desktop packaging workflows. The GitHub Actions workflow for building desktop applications remains unchanged and continues to work as before.
+- **JWT Authentication**: The monolith handles session security via JWT.
+- **First Run**: The first user to register becomes the **SuperAdmin**.
+- **Container Isolation**: No external dependencies (like Nginx) are required as Express handles routing and static file serving.

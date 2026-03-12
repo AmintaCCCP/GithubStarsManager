@@ -1,23 +1,45 @@
 import { Repository, Release, GitHubUser } from '../types';
-
-const GITHUB_API_BASE = 'https://api.github.com';
+import { backend } from './backendAdapter';
 
 export class GitHubApiService {
-  private token: string;
+  constructor() {}
 
-  constructor(token: string) {
-    this.token = token;
+  private getAuthHeaders(): Record<string, string> {
+    const storeData = localStorage.getItem('github-stars-manager');
+    let secret = '';
+    if (storeData) {
+      try {
+        const parsed = JSON.parse(storeData);
+        secret = parsed.state?.backendApiSecret || '';
+      } catch { /* ignore */ }
+    }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (secret) {
+      headers['Authorization'] = `Bearer ${secret}`;
+    }
+    return headers;
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...options.headers,
-      },
+    const url = backend.backendUrl;
+    if (!url) throw new Error('Backend not available');
+
+    // Remove leading slash for proxy path matching
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    const [path, search] = cleanEndpoint.split('?');
+    const targetUrl = `${url}/proxy/github/${path}${search ? '?' + search : ''}`;
+
+    const proxyBody = {
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(proxyBody)
     });
 
     if (!response.ok) {

@@ -1,25 +1,23 @@
-import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { config } from '../config.js';
 
-let warnedOnce = false;
+const JWT_SECRET = config.encryptionKey || 'fallback_secret_for_dev_only';
+
+// Extend Express Request to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        username: string;
+        role: string;
+      };
+    }
+  }
+}
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Skip auth for health check
-  if (req.method === 'GET' && req.path === '/health') {
-    next();
-    return;
-  }
-
-  // Dev mode: no API_SECRET set
-  if (!config.apiSecret) {
-    if (!warnedOnce) {
-      console.warn('⚠️  API_SECRET not set — auth disabled (dev mode)');
-      warnedOnce = true;
-    }
-    next();
-    return;
-  }
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -29,14 +27,15 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   const token = authHeader.slice(7);
 
-  // Constant-time comparison
-  const tokenBuf = Buffer.from(token);
-  const secretBuf = Buffer.from(config.apiSecret);
-
-  if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
-    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
-    return;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    req.user = {
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role
+    };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
   }
-
-  next();
 }

@@ -20,6 +20,8 @@ interface AppActions {
   addAIConfig: (config: AIConfig) => void;
   updateAIConfig: (id: string, updates: Partial<AIConfig>) => void;
   deleteAIConfig: (id: string) => void;
+  setBackendApiSecret: (secret: string | null) => void;
+  setBackendUser: (user: { id: number; username: string; role: string; apprise_url: string | null } | null) => void;
   setActiveAIConfig: (id: string | null) => void;
   setAIConfigs: (configs: AIConfig[]) => void;
   
@@ -54,7 +56,7 @@ interface AppActions {
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
-  setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
+  setCurrentView: (view: 'repositories' | 'releases' | 'settings' | 'admin') => void;
   setLanguage: (language: 'zh' | 'en') => void;
   
   // Update actions
@@ -64,8 +66,7 @@ interface AppActions {
   // Update Analysis Progress
   setAnalysisProgress: (newProgress: AnalysisProgress) => void;
 
-  // Backend actions
-  setBackendApiSecret: (secret: string | null) => void;
+  // No manual sync actions needed in monolith
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -83,7 +84,6 @@ type PersistedAppState = Partial<
   Pick<
     AppState,
     | 'user'
-    | 'githubToken'
     | 'isAuthenticated'
     | 'repositories'
     | 'lastSync'
@@ -98,10 +98,14 @@ type PersistedAppState = Partial<
     | 'theme'
     | 'language'
     | 'searchFilters'
+    | 'backendApiSecret'
+    | 'backendUser'
   >
 > & {
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
+  backendApiSecret?: string | null;
+  backendUser?: { id: number; username: string; role: string; apprise_url: string | null } | null;
 };
 
 const normalizeNumberSet = (value: unknown): Set<number> => {
@@ -145,7 +149,7 @@ const normalizePersistedState = (
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     assetFilters: Array.isArray(safePersisted.assetFilters) ? safePersisted.assetFilters : [],
     language: safePersisted.language || 'zh',
-    isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
+    isAuthenticated: !!safePersisted.backendApiSecret,
   };
 };
 
@@ -238,7 +242,7 @@ const defaultCategories: Category[] = [
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -263,7 +267,9 @@ export const useAppStore = create<AppState & AppActions>()(
       language: 'zh',
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
+      backendUser: null,
       backendApiSecret: null,
+      isBackendAvailable: false,
 
       // Auth actions
       setUser: (user) => {
@@ -277,6 +283,8 @@ export const useAppStore = create<AppState & AppActions>()(
       logout: () => set({
         user: null,
         githubToken: null,
+        backendApiSecret: null,
+        backendUser: null,
         isAuthenticated: false,
         repositories: [],
         releases: [],
@@ -329,6 +337,8 @@ export const useAppStore = create<AppState & AppActions>()(
         aiConfigs: state.aiConfigs.filter(config => config.id !== id),
         activeAIConfig: state.activeAIConfig === id ? null : state.activeAIConfig
       })),
+      setBackendApiSecret: (secret) => set({ backendApiSecret: secret, isAuthenticated: !!secret }),
+      setBackendUser: (user) => set({ backendUser: user }),
       setActiveAIConfig: (activeAIConfig) => set({ activeAIConfig }),
       setAIConfigs: (aiConfigs) => set({ aiConfigs }),
 
@@ -419,7 +429,6 @@ export const useAppStore = create<AppState & AppActions>()(
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
       setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
-      setBackendApiSecret: (backendApiSecret) => set({ backendApiSecret }),
     }),
     {
       name: 'github-stars-manager',
@@ -428,8 +437,7 @@ export const useAppStore = create<AppState & AppActions>()(
       partialize: (state) => ({
         // 持久化用户信息和认证状态
         user: state.user,
-        githubToken: state.githubToken,
-        isAuthenticated: state.isAuthenticated,
+        isAuthenticated: !!state.backendApiSecret,
 
         // 持久化仓库数据
         repositories: state.repositories,
@@ -459,7 +467,9 @@ export const useAppStore = create<AppState & AppActions>()(
         theme: state.theme,
         language: state.language,
 
-        // backendApiSecret: 保留在内存中，不持久化（安全考虑）
+        // 持久化后端会话
+        backendApiSecret: state.backendApiSecret,
+        backendUser: state.backendUser as any,
 
         // 持久化搜索排序设置
         searchFilters: {

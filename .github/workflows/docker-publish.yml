@@ -6,8 +6,7 @@ on:
       - 'v*'
 
 env:
-  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/github-stars-manager
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/github-stars-manager-server
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/github-stars-manager
 
 jobs:
   build-and-push:
@@ -33,7 +32,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push frontend image
+      - name: Build and push monolith image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -41,20 +40,7 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.FRONTEND_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.DOCKER_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

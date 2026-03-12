@@ -6,7 +6,7 @@
 
 ![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![全平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white)
 
-一个基于AI的GitHub星标仓库管理工具，帮助您更好地组织和管理您的GitHub星标项目。
+基于 AI 的智能 GitHub 星标仓库管理工具。优化了大规模星标收藏、软件发现和版本追踪体验。
 
 <a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI&#0032;organizes&#0032;GitHub&#0032;stars&#0032;for&#0032;easy&#0032;find | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
@@ -14,105 +14,109 @@
 
 中文 | **[English](README.md)**
 
-## 功能特性
+## ✨ 功能特性
 
-### 🤖 AI智能分析
-- 自动分析仓库内容并生成中文摘要
-- 智能提取项目标签和支持平台
-- 基于AI的自然语言搜索功能
+- **🚀 单体架构 (Monolith)**: 单容器部署，后端在 3000 端口（映射至 8080）同时提供前端界面和 API。
+- **📱 PWA 支持**: 支持作为桌面或手机 App 安装，获得原生应用体验。
+- **🤖 AI 智能分析**: 自动生成仓库摘要，智能提取项目标签。
+- **📂 智能分类**: 支持基于 AI 的自动分类和自定义文件夹管理。
+- **🔔 Release 追踪**: 订阅仓库更新，并通过 **Apprise** 接收推送通知。
+- **🔍 语义搜索**: 支持通过自然语言意图搜索仓库（按 `回车` 触发）。
+- **👥 多用户支持**: 支持 JWT 认证下的多用户数据隔离及超级管理员权限。
+- **💾 本地持久化**: 所有数据存储在服务端的 `/app/data/data.db` (SQLite)。
 
-### 📂 智能分类管理
-- 预设14个常用应用分类
-- 支持自定义分类创建和管理
-- 基于AI标签的自动分类匹配
+## 🚀 快速开始 (部署)
 
-### ⭐ 星标仓库管理
+### 🐳 使用 Docker 运行 (推荐)
 
-自动拉取您GitHub账户下的星标仓库，通过AI自动分析并生成仓库描述、标签和分类。支持过滤、关键词搜索，快速定位任意仓库。
+您可以直接从 Docker Hub 拉取预构建的镜、，快速启动应用。
 
-![SCR-20250629-qkjk](upload/repo.jpg)
+#### 方式 1: Docker CLI (最快)
 
-### 🔔 Release订阅追踪
-- 订阅感兴趣仓库的Release更新
-- 智能解析下载链接和支持平台
-- Release时间线视图和已读状态管理
-
-订阅星标仓库的发布通知，文件发布后即可快速查看和下载。
-
-![SCR-20250629-qkea](upload/release.jpg)
-
-### 🔍 强大的搜索功能
-- AI驱动的自然语言搜索
-- 多维度过滤（语言、平台、标签、状态）
-- 高级搜索和排序选项
-
-### 💾 数据备份同步
-- WebDAV云存储备份支持
-- 跨设备数据同步
-- 本地数据持久化存储
-
-### 🎨 现代化界面
-- 响应式设计，支持移动端
-- 深色/浅色主题切换
-- 中英文双语支持
-
-### 🖥️ 可选后端服务
-- 可选的 Express + SQLite 后端，支持跨设备数据同步
-- AI 和 WebDAV 请求通过服务器代理，避免浏览器 CORS 限制
-- API 密钥加密存储在服务器，增强安全性
-
-### 🤖 自定义AI模型
-
-使用您自己的AI模型API，支持OpenAI兼容接口。
-
-![SCR-20250629-qldc](upload/SCR-20250629-qldc.png)
-
-## 技术栈
-
-- **前端**: React 18 + TypeScript + Tailwind CSS
-- **状态管理**: Zustand
-- **图标**: Lucide React + Font Awesome
-- **构建工具**: Vite
-- **部署**: Netlify
-
-## 💻 桌面客户端（推荐）
-
-直接下载桌面客户端，无需配置环境：
-
-https://github.com/AmintaCCCP/GithubStarsManager/releases
-
-## 快速开始
-
-### 1. 克隆项目
 ```bash
-git clone https://github.com/AmintaCCCP/GithubStarsManager.git
-cd GithubStarsManager
+docker run -d -p 8080:3000 \
+  -v gsm-data:/app/data \
+  --name gsm \
+  banjuer/github-stars-manager:latest
 ```
 
-### 2. 安装依赖
-```bash
-npm install
+#### 方式 2: Docker Compose
+
+创建 `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  app:
+    image: banjuer/github-stars-manager:latest
+    ports:
+      - "8080:3000"
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
 ```
 
-### 3. 启动开发服务器
+运行:
 ```bash
-npm run dev
+docker-compose up -d
 ```
 
-> 💡 本地使用 `npm run dev` 运行项目时，AI 服务和 WebDAV 的调用可能因浏览器 CORS 限制而失败。建议使用预编译客户端，或启动后端服务器（`cd server && npm run dev`）代理 API 请求以完全避免 CORS 问题。
+- **访问地址**: `http://localhost:8080`
+- **初始化**: 第一个注册的用户将自动成为 **超级管理员 (SuperAdmin)**。
+- **持久化**: 数据保存在 `app-data` 卷中。
 
-### 4. 构建生产版本
-```bash
-npm run build
-```
+---
 
-## 🤖 AI服务配置
+### 💻 桌面客户端
 
-应用支持多种AI服务提供商：
+可以直接下载适用于 Windows、macOS 和 Linux 的预构建客户端：
+[最新版本下载](https://github.com/AmintaCCCP/GithubStarsManager/releases)
 
-- **OpenAI**: GPT-3.5/GPT-4
-- **Anthropic**: Claude
-- **本地部署**: Ollama等本地AI服务
+### 📲 渐进式 Web 应用 (PWA)
+
+在服务器部署后（如通过 Docker），使用 Chrome 或 Edge 浏览器访问。点击地址栏的 **安装图标**，即可将应用添加到桌面或手机主屏幕。
+
+---
+
+## 🛠 技术栈
+
+- **前端**: React 18 + TypeScript + Vite + Tailwind CSS
+- **PWA**: `vite-plugin-pwa`
+- **后端**: Node.js + Express + SQLite
+- **通知系统**: Apprise 集成
+- **自动化**: node-cron 后台任务监控 Release 更新
+
+## 📊 核心特性展示
+
+### 星标仓库管理
+AI 自动分析仓库质量，生成摘要，匹配您的兴趣。
+![仓库管理](upload/repo.jpg)
+
+### Release 监控
+不错过任何工具更新。订阅后通过 Apprise 接收实时推送。
+![Release 追踪](upload/release.jpg)
+
+### AI 服务配置
+支持 OpenAI, Claude, Ollama 以及任何兼容 OpenAI 规范的 API 提供商。
+![AI 配置](upload/SCR-20250629-qldc.png)
+
+## 🤖 开发与调试
+
+1. **克隆**: `git clone ...`
+2. **安装**: `npm install && cd server && npm install`
+3. **运行**: 在根目录运行 `npm run dev:all` (前端访问 5174, 已配置代理至后端 3000)。
+
+---
+
+## 目标用户
+
+- 拥有 1000+ 星标，难以查找旧项目的开发者。
+- 需要系统化追踪软件发布版本的用户。
+- 希望利用 AI 辅助管理和发现工具的效率爱好者。
+ Ollama等本地AI服务
 - **其他**: 任何兼容OpenAI API的服务
 
 在设置页面中配置您的AI服务：
@@ -153,42 +157,20 @@ npm run build
 - 自建服务器
 
 ### Docker 部署
-您也可以使用 Docker 来运行此应用程序。请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
-
-### 🖥️ 后端服务器（可选）
-
-应用在没有后端的情况下也能完整运行（纯前端，使用 localStorage）。可选的 Express + SQLite 后端提供以下额外功能：
-
-- **跨设备同步**: 在不同浏览器和设备间共享数据
-- **无 CORS 代理**: AI 和 WebDAV 请求通过服务器转发，避免浏览器 CORS 限制
-- **令牌安全**: API 密钥加密存储在服务器，不会暴露在浏览器网络请求中
+您也可以使用 Docker 来运行此应用程序。请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 API 代理，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务。
 
 #### 快速启动（推荐使用 Docker）
 ```bash
-docker-compose up --build
+docker run -d -p 8080:3000 banjuer/github-stars-manager:latest
 ```
-前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。
-
-#### 手动启动
-```bash
-cd server
-npm install
-npm run dev
-```
+访问 `http://localhost:8080` 即可。第一个用户注册即为管理员。
 
 #### 环境变量
 | 变量 | 必填 | 说明 |
 |----------|----------|-------------|
-| `API_SECRET` | 否 | API 认证令牌。未设置时禁用认证。 |
+| `API_SECRET` | 否 | JWT 签名密钥（如不设置将使用默认值）。 |
 | `ENCRYPTION_KEY` | 否 | 用于加密存储密钥的 AES-256 密钥。未设置时自动生成。 |
 | `PORT` | 否 | 服务器端口（默认：3000） |
-
-#### 前端连接后端
-1. 打开应用中的设置面板
-2. 找到「后端服务器」部分
-3. 输入 API Secret（如已配置）
-4. 点击「测试连接」，绿色指示灯表示连接成功
-5. 使用「同步到后端」/「从后端同步」来传输数据
 
 ## 目标用户
 

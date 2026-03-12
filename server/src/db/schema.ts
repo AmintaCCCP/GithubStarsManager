@@ -7,10 +7,20 @@ export function initializeSchema(db: Database.Database): void {
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'User',
+      apprise_url TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS repositories (
       id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
-      full_name TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
       description TEXT,
       html_url TEXT NOT NULL,
       stargazers_count INTEGER DEFAULT 0,
@@ -31,11 +41,13 @@ export function initializeSchema(db: Database.Database): void {
       custom_tags TEXT,
       custom_category TEXT,
       last_edited TEXT,
-      subscribed_to_releases INTEGER DEFAULT 0
+      subscribed_to_releases INTEGER DEFAULT 0,
+      UNIQUE(user_id, full_name)
     );
 
     CREATE TABLE IF NOT EXISTS releases (
       id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       tag_name TEXT NOT NULL,
       name TEXT,
       body TEXT,
@@ -52,6 +64,7 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       icon TEXT NOT NULL DEFAULT '📁',
       keywords TEXT,
@@ -60,6 +73,7 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS ai_configs (
       id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       api_type TEXT DEFAULT 'openai',
       base_url TEXT NOT NULL,
@@ -73,6 +87,7 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS webdav_configs (
       id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       url TEXT NOT NULL,
       username TEXT NOT NULL,
@@ -83,13 +98,17 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS asset_filters (
       id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       keywords TEXT
     );
 
     CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
+      key TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      value TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, key)
     );
   `);
 }

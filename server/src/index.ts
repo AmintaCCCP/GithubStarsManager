@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'node:path';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
+import authRouter from './routes/auth.js';
 import healthRouter from './routes/health.js';
 import repositoriesRouter from './routes/repositories.js';
 import releasesRouter from './routes/releases.js';
@@ -14,6 +16,8 @@ import categoriesRouter from './routes/categories.js';
 import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
+import adminRouter from './routes/admin.js';
+import { startReleaseMonitor } from './services/releaseMonitor.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -24,11 +28,12 @@ export function createApp(): express.Express {
   app.use(morgan('combined'));
   app.use(express.json({ limit: '50mb' }));
 
-  // Auth middleware for all /api/* except /api/health
-  app.use('/api', authMiddleware);
+  // Public routes (no auth required)
+  app.use('/api', healthRouter);
+  app.use('/api/auth', authRouter);
 
-  // Routes
-  app.use(healthRouter);
+  // Auth middleware for all subsequent /api/* routes
+  app.use('/api', authMiddleware);
 
   // Wave 2: Data CRUD routes
   app.use(repositoriesRouter);
@@ -40,8 +45,21 @@ export function createApp(): express.Express {
   // Wave 3: Proxy routes
   app.use(proxyRouter);
 
+  // Admin routes
+  app.use(adminRouter);
+
   // Global error handler
   app.use(errorHandler);
+
+  // Serve static UI in production
+  const __dirname = path.dirname(new URL(import.meta.url).pathname);
+  const frontendDistPath = path.resolve(__dirname, '../../dist');
+  app.use(express.static(frontendDistPath));
+
+  // Handle SPA routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
 
   return app;
 }
@@ -51,6 +69,9 @@ function startServer(): void {
   const db = getDb();
   runMigrations(db);
   console.log('✅ Database initialized');
+
+  // Start background services
+  startReleaseMonitor();
 
   const app = createApp();
 
