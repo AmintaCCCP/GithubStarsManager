@@ -4,6 +4,7 @@ import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
+import { forceSyncToBackend } from '../services/autoSync';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 
@@ -333,6 +334,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       const [owner, repo] = repository.full_name.split('/');
       await githubApi.unstarRepository(owner, repo);
       deleteRepository(repository.id);
+      await forceSyncToBackend();
       const successMessage = language === 'zh'
         ? '已成功取消 Star'
         : 'Successfully unstarred';
@@ -349,7 +351,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 animate-slide-up flex flex-col h-full">
+    <div className="repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full">
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
         <img
