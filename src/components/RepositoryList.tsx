@@ -34,6 +34,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
+  const savedScrollYRef = useRef<number | null>(null);
+  const restoreScrollFrameRef = useRef<number | null>(null);
   
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
@@ -150,11 +152,35 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   useEffect(() => {
     const handleSyncVisualState = (event: Event) => {
       const customEvent = event as CustomEvent<{ isSyncing?: boolean }>;
-      setDisableCardAnimations(!!customEvent.detail?.isSyncing);
+      const isSyncing = !!customEvent.detail?.isSyncing;
+      setDisableCardAnimations(isSyncing);
+
+      if (isSyncing) {
+        savedScrollYRef.current = window.scrollY;
+        if (restoreScrollFrameRef.current !== null) {
+          cancelAnimationFrame(restoreScrollFrameRef.current);
+          restoreScrollFrameRef.current = null;
+        }
+        return;
+      }
+
+      const targetScrollY = savedScrollYRef.current;
+      if (targetScrollY === null) return;
+
+      restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
+        restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
+          window.scrollTo({ top: targetScrollY, behavior: 'auto' });
+          restoreScrollFrameRef.current = null;
+          savedScrollYRef.current = null;
+        });
+      });
     };
 
     window.addEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
     return () => {
+      if (restoreScrollFrameRef.current !== null) {
+        cancelAnimationFrame(restoreScrollFrameRef.current);
+      }
       window.removeEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
     };
   }, []);
