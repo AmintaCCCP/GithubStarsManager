@@ -34,6 +34,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
+  const previousCategoryRef = useRef(selectedCategory);
   const savedScrollYRef = useRef<number | null>(null);
   const restoreScrollFrameRef = useRef<number | null>(null);
   
@@ -117,6 +118,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   useEffect(() => {
     setVisibleCount(LOAD_BATCH);
   }, [filterResetKey]);
+
+  useEffect(() => {
+    if (previousCategoryRef.current !== selectedCategory) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      previousCategoryRef.current = selectedCategory;
+    }
+  }, [selectedCategory]);
 
   // Clamp visible count when result set becomes smaller, but do not collapse
   // back to the initial batch during backend sync refreshes.
