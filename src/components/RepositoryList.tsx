@@ -33,6 +33,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
@@ -112,6 +113,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     observer.observe(node);
     return () => observer.disconnect();
   }, [filteredRepositories.length]);
+
+  useEffect(() => {
+    const handleSyncVisualState = (event: Event) => {
+      const customEvent = event as CustomEvent<{ isSyncing?: boolean }>;
+      setDisableCardAnimations(!!customEvent.detail?.isSyncing);
+    };
+
+    window.addEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
+    return () => {
+      window.removeEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
+    };
+  }, []);
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
@@ -467,7 +480,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         {/* Statistics */}
         <div className="text-sm text-gray-500 dark:text-gray-400">
           <div className="flex items-center justify-between">
-            <div>
+    <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
               {t(
                 `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
                 `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`

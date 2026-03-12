@@ -20,3 +20,9 @@
 .hd-btns {
   -webkit-app-region: no-drag;
 }
+
+.repository-list-syncing .repository-card,
+.repository-list-syncing .repository-card * {
+  animation: none !important;
+  transition: none !important;
+}
