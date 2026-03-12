@@ -528,7 +528,7 @@ export const SearchBar: React.FC = () => {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
       {/* Search Input */}
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -546,7 +546,7 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="w-full pl-10 pr-40 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
         />
 
         {/* Search History Dropdown */}
@@ -604,7 +604,7 @@ export const SearchBar: React.FC = () => {
               ))}
           </div>
         )}
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 sm:space-x-2">
           {searchQuery && (
             <button
               onClick={handleClearSearch}
@@ -617,11 +617,11 @@ export const SearchBar: React.FC = () => {
           <button
             onClick={handleAISearch}
             disabled={isSearching}
-            className="flex items-center space-x-1 px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
+            className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
             title={t('使用AI进行语义搜索和智能排序', 'Use AI for semantic search and intelligent ranking')}
           >
             <Bot className="w-4 h-4" />
-            <span>{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
+            <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
           </button>
         </div>
       </div>
@@ -651,8 +651,8 @@ export const SearchBar: React.FC = () => {
       )}
 
       {/* Filter Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
@@ -683,7 +683,7 @@ export const SearchBar: React.FC = () => {
         </div>
 
         {/* Sort Controls */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <select
             value={searchFilters.sortBy}
             onChange={(e) => setSearchFilters({ 
@@ -849,7 +849,7 @@ export const SearchBar: React.FC = () => {
             <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
               {t('Star数量范围', 'Star Count Range')}
             </h4>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 sm:gap-4">
               <div className="flex items-center space-x-2">
                 <label className="text-sm text-gray-600 dark:text-gray-400">
                   {t('最小:', 'Min:')}
