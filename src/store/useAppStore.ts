@@ -71,6 +71,7 @@ interface AppActions {
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
   setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
+  setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
   
   // Update actions
@@ -112,6 +113,8 @@ type PersistedAppState = Partial<
     | 'customCategories'
     | 'assetFilters'
     | 'theme'
+    | 'currentView'
+    | 'selectedCategory'
     | 'language'
     | 'searchFilters'
   >
@@ -276,6 +279,7 @@ export const useAppStore = create<AppState & AppActions>()(
       assetFilters: [],
       theme: 'light',
       currentView: 'repositories',
+      selectedCategory: 'all',
       language: 'zh',
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
@@ -429,6 +433,7 @@ export const useAppStore = create<AppState & AppActions>()(
       // UI actions
       setTheme: (theme) => set({ theme }),
       setCurrentView: (currentView) => set({ currentView }),
+      setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),
       
       // Update actions
@@ -476,6 +481,8 @@ export const useAppStore = create<AppState & AppActions>()(
 
         // 持久化UI设置
         theme: state.theme,
+        currentView: state.currentView,
+        selectedCategory: state.selectedCategory,
         language: state.language,
 
         // backendApiSecret: 保留在内存中，不持久化（安全考虑）
