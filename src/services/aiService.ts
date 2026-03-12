@@ -106,8 +106,14 @@ export class AIService {
           if (text) return text;
         }
       } else {
-        const content = data?.choices?.[0]?.message?.content;
+        const message = data?.choices?.[0]?.message;
+        const content = typeof message?.content === 'string' ? message.content : '';
         if (content) return content;
+
+        const reasoningContent = typeof message?.reasoning_content === 'string'
+          ? message.reasoning_content
+          : '';
+        if (reasoningContent) return reasoningContent;
       }
 
       throw new Error('No content received from AI service');
