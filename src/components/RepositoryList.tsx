@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 
@@ -85,12 +85,45 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const startIndex = filteredRepositories.length === 0 ? 0 : 1;
   const endIndex = Math.min(visibleCount, filteredRepositories.length);
   const visibleRepositories = filteredRepositories.slice(0, visibleCount);
+  const filterResetKey = useMemo(() => JSON.stringify({
+    selectedCategory,
+    query: searchFilters.query,
+    languages: searchFilters.languages,
+    tags: searchFilters.tags,
+    platforms: searchFilters.platforms,
+    sortBy: searchFilters.sortBy,
+    sortOrder: searchFilters.sortOrder,
+    minStars: searchFilters.minStars,
+    maxStars: searchFilters.maxStars,
+    isAnalyzed: searchFilters.isAnalyzed,
+    isSubscribed: searchFilters.isSubscribed,
+  }), [
+    selectedCategory,
+    searchFilters.query,
+    searchFilters.languages,
+    searchFilters.tags,
+    searchFilters.platforms,
+    searchFilters.sortBy,
+    searchFilters.sortOrder,
+    searchFilters.minStars,
+    searchFilters.maxStars,
+    searchFilters.isAnalyzed,
+    searchFilters.isSubscribed,
+  ]);
 
-  // Reset visible count when filters or data change
+  // Reset visible count only when filter context changes.
   useEffect(() => {
     setVisibleCount(LOAD_BATCH);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, repositories, filteredRepositories.length]);
+  }, [filterResetKey]);
+
+  // Clamp visible count when result set becomes smaller, but do not collapse
+  // back to the initial batch during backend sync refreshes.
+  useEffect(() => {
+    setVisibleCount((count) => {
+      if (filteredRepositories.length === 0) return LOAD_BATCH;
+      return Math.min(count, filteredRepositories.length);
+    });
+  }, [filteredRepositories.length]);
 
   // IntersectionObserver to load more on demand
   useEffect(() => {
