@@ -8,7 +8,6 @@ services:
     ports:
       - "8080:3000"
     environment:
-      - API_SECRET=${API_SECRET:-}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
     volumes:
       - app-data:/app/data

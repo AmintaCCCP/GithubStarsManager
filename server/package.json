@@ -1,6 +1,6 @@
 {
   "name": "github-stars-manager-server",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,13 +12,14 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

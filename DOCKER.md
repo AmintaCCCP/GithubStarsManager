@@ -56,7 +56,6 @@ The application stores all data in a SQLite database located at `/app/data/data.
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Port internal to container (default: 3000). Usually mapped to 8080. |
-| `API_SECRET` | JWT signing secret (optional). |
 | `ENCRYPTION_KEY` | 32-byte key for sensitive data (auto-generated if missing). |
 | `DB_PATH` | Path to the SQLite DB file (default: `/app/data/data.db`). |
 

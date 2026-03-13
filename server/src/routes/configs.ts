@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { sendNotification } from '../services/notification.js';
+import { getUserTasks, updateUserTask, getNotificationPreferences, updateNotificationPreferences } from '../services/scheduler.js';
 
 const router = Router();
 
@@ -448,6 +450,111 @@ router.put('/api/settings', (req, res) => {
   } catch (err) {
     console.error('PUT /api/settings error:', err);
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });
+  }
+});
+
+// POST /api/notifications/test
+router.post('/api/notifications/test', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { url } = req.body as { url?: string };
+    
+    const db = getDb();
+    let notificationUrl = url;
+    
+    if (!notificationUrl) {
+      const user = db.prepare('SELECT apprise_url FROM users WHERE id = ?').get(userId) as { apprise_url: string | null } | undefined;
+      notificationUrl = user?.apprise_url || undefined;
+    }
+    
+    if (!notificationUrl) {
+      return res.status(400).json({ error: 'No notification URL configured', code: 'NO_NOTIFICATION_URL' });
+    }
+
+    const title = '🧪 Test Notification';
+    const message = 'This is a test notification from GitHub Stars Manager. If you see this, your notification setup is working correctly!';
+    
+    const success = await sendNotification(notificationUrl, title, message);
+    
+    if (success) {
+      res.json({ success: true, message: 'Notification sent successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to send notification', code: 'NOTIFICATION_FAILED' });
+    }
+  } catch (err) {
+    console.error('POST /api/notifications/test error:', err);
+    res.status(500).json({ error: 'Failed to send test notification', code: 'TEST_NOTIFICATION_FAILED' });
+  }
+});
+
+// GET /api/scheduled-tasks
+router.get('/api/scheduled-tasks', (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tasks = getUserTasks(userId);
+    res.json(tasks);
+  } catch (err) {
+    console.error('GET /api/scheduled-tasks error:', err);
+    res.status(500).json({ error: 'Failed to get scheduled tasks' });
+  }
+});
+
+// PUT /api/scheduled-tasks/:taskType
+router.put('/api/scheduled-tasks/:taskType', (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { taskType } = req.params;
+    const updates = req.body as { enabled?: number; cron_expression?: string };
+
+    const task = updateUserTask(userId, taskType, updates);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    res.json(task);
+  } catch (err: any) {
+    console.error('PUT /api/scheduled-tasks error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update scheduled task' });
+  }
+});
+
+// GET /api/notification-preferences
+router.get('/api/notification-preferences', (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const prefs = getNotificationPreferences(userId);
+    res.json(prefs);
+  } catch (err) {
+    console.error('GET /api/notification-preferences error:', err);
+    res.status(500).json({ error: 'Failed to get notification preferences' });
+  }
+});
+
+// PUT /api/notification-preferences
+router.put('/api/notification-preferences', (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const updates = req.body as Partial<{
+      notify_new_release: number;
+      notify_star_added: number;
+      notify_star_removed: number;
+    }>;
+
+    const prefs = updateNotificationPreferences(userId, updates);
+    res.json(prefs);
+  } catch (err) {
+    console.error('PUT /api/notification-preferences error:', err);
+    res.status(500).json({ error: 'Failed to update notification preferences' });
   }
 });
 

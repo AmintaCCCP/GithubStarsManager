@@ -21,7 +21,7 @@ interface AppActions {
   updateAIConfig: (id: string, updates: Partial<AIConfig>) => void;
   deleteAIConfig: (id: string) => void;
   setBackendApiSecret: (secret: string | null) => void;
-  setBackendUser: (user: { id: number; username: string; role: string; apprise_url: string | null } | null) => void;
+  setBackendUser: (user: { id: number; email: string; username: string; role: string; displayName: string | null; avatarUrl: string | null; appriseUrl: string | null } | null) => void;
   setActiveAIConfig: (id: string | null) => void;
   setAIConfigs: (configs: AIConfig[]) => void;
   
@@ -105,7 +105,7 @@ type PersistedAppState = Partial<
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
   backendApiSecret?: string | null;
-  backendUser?: { id: number; username: string; role: string; apprise_url: string | null } | null;
+  backendUser?: { id: number; email: string; username: string; role: string; displayName: string | null; avatarUrl: string | null; appriseUrl: string | null } | null;
 };
 
 const normalizeNumberSet = (value: unknown): Set<number> => {
@@ -242,7 +242,7 @@ const defaultCategories: Category[] = [
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -295,7 +295,15 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
 
       // Repository actions
-      setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
+      setRepositories: (repositories) => {
+        const releaseSubscriptions = new Set<number>();
+        for (const repo of repositories) {
+          if (repo.subscribed_to_releases) {
+            releaseSubscriptions.add(repo.id);
+          }
+        }
+        set({ repositories, searchResults: repositories, releaseSubscriptions });
+      },
       updateRepository: (repo) => set((state) => {
         const updatedRepositories = state.repositories.map(r => r.id === repo.id ? repo : r);
         return {
@@ -372,18 +380,35 @@ export const useAppStore = create<AppState & AppActions>()(
         const uniqueReleases = newReleases.filter(r => !existingIds.has(r.id));
         return { releases: [...state.releases, ...uniqueReleases] };
       }),
-      toggleReleaseSubscription: (repoId) => set((state) => {
-        const newSubscriptions = new Set(state.releaseSubscriptions);
-        const wasSubscribed = newSubscriptions.has(repoId);
+      toggleReleaseSubscription: (repoId) => {
+        const state = get();
+        const wasSubscribed = state.releaseSubscriptions.has(repoId);
+        const newSubscribed = !wasSubscribed;
         
-        if (wasSubscribed) {
-          newSubscriptions.delete(repoId);
-        } else {
-          newSubscriptions.add(repoId);
+        set((state) => {
+          const newSubscriptions = new Set(state.releaseSubscriptions);
+          
+          if (wasSubscribed) {
+            newSubscriptions.delete(repoId);
+          } else {
+            newSubscriptions.add(repoId);
+          }
+          
+          return { releaseSubscriptions: newSubscriptions };
+        });
+        
+        // 同步到后端
+        if (state.isBackendAvailable) {
+          fetch(`/api/repositories/${repoId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...state.backendApiSecret ? { 'Authorization': `Bearer ${state.backendApiSecret}` } : {},
+            },
+            body: JSON.stringify({ subscribed_to_releases: newSubscribed }),
+          }).catch(err => console.error('Failed to sync release subscription:', err));
         }
-        
-        return { releaseSubscriptions: newSubscriptions };
-      }),
+      },
       markReleaseAsRead: (releaseId) => set((state) => {
         const newReadReleases = new Set(state.readReleases);
         newReadReleases.add(releaseId);

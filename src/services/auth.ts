@@ -1,14 +1,14 @@
 import { backend } from './backendAdapter';
 
 class AuthService {
-  async register(username: string, password: string, githubToken: string): Promise<{ token: string; user: { id: number; username: string; role: string; apprise_url: string | null } }> {
+  async register(email: string, password: string, githubToken: string, displayName?: string): Promise<{ token: string; user: { id: number; email: string; username: string; role: string; displayName: string | null } }> {
     const url = backend.backendUrl;
     if (!url) throw new Error('Backend not available');
 
     const res = await fetch(`${url}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, github_token: githubToken }),
+      body: JSON.stringify({ email, password, github_token: githubToken, display_name: displayName }),
     });
 
     if (!res.ok) {
@@ -19,14 +19,14 @@ class AuthService {
     return res.json();
   }
 
-  async login(username: string, password: string): Promise<{ token: string; user: { id: number; username: string; role: string; apprise_url: string | null } }> {
+  async login(email: string, password: string): Promise<{ token: string; user: { id: number; email: string; username: string; role: string; displayName: string | null; avatarUrl: string | null; appriseUrl: string | null } }> {
     const url = backend.backendUrl;
     if (!url) throw new Error('Backend not available');
 
     const res = await fetch(`${url}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (!res.ok) {
@@ -37,7 +37,21 @@ class AuthService {
     return res.json();
   }
 
-  async updateProfile(data: { apprise_url?: string; password?: string }): Promise<{ id: number; username: string; role: string; appriseUrl: string | null }> {
+  async updateProfile(data: { 
+    apprise_url?: string; 
+    password?: string;
+    username?: string;
+    display_name?: string;
+    avatar_url?: string;
+  }): Promise<{ 
+    id: number; 
+    email: string;
+    username: string; 
+    role: string; 
+    displayName: string | null;
+    avatarUrl: string | null;
+    appriseUrl: string | null;
+  }> {
     const url = backend.backendUrl;
     if (!url) throw new Error('Backend not available');
 
@@ -62,6 +76,43 @@ class AuthService {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || 'Profile update failed');
+    }
+
+    return res.json();
+  }
+
+  async getProfile(): Promise<{ 
+    id: number; 
+    email: string;
+    username: string; 
+    role: string; 
+    displayName: string | null;
+    avatarUrl: string | null;
+    appriseUrl: string | null;
+  }> {
+    const url = backend.backendUrl;
+    if (!url) throw new Error('Backend not available');
+
+    const storeData = localStorage.getItem('github-stars-manager');
+    let secret = '';
+    if (storeData) {
+      try {
+        const parsed = JSON.parse(storeData);
+        secret = parsed.state?.backendApiSecret || '';
+      } catch { /* ignore */ }
+    }
+
+    const res = await fetch(`${url}/auth/profile`, {
+      method: 'GET',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${secret}`
+      },
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Profile fetch failed');
     }
 
     return res.json();

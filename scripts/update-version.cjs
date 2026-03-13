@@ -12,7 +12,7 @@ const path = require('path');
  * 
  * 例如: 
  *   node scripts/update-version.cjs 0.1.3 "修复搜索bug" "添加新功能"
- *   node scripts/update-version.cjs 0.1.3 "修复bug" --url="https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.3-fix"
+ *   node scripts/update-version.cjs 0.1.3 "修复bug" --url="https://github.com/banjuer/GithubStarsManager/releases/tag/v0.1.3-fix"
  */
 
 function updateVersionInfo() {
@@ -117,7 +117,7 @@ function updateVersionXML(version, changelog, customDownloadUrl) {
 
   // 生成下载链接
   const downloadUrl = customDownloadUrl || 
-    `https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v${version}/github-stars-manager-${version}.dmg`;
+    `https://github.com/banjuer/GithubStarsManager/releases/download/v${version}/github-stars-manager-${version}.dmg`;
 
   // 解析现有的XML
   const versionEntry = `  <version>
@@ -212,7 +212,7 @@ function showHelp() {
   console.log('');
   console.log('示例:');
   console.log('  node scripts/update-version.cjs 0.1.3 "修复搜索bug" "添加新功能"');
-  console.log('  node scripts/update-version.cjs 0.1.4 "优化性能" --url="https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.1.4-fix"');
+  console.log('  node scripts/update-version.cjs 0.1.4 "优化性能" --url="https://github.com/banjuer/GithubStarsManager/releases/tag/v0.1.4-fix"');
   console.log('  npm run update-version 0.1.5 "修复已知问题" "提升用户体验"');
   console.log('');
   console.log('参数说明:');

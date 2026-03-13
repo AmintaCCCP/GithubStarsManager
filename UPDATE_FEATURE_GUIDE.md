@@ -92,7 +92,7 @@ git push origin main
       <item>优化用户界面</item>
       <item>修复已知bug</item>
     </changelog>
-    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.1.3/github-stars-manager-0.1.3.dmg</downloadUrl>
+    <downloadUrl>https://github.com/banjuer/GithubStarsManager/releases/download/v0.1.3/github-stars-manager-0.1.3.dmg</downloadUrl>
   </version>
 </versions>
 ```

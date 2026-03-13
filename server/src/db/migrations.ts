@@ -50,6 +50,66 @@ const migrations: Record<number, (db: Database.Database) => void> = {
         console.error('Error adding updated_at to settings:', e.message);
       }
     }
+  },
+  4: (db) => {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+          id TEXT PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          task_type TEXT NOT NULL,
+          enabled INTEGER DEFAULT 1,
+          cron_expression TEXT NOT NULL,
+          last_run TEXT,
+          next_run TEXT,
+          UNIQUE(user_id, task_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS notification_preferences (
+          user_id INTEGER PRIMARY KEY,
+          notify_new_release INTEGER DEFAULT 1,
+          notify_star_added INTEGER DEFAULT 1,
+          notify_star_removed INTEGER DEFAULT 1,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+      `);
+
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").all();
+      if (tables.length > 0) {
+        const users = db.prepare('SELECT id FROM users').all() as { id: number }[];
+        const defaultTasks = [
+          { task_type: 'sync_stars', cron_expression: '0 */6 * * *' },
+          { task_type: 'check_releases', cron_expression: '0 * * * *' }
+        ];
+        
+        const insertTask = db.prepare('INSERT OR IGNORE INTO scheduled_tasks (id, user_id, task_type, enabled, cron_expression) VALUES (?, ?, ?, 1, ?)');
+        const insertPref = db.prepare('INSERT OR IGNORE INTO notification_preferences (user_id, notify_new_release, notify_star_added, notify_star_removed) VALUES (?, 1, 1, 1)');
+        
+        for (const user of users) {
+          insertPref.run(user.id);
+          for (const task of defaultTasks) {
+            insertTask.run(`${user.id}_${task.task_type}`, user.id, task.task_type, task.cron_expression);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error('Error in migration v4:', e.message);
+    }
+  },
+  5: (db) => {
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN email TEXT;
+        ALTER TABLE users ADD COLUMN display_name TEXT;
+        ALTER TABLE users ADD COLUMN avatar_url TEXT;
+      `);
+      
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL`);
+    } catch (e: any) {
+      if (!e.message.includes('duplicate column name')) {
+        console.error('Error in migration v5:', e.message);
+      }
+    }
   }
 };
 

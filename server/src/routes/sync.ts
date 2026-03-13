@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { syncStarsManually, checkReleasesManually } from '../services/scheduler.js';
 
 const router = Router();
 
@@ -81,6 +82,34 @@ router.post('/api/sync/export', (_req, res) => {
   } catch (err) {
     console.error('POST /api/sync/export error:', err);
     res.status(500).json({ error: 'Failed to export data', code: 'EXPORT_DATA_FAILED' });
+  }
+});
+
+// POST /api/sync/stars
+router.post('/api/sync/stars', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const result = await syncStarsManually(userId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('POST /api/sync/stars error:', err);
+    res.status(500).json({ error: 'Failed to sync stars', code: 'SYNC_STARS_FAILED' });
+  }
+});
+
+// POST /api/sync/releases
+router.post('/api/sync/releases', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const result = await checkReleasesManually(userId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('POST /api/sync/releases error:', err);
+    res.status(500).json({ error: 'Failed to sync releases', code: 'SYNC_RELEASES_FAILED' });
   }
 });
 

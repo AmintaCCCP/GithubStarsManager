@@ -74,7 +74,7 @@ docker-compose up -d
 ### 💻 Desktop Client
 
 Download pre-built binaries for Windows, macOS, and Linux:
-[Latest Releases](https://github.com/AmintaCCCP/GithubStarsManager/releases)
+[Latest Releases](https://github.com/banjuer/GithubStarsManager/releases)
 
 ### 📲 Progressive Web App (PWA)
 
@@ -139,4 +139,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AmintaCCCP/GithubStarsManager&type=Date)](https://www.star-history.com/#AmintaCCCP/GithubStarsManager&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=banjuer/GithubStarsManager&type=Date)](https://www.star-history.com/#banjuer/GithubStarsManager&Date)

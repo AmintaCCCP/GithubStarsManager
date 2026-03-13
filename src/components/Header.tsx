@@ -1,7 +1,7 @@
-import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Shield } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Shield, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
+import { backend } from '../services/backendAdapter';
 
 export const Header: React.FC = () => {
   const {
@@ -13,8 +13,6 @@ export const Header: React.FC = () => {
     repositories,
     setTheme,
     setCurrentView,
-    setRepositories,
-    setReleases,
     setLoading,
     setLastSync,
     logout,
@@ -22,55 +20,52 @@ export const Header: React.FC = () => {
     backendUser,
   } = useAppStore();
 
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSync = async () => {
     setLoading(true);
     try {
-      const githubApi = new GitHubApiService();
-      
-      // 1. 获取所有starred仓库
-      console.log('Fetching starred repositories...');
-      const newRepositories = await githubApi.getAllStarredRepositories();
-      
-      // 2. 合并现有仓库数据（保留AI分析结果）
-      const existingRepoMap = new Map(repositories.map(repo => [repo.id, repo]));
-      const mergedRepositories = newRepositories.map(newRepo => {
-        const existing = existingRepoMap.get(newRepo.id);
-        if (existing) {
-          // 保留AI分析结果，更新其他信息
-          return {
-            ...newRepo,
-            ai_summary: existing.ai_summary,
-            ai_tags: existing.ai_tags,
-            ai_platforms: existing.ai_platforms,
-            analyzed_at: existing.analyzed_at,
-            analysis_failed: existing.analysis_failed,
-            custom_description: existing.custom_description,
-            custom_tags: existing.custom_tags,
-            custom_category: existing.custom_category,
-            category_locked: existing.category_locked,
-            last_edited: existing.last_edited,
-          };
-        }
-        return newRepo;
+      const response = await fetch('/api/sync/stars', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...backend.getAuthHeaders(),
+        },
       });
-      
-      setRepositories(mergedRepositories);
-      
-      // 3. 获取Release信息
-      console.log('Fetching releases...');
-      const releases = await githubApi.getMultipleRepositoryReleases(mergedRepositories.slice(0, 20));
-      setReleases(releases);
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Sync failed');
+      }
+
+      const result = await response.json();
       
       setLastSync(new Date().toISOString());
-      console.log('Sync completed successfully');
+      await backend.syncSettings({ lastSync: new Date().toISOString() });
       
-      // 显示同步结果
-      const newRepoCount = newRepositories.length - repositories.length;
-      if (newRepoCount > 0) {
-        alert(`同步完成！发现 ${newRepoCount} 个新仓库。`);
+      console.log('Sync completed:', result);
+      
+      if (result.added > 0) {
+        alert(`同步完成！发现 ${result.added} 个新仓库，${result.removed} 个仓库被移除。`);
+      } else if (result.removed > 0) {
+        alert(`同步完成！${result.removed} 个仓库被移除。`);
       } else {
         alert('同步完成！所有仓库都是最新的。');
       }
+      
+      window.location.reload();
     } catch (error) {
       console.error('Sync failed:', error);
       if (error instanceof Error && error.message.includes('token')) {
@@ -97,6 +92,16 @@ export const Header: React.FC = () => {
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const handleSettingsClick = () => {
+    setCurrentView('settings');
+    setShowUserMenu(false);
+  };
+
+  const handleLogoutClick = () => {
+    setShowUserMenu(false);
+    logout();
+  };
 
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 hd-drag">
@@ -145,17 +150,6 @@ export const Header: React.FC = () => {
               <Calendar className="w-4 h-4 inline mr-2" />
               {t('发布', 'Releases')}
             </button>
-            <button
-              onClick={() => setCurrentView('settings')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentView === 'settings'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Settings className="w-4 h-4 inline mr-2" />
-              {t('设置', 'Settings')}
-            </button>
             {backendUser?.role === 'SuperAdmin' && (
               <button
                 onClick={() => setCurrentView('admin')}
@@ -199,26 +193,70 @@ export const Header: React.FC = () => {
               )}
             </button>
 
-            {/* User Profile */}
-            {user && (
-              <div className="flex items-center space-x-3">
-                <img
-                  src={user.avatar_url}
-                  alt={user.name || user.login}
-                  className="w-8 h-8 rounded-full"
-                />
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user.name || user.login}
-                  </p>
-                </div>
-                <button
-                  onClick={logout}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  title={t('退出登录', 'Logout')}
+            {/* User Profile with Dropdown */}
+            {(user || backendUser) && (
+              <div 
+                className="relative"
+                ref={userMenuRef}
+                onMouseEnter={() => setShowUserMenu(true)}
+                onMouseLeave={() => setShowUserMenu(false)}
+              >
+                <button 
+                  className="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
                 >
-                  <LogOut className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                  {user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name || user.login}
+                      className="w-8 h-8 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">
+                        {(backendUser?.username || 'U').charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {user?.name || user?.login || backendUser?.username || 'User'}
+                    </p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                 </button>
+
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                    <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {user?.name || user?.login || backendUser?.username || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.login || backendUser?.username || ''}
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={handleSettingsClick}
+                      className="w-full flex items-center space-x-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>{t('设置', 'Settings')}</span>
+                    </button>
+                    
+                    <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                    
+                    <button
+                      onClick={handleLogoutClick}
+                      className="w-full flex items-center space-x-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>{t('退出登录', 'Logout')}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

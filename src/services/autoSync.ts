@@ -131,6 +131,9 @@ export async function syncFromBackend(): Promise<void> {
       if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
         state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
       }
+      if (typeof settings.lastSync === 'string' || settings.lastSync === null) {
+        state.setLastSync(settings.lastSync as string | null);
+      }
       _lastHash.settings = hashes.settings;
     }
 
@@ -175,6 +178,7 @@ export async function syncToBackend(): Promise<void> {
       backend.syncSettings({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        lastSync: state.lastSync,
       }),
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;
@@ -195,6 +199,7 @@ export async function syncToBackend(): Promise<void> {
       _lastHash.settings = quickHash({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        lastSync: state.lastSync,
       });
     }
   } catch (err) {

@@ -166,14 +166,9 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    if (!githubToken) {
-      alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
-      return;
-    }
-
     setIsRefreshing(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = new GitHubApiService();
       const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
       
       if (subscribedRepos.length === 0) {

@@ -35,7 +35,7 @@ npm run update-version 0.1.3 "修复搜索功能bug" "添加新的过滤选项" 
       <item>添加新的过滤选项</item>
       <item>优化界面响应速度</item>
     </changelog>
-    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.1.3/github-stars-manager-0.1.3.dmg</downloadUrl>
+    <downloadUrl>https://github.com/banjuer/GithubStarsManager/releases/download/v0.1.3/github-stars-manager-0.1.3.dmg</downloadUrl>
   </version>
 </versions>
 ```

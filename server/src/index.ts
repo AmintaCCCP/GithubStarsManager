@@ -17,7 +17,7 @@ import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
 import adminRouter from './routes/admin.js';
-import { startReleaseMonitor } from './services/releaseMonitor.js';
+import { startScheduler, stopScheduler } from './services/scheduler.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -70,21 +70,19 @@ function startServer(): void {
   runMigrations(db);
   console.log('✅ Database initialized');
 
-  // Start background services
-  startReleaseMonitor();
+  // Start background scheduler
+  startScheduler();
 
   const app = createApp();
 
   const server = app.listen(config.port, () => {
     console.log(`🚀 Server running on port ${config.port}`);
-    if (!config.apiSecret) {
-      console.warn('⚠️  Running without API_SECRET — auth is disabled');
-    }
   });
 
   // Graceful shutdown
   const shutdown = () => {
     console.log('\n🛑 Shutting down...');
+    stopScheduler();
     server.close(() => {
       closeDb();
       console.log('👋 Server stopped');

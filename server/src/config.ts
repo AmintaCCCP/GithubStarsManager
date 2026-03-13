@@ -4,7 +4,6 @@ import path from 'node:path';
 
 interface Config {
   port: number;
-  apiSecret: string | null;
   encryptionKey: string;
   dbPath: string;
   nodeEnv: string;
@@ -40,7 +39,6 @@ function loadConfig(): Config {
 
   return {
     port: parseInt(process.env.PORT || '3000', 10),
-    apiSecret: process.env.API_SECRET || null,
     encryptionKey: resolveEncryptionKey(dataDir),
     dbPath: process.env.DB_PATH || path.join(dataDir, 'data.db'),
     nodeEnv: process.env.NODE_ENV || 'development',

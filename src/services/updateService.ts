@@ -12,12 +12,10 @@ export interface UpdateCheckResult {
 }
 
 export class UpdateService {
-  private static readonly REPO_URL = 'https://raw.githubusercontent.com/AmintaCCCP/GithubStarsManager/main/versions/version-info.xml';
+  private static readonly REPO_URL = 'https://raw.githubusercontent.com/banjuer/GithubStarsManager/main/versions/version-info.xml';
 
   private static getCurrentVersion(): string {
-    // 在实际应用中，这个版本号应该在构建时注入
-    // 这里暂时硬编码，你可以通过构建脚本或环境变量来动态设置
-    return '0.2.3';
+    return __APP_VERSION__;
   }
 
   static async checkForUpdates(): Promise<UpdateCheckResult> {

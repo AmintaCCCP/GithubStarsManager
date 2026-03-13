@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bot, 
   Plus, 
@@ -18,6 +18,9 @@ import {
   Mail,
   Github,
   Bell,
+  Key,
+  User,
+  Clock,
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -66,11 +69,98 @@ export const SettingsPanel: React.FC = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [isTestingApprise, setIsTestingApprise] = useState(false);
 
   const [appriseUrlInput, setAppriseUrlInput] = useState(backendUser?.apprise_url || '');
   const [newPasswordSync, setNewPasswordSync] = useState('');
+  const [githubTokenInput, setGithubTokenInput] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isUpdatingGithubToken, setIsUpdatingGithubToken] = useState(false);
+  const [isUpdatingApprise, setIsUpdatingApprise] = useState(false);
+  const [isTestingApprise, setIsTestingApprise] = useState(false);
+
+  const [scheduledTasks, setScheduledTasks] = useState<Array<{
+    id: string;
+    task_type: string;
+    enabled: number;
+    cron_expression: string;
+    last_run: string | null;
+    next_run: string | null;
+  }>>([]);
+  const [notificationPrefs, setNotificationPrefs] = useState<{
+    notify_new_release: number;
+    notify_star_added: number;
+    notify_star_removed: number;
+  }>({
+    notify_new_release: 1,
+    notify_star_added: 1,
+    notify_star_removed: 1,
+  });
+  const [isUpdatingTask, setIsUpdatingTask] = useState<string | null>(null);
+  const [isUpdatingPrefs, setIsUpdatingPrefs] = useState(false);
+
+  useEffect(() => {
+    setAppriseUrlInput(backendUser?.appriseUrl || '');
+  }, [backendUser?.appriseUrl]);
+
+  useEffect(() => {
+    const fetchGithubToken = async () => {
+      try {
+        const settings = await backend.fetchSettings();
+        const token = settings.github_token as string;
+        if (token && !token.startsWith('***')) {
+          setGithubTokenInput('');
+        } else if (token) {
+          setGithubTokenInput(token);
+        }
+      } catch (err) {
+        console.error('Failed to fetch github token:', err);
+      }
+    };
+    if (backend.isAvailable) {
+      fetchGithubToken();
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchScheduledTasks = async () => {
+      try {
+        const response = await fetch('/api/scheduled-tasks', {
+          headers: backend.getAuthHeaders(),
+        });
+        if (response.ok) {
+          const tasks = await response.json();
+          setScheduledTasks(tasks);
+        }
+      } catch (err) {
+        console.error('Failed to fetch scheduled tasks:', err);
+      }
+    };
+
+    const fetchNotificationPrefs = async () => {
+      try {
+        const response = await fetch('/api/notification-preferences', {
+          headers: backend.getAuthHeaders(),
+        });
+        if (response.ok) {
+          const prefs = await response.json();
+          if (prefs) {
+            setNotificationPrefs({
+              notify_new_release: prefs.notify_new_release ?? 1,
+              notify_star_added: prefs.notify_star_added ?? 1,
+              notify_star_removed: prefs.notify_star_removed ?? 1,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch notification preferences:', err);
+      }
+    };
+
+    if (backend.isAvailable && backendUser) {
+      fetchScheduledTasks();
+      fetchNotificationPrefs();
+    }
+  }, [backend.isAvailable, backendUser]);
 
   type AIFormState = {
     name: string;
@@ -140,7 +230,7 @@ export const SettingsPanel: React.FC = () => {
       id: editingAIId || Date.now().toString(),
       name: aiForm.name,
       apiType: aiForm.apiType,
-      baseUrl: aiForm.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      baseUrl: aiForm.baseUrl.replace(/\/$/, ''),
       apiKey: aiForm.apiKey,
       model: aiForm.model,
       isActive: false,
@@ -203,7 +293,7 @@ export const SettingsPanel: React.FC = () => {
     const config: WebDAVConfig = {
       id: editingWebDAVId || Date.now().toString(),
       name: webdavForm.name,
-      url: webdavForm.url.replace(/\/$/, ''), // Remove trailing slash
+      url: webdavForm.url.replace(/\/$/, ''),
       username: webdavForm.username,
       password: webdavForm.password,
       path: webdavForm.path,
@@ -267,11 +357,11 @@ export const SettingsPanel: React.FC = () => {
         customCategories,
         aiConfigs: aiConfigs.map(config => ({
           ...config,
-          apiKey: '***' // Don't backup API keys for security
+          apiKey: '***'
         })),
         webdavConfigs: webdavConfigs.map(config => ({
           ...config,
-          password: '***' // Don't backup passwords for security
+          password: '***'
         })),
         exportedAt: new Date().toISOString(),
         version: '1.0'
@@ -317,14 +407,12 @@ export const SettingsPanel: React.FC = () => {
         return;
       }
 
-      // Use the most recent backup file
       const latestBackup = backupFiles.sort().reverse()[0];
       const backupContent = await webdavService.downloadFile(latestBackup);
       
       if (backupContent) {
         const backupData = JSON.parse(backupContent);
 
-        // 1) 恢复仓库与发布
         if (Array.isArray(backupData.repositories)) {
           setRepositories(backupData.repositories);
         }
@@ -332,9 +420,7 @@ export const SettingsPanel: React.FC = () => {
           setReleases(backupData.releases);
         }
 
-        // 2) 恢复自定义分类（全部替换）
         try {
-          // 先清空现有自定义分类
           if (Array.isArray(customCategories)) {
             for (const cat of customCategories) {
               if (cat && cat.id) {
@@ -342,7 +428,6 @@ export const SettingsPanel: React.FC = () => {
               }
             }
           }
-          // 再添加备份中的自定义分类
           if (Array.isArray(backupData.customCategories)) {
             for (const cat of backupData.customCategories) {
               if (cat && cat.id && cat.name) {
@@ -354,7 +439,6 @@ export const SettingsPanel: React.FC = () => {
           console.warn('恢复自定义分类时发生问题：', e);
         }
 
-        // 3) 合并 AI 配置（保留现有密钥；备份中密钥为***时不覆盖）
         try {
           if (Array.isArray(backupData.aiConfigs)) {
             const currentMap = new Map(aiConfigs.map((c: AIConfig) => [c.id, c]));
@@ -370,9 +454,7 @@ export const SettingsPanel: React.FC = () => {
                   customPrompt: cfg.customPrompt,
                   useCustomPrompt: cfg.useCustomPrompt,
                   concurrency: cfg.concurrency,
-                  // 仅当备份未掩码时才覆盖 apiKey
                   apiKey: isMasked ? existing.apiKey : cfg.apiKey,
-                  // 保留现有 isActive 状态
                   isActive: existing.isActive,
                 });
               } else {
@@ -388,7 +470,6 @@ export const SettingsPanel: React.FC = () => {
           console.warn('恢复 AI 配置时发生问题：', e);
         }
 
-        // 4) 合并 WebDAV 配置（保留现有密码；备份中密码为***时不覆盖）
         try {
           if (Array.isArray(backupData.webdavConfigs)) {
             const currentMap = new Map(webdavConfigs.map((c: WebDAVConfig) => [c.id, c]));
@@ -402,9 +483,7 @@ export const SettingsPanel: React.FC = () => {
                   url: cfg.url,
                   username: cfg.username,
                   path: cfg.path,
-                  // 仅当备份未掩码时才覆盖密码
                   password: isMasked ? existing.password : cfg.password,
-                  // 保留现有 isActive 状态
                   isActive: existing.isActive,
                 });
               } else {
@@ -477,115 +556,191 @@ Focus on practicality and accurate categorization to help users quickly understa
     }
   };
 
+  const handleUpdatePassword = async () => {
+    if (!newPasswordSync.trim()) {
+      alert(t('请输入新密码', 'Please enter a new password'));
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      await authService.updateProfile({ password: newPasswordSync });
+      setNewPasswordSync('');
+      alert(t('密码更新成功！', 'Password updated successfully!'));
+    } catch (error: any) {
+      console.error('Update password failed:', error);
+      alert(`${t('更新失败', 'Update failed')}: ${(error as Error).message}`);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
+  const handleUpdateGithubToken = async () => {
+    if (!githubTokenInput.trim()) {
+      alert(t('请输入GitHub Token', 'Please enter GitHub Token'));
+      return;
+    }
+    setIsUpdatingGithubToken(true);
+    try {
+      await backend.syncSettings({ github_token: githubTokenInput });
+      setGithubTokenInput('***' + githubTokenInput.slice(-4));
+      alert(t('GitHub Token 更新成功！', 'GitHub Token updated successfully!'));
+    } catch (error: any) {
+      console.error('Update GitHub token failed:', error);
+      alert(`${t('更新失败', 'Update failed')}: ${(error as Error).message}`);
+    } finally {
+      setIsUpdatingGithubToken(false);
+    }
+  };
 
-
-  const handleUpdateProfile = async () => {
-    setIsUpdatingProfile(true);
+  const handleUpdateApprise = async () => {
+    setIsUpdatingApprise(true);
     try {
       const updated = await authService.updateProfile({ 
-        apprise_url: appriseUrlInput || undefined,
-        password: newPasswordSync || undefined
+        apprise_url: appriseUrlInput || undefined 
       });
-      // Update backendUser in store
       useAppStore.setState(state => ({
         backendUser: state.backendUser ? {
           ...state.backendUser,
           apprise_url: updated.appriseUrl || null
         } : null
       }));
-      setNewPasswordSync('');
-      alert(t('个人资料更新成功！', 'Profile updated successfully!'));
+      alert(t('通知URL更新成功！', 'Notification URL updated successfully!'));
     } catch (error: any) {
-      console.error('Update profile failed:', error);
+      console.error('Update apprise failed:', error);
       alert(`${t('更新失败', 'Update failed')}: ${(error as Error).message}`);
     } finally {
-      setIsUpdatingProfile(false);
+      setIsUpdatingApprise(false);
     }
   };
 
   const handleTestApprise = async () => {
     setIsTestingApprise(true);
     try {
-      // In a real app, you might want a backend endpoint for testing.
-      // For now, let's just use the sendNotification logic if we can,
-      // but wait, sendNotification is a backend service.
-      // We should probably add a backend endpoint /api/notifications/test
-      alert(t('正在向该 URL 发送测试通知...', 'Sending test notification to this URL...'));
-      // To keep it simple, we'll assume the user saves and then tests via a dedicated API if we add it.
-      // Or we can just call the Apprise URL directly from frontend if CORS allows (unlikely).
-      // Let's add a backend test endpoint later if needed.
+      const response = await fetch('/api/notifications/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...backend.getAuthHeaders(),
+        },
+        body: JSON.stringify({ url: appriseUrlInput || undefined }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Test notification failed');
+      }
+
+      alert(t('测试通知发送成功！', 'Test notification sent successfully!'));
+    } catch (error: any) {
+      console.error('Test notification failed:', error);
+      alert(`${t('测试通知失败', 'Test notification failed')}: ${error.message}`);
     } finally {
       setIsTestingApprise(false);
     }
   };
 
+  const handleUpdateTask = async (taskType: string, updates: { enabled?: number; cron_expression?: string }) => {
+    setIsUpdatingTask(taskType);
+    try {
+      const response = await fetch(`/api/scheduled-tasks/${taskType}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...backend.getAuthHeaders(),
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update task');
+      }
+
+      const updatedTask = await response.json();
+      setScheduledTasks(prev => prev.map(t => t.task_type === taskType ? updatedTask : t));
+      alert(t('定时任务更新成功！', 'Scheduled task updated successfully!'));
+    } catch (error: any) {
+      console.error('Update task failed:', error);
+      alert(`${t('更新失败', 'Update failed')}: ${error.message}`);
+    } finally {
+      setIsUpdatingTask(null);
+    }
+  };
+
+  const handleUpdateNotificationPrefs = async () => {
+    setIsUpdatingPrefs(true);
+    try {
+      const response = await fetch('/api/notification-preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...backend.getAuthHeaders(),
+        },
+        body: JSON.stringify(notificationPrefs),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update preferences');
+      }
+
+      alert(t('通知偏好更新成功！', 'Notification preferences updated successfully!'));
+    } catch (error: any) {
+      console.error('Update notification preferences failed:', error);
+      alert(`${t('更新失败', 'Update failed')}: ${error.message}`);
+    } finally {
+      setIsUpdatingPrefs(false);
+    }
+  };
+
+  const getTaskName = (taskType: string) => {
+    switch (taskType) {
+      case 'sync_stars':
+        return t('同步Stars', 'Sync Stars');
+      case 'check_releases':
+        return t('检查Release', 'Check Releases');
+      default:
+        return taskType;
+    }
+  };
+
+  const getTaskDescription = (taskType: string) => {
+    switch (taskType) {
+      case 'sync_stars':
+        return t('定时同步GitHub Stars，检测新增和移除的仓库，自动进行AI分析并发送通知', 'Periodically sync GitHub Stars, detect added and removed repos, auto AI analysis and send notifications');
+      case 'check_releases':
+        return t('检查订阅仓库的新Release发布', 'Check for new releases of subscribed repos');
+      default:
+        return '';
+    }
+  };
+
+  const getCronDescription = (cron: string) => {
+    const parts = cron.split(' ');
+    if (parts.length !== 5) return cron;
+    
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+    
+    if (minute === '0' && hour === '*') {
+      return t('每小时', 'Every hour');
+    }
+    if (minute === '0' && hour.startsWith('*/')) {
+      const hours = hour.replace('*/', '');
+      return t(`每${hours}小时`, `Every ${hours} hours`);
+    }
+    if (minute === '0' && hour.match(/^\d+$/)) {
+      return t(`每天 ${hour}:00`, `Daily at ${hour}:00`);
+    }
+    if (minute === '0' && hour === '3') {
+      return t('每天凌晨3点', 'Daily at 3:00 AM');
+    }
+    
+    return cron;
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      {/* Update Check */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('检查更新', 'Check for Updates')}
-          </h3>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              {t('当前版本: v0.2.3', 'Current Version: v0.2.3')}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              {t('检查是否有新版本可用', 'Check if a new version is available')}
-            </p>
-          </div>
-          <UpdateChecker />
-        </div>
-      </div>
-
-      {/* Language Settings */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Globe className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('语言设置', 'Language Settings')}
-          </h3>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="radio"
-              name="language"
-              value="zh"
-              checked={language === 'zh'}
-              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              中文
-            </span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="radio"
-              name="language"
-              value="en"
-              checked={language === 'en'}
-              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              English
-            </span>
-          </label>
-        </div>
-      </div>
-
-
-      {/* AI Configuration */}
+      {/* 1. AI Configuration */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -603,7 +758,6 @@ Focus on practicality and accurate categorization to help users quickly understa
           </button>
         </div>
 
-        {/* AI Config Form */}
         {showAIForm && (
           <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
             <h4 className="font-medium text-gray-900 dark:text-white mb-4">
@@ -710,7 +864,6 @@ Focus on practicality and accurate categorization to help users quickly understa
               </div>
             </div>
 
-            {/* Custom Prompt Section */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="flex items-center space-x-2 cursor-pointer">
@@ -777,7 +930,6 @@ Focus on practicality and accurate categorization to help users quickly understa
           </div>
         )}
 
-        {/* AI Configs List */}
         <div className="space-y-3">
           {aiConfigs.map(config => (
             <div
@@ -859,7 +1011,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         </div>
       </div>
 
-      {/* WebDAV Configuration */}
+      {/* 2. WebDAV Configuration */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -891,7 +1043,6 @@ Focus on practicality and accurate categorization to help users quickly understa
           )}
         </p>
 
-        {/* WebDAV Config Form */}
         {showWebDAVForm && (
           <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
             <h4 className="font-medium text-gray-900 dark:text-white mb-4">
@@ -984,7 +1135,6 @@ Focus on practicality and accurate categorization to help users quickly understa
           </div>
         )}
 
-        {/* WebDAV Configs List */}
         <div className="space-y-3 mb-6">
           {webdavConfigs.map(config => (
             <div
@@ -1057,7 +1207,6 @@ Focus on practicality and accurate categorization to help users quickly understa
           )}
         </div>
 
-        {/* Backup Actions */}
         {webdavConfigs.length > 0 && (
           <div className="flex items-center justify-center space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
             <button
@@ -1089,20 +1238,158 @@ Focus on practicality and accurate categorization to help users quickly understa
         )}
       </div>
 
+      {/* 3. Scheduled Tasks */}
+      {backend.isAvailable && scheduledTasks.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <Clock className="w-6 h-6 text-teal-600 dark:text-teal-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('定时任务', 'Scheduled Tasks')}
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            {scheduledTasks.map(task => (
+              <div key={task.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={task.enabled === 1}
+                        onChange={(e) => handleUpdateTask(task.task_type, { enabled: e.target.checked ? 1 : 0 })}
+                        disabled={isUpdatingTask === task.task_type}
+                        className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500 dark:focus:ring-teal-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {getTaskName(task.task_type)}
+                      </span>
+                    </label>
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {getCronDescription(task.cron_expression)}
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  {getTaskDescription(task.task_type)}
+                </p>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      {t('Cron表达式', 'Cron Expression')}
+                    </label>
+                    <input
+                      type="text"
+                      value={task.cron_expression}
+                      onChange={(e) => {
+                        setScheduledTasks(prev => prev.map(t => 
+                          t.task_type === task.task_type 
+                            ? { ...t, cron_expression: e.target.value }
+                            : t
+                        ));
+                      }}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      placeholder="0 * * * *"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleUpdateTask(task.task_type, { cron_expression: task.cron_expression })}
+                    disabled={isUpdatingTask === task.task_type}
+                    className="mt-4 px-3 py-1.5 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors disabled:opacity-50"
+                  >
+                    {isUpdatingTask === task.task_type ? t('保存中...', 'Saving...') : t('保存', 'Save')}
+                  </button>
+                </div>
+                
+                {task.last_run && (
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {t('上次运行: ', 'Last run: ')}{new Date(task.last_run).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            {t(
+              'Cron表达式格式: 分 时 日 月 周。例如: "0 * * * *" 表示每小时执行，"0 */6 * * *" 表示每6小时执行，"0 3 * * *" 表示每天凌晨3点执行。',
+              'Cron format: minute hour day month weekday. E.g., "0 * * * *" = hourly, "0 */6 * * *" = every 6 hours, "0 3 * * *" = daily at 3 AM.'
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* 4. Notification Settings */}
       {backend.isAvailable && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center space-x-3 mb-6">
             <Bell className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('账户与通知', 'Account & Notifications')}
+              {t('通知设置', 'Notification Settings')}
             </h3>
           </div>
 
           <div className="space-y-6">
+            {/* Notification Preferences */}
+            <div className="pb-6 border-b border-gray-100 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                {t('通知事件', 'Notification Events')}
+              </h4>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationPrefs.notify_new_release === 1}
+                    onChange={(e) => setNotificationPrefs(prev => ({ ...prev, notify_new_release: e.target.checked ? 1 : 0 }))}
+                    className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {t('新Release发布', 'New Release')}
+                  </span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationPrefs.notify_star_added === 1}
+                    onChange={(e) => setNotificationPrefs(prev => ({ ...prev, notify_star_added: e.target.checked ? 1 : 0 }))}
+                    className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {t('新增Star', 'Star Added')}
+                  </span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationPrefs.notify_star_removed === 1}
+                    onChange={(e) => setNotificationPrefs(prev => ({ ...prev, notify_star_removed: e.target.checked ? 1 : 0 }))}
+                    className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {t('移除Star', 'Star Removed')}
+                  </span>
+                </label>
+              </div>
+              <button
+                onClick={handleUpdateNotificationPrefs}
+                disabled={isUpdatingPrefs}
+                className="mt-3 flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+              >
+                {isUpdatingPrefs ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{t('保存偏好', 'Save Preferences')}</span>
+              </button>
+            </div>
+
             {/* Apprise URL */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('Apprise 通知 URL', 'Apprise Notification URL')}
+                {t('通知URL', 'Notification URL')}
               </label>
               <div className="flex space-x-3">
                 <input
@@ -1110,32 +1397,18 @@ Focus on practicality and accurate categorization to help users quickly understa
                   value={appriseUrlInput}
                   onChange={(e) => setAppriseUrlInput(e.target.value)}
                   className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="https://apprise.example.com/notify/apprise-config-url"
+                  placeholder="gotifys://gotify.example.com/token"
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t(
-                  '用于接收仓库更新、Release 等通知。支持 Apprise API 格式。',
-                  'Used for receiving notifications for repo updates, releases, etc. Supports Apprise API format.'
+                  '支持的通知格式：gotifys://gotify.example.com/token、discord://webhook_id/webhook_token、telegram://bot_token/chat_id、https://webhook.url（直接POST）',
+                  'Supported formats: gotifys://gotify.example.com/token, discord://webhook_id/webhook_token, telegram://bot_token/chat_id, https://webhook.url (direct POST)'
                 )}
               </p>
             </div>
 
-            {/* Password Change */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('修改密码', 'Change Password')}
-              </label>
-              <input
-                type="password"
-                value={newPasswordSync}
-                onChange={(e) => setNewPasswordSync(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                placeholder={t('留空则不修改', 'Leave empty to keep current password')}
-              />
-            </div>
-
-            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end space-x-3">
+            <div className="flex justify-end space-x-3">
               <button
                 onClick={handleTestApprise}
                 disabled={isTestingApprise || !appriseUrlInput}
@@ -1149,23 +1422,166 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <span>{t('测试通知', 'Test Notification')}</span>
               </button>
               <button
-                onClick={handleUpdateProfile}
-                disabled={isUpdatingProfile}
+                onClick={handleUpdateApprise}
+                disabled={isUpdatingApprise}
                 className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
               >
-                {isUpdatingProfile ? (
+                {isUpdatingApprise ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                <span>{t('保存更改', 'Save Changes')}</span>
+                <span>{t('保存', 'Save')}</span>
               </button>
             </div>
           </div>
         </div>
       )}
-      
-      {/* Contact Information */}
+
+      {/* 5. Account Settings */}
+      {backend.isAvailable && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <User className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('账户设置', 'Account Settings')}
+            </h3>
+          </div>
+
+          <div className="space-y-6">
+            {/* GitHub Token */}
+            <div className="pb-6 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center space-x-2 mb-2">
+                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {t('GitHub Token', 'GitHub Token')}
+                </label>
+              </div>
+              <div className="flex space-x-3">
+                <input
+                  type="password"
+                  value={githubTokenInput}
+                  onChange={(e) => setGithubTokenInput(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('输入新的 GitHub Personal Access Token', 'Enter new GitHub Personal Access Token')}
+                />
+                <button
+                  onClick={handleUpdateGithubToken}
+                  disabled={isUpdatingGithubToken}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50"
+                >
+                  {isUpdatingGithubToken ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>{t('保存', 'Save')}</span>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t(
+                  '需要 repo 和 user 权限。用于同步仓库和获取 Release 信息。',
+                  'Requires repo and user permissions. Used for syncing repositories and fetching release information.'
+                )}
+              </p>
+            </div>
+
+            {/* Password */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <Key className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {t('修改密码', 'Change Password')}
+                </label>
+              </div>
+              <div className="flex space-x-3">
+                <input
+                  type="password"
+                  value={newPasswordSync}
+                  onChange={(e) => setNewPasswordSync(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder={t('输入新密码', 'Enter new password')}
+                />
+                <button
+                  onClick={handleUpdatePassword}
+                  disabled={isUpdatingPassword}
+                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {isUpdatingPassword ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>{t('保存', 'Save')}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Language Settings */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Globe className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('语言设置', 'Language Settings')}
+          </h3>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="radio"
+              name="language"
+              value="zh"
+              checked={language === 'zh'}
+              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              中文
+            </span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="radio"
+              name="language"
+              value="en"
+              checked={language === 'en'}
+              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              English
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* 7. Update Check */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('检查更新', 'Check for Updates')}
+          </h3>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+              {t(`当前版本: v${__APP_VERSION__}`, `Current Version: v${__APP_VERSION__}`)}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              {t('检查是否有新版本可用', 'Check if a new version is available')}
+            </p>
+          </div>
+          <UpdateChecker />
+        </div>
+      </div>
+
+      {/* 8. Contact Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -1190,7 +1606,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             </button>
             
             <button
-              onClick={() => window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank')}
+              onClick={() => window.open('https://github.com/banjuer/GithubStarsManager', '_blank')}
               className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
             >
               <Github className="w-5 h-5" />

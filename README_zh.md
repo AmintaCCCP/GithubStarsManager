@@ -73,7 +73,7 @@ docker-compose up -d
 ### 💻 桌面客户端
 
 可以直接下载适用于 Windows、macOS 和 Linux 的预构建客户端：
-[最新版本下载](https://github.com/AmintaCCCP/GithubStarsManager/releases)
+[最新版本下载](https://github.com/banjuer/GithubStarsManager/releases)
 
 ### 📲 渐进式 Web 应用 (PWA)
 
@@ -168,9 +168,8 @@ docker run -d -p 8080:3000 banjuer/github-stars-manager:latest
 #### 环境变量
 | 变量 | 必填 | 说明 |
 |----------|----------|-------------|
-| `API_SECRET` | 否 | JWT 签名密钥（如不设置将使用默认值）。 |
 | `ENCRYPTION_KEY` | 否 | 用于加密存储密钥的 AES-256 密钥。未设置时自动生成。 |
-| `PORT` | 否 | 服务器端口（默认：3000） |
+| `PORT` | 否 | 端口（默认：3000） |
 
 ## 目标用户
 
@@ -205,10 +204,10 @@ docker run -d -p 8080:3000 banjuer/github-stars-manager:latest
 
 ## 星标历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AmintaCCCP/GithubStarsManager&type=Date)](https://www.star-history.com/#AmintaCCCP/GithubStarsManager&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=banjuer/GithubStarsManager&type=Date)](https://www.star-history.com/#banjuer/GithubStarsManager&Date)
 
 ---
 
 **在线演示**: [https://soft-stroopwafel-2b73d1.netlify.app](https://soft-stroopwafel-2b73d1.netlify.app)
 
-**GitHub 仓库**: [https://github.com/AmintaCCCP/GithubStarsManager](https://github.com/AmintaCCCP/GithubStarsManager)
+**GitHub 仓库**: [https://github.com/banjuer/GithubStarsManager](https://github.com/banjuer/GithubStarsManager)
