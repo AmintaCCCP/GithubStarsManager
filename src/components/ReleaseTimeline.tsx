@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Download, ChevronDown } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, BellOff, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Download, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
+import { forceSyncToBackend } from '../services/autoSync';
 import { formatDistanceToNow, format } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 
@@ -18,6 +19,8 @@ export const ReleaseTimeline: React.FC = () => {
     setReleases,
     addReleases,
     markReleaseAsRead,
+    toggleReleaseSubscription,
+    updateRepository,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -278,6 +281,8 @@ export const ReleaseTimeline: React.FC = () => {
 
 
 
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
   const truncateBody = (body: string, maxLength = 200) => {
     if (body.length <= maxLength) return body;
     return body.substring(0, maxLength) + '...';
@@ -287,11 +292,41 @@ export const ReleaseTimeline: React.FC = () => {
     markReleaseAsRead(releaseId);
   };
 
+  const handleUnsubscribeRelease = async (repoId: number) => {
+    const repo = repositories.find((item) => item.id === repoId);
+    if (!repo) {
+      alert(t('仓库信息不完整，无法取消订阅。', 'Repository information missing. Cannot unsubscribe.'));
+      return;
+    }
+
+    const confirmMessage = language === 'zh'
+      ? `确定取消订阅 "${repo.full_name}" 的 Release 吗？`
+      : `Unsubscribe from releases for "${repo.full_name}"?`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    const updatedRepo = { ...repo, subscribed_to_releases: false };
+    updateRepository(updatedRepo);
+    toggleReleaseSubscription(repo.id);
+
+    try {
+      await forceSyncToBackend();
+    } catch (error) {
+      console.error('Failed to unsubscribe release:', error);
+      updateRepository({ ...repo, subscribed_to_releases: true });
+      toggleReleaseSubscription(repo.id);
+      alert(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'));
+      return;
+    }
+
+    alert(t('已取消订阅该仓库的 Release。', 'Unsubscribed from repository releases.'));
+  };
+
   const isReleaseUnread = (releaseId: number) => {
     return !readReleases.has(releaseId);
   };
-
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   if (subscribedReleases.length === 0) {
     const subscribedRepoCount = releaseSubscriptions.size;
@@ -578,6 +613,16 @@ export const ReleaseTimeline: React.FC = () => {
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnsubscribeRelease(release.repository.id);
+                        }}
+                        className="p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        title={t('取消订阅 Release', 'Unsubscribe from releases')}
+                      >
+                        <BellOff className="w-4 h-4" />
+                      </button>
                       <a
                         href={release.html_url}
                         target="_blank"
@@ -876,6 +921,16 @@ export const ReleaseTimeline: React.FC = () => {
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnsubscribeRelease(release.repository.id);
+                        }}
+                        className="p-1.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        title={t('取消订阅 Release', 'Unsubscribe from releases')}
+                      >
+                        <BellOff className="w-3 h-3" />
+                      </button>
                       <a
                         href={release.html_url}
                         target="_blank"
