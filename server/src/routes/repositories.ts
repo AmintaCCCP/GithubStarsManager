@@ -108,19 +108,23 @@ router.put('/api/repositories', (req, res) => {
       db.prepare(`DELETE FROM repositories WHERE id NOT IN (${placeholders})`);
 
     const upsert = db.transaction(() => {
-      const repoIds = repositories
-        .map((repo) => repo.id)
-        .filter((id): id is number => typeof id === 'number');
+      const isFullSync = Boolean(req.body?.isFullSync);
 
-      if (repoIds.length === 0) {
-        deleteAllReleases.run();
-        deleteAllRepositories.run();
-        return 0;
+      if (isFullSync) {
+        const repoIds = repositories
+          .map((repo) => repo.id)
+          .filter((id): id is number => typeof id === 'number');
+
+        if (repoIds.length === 0) {
+          deleteAllReleases.run();
+          deleteAllRepositories.run();
+          return 0;
+        }
+
+        const placeholders = repoIds.map(() => '?').join(', ');
+        deleteReleasesNotIn(placeholders).run(...repoIds);
+        deleteRepositoriesNotIn(placeholders).run(...repoIds);
       }
-
-      const placeholders = repoIds.map(() => '?').join(', ');
-      deleteReleasesNotIn(placeholders).run(...repoIds);
-      deleteRepositoriesNotIn(placeholders).run(...repoIds);
 
       let count = 0;
       for (const repo of repositories) {

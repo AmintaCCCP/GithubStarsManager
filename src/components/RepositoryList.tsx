@@ -478,35 +478,37 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         </div>
 
         {/* Statistics */}
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          <div className="flex items-center justify-between">
-    <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
-              {t(
-                `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
-                `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
-              )}
-              {repositories.length !== filteredRepositories.length && (
-                <span className="ml-2 text-blue-600 dark:text-blue-400">
-                  {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
-                </span>
-              )}
-            </div>
-            <div>
-              {analyzedCount > 0 && (
-                <span className="mr-3">
-                  • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
-                </span>
-              )}
-              {failedCount > 0 && (
-                <span className="mr-3">
-                  • {failedCount} {t('个分析失败', 'analysis failed')}
-                </span>
-              )}
-              {unanalyzedCount > 0 && (
-                <span>
-                  • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
-                </span>
-              )}
+        <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-between">
+              <div>
+                {t(
+                  `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
+                  `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
+                )}
+                {repositories.length !== filteredRepositories.length && (
+                  <span className="ml-2 text-blue-600 dark:text-blue-400">
+                    {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
+                  </span>
+                )}
+              </div>
+              <div>
+                {analyzedCount > 0 && (
+                  <span className="mr-3">
+                    • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
+                  </span>
+                )}
+                {failedCount > 0 && (
+                  <span className="mr-3">
+                    • {failedCount} {t('个分析失败', 'analysis failed')}
+                  </span>
+                )}
+                {unanalyzedCount > 0 && (
+                  <span>
+                    • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
