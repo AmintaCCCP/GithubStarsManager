@@ -106,27 +106,69 @@ export const Header: React.FC = () => {
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 hd-drag">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex flex-col gap-3 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0">
           {/* Logo and Title */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden">
-              <img 
-                src="./icon.png" 
-                alt="GitHub Stars Manager" 
-                className="w-10 h-10 object-cover"
-              />
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <div className="flex min-w-0 items-center space-x-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden">
+                <img 
+                  src="./icon.png" 
+                  alt="GitHub Stars Manager" 
+                  className="w-10 h-10 object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-bold text-gray-900 dark:text-white">
+                  GitHub Stars Manager
+                </h1>
+                <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                  AI-powered repository management
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                GitHub Stars Manager
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                AI-powered repository management
-              </p>
-            </div>
+            <button
+              onClick={handleSync}
+              disabled={isLoading}
+              className="sm:hidden inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              title={t('同步仓库', 'Sync repositories')}
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
           {/* Navigation */}
+          <nav className="grid w-full grid-cols-3 gap-2 sm:hidden hd-btns">
+            <button
+              onClick={() => setCurrentView('repositories')}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentView === 'repositories'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t('仓库', 'Repos')}
+            </button>
+            <button
+              onClick={() => setCurrentView('releases')}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentView === 'releases'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t('发布', 'Releases')}
+            </button>
+            <button
+              onClick={() => setCurrentView('settings')}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentView === 'settings'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t('设置', 'Settings')}
+            </button>
+          </nav>
           <nav className="hidden md:flex items-center space-x-1 hd-btns">
             <button
               onClick={() => setCurrentView('repositories')}
@@ -164,7 +206,7 @@ export const Header: React.FC = () => {
           </nav>
 
           {/* User Actions */}
-          <div className="flex items-center space-x-3 hd-btns">
+          <div className="flex items-center justify-between gap-3 sm:justify-end hd-btns">
             {/* Sync Status */}
             <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
@@ -193,14 +235,14 @@ export const Header: React.FC = () => {
 
             {/* User Profile */}
             {user && (
-              <div className="flex items-center space-x-3">
+              <div className="flex min-w-0 items-center space-x-3">
                 <img
                   src={user.avatar_url}
                   alt={user.name || user.login}
                   className="w-8 h-8 rounded-full"
                 />
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                     {user.name || user.login}
                   </p>
                 </div>

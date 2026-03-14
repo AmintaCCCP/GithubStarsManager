@@ -3,6 +3,22 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 
+const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
+
+const readSessionBackendSecret = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem(BACKEND_SECRET_SESSION_KEY);
+};
+
+const writeSessionBackendSecret = (secret: string | null): void => {
+  if (typeof window === 'undefined') return;
+  if (secret) {
+    window.sessionStorage.setItem(BACKEND_SECRET_SESSION_KEY, secret);
+  } else {
+    window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
+  }
+};
+
 interface AppActions {
   // Auth actions
   setUser: (user: GitHubUser | null) => void;
@@ -263,7 +279,7 @@ export const useAppStore = create<AppState & AppActions>()(
       language: 'zh',
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
-      backendApiSecret: null,
+      backendApiSecret: readSessionBackendSecret(),
 
       // Auth actions
       setUser: (user) => {
@@ -419,7 +435,10 @@ export const useAppStore = create<AppState & AppActions>()(
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
       setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
-      setBackendApiSecret: (backendApiSecret) => set({ backendApiSecret }),
+      setBackendApiSecret: (backendApiSecret) => {
+        writeSessionBackendSecret(backendApiSecret);
+        set({ backendApiSecret });
+      },
     }),
     {
       name: 'github-stars-manager',

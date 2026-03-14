@@ -1,6 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 
 import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
+import { useAppStore } from '../store/useAppStore';
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
@@ -56,15 +57,7 @@ class BackendAdapter {
   }
 
   private getAuthHeaders(): Record<string, string> {
-    // Read from localStorage directly to avoid circular dependency with store
-    const storeData = localStorage.getItem('github-stars-manager');
-    let secret = '';
-    if (storeData) {
-      try {
-        const parsed = JSON.parse(storeData);
-        secret = parsed.state?.backendApiSecret || '';
-      } catch { /* ignore */ }
-    }
+    const secret = useAppStore.getState().backendApiSecret || '';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -347,6 +340,19 @@ class BackendAdapter {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  async verifyAuth(): Promise<boolean> {
+    if (!this._backendUrl) return false;
+
+    try {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
+        headers: this.getAuthHeaders(),
+      }, 5000);
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 }
