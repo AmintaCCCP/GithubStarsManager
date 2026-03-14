@@ -506,14 +506,18 @@ Focus on practicality and accurate categorization to help users quickly understa
     // Re-init and check
     await backend.init();
     const health = await backend.checkHealth();
-    if (health) {
+    const authOk = backendSecretInput ? await backend.verifyAuth() : true;
+    if (health && authOk) {
       setBackendStatus('connected');
       setBackendHealth({ version: health.version, timestamp: health.timestamp });
       alert(t('后端连接成功！', 'Backend connection successful!'));
     } else {
       setBackendStatus('disconnected');
       setBackendHealth(null);
-      alert(t('后端连接失败，请检查服务器是否运行。', 'Backend connection failed. Please check if the server is running.'));
+      alert(t(
+        '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
+        'Backend connection failed. Please check the server status or whether the API Secret is correct.'
+      ));
     }
   };
 

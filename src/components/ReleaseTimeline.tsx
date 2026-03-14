@@ -346,8 +346,8 @@ export const ReleaseTimeline: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               {t('Release时间线', 'Release Timeline')}
@@ -356,7 +356,7 @@ export const ReleaseTimeline: React.FC = () => {
               {t(`来自您的 ${releaseSubscriptions.size} 个订阅仓库的最新Release`, `Latest releases from your ${releaseSubscriptions.size} subscribed repositories`)}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-2">
               <button
@@ -385,7 +385,7 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Last Refresh Time */}
             {lastRefreshTime && (
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="w-full text-sm text-gray-500 dark:text-gray-400 lg:w-auto">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
               </span>
             )}
@@ -452,8 +452,8 @@ export const ReleaseTimeline: React.FC = () => {
         </div>
 
         {/* Results Info and Pagination Controls */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-gray-600 dark:text-gray-400">
               {t(
                 `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
@@ -467,7 +467,7 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             {/* Items per page selector */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">{t('每页:', 'Per page:')}</span>
@@ -488,7 +488,7 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 overflow-x-auto pb-1">
                 <button
                   onClick={() => handlePageChange(1)}
                   disabled={currentPage === 1}

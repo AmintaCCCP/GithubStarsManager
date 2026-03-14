@@ -13,6 +13,8 @@ let _storeUnsubscribe: (() => void) | null = null;
 let _isPushingToBackend = false;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
+// Track unsynced local edits so backend polling does not overwrite them.
+let _hasPendingLocalChanges = false;
 
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -36,13 +38,26 @@ function quickHash(data: unknown): string {
   return JSON.stringify(data);
 }
 
+function setRepositorySyncVisualState(isSyncing: boolean): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('gsm:repository-sync-visual-state', { detail: { isSyncing } }));
+}
+
 /**
  * Pull all data from backend and update local store.
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
  */
 export async function syncFromBackend(): Promise<void> {
-  if (!backend.isAvailable || _isSyncingFromBackendActive || _isPushingToBackend) return;
+  if (
+    !backend.isAvailable ||
+    _isSyncingFromBackendActive ||
+    _isPushingToBackend ||
+    _hasPendingLocalChanges ||
+    _debounceTimer
+  ) {
+    return;
+  }
 
   _isSyncingFromBackendActive = true;
 
@@ -103,6 +118,9 @@ export async function syncFromBackend(): Promise<void> {
     if (!Object.values(changed).some(Boolean)) return;
 
     _isSyncingFromBackend = true;
+    if (changed.repos || changed.releases) {
+      setRepositorySyncVisualState(true);
+    }
     const state = useAppStore.getState();
 
     // Update store then commit hash — hash only changes if setter succeeds
@@ -138,6 +156,7 @@ export async function syncFromBackend(): Promise<void> {
   } catch (err) {
     console.error('Failed to sync from backend:', err);
   } finally {
+    setRepositorySyncVisualState(false);
     _isSyncingFromBackend = false;
     _isSyncingFromBackendActive = false;
     // Drain pending push that was queued during pull
@@ -164,6 +183,7 @@ export async function syncToBackend(): Promise<void> {
 
   _isPushingToBackend = true;
   _hasPendingPush = false;
+  setRepositorySyncVisualState(true);
   try {
     const state = useAppStore.getState();
 
@@ -182,8 +202,10 @@ export async function syncToBackend(): Promise<void> {
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
       console.warn(`⚠️ Synced to backend with ${failures.length} error(s):`, failures.map(f => (f as PromiseRejectedResult).reason));
+      _hasPendingLocalChanges = true;
     } else {
       console.log('✅ Synced to backend');
+      _hasPendingLocalChanges = false;
     }
 
     // Only update _lastHash for successfully synced slices
@@ -200,8 +222,22 @@ export async function syncToBackend(): Promise<void> {
   } catch (err) {
     console.error('Failed to sync to backend:', err);
   } finally {
+    setRepositorySyncVisualState(false);
     _isPushingToBackend = false;
   }
+}
+
+/**
+ * Immediately push current local state to backend.
+ * Used for destructive/high-priority operations such as unstar/delete.
+ */
+export async function forceSyncToBackend(): Promise<void> {
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
+  _hasPendingLocalChanges = true;
+  await syncToBackend();
 }
 
 /**
@@ -227,6 +263,7 @@ export function startAutoSync(): () => void {
   _isPushingToBackend = false;
   _isSyncingFromBackendActive = false;
   _hasPendingPush = false;
+  _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (_isSyncingFromBackend) return;
@@ -241,12 +278,15 @@ export function startAutoSync(): () => void {
 
     if (!changed) return;
 
+    _hasPendingLocalChanges = true;
+
     // Debounce: wait 2s after last change before pushing
     if (_debounceTimer) {
       clearTimeout(_debounceTimer);
     }
     _debounceTimer = setTimeout(() => {
-      syncToBackend();
+      _debounceTimer = null;
+      void syncToBackend();
     }, 2000);
   });
   _storeUnsubscribe = unsubscribe;
@@ -283,5 +323,6 @@ export function stopAutoSync(unsubscribe: () => void): void {
   _isSyncingFromBackendActive = false;
   _isSyncingFromBackend = false;
   _hasPendingPush = false;
+  _hasPendingLocalChanges = false;
   console.log('🔄 Auto-sync stopped');
 }

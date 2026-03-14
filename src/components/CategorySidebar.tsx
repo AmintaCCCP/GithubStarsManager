@@ -102,7 +102,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   return (
     <>
-      <div className="w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 max-h-[calc(100vh-8rem)] sticky top-24 overflow-y-auto">
+      <div className="w-full lg:w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 lg:max-h-[calc(100vh-8rem)] lg:sticky lg:top-24 overflow-hidden lg:overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {t('应用分类', 'Categories')}
@@ -116,16 +116,16 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
           </button>
         </div>
         
-        <div className="space-y-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible">
           {allCategories.map(category => {
             const count = getCategoryCount(category);
             const isSelected = selectedCategory === category.id;
             
             return (
-              <div key={category.id} className="group">
+              <div key={category.id} className="group shrink-0 lg:shrink">
                 <button
                   onClick={() => onCategorySelect(category.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                  className={`flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors lg:w-full ${
                     isSelected
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'

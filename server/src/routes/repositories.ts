@@ -100,7 +100,32 @@ router.put('/api/repositories', (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const deleteAllReleases = db.prepare('DELETE FROM releases');
+    const deleteAllRepositories = db.prepare('DELETE FROM repositories');
+    const deleteReleasesNotIn = (placeholders: string) =>
+      db.prepare(`DELETE FROM releases WHERE repo_id NOT IN (${placeholders})`);
+    const deleteRepositoriesNotIn = (placeholders: string) =>
+      db.prepare(`DELETE FROM repositories WHERE id NOT IN (${placeholders})`);
+
     const upsert = db.transaction(() => {
+      const isFullSync = Boolean(req.body?.isFullSync);
+
+      if (isFullSync) {
+        const repoIds = repositories
+          .map((repo) => repo.id)
+          .filter((id): id is number => typeof id === 'number');
+
+        if (repoIds.length === 0) {
+          deleteAllReleases.run();
+          deleteAllRepositories.run();
+          return 0;
+        }
+
+        const placeholders = repoIds.map(() => '?').join(', ');
+        deleteReleasesNotIn(placeholders).run(...repoIds);
+        deleteRepositoriesNotIn(placeholders).run(...repoIds);
+      }
+
       let count = 0;
       for (const repo of repositories) {
         const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
