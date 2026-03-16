@@ -281,36 +281,93 @@ jobs:
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
           '  });\\n\\n' +
-          '  // 提供稳定的菜单与编辑快捷键（生产环境）\\n' +
-          '  const menuTemplate = [\\n' +
-          '    {\\n' +
-          '      label: \\'Edit\\',\\n' +
-          '      submenu: [\\n' +
-          '        { role: \\'undo\\' },\\n' +
-          '        { role: \\'redo\\' },\\n' +
-          '        { type: \\'separator\\' },\\n' +
-          '        { role: \\'cut\\' },\\n' +
-          '        { role: \\'copy\\' },\\n' +
-          '        { role: \\'paste\\' },\\n' +
-          '        { role: \\'selectAll\\' }\\n' +
-          '      ]\\n' +
-          '    },\\n' +
-          '    {\\n' +
-          '      label: \\'View\\',\\n' +
-          '      submenu: [\\n' +
-          '        { role: \\'reload\\' },\\n' +
-          '        { role: \\'forceReload\\' },\\n' +
-          '        { type: \\'separator\\' },\\n' +
-          '        { role: \\'toggleDevTools\\' },\\n' +
-          '        { type: \\'separator\\' },\\n' +
-          '        { role: \\'resetZoom\\' },\\n' +
-          '        { role: \\'zoomIn\\' },\\n' +
-          '        { role: \\'zoomOut\\' },\\n' +
-          '        { role: \\'togglefullscreen\\' }\\n' +
-          '      ]\\n' +
-          '    }\\n' +
-          '  ];\\n' +
-          '  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));\\n\\n' +
+          '            '  // 提供稳定的菜单与编辑快捷键（生产环境）\n' +
+          '  const menuTemplate = process.platform === \'darwin\' ? [\n' +
+          '    {\n' +
+          '      label: app.name,\n' +
+          '      submenu: [\n' +
+          '        { role: \'about\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'services\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'hide\' },\n' +
+          '        { role: \'hideOthers\' },\n' +
+          '        { role: \'unhide\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'quit\' }\n' +
+          '      ]\n' +
+          '    },\n' +
+          '    {\n' +
+          '      label: \'Edit\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'undo\' },\n' +
+          '        { role: \'redo\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'cut\' },\n' +
+          '        { role: \'copy\' },\n' +
+          '        { role: \'paste\' },\n' +
+          '        { role: \'selectAll\' }\n' +
+          '      ]\n' +
+          '    },\n' +
+          '    {\n' +
+          '      label: \'View\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'reload\' },\n' +
+          '        { role: \'forceReload\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'toggleDevTools\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'resetZoom\' },\n' +
+          '        { role: \'zoomIn\' },\n' +
+          '        { role: \'zoomOut\' },\n' +
+          '        { role: \'togglefullscreen\' }\n' +
+          '      ]\n' +
+          '    },\n' +
+          '    {\n' +
+          '      label: \'Window\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'minimize\' },\n' +
+          '        { role: \'close\' }\n' +
+          '      ]\n' +
+          '    }\n' +
+          '  ] : [\n' +
+          '    {\n' +
+          '      label: \'Edit\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'undo\' },\n' +
+          '        { role: \'redo\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'cut\' },\n' +
+          '        { role: \'copy\' },\n' +
+          '        { role: \'paste\' },\n' +
+          '        { role: \'selectAll\' }\n' +
+          '      ]\n' +
+          '    },\n' +
+          '    {\n' +
+          '      label: \'View\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'reload\' },\n' +
+          '        { role: \'forceReload\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'toggleDevTools\' },\n' +
+          '        { type: \'separator\' },\n' +
+          '        { role: \'resetZoom\' },\n' +
+          '        { role: \'zoomIn\' },\n' +
+          '        { role: \'zoomOut\' },\n' +
+          '        { role: \'togglefullscreen\' }\n' +
+          '      ]\n' +
+          '    },\n' +
+          '    {\n' +
+          '      label: \'Window\',\n' +
+          '      submenu: [\n' +
+          '        { role: \'minimize\' },\n' +
+          '        { role: \'close\' }\n' +
+          '      ]\n' +
+          '    }\n' +
+          '  ];\n' +
+          '  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));\n' +
+          '\n' +
+
           '  mainWindow.webContents.setWindowOpenHandler(({ url }) => {\\n' +
           '    shell.openExternal(url);\\n' +
           '    return { action: \\'deny\\' };\\n' +
