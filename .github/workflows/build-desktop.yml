@@ -281,7 +281,7 @@ jobs:
           '  mainWindow.once(\\'ready-to-show\\', () => {\\n' +
           '    mainWindow.show();\\n' +
           '  });\\n\\n' +
-          '            '  // 提供稳定的菜单与编辑快捷键（生产环境）\n' +
+          '            '            '  // 提供稳定的菜单与编辑快捷键（生产环境）\n' +
           '  const menuTemplate = process.platform === \'darwin\' ? [\n' +
           '    {\n' +
           '      label: app.name,\n' +
@@ -366,6 +366,7 @@ jobs:
           '    }\n' +
           '  ];\n' +
           '  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));\n' +
+          '\n' +
           '\n' +
 
           '  mainWindow.webContents.setWindowOpenHandler(({ url }) => {\\n' +
