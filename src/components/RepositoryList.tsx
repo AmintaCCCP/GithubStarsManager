@@ -174,6 +174,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
       const targetScrollY = savedScrollYRef.current;
       if (targetScrollY === null) return;
+      if (window.scrollY === targetScrollY) {
+        savedScrollYRef.current = null;
+        return;
+      }
 
       restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
         restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
