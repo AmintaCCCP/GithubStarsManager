@@ -120,4 +120,13 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.4</downloadUrl>
   </version>
+  <version>
+    <number>0.2.5</number>
+    <releaseDate>2026-03-16</releaseDate>
+    <changelog>
+      <item>Fixed macOS App/Window menu missing in desktop build, restoring Command+Q (quit) and Command+W (close window) shortcuts.</item>
+      <item>Fixed SyntaxError in generated main.js caused by improper string escaping in the build workflow.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.5</downloadUrl>
+  </version>
 </versions>
