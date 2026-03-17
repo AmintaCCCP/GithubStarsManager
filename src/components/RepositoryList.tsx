@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 
@@ -34,6 +34,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
+  const previousCategoryRef = useRef(selectedCategory);
+  const savedScrollYRef = useRef<number | null>(null);
+  const restoreScrollFrameRef = useRef<number | null>(null);
   
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
@@ -85,12 +88,52 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const startIndex = filteredRepositories.length === 0 ? 0 : 1;
   const endIndex = Math.min(visibleCount, filteredRepositories.length);
   const visibleRepositories = filteredRepositories.slice(0, visibleCount);
+  const filterResetKey = useMemo(() => JSON.stringify({
+    selectedCategory,
+    query: searchFilters.query,
+    languages: searchFilters.languages,
+    tags: searchFilters.tags,
+    platforms: searchFilters.platforms,
+    sortBy: searchFilters.sortBy,
+    sortOrder: searchFilters.sortOrder,
+    minStars: searchFilters.minStars,
+    maxStars: searchFilters.maxStars,
+    isAnalyzed: searchFilters.isAnalyzed,
+    isSubscribed: searchFilters.isSubscribed,
+  }), [
+    selectedCategory,
+    searchFilters.query,
+    searchFilters.languages,
+    searchFilters.tags,
+    searchFilters.platforms,
+    searchFilters.sortBy,
+    searchFilters.sortOrder,
+    searchFilters.minStars,
+    searchFilters.maxStars,
+    searchFilters.isAnalyzed,
+    searchFilters.isSubscribed,
+  ]);
 
-  // Reset visible count when filters or data change
+  // Reset visible count only when filter context changes.
   useEffect(() => {
     setVisibleCount(LOAD_BATCH);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, repositories, filteredRepositories.length]);
+  }, [filterResetKey]);
+
+  useEffect(() => {
+    if (previousCategoryRef.current !== selectedCategory) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      previousCategoryRef.current = selectedCategory;
+    }
+  }, [selectedCategory]);
+
+  // Clamp visible count when result set becomes smaller, but do not collapse
+  // back to the initial batch during backend sync refreshes.
+  useEffect(() => {
+    setVisibleCount((count) => {
+      if (filteredRepositories.length === 0) return LOAD_BATCH;
+      return Math.min(count, filteredRepositories.length);
+    });
+  }, [filteredRepositories.length]);
 
   // IntersectionObserver to load more on demand
   useEffect(() => {
@@ -117,11 +160,35 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   useEffect(() => {
     const handleSyncVisualState = (event: Event) => {
       const customEvent = event as CustomEvent<{ isSyncing?: boolean }>;
-      setDisableCardAnimations(!!customEvent.detail?.isSyncing);
+      const isSyncing = !!customEvent.detail?.isSyncing;
+      setDisableCardAnimations(isSyncing);
+
+      if (isSyncing) {
+        savedScrollYRef.current = window.scrollY;
+        if (restoreScrollFrameRef.current !== null) {
+          cancelAnimationFrame(restoreScrollFrameRef.current);
+          restoreScrollFrameRef.current = null;
+        }
+        return;
+      }
+
+      const targetScrollY = savedScrollYRef.current;
+      if (targetScrollY === null) return;
+
+      restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
+        restoreScrollFrameRef.current = window.requestAnimationFrame(() => {
+          window.scrollTo({ top: targetScrollY, behavior: 'auto' });
+          restoreScrollFrameRef.current = null;
+          savedScrollYRef.current = null;
+        });
+      });
     };
 
     window.addEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
     return () => {
+      if (restoreScrollFrameRef.current !== null) {
+        cancelAnimationFrame(restoreScrollFrameRef.current);
+      }
       window.removeEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
     };
   }, []);

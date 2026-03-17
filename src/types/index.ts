@@ -155,6 +155,7 @@ export interface AppState {
   // UI
   theme: 'light' | 'dark';
   currentView: 'repositories' | 'releases' | 'settings';
+  selectedCategory: string;
   language: 'zh' | 'en';
   
   // Update
