@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -16,12 +16,12 @@ function App() {
   const { 
     isAuthenticated, 
     currentView, 
+    selectedCategory,
     theme,
     searchResults,
-    repositories 
+    repositories,
+    setSelectedCategory,
   } = useAppStore();
-
-  const [selectedCategory, setSelectedCategory] = useState('all');
 
   // 自动检查更新
   useAutoUpdateCheck();

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Star, Github, Key, ArrowRight, AlertCircle } from 'lucide-react';
+import { Github, Key, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -67,8 +67,12 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 shadow-lg">
-            <Star className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-center w-16 h-16 bg-white rounded-2xl mx-auto mb-4 shadow-lg ring-1 ring-blue-100 overflow-hidden">
+            <img
+              src="./icon.png"
+              alt="GitHub Stars Manager"
+              className="w-full h-full object-cover"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             GitHub Stars Manager
