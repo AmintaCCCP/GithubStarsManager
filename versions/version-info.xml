@@ -129,4 +129,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.5</downloadUrl>
   </version>
+  <version>
+    <number>0.2.6</number>
+    <releaseDate>2026-03-22</releaseDate>
+    <changelog>
+      <item>Kept already loaded repository cards visible during sync, so refreshes no longer interrupt reading flow.</item>
+      <item>Preserved scroll position after repository sync to avoid sudden jumps in long lists.</item>
+      <item>Persisted repository view context, including the selected category and current view, across refresh and reload.</item>
+      <item>Updated the app and login icon assets to use the project icon consistently.</item>
+      <item>Improved nginx proxy resilience for containerized deployments by using a more reliable backend upstream setup. Thanks to external contributor @HuberttFox for PR #60.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.6</downloadUrl>
+  </version>
 </versions>
