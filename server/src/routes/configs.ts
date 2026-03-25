@@ -37,6 +37,7 @@ router.get('/api/configs/ai', (req, res) => {
         customPrompt: row.custom_prompt ?? null,
         useCustomPrompt: !!row.use_custom_prompt,
         concurrency: row.concurrency ?? 1,
+        reasoningEffort: row.reasoning_effort ?? null,
       };
     });
     res.json(configs);
@@ -50,18 +51,18 @@ router.get('/api/configs/ai', (req, res) => {
 router.post('/api/configs/ai', (req, res) => {
   try {
     const db = getDb();
-    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency } = req.body as Record<string, unknown>;
+    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency, reasoningEffort } = req.body as Record<string, unknown>;
 
     const encryptedKey = apiKey && typeof apiKey === 'string' ? encrypt(apiKey, config.encryptionKey) : null;
 
     const result = db.prepare(
-      'INSERT INTO ai_configs (name, api_type, model, base_url, api_key_encrypted, is_active, custom_prompt, use_custom_prompt, concurrency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO ai_configs (name, api_type, model, base_url, api_key_encrypted, is_active, custom_prompt, use_custom_prompt, concurrency, reasoning_effort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null,
-      encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1
+      encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, reasoningEffort ?? null
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, apiType, model, baseUrl, apiKey: maskApiKey(apiKey as string), isActive: !!isActive });
+    res.status(201).json({ id: result.lastInsertRowid, name, apiType, model, baseUrl, apiKey: maskApiKey(apiKey as string), isActive: !!isActive, reasoningEffort: reasoningEffort ?? null });
   } catch (err) {
     console.error('POST /api/configs/ai error:', err);
     res.status(500).json({ error: 'Failed to create AI config', code: 'CREATE_AI_CONFIG_FAILED' });
@@ -84,6 +85,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
       customPrompt?: string;
       useCustomPrompt?: boolean;
       concurrency?: number;
+      reasoningEffort?: string;
     }>;
 
     if (!Array.isArray(configs)) {
@@ -102,8 +104,8 @@ router.put('/api/configs/ai/bulk', (req, res) => {
       db.prepare('DELETE FROM ai_configs').run();
 
       const stmt = db.prepare(`
-        INSERT INTO ai_configs (id, name, api_type, base_url, api_key_encrypted, model, is_active, custom_prompt, use_custom_prompt, concurrency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ai_configs (id, name, api_type, base_url, api_key_encrypted, model, is_active, custom_prompt, use_custom_prompt, concurrency, reasoning_effort)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const c of configs) {
@@ -116,7 +118,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
         stmt.run(
           c.id, c.name ?? '', c.apiType ?? 'openai', c.baseUrl ?? '',
           encryptedKey, c.model ?? '', c.isActive ? 1 : 0,
-          c.customPrompt ?? null, c.useCustomPrompt ? 1 : 0, c.concurrency ?? 1
+          c.customPrompt ?? null, c.useCustomPrompt ? 1 : 0, c.concurrency ?? 1, c.reasoningEffort ?? null
         );
       }
     });
@@ -134,7 +136,7 @@ router.put('/api/configs/ai/:id', (req, res) => {
   try {
     const db = getDb();
     const id = req.params.id;
-    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency } = req.body as Record<string, unknown>;
+    const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency, reasoningEffort } = req.body as Record<string, unknown>;
 
     let encryptedKey: string | null = null;
     if (apiKey && typeof apiKey === 'string' && !apiKey.startsWith('***')) {
@@ -146,8 +148,8 @@ router.put('/api/configs/ai/:id', (req, res) => {
     }
 
     const result = db.prepare(
-      'UPDATE ai_configs SET name = ?, api_type = ?, model = ?, base_url = ?, api_key_encrypted = ?, is_active = ?, custom_prompt = ?, use_custom_prompt = ?, concurrency = ? WHERE id = ?'
-    ).run(name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null, encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, id);
+      'UPDATE ai_configs SET name = ?, api_type = ?, model = ?, base_url = ?, api_key_encrypted = ?, is_active = ?, custom_prompt = ?, use_custom_prompt = ?, concurrency = ?, reasoning_effort = ? WHERE id = ?'
+    ).run(name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null, encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, reasoningEffort ?? null, id);
 
     if (result.changes === 0) {
       res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
@@ -158,7 +160,7 @@ router.put('/api/configs/ai/:id', (req, res) => {
       try { maskedKey = maskApiKey(decrypt(encryptedKey, config.encryptionKey)); } catch { maskedKey = '****'; }
     }
 
-    res.json({ id, name, apiType, model, baseUrl, apiKey: maskedKey, isActive: !!isActive });
+    res.json({ id, name, apiType, model, baseUrl, apiKey: maskedKey, isActive: !!isActive, reasoningEffort: reasoningEffort ?? null });
   } catch (err) {
     console.error('PUT /api/configs/ai error:', err);
     res.status(500).json({ error: 'Failed to update AI config', code: 'UPDATE_AI_CONFIG_FAILED' });

@@ -1,5 +1,12 @@
 import type Database from 'better-sqlite3';
 
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((col) => col.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 export function initializeSchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
@@ -68,7 +75,8 @@ export function initializeSchema(db: Database.Database): void {
       is_active INTEGER DEFAULT 0,
       custom_prompt TEXT,
       use_custom_prompt INTEGER DEFAULT 0,
-      concurrency INTEGER DEFAULT 1
+      concurrency INTEGER DEFAULT 1,
+      reasoning_effort TEXT
     );
 
     CREATE TABLE IF NOT EXISTS webdav_configs (
@@ -92,4 +100,6 @@ export function initializeSchema(db: Database.Database): void {
       value TEXT
     );
   `);
+
+  addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
 }

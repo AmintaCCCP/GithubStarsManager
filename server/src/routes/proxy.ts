@@ -93,6 +93,9 @@ router.post('/api/proxy/ai', async (req, res) => {
     const apiType = (aiConfig.api_type as string) || 'openai';
     const baseUrl = aiConfig.base_url as string;
     const model = aiConfig.model as string;
+    const reasoningEffort = aiConfig.reasoning_effort === 'minimal'
+      ? 'low'
+      : aiConfig.reasoning_effort as string | null | undefined;
 
     let targetUrl: string;
     const headers: Record<string, string> = {
@@ -118,12 +121,24 @@ router.post('/api/proxy/ai', async (req, res) => {
       targetUrl = urlObj.toString();
     }
 
+    const effectiveRequestBody = (
+      reasoningEffort
+      && typeof requestBody === 'object'
+      && requestBody !== null
+      && (apiType === 'openai' || apiType === 'openai-responses')
+      && !('reasoning' in requestBody)
+    )
+      ? { ...requestBody, reasoning: { effort: reasoningEffort } }
+      : requestBody;
+
+    const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
+
     const result = await proxyRequest({
       url: targetUrl,
       method: 'POST',
       headers,
-      body: requestBody,
-      timeout: 60000,
+      body: effectiveRequestBody,
+      timeout,
     });
 
     res.status(result.status).json(result.data);

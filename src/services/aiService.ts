@@ -1,4 +1,4 @@
-import { Repository, AIConfig } from '../types';
+import { Repository, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 
 export class AIService {
@@ -10,8 +10,15 @@ export class AIService {
     this.language = language;
   }
 
-  private getApiType(): 'openai' | 'openai-responses' | 'claude' | 'gemini' {
-    return (this.config.apiType as 'openai' | 'openai-responses' | 'claude' | 'gemini') || 'openai';
+  private getApiType(): AIApiType {
+    return this.config.apiType || 'openai';
+  }
+
+  private getOpenAIReasoningPayload(): { effort: 'none' | 'low' | 'medium' | 'high' | 'xhigh' } | undefined {
+    const effort = this.config.reasoningEffort === 'minimal'
+      ? 'low'
+      : this.config.reasoningEffort;
+    return effort ? { effort } : undefined;
   }
 
   private buildApiUrl(pathWithVersion: string): string {
@@ -49,6 +56,7 @@ export class AIService {
     signal?: AbortSignal;
   }): Promise<string> {
     const apiType = this.getApiType();
+    const reasoning = this.getOpenAIReasoningPayload();
 
     if (apiType === 'openai' || apiType === 'openai-responses') {
       const messages = [
@@ -64,12 +72,14 @@ export class AIService {
             input: messages,
             temperature: options.temperature,
             max_output_tokens: options.maxTokens,
+            ...(reasoning ? { reasoning } : {}),
           }
         : {
             model: this.config.model,
             messages,
             temperature: options.temperature,
             max_tokens: options.maxTokens,
+            ...(reasoning ? { reasoning } : {}),
           };
 
       let data: any;
@@ -471,7 +481,9 @@ Focus on practicality and accurate categorization to help users quickly understa
       if (base.protocol !== 'http:' && base.protocol !== 'https:') return false;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 秒超时，避免长时间卡住
+      const apiType = this.getApiType();
+      const timeoutMs = apiType === 'openai-responses' || this.config.reasoningEffort ? 30000 : 10000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const content = await this.requestText({
           system: 'You are a connection test assistant.',
