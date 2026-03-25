@@ -70,6 +70,8 @@ export interface GitHubUser {
 export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini';
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 
+export type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
+
 export interface AIConfig {
   id: string;
   name: string;
@@ -82,6 +84,7 @@ export interface AIConfig {
   useCustomPrompt?: boolean; // 是否使用自定义提示词
   concurrency?: number; // AI分析并发数，默认为1
   reasoningEffort?: AIReasoningEffort; // OpenAI GPT-5/Responses 可选 reasoning 强度
+  apiKeyStatus?: SecretStatus;
 }
 
 export interface WebDAVConfig {
@@ -92,6 +95,7 @@ export interface WebDAVConfig {
   password: string;
   path: string;
   isActive: boolean;
+  passwordStatus?: SecretStatus;
 }
 
 export interface SearchFilters {

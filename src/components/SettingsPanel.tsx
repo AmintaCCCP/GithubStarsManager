@@ -943,6 +943,14 @@ Focus on practicality and accurate categorization to help users quickly understa
                       {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                       {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                     </p>
+                    {config.apiKeyStatus === 'decrypt_failed' && (
+                      <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                        {t(
+                          '存储的 API Key 无法解密，请重新输入并保存该配置。',
+                          'The stored API key could not be decrypted. Please re-enter and save this configuration.'
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
@@ -1135,6 +1143,14 @@ Focus on practicality and accurate categorization to help users quickly understa
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {config.url} • {config.path}
                     </p>
+                    {config.passwordStatus === 'decrypt_failed' && (
+                      <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                        {t(
+                          '存储的 WebDAV 密码无法解密，请重新输入并保存该配置。',
+                          'The stored WebDAV password could not be decrypted. Please re-enter and save this configuration.'
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
