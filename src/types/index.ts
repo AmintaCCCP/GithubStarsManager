@@ -68,7 +68,7 @@ export interface GitHubUser {
 }
 
 export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini';
-export type AIReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export interface AIConfig {
   id: string;
