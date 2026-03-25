@@ -5,6 +5,35 @@ import { config } from '../config.js';
 
 const router = Router();
 
+type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
+
+function getMaskedSecretResult(params: {
+  encryptedValue: unknown;
+  encryptionKey: string;
+  kind: 'AI API key' | 'WebDAV password' | 'GitHub token';
+  configId?: unknown;
+  configName?: unknown;
+}): { decryptedValue: string; status: SecretStatus } {
+  const { encryptedValue, encryptionKey, kind, configId, configName } = params;
+
+  if (!encryptedValue || typeof encryptedValue !== 'string') {
+    return { decryptedValue: '', status: 'empty' };
+  }
+
+  try {
+    return {
+      decryptedValue: decrypt(encryptedValue, encryptionKey),
+      status: 'ok',
+    };
+  } catch (error) {
+    const detail = [configId ? `id=${String(configId)}` : '', configName ? `name=${String(configName)}` : '']
+      .filter(Boolean)
+      .join(', ');
+    console.warn(`[configs] Failed to decrypt ${kind}${detail ? ` (${detail})` : ''}:`, error);
+    return { decryptedValue: '', status: 'decrypt_failed' };
+  }
+}
+
 // ── AI Configs ──
 
 function maskApiKey(key: string | null | undefined): string {
@@ -20,19 +49,21 @@ router.get('/api/configs/ai', (req, res) => {
     const shouldDecrypt = req.query.decrypt === 'true';
     const rows = db.prepare('SELECT * FROM ai_configs ORDER BY id ASC').all() as Record<string, unknown>[];
     const configs = rows.map((row) => {
-      let decryptedKey = '';
-      try {
-        if (row.api_key_encrypted && typeof row.api_key_encrypted === 'string') {
-          decryptedKey = decrypt(row.api_key_encrypted, config.encryptionKey);
-        }
-      } catch { /* leave empty */ }
+      const { decryptedValue, status } = getMaskedSecretResult({
+        encryptedValue: row.api_key_encrypted,
+        encryptionKey: config.encryptionKey,
+        kind: 'AI API key',
+        configId: row.id,
+        configName: row.name,
+      });
       return {
         id: row.id,
         name: row.name,
         apiType: row.api_type,
         model: row.model,
         baseUrl: row.base_url,
-        apiKey: shouldDecrypt ? decryptedKey : maskApiKey(decryptedKey),
+        apiKey: shouldDecrypt ? decryptedValue : maskApiKey(decryptedValue),
+        apiKeyStatus: status,
         isActive: !!row.is_active,
         customPrompt: row.custom_prompt ?? null,
         useCustomPrompt: !!row.use_custom_prompt,
@@ -199,18 +230,20 @@ router.get('/api/configs/webdav', (req, res) => {
     const shouldDecrypt = req.query.decrypt === 'true';
     const rows = db.prepare('SELECT * FROM webdav_configs ORDER BY id ASC').all() as Record<string, unknown>[];
     const configs = rows.map((row) => {
-      let decryptedPwd = '';
-      try {
-        if (row.password_encrypted && typeof row.password_encrypted === 'string') {
-          decryptedPwd = decrypt(row.password_encrypted, config.encryptionKey);
-        }
-      } catch { /* leave empty */ }
+      const { decryptedValue, status } = getMaskedSecretResult({
+        encryptedValue: row.password_encrypted,
+        encryptionKey: config.encryptionKey,
+        kind: 'WebDAV password',
+        configId: row.id,
+        configName: row.name,
+      });
       return {
         id: row.id,
         name: row.name,
         url: row.url,
         username: row.username,
-        password: shouldDecrypt ? decryptedPwd : maskPassword(decryptedPwd),
+        password: shouldDecrypt ? decryptedValue : maskPassword(decryptedValue),
+        passwordStatus: status,
         path: row.path,
         isActive: !!row.is_active,
       };
@@ -367,12 +400,13 @@ router.get('/api/settings', (_req, res) => {
       let value = row.value as string | null;
 
       if (key === 'github_token' && value) {
-        try {
-          const decrypted = decrypt(value, config.encryptionKey);
-          value = maskApiKey(decrypted);
-        } catch {
-          value = '****';
-        }
+        const { decryptedValue, status } = getMaskedSecretResult({
+          encryptedValue: value,
+          encryptionKey: config.encryptionKey,
+          kind: 'GitHub token',
+        });
+        value = status === 'empty' ? '' : maskApiKey(decryptedValue);
+        settings.github_token_status = status;
       }
 
       settings[key] = value;
