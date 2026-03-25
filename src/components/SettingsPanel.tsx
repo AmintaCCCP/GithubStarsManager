@@ -22,7 +22,7 @@ import {
   Twitter,
   Server,
 } from 'lucide-react';
-import { AIConfig, WebDAVConfig } from '../types';
+import { AIConfig, WebDAVConfig, AIApiType, AIReasoningEffort } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
@@ -94,13 +94,14 @@ export const SettingsPanel: React.FC = () => {
 
   type AIFormState = {
     name: string;
-    apiType: 'openai' | 'openai-responses' | 'claude' | 'gemini';
+    apiType: AIApiType;
     baseUrl: string;
     apiKey: string;
     model: string;
     customPrompt: string;
     useCustomPrompt: boolean;
     concurrency: number;
+    reasoningEffort: '' | AIReasoningEffort;
   };
 
   const [aiForm, setAIForm] = useState<AIFormState>({
@@ -112,6 +113,7 @@ export const SettingsPanel: React.FC = () => {
     customPrompt: '',
     useCustomPrompt: false,
     concurrency: 1,
+    reasoningEffort: '',
   });
 
   const [webdavForm, setWebDAVForm] = useState({
@@ -132,6 +134,7 @@ export const SettingsPanel: React.FC = () => {
       customPrompt: '',
       useCustomPrompt: false,
       concurrency: 1,
+      reasoningEffort: '',
     });
     setShowAIForm(false);
     setEditingAIId(null);
@@ -167,6 +170,7 @@ export const SettingsPanel: React.FC = () => {
       customPrompt: aiForm.customPrompt || undefined,
       useCustomPrompt: aiForm.useCustomPrompt,
       concurrency: aiForm.concurrency,
+      reasoningEffort: aiForm.reasoningEffort || undefined,
     };
 
     if (editingAIId) {
@@ -188,6 +192,7 @@ export const SettingsPanel: React.FC = () => {
       customPrompt: config.customPrompt || '',
       useCustomPrompt: config.useCustomPrompt || false,
       concurrency: config.concurrency || 1,
+      reasoningEffort: config.reasoningEffort || '',
     });
     setEditingAIId(config.id);
     setShowAIForm(true);
@@ -390,6 +395,7 @@ export const SettingsPanel: React.FC = () => {
                   customPrompt: cfg.customPrompt,
                   useCustomPrompt: cfg.useCustomPrompt,
                   concurrency: cfg.concurrency,
+                  reasoningEffort: cfg.reasoningEffort,
                   // 仅当备份未掩码时才覆盖 apiKey
                   apiKey: isMasked ? existing.apiKey : cfg.apiKey,
                   // 保留现有 isActive 状态
@@ -732,7 +738,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 </label>
                 <select
                   value={aiForm.apiType}
-                  onChange={(e) => setAIForm(prev => ({ ...prev, apiType: e.target.value as 'openai' | 'openai-responses' | 'claude' | 'gemini' }))}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, apiType: e.target.value as AIApiType }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
                   <option value="openai">OpenAI (Chat Completions)</option>
@@ -808,6 +814,29 @@ Focus on practicality and accurate categorization to help users quickly understa
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('推理强度', 'Reasoning Effort')}
+                </label>
+                <select
+                  value={aiForm.reasoningEffort}
+                  onChange={(e) => setAIForm(prev => ({ ...prev, reasoningEffort: e.target.value as '' | AIReasoningEffort }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
+                  <option value="minimal">minimal</option>
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t(
+                    '仅对 OpenAI 兼容接口生效。留空时保持旧模式兼容，不额外传 reasoning。',
+                    'Only applies to OpenAI-compatible APIs. Leave empty to preserve legacy behavior and omit reasoning.'
+                  )}
                 </p>
               </div>
             </div>
@@ -911,6 +940,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     </h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
+                      {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                     </p>
                   </div>
                 </div>
