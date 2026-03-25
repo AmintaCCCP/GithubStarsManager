@@ -153,4 +153,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.7</downloadUrl>
   </version>
+  <version>
+    <number>0.2.8</number>
+    <releaseDate>2026-03-25</releaseDate>
+    <changelog>
+      <item>Added observable decryption failure handling for stored AI API keys, WebDAV passwords, and GitHub tokens.</item>
+      <item>Kept settings APIs responsive even when one stored secret cannot be decrypted, instead of failing the entire response.</item>
+      <item>Returned per-secret status metadata so the frontend can distinguish normal, empty, and decrypt-failed states.</item>
+      <item>Added clear Settings warnings telling users to re-enter and save configurations whose stored secrets can no longer be decrypted.</item>
+      <item>Improved debugging by logging decryption failures with config context on the backend.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.8</downloadUrl>
+  </version>
 </versions>
