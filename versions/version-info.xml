@@ -141,4 +141,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.6</downloadUrl>
   </version>
+  <version>
+    <number>0.2.7</number>
+    <releaseDate>2026-03-25</releaseDate>
+    <changelog>
+      <item>Added optional reasoning effort support for GPT-5 compatible OpenAI APIs.</item>
+      <item>Kept backward compatibility by leaving reasoning disabled unless users explicitly enable it.</item>
+      <item>Persisted the reasoning setting across frontend config state, backend config APIs, import/export, and database migration.</item>
+      <item>Improved compatibility for OpenAI Responses and reasoning-enabled requests with longer request and connection test timeouts.</item>
+      <item>Normalized legacy unsupported reasoning value `minimal` to `low` to prevent request failures with GPT-5 compatible models.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.7</downloadUrl>
+  </version>
 </versions>
