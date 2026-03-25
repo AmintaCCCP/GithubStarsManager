@@ -67,10 +67,13 @@ export interface GitHubUser {
   email: string | null;
 }
 
+export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini';
+export type AIReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+
 export interface AIConfig {
   id: string;
   name: string;
-  apiType?: 'openai' | 'openai-responses' | 'claude' | 'gemini'; // API 格式/兼容协议（默认 openai）
+  apiType?: AIApiType; // API 格式/兼容协议（默认 openai）
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -78,6 +81,7 @@ export interface AIConfig {
   customPrompt?: string; // 自定义提示词
   useCustomPrompt?: boolean; // 是否使用自定义提示词
   concurrency?: number; // AI分析并发数，默认为1
+  reasoningEffort?: AIReasoningEffort; // OpenAI GPT-5/Responses 可选 reasoning 强度
 }
 
 export interface WebDAVConfig {
