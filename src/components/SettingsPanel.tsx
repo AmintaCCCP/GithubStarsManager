@@ -192,7 +192,7 @@ export const SettingsPanel: React.FC = () => {
       customPrompt: config.customPrompt || '',
       useCustomPrompt: config.useCustomPrompt || false,
       concurrency: config.concurrency || 1,
-      reasoningEffort: config.reasoningEffort || '',
+      reasoningEffort: (config.reasoningEffort === 'minimal' ? 'low' : config.reasoningEffort) || '',
     });
     setEditingAIId(config.id);
     setShowAIForm(true);
@@ -827,10 +827,11 @@ Focus on practicality and accurate categorization to help users quickly understa
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
                   <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
-                  <option value="minimal">minimal</option>
+                  <option value="none">none</option>
                   <option value="low">low</option>
                   <option value="medium">medium</option>
                   <option value="high">high</option>
+                  <option value="xhigh">xhigh</option>
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t(

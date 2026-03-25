@@ -14,8 +14,10 @@ export class AIService {
     return this.config.apiType || 'openai';
   }
 
-  private getOpenAIReasoningPayload(): { effort: 'minimal' | 'low' | 'medium' | 'high' } | undefined {
-    const effort = this.config.reasoningEffort;
+  private getOpenAIReasoningPayload(): { effort: 'none' | 'low' | 'medium' | 'high' | 'xhigh' } | undefined {
+    const effort = this.config.reasoningEffort === 'minimal'
+      ? 'low'
+      : this.config.reasoningEffort;
     return effort ? { effort } : undefined;
   }
 

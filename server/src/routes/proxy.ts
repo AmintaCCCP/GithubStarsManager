@@ -93,7 +93,9 @@ router.post('/api/proxy/ai', async (req, res) => {
     const apiType = (aiConfig.api_type as string) || 'openai';
     const baseUrl = aiConfig.base_url as string;
     const model = aiConfig.model as string;
-    const reasoningEffort = aiConfig.reasoning_effort as string | null | undefined;
+    const reasoningEffort = aiConfig.reasoning_effort === 'minimal'
+      ? 'low'
+      : aiConfig.reasoning_effort as string | null | undefined;
 
     let targetUrl: string;
     const headers: Record<string, string> = {
