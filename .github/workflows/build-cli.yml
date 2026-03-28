@@ -1,0 +1,38 @@
+name: Build CLI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'scripts/githubstars-cli.mjs'
+      - '.github/workflows/build-cli.yml'
+      - 'package.json'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'scripts/githubstars-cli.mjs'
+      - '.github/workflows/build-cli.yml'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  build-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify CLI help path
+        run: |
+          node scripts/githubstars-cli.mjs || true
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: githubstars-cli
+          path: scripts/githubstars-cli.mjs

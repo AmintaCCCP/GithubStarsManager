@@ -11,6 +11,7 @@ import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import { syncSnapshotToLocalStorage } from './services/snapshotStorage';
 
 function App() {
   const { 
@@ -20,6 +21,7 @@ function App() {
     theme,
     searchResults,
     repositories,
+    customCategories,
     setSelectedCategory,
   } = useAppStore();
 
@@ -34,6 +36,12 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Keep a stable snapshot for local CLI/skills consumption
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    syncSnapshotToLocalStorage(repositories, customCategories);
+  }, [isAuthenticated, repositories, customCategories]);
 
   // Initialize backend adapter and auto-sync
   useEffect(() => {
