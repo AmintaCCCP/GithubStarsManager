@@ -19,8 +19,9 @@ if (!fs.existsSync(electronDir)) {
 
 // 3. 创建主进程文件
 const mainJs = `
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
@@ -35,11 +36,12 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: true
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
     icon: path.join(__dirname, '../dist/icon.svg'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    show: false
+    show: false,
   });
 
   // 加载应用
@@ -52,60 +54,6 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
-    // 设置应用菜单
-    if (process.platform === 'darwin') {
-      const template = [
-        {
-          label: 'GitHub Stars Manager',
-          submenu: [
-            { role: 'about' },
-            { type: 'separator' },
-            { role: 'services' },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideothers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { role: 'quit' }
-          ]
-        },
-        {
-          label: 'Edit',
-          submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
-            { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
-            { role: 'selectall' }
-          ]
-        },
-        {
-          label: 'View',
-          submenu: [
-            { role: 'reload' },
-            { role: 'forceReload' },
-            { role: 'toggleDevTools' },
-            { type: 'separator' },
-            { role: 'resetZoom' },
-            { role: 'zoomIn' },
-            { role: 'zoomOut' },
-            { type: 'separator' },
-            { role: 'togglefullscreen' }
-          ]
-        },
-        {
-          label: 'Window',
-          submenu: [
-            { role: 'minimize' },
-            { role: 'close' }
-          ]
-        }
-      ];
-      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    }
   });
 
   // 处理外部链接
@@ -118,6 +66,47 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// 获取快照文件路径（固定位置）
+function getSnapshotPath() {
+  const appDataPath = app.getPath('userData');
+  return path.join(appDataPath, 'github-stars.snapshot.json');
+}
+
+// 写快照文件
+ipcMain.handle('write-snapshot', async (event, data) => {
+  try {
+    const snapshotPath = getSnapshotPath();
+    const dir = path.dirname(snapshotPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    fs.writeFileSync(snapshotPath, content, 'utf8');
+    return { ok: true, path: snapshotPath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// 读快照文件
+ipcMain.handle('read-snapshot', async () => {
+  try {
+    const snapshotPath = getSnapshotPath();
+    if (!fs.existsSync(snapshotPath)) {
+      return { ok: false, error: 'Snapshot file not found', path: snapshotPath };
+    }
+    const content = fs.readFileSync(snapshotPath, 'utf8');
+    return { ok: true, data: JSON.parse(content), path: snapshotPath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// 获取快照路径
+ipcMain.handle('get-snapshot-path', async () => {
+  return getSnapshotPath();
+});
 
 app.whenReady().then(createWindow);
 
@@ -133,7 +122,6 @@ app.on('activate', () => {
   }
 });
 
-// 安全设置
 app.on('web-contents-created', (event, contents) => {
   contents.on('new-window', (event, navigationUrl) => {
     event.preventDefault();
@@ -144,22 +132,35 @@ app.on('web-contents-created', (event, contents) => {
 
 fs.writeFileSync(path.join(electronDir, 'main.js'), mainJs);
 
-// 4. 创建Electron package.json
+// 4. 创建 preload.js（安全桥接）
+const preloadJs = `
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  writeSnapshot: (data) => ipcRenderer.invoke('write-snapshot', data),
+  readSnapshot: () => ipcRenderer.invoke('read-snapshot'),
+  getSnapshotPath: () => ipcRenderer.invoke('get-snapshot-path'),
+});
+`;
+
+fs.writeFileSync(path.join(electronDir, 'preload.js'), preloadJs);
+
+// 5. 创建Electron package.json
 const electronPackageJson = {
   name: 'github-stars-manager-desktop',
   version: '1.0.0',
   description: 'GitHub Stars Manager Desktop App',
   main: 'main.js',
   author: 'GitHub Stars Manager',
-  license: 'MIT'
+  license: 'MIT',
 };
 
 fs.writeFileSync(
-  path.join(electronDir, 'package.json'), 
+  path.join(electronDir, 'package.json'),
   JSON.stringify(electronPackageJson, null, 2)
 );
 
-// 5. 安装Electron依赖
+// 6. 安装Electron依赖
 console.log('📥 安装Electron依赖...');
 try {
   execSync('npm install --save-dev electron electron-builder', { stdio: 'inherit' });
@@ -168,7 +169,7 @@ try {
   process.exit(1);
 }
 
-// 6. 构建应用
+// 7. 构建应用
 console.log('🔨 构建桌面应用...');
 try {
   execSync('npx electron-builder', { stdio: 'inherit' });
