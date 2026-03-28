@@ -11,7 +11,7 @@ import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
-import { syncSnapshotToLocalStorage } from './services/snapshotStorage';
+import { syncSnapshotToLocalStorage, writeSnapshotToDesktopFile } from './services/snapshotStorage';
 
 function App() {
   const { 
@@ -37,10 +37,17 @@ function App() {
     }
   }, [theme]);
 
-  // Keep a stable snapshot for local CLI/skills consumption
+  // Keep a stable snapshot for local CLI/skills consumption (localStorage + desktop file)
   useEffect(() => {
     if (!isAuthenticated) return;
-    syncSnapshotToLocalStorage(repositories, customCategories);
+    const snapshot = syncSnapshotToLocalStorage(repositories, customCategories);
+    // Also write to the fixed desktop snapshot file
+    writeSnapshotToDesktopFile({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      repositories,
+      categories: customCategories,
+    }).catch(console.error);
   }, [isAuthenticated, repositories, customCategories]);
 
   // Initialize backend adapter and auto-sync
