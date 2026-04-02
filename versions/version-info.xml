@@ -165,4 +165,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.8</downloadUrl>
   </version>
+  <version>
+    <number>0.2.9</number>
+    <releaseDate>2026-04-02</releaseDate>
+    <changelog>
+      <item>Improved AI summary parsing by stripping fenced JSON code blocks before extraction.</item>
+      <item>Replaced fragile greedy JSON matching with balanced-brace parsing to better handle wrapped responses.</item>
+      <item>Increased the AI analysis token budget to reduce failures caused by truncated structured output.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.9</downloadUrl>
+  </version>
 </versions>
