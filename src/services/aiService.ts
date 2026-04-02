@@ -250,7 +250,7 @@ ${options.user}` : options.user;
         system,
         user: prompt,
         temperature: 0.3,
-        maxTokens: 400,
+        maxTokens: 700,
       });
 
       return this.parseAIResponse(content);
@@ -351,20 +351,25 @@ Focus on practicality and accurate categorization to help users quickly understa
 
   private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
     try {
-      // Try to extract JSON from the response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+      const cleaned = content
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const parsed = this.extractAndParseAIJson(cleaned);
+      if (parsed) {
         return {
-          summary: parsed.summary || (this.language === 'zh' ? '无法生成概述' : 'Unable to generate summary'),
-          tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [],
-          platforms: Array.isArray(parsed.platforms) ? parsed.platforms.slice(0, 8) : [],
+          summary: typeof parsed.summary === 'string' && parsed.summary.trim()
+            ? parsed.summary.trim()
+            : (this.language === 'zh' ? '无法生成概述' : 'Unable to generate summary'),
+          tags: Array.isArray(parsed.tags) ? parsed.tags.filter((v) => typeof v === 'string').slice(0, 5) : [],
+          platforms: Array.isArray(parsed.platforms) ? parsed.platforms.filter((v) => typeof v === 'string').slice(0, 8) : [],
         };
       }
-      
-      // Fallback parsing
+
       return {
-        summary: content.substring(0, 50) + '...',
+        summary: cleaned.substring(0, 50) + (cleaned.length > 50 ? '...' : ''),
         tags: [],
         platforms: [],
       };
@@ -375,6 +380,63 @@ Focus on practicality and accurate categorization to help users quickly understa
         tags: [],
         platforms: [],
       };
+    }
+  }
+
+  private extractAndParseAIJson(content: string): Record<string, unknown> | null {
+    const direct = this.tryParseJsonObject(content);
+    if (direct) return direct;
+
+    const start = content.indexOf('{');
+    if (start === -1) return null;
+
+    let inString = false;
+    let escaped = false;
+    let depth = 0;
+
+    for (let i = start; i < content.length; i++) {
+      const char = content[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === '{') depth++;
+      if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          return this.tryParseJsonObject(content.slice(start, i + 1));
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private tryParseJsonObject(text: string): Record<string, unknown> | null {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
     }
   }
 
