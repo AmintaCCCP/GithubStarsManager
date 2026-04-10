@@ -452,7 +452,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         const clearedRepositories = state.repositories.map(repo =>
           repo.custom_category === targetCategory.name
-            ? { ...repo, custom_category: undefined, last_edited: new Date().toISOString() }
+            ? { ...repo, custom_category: undefined, category_locked: false, last_edited: new Date().toISOString() }
             : repo
         );
 
@@ -461,7 +461,7 @@ export const useAppStore = create<AppState & AppActions>()(
           repositories: clearedRepositories,
           searchResults: state.searchResults.map(repo =>
             repo.custom_category === targetCategory.name
-              ? { ...repo, custom_category: undefined, last_edited: new Date().toISOString() }
+              ? { ...repo, custom_category: undefined, category_locked: false, last_edited: new Date().toISOString() }
               : repo
           ),
           selectedCategory: nextSelectedCategory

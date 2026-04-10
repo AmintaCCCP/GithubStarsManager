@@ -23,7 +23,7 @@ import {
   Server,
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig, AIApiType, AIReasoningEffort } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
 import { UpdateChecker } from './UpdateChecker';
@@ -522,6 +522,8 @@ Focus on practicality and accurate categorization to help users quickly understa
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const hiddenDefaultCategories = getAllCategories([], language, []).filter(category => hiddenDefaultCategoryIds.includes(category.id));
+
 
   const handleTestBackendConnection = async () => {
     setBackendStatus('checking');
@@ -586,6 +588,7 @@ Focus on practicality and accurate categorization to help users quickly understa
       const releaseData = await backend.fetchReleases();
       const aiConfigData = await backend.fetchAIConfigs();
       const webdavConfigData = await backend.fetchWebDAVConfigs();
+      const settingsData = await backend.fetchSettings();
       
       if (repoData.repositories.length > 0) {
         setRepositories(repoData.repositories);
@@ -598,6 +601,16 @@ Focus on practicality and accurate categorization to help users quickly understa
       }
       if (webdavConfigData.length > 0) {
         setWebDAVConfigs(webdavConfigData);
+      }
+      if (Array.isArray(hiddenDefaultCategoryIds)) {
+        for (const categoryId of hiddenDefaultCategoryIds) {
+          if (typeof categoryId === 'string') showDefaultCategory(categoryId);
+        }
+      }
+      if (Array.isArray(settingsData.hiddenDefaultCategoryIds)) {
+        for (const categoryId of settingsData.hiddenDefaultCategoryIds) {
+          if (typeof categoryId === 'string') hideDefaultCategory(categoryId);
+        }
       }
       
       alert(t(
@@ -695,13 +708,13 @@ Focus on practicality and accurate categorization to help users quickly understa
               {t('以下默认分类已被隐藏，你可以在这里恢复显示。', 'The following built-in categories are hidden. You can restore them here.')}
             </p>
             <div className="flex flex-wrap gap-2">
-              {hiddenDefaultCategoryIds.map((categoryId) => (
+              {hiddenDefaultCategories.map((category) => (
                 <button
-                  key={categoryId}
-                  onClick={() => showDefaultCategory(categoryId)}
+                  key={category.id}
+                  onClick={() => showDefaultCategory(category.id)}
                   className="px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors text-sm"
                 >
-                  {t('恢复', 'Restore')} {categoryId}
+                  {t('恢复', 'Restore')} {category.icon} {category.name}
                 </button>
               ))}
             </div>
