@@ -6,6 +6,7 @@ import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
+import { resolveCategoryAssignment } from '../utils/categoryUtils';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -25,6 +26,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     updateRepository,
     language,
     customCategories,
+    hiddenDefaultCategoryIds,
     analysisProgress,
     setAnalysisProgress,
     searchFilters
@@ -42,7 +44,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const shouldStopRef = useRef(false);
   const isAnalyzingRef = useRef(false);
 
-  const allCategories = getAllCategories(customCategories, language);
+  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
   // Filter repositories by selected category
   const filteredRepositories = repositories.filter(repo => {
@@ -246,8 +248,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const githubApi = new GitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
       
-      // 获取自定义分类名称列表
-      const customCategoryNames = customCategories.map(cat => cat.name);
+      // 获取可用分类名称列表
+      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
       
       let analyzed = 0;
       const concurrency = activeConfig.concurrency || 1;
@@ -275,7 +277,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           const readmeContent = await githubApi.getRepositoryReadme(owner, name);
           
           // AI分析
-          const analysis = await aiService.analyzeRepository(repo, readmeContent, customCategoryNames);
+          const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
+          const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
           
           // 更新仓库信息
           const updatedRepo = {
@@ -283,6 +286,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ai_summary: analysis.summary,
             ai_tags: analysis.tags,
             ai_platforms: analysis.platforms,
+            custom_category: resolvedCategory,
             analyzed_at: new Date().toISOString(),
             analysis_failed: false // 分析成功，清除失败标记
           };
