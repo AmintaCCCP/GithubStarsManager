@@ -21,6 +21,10 @@ export class AIService {
     return effort ? { effort } : undefined;
   }
 
+  private isDeepSeekReasonerModel(): boolean {
+    return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
+  }
+
   private buildApiUrl(pathWithVersion: string): string {
     const baseUrlWithSlash = this.config.baseUrl.endsWith('/')
       ? this.config.baseUrl
@@ -65,6 +69,7 @@ export class AIService {
           : []),
         { role: 'user', content: options.user },
       ];
+      const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
 
       const requestBody = apiType === 'openai-responses'
         ? {
@@ -77,9 +82,9 @@ export class AIService {
         : {
             model: this.config.model,
             messages,
-            temperature: options.temperature,
             max_tokens: options.maxTokens,
-            ...(reasoning ? { reasoning } : {}),
+            ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
+            ...(!isDeepSeekReasoner && reasoning ? { reasoning } : {}),
           };
 
       let data: any;
