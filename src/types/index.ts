@@ -117,6 +117,7 @@ export interface Category {
   icon: string;
   keywords: string[];
   isCustom?: boolean;
+  isHidden?: boolean;
 }
 
 export interface AssetFilter {
@@ -156,6 +157,7 @@ export interface AppState {
   
   // Categories
   customCategories: Category[]; // 新增：自定义分类
+  hiddenDefaultCategoryIds: string[];
   
   // Asset Filters
   assetFilters: AssetFilter[]; // 新增：资源过滤器
