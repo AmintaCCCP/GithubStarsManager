@@ -36,6 +36,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+
   const repositoryMap = useMemo(() => new Map(repositories.map(repo => [String(repo.id), repo])), [repositories]);
 
   const getCategoryCount = (category: Category) => {
@@ -84,7 +85,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const handleDeleteCategory = async (category: Category) => {
     const confirmed = confirm(
       t(
-        `确定删除自定义分类“${category.name}”吗？\n\n仓库会保留，Star 不会取消，只会清空它们的手动分类归属。`,
+        `确定删除自定义分类"${category.name}"吗？\n\n仓库会保留，Star 不会取消，只会清空它们的手动分类归属。`,
         `Delete custom category "${category.name}"?\n\nRepositories will stay starred. Only their manual category assignment will be cleared.`
       )
     );
@@ -98,7 +99,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const handleHideDefaultCategory = async (category: Category) => {
     const confirmed = confirm(
       t(
-        `隐藏默认分类“${category.name}”？\n\n这不会删除任何仓库，只是在左侧隐藏这个预设分类。`,
+        `隐藏默认分类"${category.name}"？\n\n这不会删除任何仓库，只是在左侧隐藏这个预设分类。`,
         `Hide default category "${category.name}"?\n\nThis will not delete any repositories. It only hides this built-in category from the sidebar.`
       )
     );
@@ -175,7 +176,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     }
                   }}
                   onDrop={(event) => handleDropOnCategory(event, category)}
-                  className={`flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors lg:w-full ${
+                  className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors lg:w-full ${
                     isSelected
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : isDragTarget
@@ -188,56 +189,58 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     <span className="text-base flex-shrink-0">{category.icon}</span>
                     <span className="text-sm font-medium truncate">{category.name}</span>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <div className={`relative text-xs px-2 py-1 rounded-full ${
+
+                  {/* 数字 badge - 正常状态显示，hover 时隐藏 */}
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full shrink-0 transition-opacity ${
                       isSelected
                         ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
                         : isDragTarget
                           ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200'
                           : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'
-                    }`}>
-                      <span>{count}</span>
-                    </div>
+                    } group-hover:opacity-0`}
+                  >
+                    {count}
+                  </span>
 
-                    {category.id !== 'all' && (
+                  {/* 操作按钮 - 绝对定位，hover 时显示，不占位 */}
+                  {category.id !== 'all' && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEditCategory(category);
                         }}
-                        className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-600"
+                        className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
                         title={t('编辑分类', 'Edit category')}
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
-                    )}
-
-                    {category.id !== 'all' && category.isCustom && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleDeleteCategory(category);
-                        }}
-                        className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
-                        title={t('删除分类', 'Delete category')}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-
-                    {category.id !== 'all' && !category.isCustom && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleHideDefaultCategory(category);
-                        }}
-                        className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
-                        title={t('隐藏默认分类', 'Hide default category')}
-                      >
-                        <EyeOff className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
+                      {category.isCustom ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteCategory(category);
+                          }}
+                          className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                          title={t('删除分类', 'Delete category')}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleHideDefaultCategory(category);
+                          }}
+                          className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          title={t('隐藏默认分类', 'Hide default category')}
+                        >
+                          <EyeOff className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </button>
               </div>
             );
