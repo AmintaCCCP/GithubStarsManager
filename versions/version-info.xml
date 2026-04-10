@@ -175,4 +175,21 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.9</downloadUrl>
   </version>
+  <version>
+    <number>0.3.0</number>
+    <releaseDate>2026-04-10</releaseDate>
+    <changelog>
+      <item>Added hide/show for built-in categories - default categories can be hidden from sidebar and restored from Settings.</item>
+      <item>Added delete support for custom categories without affecting repository starred status.</item>
+      <item>Added drag-and-drop category assignment - drag repository cards onto sidebar categories to quickly assign.</item>
+      <item>Added category lock - manually assigned categories won't be changed by subsequent AI analysis or sync.</item>
+      <item>Added AI category matching - AI analysis now considers custom categories and assigns repositories accordingly.</item>
+      <item>Fixed Gemini connection test failures by increasing maxTokens threshold. Thanks to @Minttc for the contribution!</item>
+      <item>Fixed DeepSeek Reasoner compatibility by removing unsupported API parameters.</item>
+      <item>Fixed sidebar layout - category count badges are now properly aligned without layout shifts on hover.</item>
+      <item>Fixed backend persistence - category lock state is now properly synced to the database.</item>
+      <item>Fixed category rename - renaming a custom category now updates all assigned repositories.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.3.0</downloadUrl>
+  </version>
 </versions>
