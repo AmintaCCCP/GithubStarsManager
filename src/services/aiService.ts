@@ -551,7 +551,7 @@ Focus on practicality and accurate categorization to help users quickly understa
           system: 'You are a connection test assistant.',
           user: 'Reply with exactly one word: OK',
           temperature: 0,
-          maxTokens: 10,
+          maxTokens: 50,
           signal: controller.signal,
         });
         return !!content;
