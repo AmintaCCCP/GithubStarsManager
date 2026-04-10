@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Zap } from 'lucide-react';
-import { Repository } from '../types';
+import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { forceSyncToBackend } from '../services/autoSync';
@@ -29,6 +30,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     setLoading,
     language,
     customCategories,
+    hiddenDefaultCategoryIds,
     updateRepository,
     deleteRepository
   } = useAppStore();
@@ -39,6 +41,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const [unstarring, setUnstarring] = useState(false);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
   const isSubscribed = releaseSubscriptions.has(repository.id);
 
@@ -188,11 +191,12 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       const [owner, name] = repository.full_name.split('/');
       const readmeContent = await githubApi.getRepositoryReadme(owner, name);
 
-      // 获取自定义分类名称列表
-      const customCategoryNames = customCategories.map(cat => cat.name);
+      // 获取可用分类名称列表
+      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
 
       // AI分析
-      const analysis = await aiService.analyzeRepository(repository, readmeContent, customCategoryNames);
+      const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames);
+      const resolvedCategory = resolveCategoryAssignment(repository, analysis.tags, allCategories);
 
       // 更新仓库信息
       const updatedRepo = {
@@ -200,6 +204,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         ai_summary: analysis.summary,
         ai_tags: analysis.tags,
         ai_platforms: analysis.platforms,
+        custom_category: resolvedCategory,
         analyzed_at: new Date().toISOString(),
         analysis_failed: false // 分析成功，清除失败标记
       };
@@ -350,8 +355,17 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
+  const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
+    event.dataTransfer.setData('application/x-gsm-repository-id', String(repository.id));
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
-    <div className="repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full">
+    <div
+      className="repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full"
+      draggable
+      onDragStart={handleDragStart}
+    >
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
         <img

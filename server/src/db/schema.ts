@@ -37,6 +37,7 @@ export function initializeSchema(db: Database.Database): void {
       custom_description TEXT,
       custom_tags TEXT,
       custom_category TEXT,
+      category_locked INTEGER DEFAULT 0,
       last_edited TEXT,
       subscribed_to_releases INTEGER DEFAULT 0
     );
@@ -102,4 +103,5 @@ export function initializeSchema(db: Database.Database): void {
   `);
 
   addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
+  addColumnIfMissing(db, 'repositories', 'category_locked', 'INTEGER DEFAULT 0');
 }

@@ -3,6 +3,7 @@ import { Save, X, Plus, Lock, Unlock } from 'lucide-react';
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { forceSyncToBackend } from '../services/autoSync';
 
 interface RepositoryEditModalProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   onClose,
   repository
 }) => {
-  const { updateRepository, language, customCategories, repositories } = useAppStore();
+  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds } = useAppStore();
   
   const [formData, setFormData] = useState({
     description: '',
@@ -25,7 +26,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   });
   const [newTag, setNewTag] = useState('');
 
-  const allCategories = getAllCategories(customCategories, language);
+  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
   // 获取仓库当前所属的分类
   const getCurrentCategory = (repo: Repository) => {
@@ -83,7 +84,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     }
   }, [repository, isOpen]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!repository) return;
 
     const originalCategory = getCurrentCategory(repository);
@@ -100,6 +101,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     };
     
     updateRepository(updatedRepo);
+    await forceSyncToBackend();
     onClose();
   };
 
@@ -298,7 +300,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <span>{t('取消', 'Cancel')}</span>
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
             <Save className="w-4 h-4" />

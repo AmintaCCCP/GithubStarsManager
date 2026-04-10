@@ -36,6 +36,7 @@ function transformRepo(row: Record<string, unknown>) {
     custom_description: row.custom_description,
     custom_tags: parseJsonColumn(row.custom_tags),
     custom_category: row.custom_category,
+    category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
   };
@@ -95,9 +96,9 @@ router.put('/api/repositories', (req, res) => {
         created_at, updated_at, pushed_at, starred_at,
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
-        custom_description, custom_tags, custom_category, last_edited,
+        custom_description, custom_tags, custom_category, category_locked, last_edited,
         subscribed_to_releases
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -142,7 +143,7 @@ router.put('/api/repositories', (req, res) => {
           repo.analyzed_at ?? null, (repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0,
           repo.custom_description ?? null,
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
-          repo.custom_category ?? null, repo.last_edited ?? null,
+          repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
           (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0
         );
         count++;
@@ -174,6 +175,7 @@ router.patch('/api/repositories/:id', (req, res) => {
       custom_description: (v) => v,
       custom_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
       custom_category: (v) => v,
+      category_locked: (v) => (v === true || v === 1) ? 1 : 0,
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       description: (v) => v,

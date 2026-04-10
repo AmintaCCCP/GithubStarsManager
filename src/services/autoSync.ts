@@ -149,6 +149,20 @@ export async function syncFromBackend(): Promise<void> {
       if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
         state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
       }
+      if (Array.isArray(settings.hiddenDefaultCategoryIds)) {
+        const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
+        const currentHiddenIds = state.hiddenDefaultCategoryIds || [];
+        for (const id of currentHiddenIds) {
+          if (!nextHiddenIds.includes(id)) {
+            state.showDefaultCategory(id);
+          }
+        }
+        for (const id of nextHiddenIds) {
+          if (!currentHiddenIds.includes(id)) {
+            state.hideDefaultCategory(id);
+          }
+        }
+      }
       _lastHash.settings = hashes.settings;
     }
 
@@ -195,6 +209,7 @@ export async function syncToBackend(): Promise<void> {
       backend.syncSettings({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
       }),
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;
@@ -217,6 +232,7 @@ export async function syncToBackend(): Promise<void> {
       _lastHash.settings = quickHash({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
       });
     }
   } catch (err) {

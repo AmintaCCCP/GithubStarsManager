@@ -23,7 +23,7 @@ import {
   Server,
 } from 'lucide-react';
 import { AIConfig, WebDAVConfig, AIApiType, AIReasoningEffort } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { WebDAVService } from '../services/webdavService';
 import { UpdateChecker } from './UpdateChecker';
@@ -39,6 +39,7 @@ export const SettingsPanel: React.FC = () => {
     repositories,
     releases,
     customCategories,
+    hiddenDefaultCategoryIds,
     theme,
     language,
     addAIConfig,
@@ -55,6 +56,8 @@ export const SettingsPanel: React.FC = () => {
     setReleases,
     addCustomCategory,
     deleteCustomCategory,
+    hideDefaultCategory,
+    showDefaultCategory,
     backendApiSecret,
     setBackendApiSecret,
     setAIConfigs,
@@ -290,6 +293,7 @@ export const SettingsPanel: React.FC = () => {
         repositories,
         releases,
         customCategories,
+        hiddenDefaultCategoryIds,
         aiConfigs: aiConfigs.map(config => ({
           ...config,
           apiKey: '***' // Don't backup API keys for security
@@ -372,6 +376,20 @@ export const SettingsPanel: React.FC = () => {
             for (const cat of backupData.customCategories) {
               if (cat && cat.id && cat.name) {
                 addCustomCategory({ ...cat, isCustom: true });
+              }
+            }
+          }
+          if (Array.isArray(hiddenDefaultCategoryIds)) {
+            for (const categoryId of hiddenDefaultCategoryIds) {
+              if (typeof categoryId === 'string') {
+                showDefaultCategory(categoryId);
+              }
+            }
+          }
+          if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
+            for (const categoryId of backupData.hiddenDefaultCategoryIds) {
+              if (typeof categoryId === 'string') {
+                hideDefaultCategory(categoryId);
               }
             }
           }
@@ -504,6 +522,8 @@ Focus on practicality and accurate categorization to help users quickly understa
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const hiddenDefaultCategories = getAllCategories([], language, []).filter(category => hiddenDefaultCategoryIds.includes(category.id));
+
 
   const handleTestBackendConnection = async () => {
     setBackendStatus('checking');
@@ -538,6 +558,7 @@ Focus on practicality and accurate categorization to help users quickly understa
       await backend.syncReleases(releases);
       await backend.syncAIConfigs(aiConfigs);
       await backend.syncWebDAVConfigs(webdavConfigs);
+      await backend.syncSettings({ hiddenDefaultCategoryIds });
       alert(t(
         `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
         `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
@@ -567,6 +588,7 @@ Focus on practicality and accurate categorization to help users quickly understa
       const releaseData = await backend.fetchReleases();
       const aiConfigData = await backend.fetchAIConfigs();
       const webdavConfigData = await backend.fetchWebDAVConfigs();
+      const settingsData = await backend.fetchSettings();
       
       if (repoData.repositories.length > 0) {
         setRepositories(repoData.repositories);
@@ -579,6 +601,16 @@ Focus on practicality and accurate categorization to help users quickly understa
       }
       if (webdavConfigData.length > 0) {
         setWebDAVConfigs(webdavConfigData);
+      }
+      if (Array.isArray(hiddenDefaultCategoryIds)) {
+        for (const categoryId of hiddenDefaultCategoryIds) {
+          if (typeof categoryId === 'string') showDefaultCategory(categoryId);
+        }
+      }
+      if (Array.isArray(settingsData.hiddenDefaultCategoryIds)) {
+        for (const categoryId of settingsData.hiddenDefaultCategoryIds) {
+          if (typeof categoryId === 'string') hideDefaultCategory(categoryId);
+        }
       }
       
       alert(t(
@@ -655,6 +687,39 @@ Focus on practicality and accurate categorization to help users quickly understa
             </span>
           </label>
         </div>
+      </div>
+
+      {/* Language Settings */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Package className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('分类显示管理', 'Category Visibility')}
+          </h3>
+        </div>
+
+        {hiddenDefaultCategoryIds.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t('当前没有隐藏的默认分类。', 'No default categories are hidden right now.')}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {t('以下默认分类已被隐藏，你可以在这里恢复显示。', 'The following built-in categories are hidden. You can restore them here.')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {hiddenDefaultCategories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => showDefaultCategory(category.id)}
+                  className="px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors text-sm"
+                >
+                  {t('恢复', 'Restore')} {category.icon} {category.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Contact Information */}

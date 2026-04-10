@@ -62,6 +62,8 @@ interface AppActions {
   addCustomCategory: (category: Category) => void;
   updateCustomCategory: (id: string, updates: Partial<Category>) => void;
   deleteCustomCategory: (id: string) => void;
+  hideDefaultCategory: (id: string) => void;
+  showDefaultCategory: (id: string) => void;
   
   // Asset Filter actions
   addAssetFilter: (filter: AssetFilter) => void;
@@ -111,6 +113,7 @@ type PersistedAppState = Partial<
     | 'lastBackup'
     | 'releases'
     | 'customCategories'
+    | 'hiddenDefaultCategoryIds'
     | 'assetFilters'
     | 'theme'
     | 'currentView'
@@ -162,6 +165,7 @@ const normalizePersistedState = (
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
+    hiddenDefaultCategoryIds: Array.isArray((safePersisted as any).hiddenDefaultCategoryIds) ? (safePersisted as any).hiddenDefaultCategoryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
     assetFilters: Array.isArray(safePersisted.assetFilters) ? safePersisted.assetFilters : [],
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
@@ -276,6 +280,7 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseSubscriptions: new Set<number>(),
       readReleases: new Set<number>(),
       customCategories: [],
+      hiddenDefaultCategoryIds: [],
       assetFilters: [],
       theme: 'light',
       currentView: 'repositories',
@@ -408,13 +413,68 @@ export const useAppStore = create<AppState & AppActions>()(
       addCustomCategory: (category) => set((state) => ({
         customCategories: [...state.customCategories, { ...category, isCustom: true }]
       })),
-      updateCustomCategory: (id, updates) => set((state) => ({
-        customCategories: state.customCategories.map(category => 
+      updateCustomCategory: (id, updates) => set((state) => {
+        const targetCategory = state.customCategories.find(category => category.id === id);
+        const nextCategories = state.customCategories.map(category => 
           category.id === id ? { ...category, ...updates } : category
-        )
+        );
+
+        if (!targetCategory || !updates.name || updates.name === targetCategory.name) {
+          return { customCategories: nextCategories };
+        }
+
+        const nextRepositories = state.repositories.map(repo =>
+          repo.custom_category === targetCategory.name
+            ? { ...repo, custom_category: updates.name, last_edited: new Date().toISOString() }
+            : repo
+        );
+
+        return {
+          customCategories: nextCategories,
+          repositories: nextRepositories,
+          searchResults: state.searchResults.map(repo =>
+            repo.custom_category === targetCategory.name
+              ? { ...repo, custom_category: updates.name, last_edited: new Date().toISOString() }
+              : repo
+          )
+        };
+      }),
+      deleteCustomCategory: (id) => set((state) => {
+        const targetCategory = state.customCategories.find(category => category.id === id);
+        const nextSelectedCategory = state.selectedCategory === id ? 'all' : state.selectedCategory;
+
+        if (!targetCategory) {
+          return {
+            customCategories: state.customCategories.filter(category => category.id !== id),
+            selectedCategory: nextSelectedCategory
+          };
+        }
+
+        const clearedRepositories = state.repositories.map(repo =>
+          repo.custom_category === targetCategory.name
+            ? { ...repo, custom_category: undefined, category_locked: false, last_edited: new Date().toISOString() }
+            : repo
+        );
+
+        return {
+          customCategories: state.customCategories.filter(category => category.id !== id),
+          repositories: clearedRepositories,
+          searchResults: state.searchResults.map(repo =>
+            repo.custom_category === targetCategory.name
+              ? { ...repo, custom_category: undefined, category_locked: false, last_edited: new Date().toISOString() }
+              : repo
+          ),
+          selectedCategory: nextSelectedCategory
+        };
+      }),
+      hideDefaultCategory: (id) => set((state) => ({
+        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds.includes(id)
+          ? state.hiddenDefaultCategoryIds
+          : [...state.hiddenDefaultCategoryIds, id],
+        selectedCategory: state.selectedCategory === id ? 'all' : state.selectedCategory
       })),
-      deleteCustomCategory: (id) => set((state) => ({
-        customCategories: state.customCategories.filter(category => category.id !== id)
+      showDefaultCategory: (id) => set((state) => ({
+        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds.filter(categoryId => categoryId !== id)
       })),
 
       // Asset Filter actions
@@ -475,6 +535,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         // 持久化自定义分类
         customCategories: state.customCategories,
+        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
 
         // 持久化资源过滤器
         assetFilters: state.assetFilters,
@@ -519,11 +580,17 @@ export const useAppStore = create<AppState & AppActions>()(
 );
 
 // Helper function to get all categories (default + custom)
-export const getAllCategories = (customCategories: Category[], language: 'zh' | 'en' = 'zh'): Category[] => {
-  const translatedDefaults = defaultCategories.map(cat => ({
-    ...cat,
-    name: language === 'en' ? translateCategoryName(cat.name) : cat.name
-  }));
+export const getAllCategories = (
+  customCategories: Category[],
+  language: 'zh' | 'en' = 'zh',
+  hiddenDefaultCategoryIds: string[] = []
+): Category[] => {
+  const translatedDefaults = defaultCategories
+    .filter(cat => !hiddenDefaultCategoryIds.includes(cat.id))
+    .map(cat => ({
+      ...cat,
+      name: language === 'en' ? translateCategoryName(cat.name) : cat.name
+    }));
   
   return [...translatedDefaults, ...customCategories];
 };
