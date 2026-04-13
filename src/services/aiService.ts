@@ -25,16 +25,30 @@ export class AIService {
     return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
   }
 
-  private buildApiUrl(path: string): string {
+  private buildApiUrl(pathWithVersion: string): string {
     const baseUrlWithSlash = this.config.baseUrl.endsWith('/')
       ? this.config.baseUrl
       : `${this.config.baseUrl}/`;
 
+    const versionPrefix = pathWithVersion.split('/')[0] || '';
+
     try {
-      return new URL(path, baseUrlWithSlash).toString();
+      const base = new URL(baseUrlWithSlash);
+      const basePath = base.pathname.replace(/\/$/, '');
+
+      // 兼容用户把 baseUrl 写成 .../v1 或 .../v1beta 的情况，避免拼成 /v1/v1/...
+      if (versionPrefix) {
+        const versionRe = new RegExp(`/${versionPrefix}$`);
+        if (versionRe.test(basePath) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
+          const rest = pathWithVersion.slice(versionPrefix.length + 1); // remove "v1/"
+          return new URL(rest, baseUrlWithSlash).toString();
+        }
+      }
+
+      return new URL(pathWithVersion, baseUrlWithSlash).toString();
     } catch {
       // baseUrl 非绝对 URL 时这里会抛错；上层会在 testConnection/调用处处理失败
-      return `${baseUrlWithSlash}${path}`;
+      return `${baseUrlWithSlash}${pathWithVersion}`;
     }
   }
 

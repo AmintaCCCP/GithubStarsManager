@@ -832,8 +832,8 @@ Focus on practicality and accurate categorization to help users quickly understa
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t(
-                    '请填写完整的 API 基础路径（如 https://api.openai.com/v1、https://api.anthropic.com/v1 或 https://generativelanguage.googleapis.com/v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
-                    'Please fill in the complete API base path (e.g. https://api.openai.com/v1, https://api.anthropic.com/v1, or https://generativelanguage.googleapis.com/v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
+                    '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
+                    'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
                   )}
                 </p>
               </div>
