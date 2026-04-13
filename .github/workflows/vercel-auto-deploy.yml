@@ -1,0 +1,25 @@
+name: Vercel Auto Deploy (Bypass Protection)
+on:
+  push:
+    branches: [ main ]  # 替换为你的实际主分支
+  pull_request:
+    types: [ closed ]
+    branches: [ main ]
+
+jobs:
+  deploy:
+    # 仅在 PR 被合并或直接推送时触发
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Vercel Production
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}          # 免费版通常可留空或填个人ID
+          vercel-project-id: ${{ secrets.PROJECT_ID }}  # 在项目 Settings → General 中获取
+          vercel-args: '--prod'
+          vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_TOKEN }}
+          working-directory: ./                       # 若代码在子目录请修改
