@@ -120,14 +120,18 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       if (webdavConfigData.length > 0) {
         setWebDAVConfigs(webdavConfigData);
       }
-      if (Array.isArray(hiddenDefaultCategoryIds)) {
-        for (const categoryId of hiddenDefaultCategoryIds) {
-          if (typeof categoryId === 'string') showDefaultCategory(categoryId);
-        }
-      }
+      // 从服务端数据中隐藏所有应隐藏的分类
       if (Array.isArray(settingsData.hiddenDefaultCategoryIds)) {
         for (const categoryId of settingsData.hiddenDefaultCategoryIds) {
           if (typeof categoryId === 'string') hideDefaultCategory(categoryId);
+        }
+      }
+      // 显示本地隐藏列表中但服务端没有隐藏的分类（即本地手动显示的）
+      if (Array.isArray(hiddenDefaultCategoryIds)) {
+        for (const categoryId of hiddenDefaultCategoryIds) {
+          if (typeof categoryId === 'string' && !settingsData.hiddenDefaultCategoryIds?.includes(categoryId)) {
+            showDefaultCategory(categoryId);
+          }
         }
       }
       

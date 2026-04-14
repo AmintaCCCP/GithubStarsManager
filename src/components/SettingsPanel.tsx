@@ -128,7 +128,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
             <div className="hidden md:block w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
               <nav className="p-4 space-y-1">
@@ -193,7 +193,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 侧边栏 */}
-        <div className="w-full lg:w-64 flex-shrink-0">
+        <div className="w-full lg:w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <nav className="p-2 space-y-1">
               {tabs.map((tab) => (

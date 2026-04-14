@@ -45,7 +45,16 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   const handleSave = () => {
     const errors = WebDAVService.validateConfig(form);
     if (errors.length > 0) {
-      alert(errors.join('\n'));
+      const translated = errors.map(err => {
+        if (err === 'WebDAV URL是必需的') return t('WebDAV URL是必需的', 'WebDAV URL is required');
+        if (err === 'WebDAV URL必须以 http:// 或 https:// 开头') return t('WebDAV URL必须以 http:// 或 https:// 开头', 'WebDAV URL must start with http:// or https://');
+        if (err === '用户名是必需的') return t('用户名是必需的', 'Username is required');
+        if (err === '密码是必需的') return t('密码是必需的', 'Password is required');
+        if (err === '路径是必需的') return t('路径是必需的', 'Path is required');
+        if (err === '路径必须以 / 开头') return t('路径必须以 / 开头', 'Path must start with /');
+        return err;
+      });
+      alert(translated.join('\n'));
       return;
     }
 

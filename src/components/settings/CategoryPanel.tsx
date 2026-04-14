@@ -13,6 +13,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     language,
     addCustomCategory,
     deleteCustomCategory,
+    updateCustomCategory,
     hideDefaultCategory,
     showDefaultCategory,
   } = useAppStore();
@@ -63,19 +64,15 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       return;
     }
 
-    const category = customCategories.find(c => c.id === editingId);
-    if (category) {
-      deleteCustomCategory(category.id);
-      addCustomCategory({
-        ...category,
+    if (editingId) {
+      updateCustomCategory(editingId, {
         name: editName.trim(),
         icon: editIcon,
       });
+      setEditingId(null);
+      setEditName('');
+      setEditIcon('');
     }
-
-    setEditingId(null);
-    setEditName('');
-    setEditIcon('');
   };
 
   const handleCancelEdit = () => {

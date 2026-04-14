@@ -71,23 +71,37 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       return;
     }
 
-    const config: AIConfig = {
-      id: editingId || Date.now().toString(),
-      name: form.name,
-      apiType: form.apiType,
-      baseUrl: form.baseUrl.replace(/\/$/, ''),
-      apiKey: form.apiKey,
-      model: form.model,
-      isActive: false,
-      customPrompt: form.customPrompt || undefined,
-      useCustomPrompt: form.useCustomPrompt,
-      concurrency: form.concurrency,
-      reasoningEffort: form.reasoningEffort || undefined,
-    };
-
     if (editingId) {
-      updateAIConfig(editingId, config);
+      const existingConfig = aiConfigs.find(c => c.id === editingId);
+      if (existingConfig) {
+        const updates: Partial<AIConfig> = {
+          name: form.name,
+          apiType: form.apiType,
+          baseUrl: form.baseUrl.replace(/\/$/, ''),
+          apiKey: form.apiKey,
+          model: form.model,
+          customPrompt: form.customPrompt || undefined,
+          useCustomPrompt: form.useCustomPrompt,
+          concurrency: form.concurrency,
+          reasoningEffort: form.reasoningEffort || undefined,
+          isActive: existingConfig.isActive,
+        };
+        updateAIConfig(editingId, updates);
+      }
     } else {
+      const config: AIConfig = {
+        id: Date.now().toString(),
+        name: form.name,
+        apiType: form.apiType,
+        baseUrl: form.baseUrl.replace(/\/$/, ''),
+        apiKey: form.apiKey,
+        model: form.model,
+        isActive: false,
+        customPrompt: form.customPrompt || undefined,
+        useCustomPrompt: form.useCustomPrompt,
+        concurrency: form.concurrency,
+        reasoningEffort: form.reasoningEffort || undefined,
+      };
       addAIConfig(config);
     }
 

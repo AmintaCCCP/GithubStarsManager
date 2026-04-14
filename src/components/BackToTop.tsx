@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const { language } = useAppStore();
 
   const toggleVisibility = useCallback(() => {
     if (window.scrollY > 300) {
@@ -49,8 +51,8 @@ export const BackToTop: React.FC = () => {
         sm:bottom-8 sm:right-8
         lg:bottom-10 lg:right-10
       `}
-      aria-label="回到顶部"
-      title="回到顶部"
+      aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}
+      title={language === 'zh' ? '回到顶部' : 'Back to top'}
     >
       <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
     </button>

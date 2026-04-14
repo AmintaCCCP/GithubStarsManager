@@ -130,13 +130,17 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
               }
             }
           }
-          if (Array.isArray(hiddenDefaultCategoryIds)) {
-            for (const categoryId of hiddenDefaultCategoryIds) {
+          // 在 restore 回调中，先获取最新状态
+          const currentHidden = useAppStore.getState().hiddenDefaultCategoryIds;
+          // 显示当前隐藏的分类（恢复前它们被隐藏，需要显示）
+          if (Array.isArray(currentHidden)) {
+            for (const categoryId of currentHidden) {
               if (typeof categoryId === 'string') {
                 showDefaultCategory(categoryId);
               }
             }
           }
+          // 再隐藏备份数据中标记为隐藏的分类
           if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
             for (const categoryId of backupData.hiddenDefaultCategoryIds) {
               if (typeof categoryId === 'string') {
@@ -318,8 +322,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('自定义分类', 'Custom categories')}</li>
-          <li>• {t('AI 服务配置（密钥已加密）', 'AI service configurations (keys encrypted)')}</li>
-          <li>• {t('WebDAV 配置（密码已加密）', 'WebDAV configurations (passwords encrypted)')}</li>
+          <li>• {t('AI 服务配置（密钥已脱敏）', 'AI service configurations (keys masked)')}</li>
+          <li>• {t('WebDAV 配置（密码已脱敏）', 'WebDAV configurations (passwords masked)')}</li>
         </ul>
       </div>
     </div>

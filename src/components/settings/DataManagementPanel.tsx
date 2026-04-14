@@ -104,14 +104,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     try {
       await indexedDBStorage.removeItem('github-stars-manager');
     } catch (error) {
-      console.warn('Failed to clear IndexedDB:', error);
+      console.error('Failed to clear IndexedDB', error);
+      throw new Error('IndexedDB clear failed');
     }
   };
 
   const deleteRepositories = async () => {
     try {
       setRepositories([]);
-      await clearAllStorage();
       addLog(t('删除GitHub Stars仓库数据', 'Delete GitHub Stars repositories'), true);
       showSuccess(t('GitHub Stars仓库数据已删除', 'GitHub Stars repositories deleted'));
     } catch (error) {
@@ -128,7 +128,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteReleases = async () => {
     try {
       setReleases([]);
-      await clearAllStorage();
       addLog(t('删除Release发布信息数据', 'Delete Release information'), true);
       showSuccess(t('Release发布信息数据已删除', 'Release information deleted'));
     } catch (error) {
@@ -147,7 +146,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setAIConfigs([]);
       store.setActiveAIConfig(null);
-      await clearAllStorage();
       addLog(t('删除AI服务配置数据', 'Delete AI service configurations'), true);
       showSuccess(t('AI服务配置数据已删除', 'AI service configurations deleted'));
     } catch (error) {
@@ -166,7 +164,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setWebDAVConfigs([]);
       store.setActiveWebDAVConfig(null);
-      await clearAllStorage();
       addLog(t('删除WebDAV配置数据', 'Delete WebDAV configurations'), true);
       showSuccess(t('WebDAV配置数据已删除', 'WebDAV configurations deleted'));
     } catch (error) {
@@ -189,7 +186,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       });
       // Clear hidden default categories
       useAppStore.setState({ hiddenDefaultCategoryIds: [] });
-      await clearAllStorage();
       addLog(t('删除分类显示设置数据', 'Delete category display settings'), true);
       showSuccess(t('分类显示设置数据已删除', 'Category display settings deleted'));
     } catch (error) {

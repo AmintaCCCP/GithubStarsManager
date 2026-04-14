@@ -58,6 +58,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   // 键盘快捷键支持 (Ctrl/Cmd + B)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      const isEditable = active?.tagName === 'INPUT' ||
+                         active?.tagName === 'TEXTAREA' ||
+                         active?.isContentEditable ||
+                         active?.getAttribute('role') === 'textbox';
+      if (isEditable) return;
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
         toggleSidebar();
