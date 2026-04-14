@@ -8,6 +8,7 @@ import {
   Server,
   Package,
   X,
+  Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import {
@@ -17,9 +18,10 @@ import {
   BackupPanel,
   BackendPanel,
   CategoryPanel,
+  DataManagementPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data';
 
 interface SettingsPanelProps {
   isOpen?: boolean;
@@ -76,6 +78,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('分类管理', 'Categories'),
       icon: <Package className="w-5 h-5" />,
     },
+    {
+      id: 'data',
+      label: t('数据管理', 'Data Management'),
+      icon: <Trash2 className="w-5 h-5" />,
+    },
   ];
 
   const renderTabContent = () => {
@@ -92,6 +99,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         return <BackendPanel t={t} />;
       case 'category':
         return <CategoryPanel t={t} />;
+      case 'data':
+        return <DataManagementPanel t={t} />;
       default:
         return null;
     }
