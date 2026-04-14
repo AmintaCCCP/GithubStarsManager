@@ -27,8 +27,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     showDefaultCategory,
     addAIConfig,
     updateAIConfig,
+    deleteAIConfig,
     addWebDAVConfig,
     updateWebDAVConfig,
+    deleteWebDAVConfig,
   } = useAppStore();
 
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -65,10 +67,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
       const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
       const success = await webdavService.uploadFile(filename, JSON.stringify(backupData, null, 2));
-      
+
       if (success) {
         setLastBackup(new Date().toISOString());
         alert(t('数据备份成功！', 'Data backup successful!'));
+      } else {
+        console.error('Backup failed: uploadFile returned falsy');
+        alert(t('数据备份失败！', 'Data backup failed!'));
       }
     } catch (error) {
       console.error('Backup failed:', error);
@@ -155,6 +160,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         try {
           if (Array.isArray(backupData.aiConfigs)) {
             const currentMap = new Map(aiConfigs.map((c: AIConfig) => [c.id, c]));
+            const backupIdSet = new Set((backupData.aiConfigs as AIConfig[]).map(cfg => cfg.id).filter(Boolean));
+            // Remove local entries not in backup
+            for (const [id] of currentMap) {
+              if (!backupIdSet.has(id)) {
+                deleteAIConfig(id);
+              }
+            }
+            // Add or update entries from backup
             for (const cfg of backupData.aiConfigs as AIConfig[]) {
               if (!cfg || !cfg.id) continue;
               const existing = currentMap.get(cfg.id);
@@ -187,6 +200,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         try {
           if (Array.isArray(backupData.webdavConfigs)) {
             const currentMap = new Map(webdavConfigs.map((c: WebDAVConfig) => [c.id, c]));
+            const backupIdSet = new Set((backupData.webdavConfigs as WebDAVConfig[]).map(cfg => cfg.id).filter(Boolean));
+            // Remove local entries not in backup
+            for (const [id] of currentMap) {
+              if (!backupIdSet.has(id)) {
+                deleteWebDAVConfig(id);
+              }
+            }
+            // Add or update entries from backup
             for (const cfg of backupData.webdavConfigs as WebDAVConfig[]) {
               if (!cfg || !cfg.id) continue;
               const existing = currentMap.get(cfg.id);

@@ -87,20 +87,39 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   }, []);
 
   const clearAllStorage = async () => {
-    // Clear localStorage
+    // App-owned localStorage keys and prefixes
+    const APP_LOCALSTORAGE_KEYS = [
+      'github-stars-search-history',
+      'lastSearchTime',
+    ];
+    const APP_LOCALSTORAGE_PREFIXES = [
+      'github-stars-manager',
+      'zustand',
+    ];
+
+    // Clear localStorage - only remove app-owned keys
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.includes('github-stars') || key.includes('zustand'))) {
-        keysToRemove.push(key);
+      if (key) {
+        const isExactMatch = APP_LOCALSTORAGE_KEYS.includes(key);
+        const isPrefixMatch = APP_LOCALSTORAGE_PREFIXES.some(prefix => key.startsWith(prefix));
+        if (isExactMatch || isPrefixMatch) {
+          keysToRemove.push(key);
+        }
       }
     }
     keysToRemove.forEach((key) => localStorage.removeItem(key));
 
-    // Clear sessionStorage
-    sessionStorage.clear();
+    // App-owned sessionStorage keys
+    const APP_SESSIONSTORAGE_KEYS = [
+      'github-stars-manager-backend-secret',
+    ];
 
-    // Clear IndexedDB
+    // Clear sessionStorage - only remove app-owned keys
+    APP_SESSIONSTORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
+
+    // Clear IndexedDB - only remove the specific database used by this app
     try {
       await indexedDBStorage.removeItem('github-stars-manager');
     } catch (error) {

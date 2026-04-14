@@ -23,6 +23,7 @@ export const BackToTop: React.FC = () => {
 
   useEffect(() => {
     window.addEventListener('scroll', toggleVisibility, { passive: true });
+    toggleVisibility();
     return () => {
       window.removeEventListener('scroll', toggleVisibility);
     };
@@ -52,6 +53,8 @@ export const BackToTop: React.FC = () => {
         lg:bottom-10 lg:right-10
       `}
       aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}
+      aria-hidden={!isVisible}
+      tabIndex={isVisible ? 0 : -1}
       title={language === 'zh' ? '回到顶部' : 'Back to top'}
     >
       <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />

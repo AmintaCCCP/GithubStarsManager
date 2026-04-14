@@ -191,6 +191,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               onClick={handleAddCategory}
               className="p-1.5 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
               title={t('添加分类', 'Add Category')}
+              aria-label={t('添加分类', 'Add Category')}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -283,17 +284,18 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     const isSelected = selectedCategory === category.id;
                     return (
                       <button
-                        key={category.id}
-                        onClick={() => onCategorySelect(category.id)}
-                        className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                        title={category.name}
-                      >
-                        {category.icon}
-                      </button>
+                    key={category.id}
+                    onClick={() => onCategorySelect(category.id)}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title={category.name}
+                    aria-label={category.name}
+                  >
+                    {category.icon}
+                  </button>
                     );
                   })}
                 </div>
@@ -303,6 +305,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   onClick={handleAddCategory}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
                   title={t('添加分类', 'Add Category')}
+                  aria-label={t('添加分类', 'Add Category')}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -320,6 +323,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       onClick={handleAddCategory}
                       className="p-1.5 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
                       title={t('添加分类', 'Add Category')}
+                      aria-label={t('添加分类', 'Add Category')}
                     >
                       <Plus className="w-4 h-4" />
                     </button>
