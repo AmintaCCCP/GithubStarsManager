@@ -407,7 +407,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
               ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
               : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
-            title={isSubscribed ? 'Unsubscribe from releases' : 'Subscribe to releases'}
+            title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
             {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
           </button>
@@ -436,7 +436,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            title="View on GitHub"
+            title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />
           </a>
