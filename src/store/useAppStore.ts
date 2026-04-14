@@ -75,6 +75,7 @@ interface AppActions {
   setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
@@ -120,6 +121,7 @@ type PersistedAppState = Partial<
     | 'selectedCategory'
     | 'language'
     | 'searchFilters'
+    | 'isSidebarCollapsed'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -289,6 +291,7 @@ export const useAppStore = create<AppState & AppActions>()(
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
+      isSidebarCollapsed: false,
 
       // Auth actions
       setUser: (user) => {
@@ -495,6 +498,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setCurrentView: (currentView) => set({ currentView }),
       setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),
+      setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
@@ -545,6 +549,7 @@ export const useAppStore = create<AppState & AppActions>()(
         currentView: state.currentView,
         selectedCategory: state.selectedCategory,
         language: state.language,
+        isSidebarCollapsed: state.isSidebarCollapsed,
 
         // backendApiSecret: 保留在内存中，不持久化（安全考虑）
 

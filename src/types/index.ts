@@ -167,6 +167,7 @@ export interface AppState {
   currentView: 'repositories' | 'releases' | 'settings';
   selectedCategory: string;
   language: 'zh' | 'en';
+  isSidebarCollapsed: boolean;
   
   // Update
   updateNotification: UpdateNotification | null;
