@@ -346,7 +346,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <button
               onClick={handleClose}
               className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              aria-label={t('settings.close', 'Close settings')}
+              aria-label={t('关闭设置', 'Close settings')}
             >
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>

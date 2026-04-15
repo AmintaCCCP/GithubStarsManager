@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Star, FolderOpen, Bot, Bell, CheckSquare, Square, Loader2 } from 'lucide-react';
+import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -44,6 +44,15 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isVisible]);
+
+  // 清理 shake timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 触发抖动动画
   const triggerShake = () => {
@@ -241,6 +250,30 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                   : showConfirm === 'subscribe'
                     ? t('再次确认', 'Confirm Again')
                     : t('订阅版本发布', 'Subscribe')}
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleAction('unsubscribe')}
+              disabled={isProcessing}
+              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+                showConfirm === 'unsubscribe'
+                  ? 'bg-orange-700 text-white hover:bg-orange-800'
+                  : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={t('取消订阅发布', 'Unsubscribe Releases')}
+            >
+              {isProcessing && showConfirm === 'unsubscribe' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <BellOff className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isProcessing && showConfirm === 'unsubscribe'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'unsubscribe'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('取消订阅', 'Unsubscribe')}
               </span>
             </button>
 

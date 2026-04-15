@@ -115,3 +115,54 @@
 .repository-card[data-selection-mode="true"] {
   scroll-margin: 0;
 }
+
+/* 高性能展开动画 - 使用 CSS Grid 替代 max-height */
+.expandable-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease-in-out;
+  will-change: grid-template-rows;
+}
+
+.expandable-container.expanded {
+  grid-template-rows: 1fr;
+}
+
+.expandable-content {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* GPU 加速优化 */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* 内容懒加载优化 */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* 展开动画性能优化 */
+.release-card-expand {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.release-card-expand.expanding {
+  animation: expand-fade 0.3s ease-out;
+}
+
+@keyframes expand-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}

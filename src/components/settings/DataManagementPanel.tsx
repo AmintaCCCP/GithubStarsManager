@@ -94,7 +94,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     ];
     const APP_LOCALSTORAGE_PREFIXES = [
       'github-stars-manager',
-      'zustand',
     ];
 
     // Clear localStorage - only remove app-owned keys
@@ -203,8 +202,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       store.customCategories.forEach((cat) => {
         store.deleteCustomCategory(cat.id);
       });
-      // Clear hidden default categories
-      useAppStore.setState({ hiddenDefaultCategoryIds: [] });
+      // Clear hidden default categories and reset category-related settings
+      useAppStore.setState({ 
+        hiddenDefaultCategoryIds: [],
+        categoryOrder: [],
+        collapsedSidebarCategoryCount: 5,
+        isSidebarCollapsed: false
+      });
       addLog(t('删除分类显示设置数据', 'Delete category display settings'), true);
       showSuccess(t('分类显示设置数据已删除', 'Category display settings deleted'));
     } catch (error) {

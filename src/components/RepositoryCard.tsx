@@ -10,6 +10,43 @@ import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
 
+// Selection-aware button component to centralize selectionMode disable logic
+interface SelectionAwareButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  selectionMode?: boolean;
+  children: React.ReactNode;
+  variant?: 'default' | 'ai' | 'subscribe' | 'edit' | 'unstar';
+}
+
+const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
+  selectionMode,
+  children,
+  variant = 'default',
+  className = '',
+  disabled,
+  ...props
+}) => {
+  const baseClasses = 'p-2 rounded-lg transition-colors disabled:opacity-50';
+  const selectionClasses = selectionMode ? 'pointer-events-none' : '';
+
+  const variantClasses = {
+    default: '',
+    ai: '', // AI variant uses dynamic classes based on state
+    subscribe: '', // Subscribe variant uses dynamic classes based on state
+    edit: 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800',
+    unstar: 'flex items-center justify-center w-8 h-8 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 disabled:cursor-not-allowed',
+  };
+
+  return (
+    <button
+      {...props}
+      disabled={disabled || selectionMode}
+      className={`${baseClasses} ${variantClasses[variant]} ${selectionClasses} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
+
 interface RepositoryCardProps {
   repository: Repository;
   showAISummary?: boolean;
@@ -435,39 +472,40 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       <div className="flex items-center justify-between mb-4">
         {/* Left side: AI Analysis, Release Subscription, and Edit */}
         <div className="flex items-center space-x-2">
-          <button
+          <SelectionAwareButton
             onClick={handleAIAnalyze}
-            disabled={isLoading || selectionMode}
-            className={`p-2 rounded-lg transition-colors ${
+            disabled={isLoading}
+            selectionMode={selectionMode}
+            className={`${
               repository.analysis_failed
                 ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
                 : repository.analyzed_at
                   ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
                   : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
-              } disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
+            }`}
             title={getAIButtonTitle()}
           >
             <Bot className="w-4 h-4" />
-          </button>
-          <button
+          </SelectionAwareButton>
+          <SelectionAwareButton
             onClick={() => toggleReleaseSubscription(repository.id)}
-            disabled={selectionMode}
-            className={`p-2 rounded-lg transition-colors ${isSubscribed
+            selectionMode={selectionMode}
+            className={`${isSubscribed
               ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
               : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-              } disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
+            }`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
             {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-          </button>
-          <button
+          </SelectionAwareButton>
+          <SelectionAwareButton
             onClick={() => setEditModalOpen(true)}
-            disabled={selectionMode}
-            className={`p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
+            selectionMode={selectionMode}
+            variant="edit"
             title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
           >
             <Edit3 className="w-4 h-4" />
-          </button>
+          </SelectionAwareButton>
         </div>
 
         {/* Right side: Zread/DeepWiki, GitHub Links, and Unstar */}
@@ -492,14 +530,15 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           >
             <ExternalLink className="w-4 h-4" />
           </a>
-          <button
+          <SelectionAwareButton
             onClick={handleUnstar}
-            disabled={unstarring || selectionMode}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${selectionMode ? 'pointer-events-none' : ''}`}
+            disabled={unstarring}
+            selectionMode={selectionMode}
+            variant="unstar"
             title={language === 'zh' ? '取消 Star' : 'Unstar'}
           >
             <Star className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
-          </button>
+          </SelectionAwareButton>
         </div>
       </div>
 

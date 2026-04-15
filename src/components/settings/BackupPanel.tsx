@@ -110,7 +110,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       const latestBackup = backupFiles.sort().reverse()[0];
       const backupContent = await webdavService.downloadFile(latestBackup);
       
-      if (backupContent) {
+      if (!backupContent) {
+        setIsRestoring(false);
+        alert(t('备份文件内容为空，无法恢复。', 'Backup file is empty, cannot restore.'));
+        return;
+      }
+      
+      try {
         const backupData = JSON.parse(backupContent);
 
         if (Array.isArray(backupData.repositories)) {
@@ -188,7 +194,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                 addAIConfig({
                   ...cfg,
                   apiKey: isMasked ? '' : cfg.apiKey,
-                  isActive: false,
+                  isActive: cfg.isActive,
                 });
               }
             }
@@ -238,10 +244,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           `已从备份恢复数据：仓库 ${backupData.repositories?.length ?? 0}，发布 ${backupData.releases?.length ?? 0}，自定义分类 ${backupData.customCategories?.length ?? 0}。`,
           `Data restored from backup: repositories ${backupData.repositories?.length ?? 0}, releases ${backupData.releases?.length ?? 0}, custom categories ${backupData.customCategories?.length ?? 0}.`
         ));
+      } catch (error) {
+        console.error('Restore failed:', error);
+        alert(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`);
       }
-    } catch (error) {
-      console.error('Restore failed:', error);
-      alert(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`);
     } finally {
       setIsRestoring(false);
     }

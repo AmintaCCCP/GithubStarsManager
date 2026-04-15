@@ -29,6 +29,8 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
     }
   }, [isOpen]);
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleCategorize = async () => {
     if (!selectedCategory) return;
 
@@ -36,9 +38,12 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
     if (!category) return;
 
     setIsProcessing(true);
+    setError(null);
     try {
       await onCategorize(category.name);
       onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('分类失败', 'Categorization failed'));
     } finally {
       setIsProcessing(false);
     }
@@ -85,6 +90,14 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
             ))}
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              {error}
+            </p>
+          </div>
+        )}
 
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
           <p className="text-sm text-yellow-700 dark:text-yellow-300">

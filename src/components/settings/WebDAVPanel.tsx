@@ -58,6 +58,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       return;
     }
 
+    // When editing, preserve existing isActive value from current config
+    const existingConfig = editingId ? webdavConfigs.find(c => c.id === editingId) : undefined;
     const config: WebDAVConfig = {
       id: editingId || Date.now().toString(),
       name: form.name,
@@ -65,7 +67,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       username: form.username,
       password: form.password,
       path: form.path,
-      isActive: false,
+      isActive: existingConfig?.isActive ?? false,
     };
 
     if (editingId) {

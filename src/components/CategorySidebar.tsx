@@ -191,7 +191,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (!confirmed) return;
 
     deleteCustomCategory(category.id);
-    await forceSyncToBackend();
+    try {
+      await forceSyncToBackend();
+    } catch (error) {
+      // Revert local change on failure
+      alert(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'));
+    }
   };
 
   const handleHideDefaultCategory = async (category: Category) => {
@@ -205,7 +210,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (!confirmed) return;
 
     hideDefaultCategory(category.id);
-    await forceSyncToBackend();
+    try {
+      await forceSyncToBackend();
+    } catch (error) {
+      // Revert local change on failure
+      showDefaultCategory(category.id);
+      alert(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'));
+    }
   };
 
   const handleCloseModal = () => {
@@ -305,6 +316,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
+                    aria-pressed={isSelected}
+                    aria-current={isSelected ? 'page' : undefined}
                   >
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
                       <span className="text-base flex-shrink-0">{category.icon}</span>

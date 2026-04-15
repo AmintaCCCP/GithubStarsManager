@@ -35,6 +35,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     setAnalysisProgress,
     searchFilters,
     toggleReleaseSubscription,
+    batchUnsubscribeReleases,
     releaseSubscriptions
   } = useAppStore();
 
@@ -509,6 +510,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           // 设置加载状态
           setLoading(true);
           isAnalyzingRef.current = true;
+          setAnalysisProgress({ current: 0, total: repos.length });
 
           try {
             const githubApi = new GitHubApiService(githubToken);
@@ -519,6 +521,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             const concurrency = activeConfig.concurrency || 1;
 
             for (let i = 0; i < repos.length; i += concurrency) {
+              // Update progress before processing batch
+              setAnalysisProgress({ current: i, total: repos.length });
               // 检查是否需要停止
               if (shouldStopRef.current) {
                 console.log('AI analysis stopped by user');
@@ -548,6 +552,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     analysis_failed: false
                   });
                   successCount++;
+                  // Increment progress per repo completion
+                  const newCurrent = Math.min(analysisProgress.current + 1, analysisProgress.total);
+                  setAnalysisProgress({ current: newCurrent, total: analysisProgress.total });
                 } catch (error) {
                   console.error(`Failed to analyze ${repo.full_name}:`, error);
                   updateRepository({
@@ -606,6 +613,51 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ? `成功订阅 ${successCount} 个仓库的版本发布`
             : `Successfully subscribed to ${successCount} repositories releases`
           );
+          break;
+        }
+
+        case 'unsubscribe': {
+          const subscribedRepos = repos.filter(repo => releaseSubscriptions.has(repo.id));
+          
+          if (subscribedRepos.length === 0) {
+            alert(language === 'zh'
+              ? '选中的仓库中没有被订阅的'
+              : 'None of the selected repositories are subscribed'
+            );
+            return;
+          }
+
+          // 批量取消订阅
+          const repoIds = subscribedRepos.map(repo => repo.id);
+          batchUnsubscribeReleases(repoIds);
+
+          // 更新仓库的 subscribed_to_releases 字段，记录失败项
+          const failedRepos: string[] = [];
+          for (const repo of subscribedRepos) {
+            try {
+              const updatedRepo = { ...repo, subscribed_to_releases: false };
+              updateRepository(updatedRepo);
+            } catch (error) {
+              console.error(`Failed to update repository ${repo.full_name}:`, error);
+              failedRepos.push(repo.full_name);
+            }
+          }
+
+          await forceSyncToBackend();
+
+          // 汇总结果显示
+          const successCount = subscribedRepos.length - failedRepos.length;
+          if (failedRepos.length > 0) {
+            alert(language === 'zh'
+              ? `成功取消 ${successCount} 个仓库的版本发布订阅\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
+              : `Successfully unsubscribed ${successCount} repositories from releases\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+            );
+          } else {
+            alert(language === 'zh'
+              ? `成功取消 ${successCount} 个仓库的版本发布订阅`
+              : `Successfully unsubscribed ${successCount} repositories from releases`
+            );
+          }
           break;
         }
 

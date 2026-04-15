@@ -55,6 +55,7 @@ interface AppActions {
   setReleases: (releases: Release[]) => void;
   addReleases: (releases: Release[]) => void;
   toggleReleaseSubscription: (repoId: number) => void;
+  batchUnsubscribeReleases: (repoIds: number[]) => void;
   markReleaseAsRead: (releaseId: number) => void;
   markAllReleasesAsRead: () => void;
   
@@ -418,6 +419,13 @@ export const useAppStore = create<AppState & AppActions>()(
           newSubscriptions.add(repoId);
         }
         
+        return { releaseSubscriptions: newSubscriptions };
+      }),
+      batchUnsubscribeReleases: (repoIds) => set((state) => {
+        const newSubscriptions = new Set(state.releaseSubscriptions);
+        repoIds.forEach(repoId => {
+          newSubscriptions.delete(repoId);
+        });
         return { releaseSubscriptions: newSubscriptions };
       }),
       markReleaseAsRead: (releaseId) => set((state) => {

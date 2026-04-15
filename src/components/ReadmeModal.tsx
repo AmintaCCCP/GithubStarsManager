@@ -1,9 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { X, Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
+import MarkdownRenderer from './MarkdownRenderer';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { useAppStore } from '../store/useAppStore';
@@ -13,95 +10,6 @@ interface ReadmeModalProps {
   onClose: () => void;
   repository: Repository | null;
 }
-
-// Markdown链接组件
-interface MarkdownLinkProps {
-  href?: string;
-  children?: React.ReactNode;
-}
-
-interface MarkdownLinkComponentProps extends MarkdownLinkProps {
-  baseUrl?: string;
-}
-
-const MarkdownLink: React.FC<MarkdownLinkComponentProps> = ({ href, children, baseUrl }) => {
-  if (!href) return <>{children}</>;
-
-  // 处理相对链接
-  const resolveHref = (link: string): string => {
-    // 绝对链接保持不变
-    if (link.startsWith('http://') || link.startsWith('https://') || link.startsWith('//')) {
-      return link;
-    }
-    // 锚点链接保持不变
-    if (link.startsWith('#')) {
-      return link;
-    }
-    // 相对链接转换为绝对链接，指向仓库文件视图
-    if (baseUrl) {
-      try {
-        return new URL(link, baseUrl + '/blob/HEAD/').href;
-      } catch {
-        return link;
-      }
-    }
-    return link;
-  };
-
-  const resolvedHref = resolveHref(href);
-  return (
-    <a
-      href={resolvedHref}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {children}
-    </a>
-  );
-};
-
-// Markdown图片组件 - 处理相对路径
-interface MarkdownImageProps {
-  src?: string;
-  alt?: string;
-}
-
-const MarkdownImage: React.FC<MarkdownImageProps> = ({ src, alt }) => {
-  const [hasError, setHasError] = useState(false);
-  
-  if (!src) return null;
-
-  // 确保图片路径是完整的 URL
-  const imageUrl = src;
-  if (src.startsWith('./') || src.startsWith('../')) {
-    // 相对路径，需要特殊处理
-    return (
-      <span className="text-gray-500 italic">
-        [图片: {alt || 'image'}]
-      </span>
-    );
-  }
-
-  // 图片加载失败时显示安全回退元素
-  if (hasError) {
-    return (
-      <span className="text-gray-500 italic">
-        [图片加载失败: {alt || 'image'}]
-      </span>
-    );
-  }
-
-  return (
-    <img
-      src={imageUrl}
-      alt={alt || ''}
-      className="max-w-full h-auto rounded-lg my-4"
-      onError={() => setHasError(true)}
-    />
-  );
-};
 
 export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   isOpen,
@@ -114,9 +22,17 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchReadme = useCallback(async () => {
     if (!repository || !githubToken) return;
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     setLoading(true);
     setError(null);
@@ -126,16 +42,23 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       const [owner, name] = repository.full_name.split('/');
       const content = await githubApi.getRepositoryReadme(owner, name);
 
+      // Check if request was aborted before updating state
+      if (abortController.signal.aborted) return;
+
       if (content.trim()) {
         setReadmeContent(content);
       } else {
         setError(language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file');
       }
     } catch (err) {
+      // Check if request was aborted before updating state
+      if (abortController.signal.aborted) return;
       console.error('Failed to fetch README:', err);
       setError(language === 'zh' ? '加载 README 失败，请检查网络连接或稍后重试' : 'Failed to load README. Please check your network connection and try again later');
     } finally {
-      setLoading(false);
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [repository, githubToken, language]);
 
@@ -145,7 +68,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     }
   }, [isOpen, repository, githubToken, fetchReadme]);
 
-  // Reset state when modal closes
+  // Reset state when modal closes and cleanup abortController on unmount
   useEffect(() => {
     if (!isOpen) {
       setReadmeContent('');
@@ -153,6 +76,16 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setLoading(false);
     }
   }, [isOpen]);
+
+  // Cleanup abortController on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   // Close modal on Escape key press and manage focus
   useEffect(() => {
@@ -268,61 +201,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </button>
               </div>
             ) : readmeContent ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                  components={{
-                    a: (props) => <MarkdownLink {...props} baseUrl={repository?.html_url} />,
-                    img: MarkdownImage,
-                    h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-3">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mt-4 mb-2">{children}</h3>,
-                    p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="ml-4 mb-1">{children}</li>,
-                    code: ({ children, className }) => {
-                      const isInline = !className;
-                      return isInline ? (
-                        <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm font-mono">
-                          {children}
-                        </code>
-                      ) : (
-                        <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
-                          <code className="text-sm font-mono text-gray-800 dark:text-gray-200">{children}</code>
-                        </pre>
-                      );
-                    },
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-2 my-4 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
-                        {children}
-                      </blockquote>
-                    ),
-                    hr: () => <hr className="my-6 border-gray-200 dark:border-gray-700" />,
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-4">
-                        <table className="min-w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm">
-                          {children}
-                        </table>
-                      </div>
-                    ),
-                    thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>,
-                    th: ({ children }) => (
-                      <th className="border border-gray-200 dark:border-gray-700 px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="border border-gray-200 dark:border-gray-700 px-4 py-2 text-gray-700 dark:text-gray-300">
-                        {children}
-                      </td>
-                    ),
-                  }}
-                >
-                  {readmeContent}
-                </ReactMarkdown>
-              </div>
+              <MarkdownRenderer
+                content={readmeContent}
+                enableHtml={true}
+                baseUrl={repository?.html_url}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
                 <FileText className="w-12 h-12 text-gray-400 mb-4" />

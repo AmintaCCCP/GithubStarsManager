@@ -33,11 +33,16 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   useEffect(() => {
     const checkBackend = async () => {
       setStatus('checking');
-      const healthData = await backend.checkHealth();
-      if (healthData) {
-        setStatus('connected');
-        setHealth({ version: healthData.version, timestamp: healthData.timestamp });
-      } else {
+      try {
+        const healthData = await backend.checkHealth();
+        if (healthData) {
+          setStatus('connected');
+          setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+        } else {
+          setStatus('disconnected');
+          setHealth(null);
+        }
+      } catch (error) {
         setStatus('disconnected');
         setHealth(null);
       }
@@ -48,14 +53,23 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const handleTestConnection = async () => {
     setStatus('checking');
     setBackendApiSecret(secretInput || null);
-    await backend.init();
-    const healthData = await backend.checkHealth();
-    const authOk = secretInput ? await backend.verifyAuth() : true;
-    if (healthData && authOk) {
-      setStatus('connected');
-      setHealth({ version: healthData.version, timestamp: healthData.timestamp });
-      alert(t('后端连接成功！', 'Backend connection successful!'));
-    } else {
+    try {
+      await backend.init();
+      const healthData = await backend.checkHealth();
+      const authOk = secretInput ? await backend.verifyAuth() : true;
+      if (healthData && authOk) {
+        setStatus('connected');
+        setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+        alert(t('后端连接成功！', 'Backend connection successful!'));
+      } else {
+        setStatus('disconnected');
+        setHealth(null);
+        alert(t(
+          '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
+          'Backend connection failed. Please check the server status or whether the API Secret is correct.'
+        ));
+      }
+    } catch (error) {
       setStatus('disconnected');
       setHealth(null);
       alert(t(
@@ -108,18 +122,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       const webdavConfigData = await backend.fetchWebDAVConfigs();
       const settingsData = await backend.fetchSettings();
       
-      if (repoData.repositories.length > 0) {
-        setRepositories(repoData.repositories);
-      }
-      if (releaseData.releases.length > 0) {
-        setReleases(releaseData.releases);
-      }
-      if (aiConfigData.length > 0) {
-        setAIConfigs(aiConfigData);
-      }
-      if (webdavConfigData.length > 0) {
-        setWebDAVConfigs(webdavConfigData);
-      }
+      // Always apply backend snapshot to state (empty array allowed)
+      setRepositories(repoData.repositories);
+      setReleases(releaseData.releases);
+      setAIConfigs(aiConfigData);
+      setWebDAVConfigs(webdavConfigData);
       // 从服务端数据中隐藏所有应隐藏的分类
       if (Array.isArray(settingsData.hiddenDefaultCategoryIds)) {
         for (const categoryId of settingsData.hiddenDefaultCategoryIds) {
@@ -128,8 +135,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       }
       // 显示本地隐藏列表中但服务端没有隐藏的分类（即本地手动显示的）
       if (Array.isArray(hiddenDefaultCategoryIds)) {
+        const hiddenIdsFromServer = Array.isArray(settingsData.hiddenDefaultCategoryIds) 
+          ? settingsData.hiddenDefaultCategoryIds 
+          : [];
         for (const categoryId of hiddenDefaultCategoryIds) {
-          if (typeof categoryId === 'string' && !settingsData.hiddenDefaultCategoryIds?.includes(categoryId)) {
+          if (typeof categoryId === 'string' && !hiddenIdsFromServer.includes(categoryId)) {
             showDefaultCategory(categoryId);
           }
         }

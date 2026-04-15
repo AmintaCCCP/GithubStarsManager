@@ -2,6 +2,7 @@ import React from 'react';
 import { Globe, Package, Mail, ExternalLink, Github, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
+import { version } from '../../../package.json';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -78,7 +79,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              {t('当前版本: v0.3.0', 'Current Version: v0.3.0')}
+              {t(`当前版本: v${version}`, `Current Version: v${version}`)}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-500">
               {t('检查是否有新版本可用', 'Check if a new version is available')}

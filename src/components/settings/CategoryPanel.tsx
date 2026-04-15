@@ -106,28 +106,32 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= allVisibleCategories.length) return;
 
-    const newOrder = allVisibleCategories.map(c => c.id);
-    const [movedId] = newOrder.splice(index, 1);
-    newOrder.splice(newIndex, 0, movedId);
-    setCategoryOrder(newOrder);
+    // Compute new visible sequence and merge into existing categoryOrder preserving hidden IDs
+    const visibleIds = allVisibleCategories.map(c => c.id);
+    const [movedId] = visibleIds.splice(index, 1);
+    visibleIds.splice(newIndex, 0, movedId);
+    const hiddenIds = categoryOrder.filter(id => !visibleIds.includes(id));
+    setCategoryOrder([...visibleIds, ...hiddenIds]);
   };
 
   // 快速置顶
   const handleMoveToTop = (index: number) => {
     if (index === 0) return;
-    const newOrder = allVisibleCategories.map(c => c.id);
-    const [movedId] = newOrder.splice(index, 1);
-    newOrder.unshift(movedId);
-    setCategoryOrder(newOrder);
+    const visibleIds = allVisibleCategories.map(c => c.id);
+    const [movedId] = visibleIds.splice(index, 1);
+    visibleIds.unshift(movedId);
+    const hiddenIds = categoryOrder.filter(id => !visibleIds.includes(id));
+    setCategoryOrder([...visibleIds, ...hiddenIds]);
   };
 
   // 快速置底
   const handleMoveToBottom = (index: number) => {
     if (index === allVisibleCategories.length - 1) return;
-    const newOrder = allVisibleCategories.map(c => c.id);
-    const [movedId] = newOrder.splice(index, 1);
-    newOrder.push(movedId);
-    setCategoryOrder(newOrder);
+    const visibleIds = allVisibleCategories.map(c => c.id);
+    const [movedId] = visibleIds.splice(index, 1);
+    visibleIds.push(movedId);
+    const hiddenIds = categoryOrder.filter(id => !visibleIds.includes(id));
+    setCategoryOrder([...visibleIds, ...hiddenIds]);
   };
 
   // 重置分类排序
@@ -172,19 +176,21 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, []);
 
   // 放置
-  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number, categoryId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number, _categoryId: string) => {
     e.preventDefault();
     setDragOverId(null);
 
     if (dragItemIndex.current === null || dragItemIndex.current === dropIndex) return;
 
-    const newOrder = allVisibleCategories.map(c => c.id);
-    const [movedId] = newOrder.splice(dragItemIndex.current, 1);
-    newOrder.splice(dropIndex, 0, movedId);
-    setCategoryOrder(newOrder);
+    // Compute new visible sequence and merge into existing categoryOrder preserving hidden IDs
+    const visibleIds = allVisibleCategories.map(c => c.id);
+    const [movedId] = visibleIds.splice(dragItemIndex.current, 1);
+    visibleIds.splice(dropIndex, 0, movedId);
+    const hiddenIds = categoryOrder.filter(id => !visibleIds.includes(id));
+    setCategoryOrder([...visibleIds, ...hiddenIds]);
     dragItemIndex.current = null;
     setDraggingId(null);
-  }, [allVisibleCategories, setCategoryOrder]);
+  }, [allVisibleCategories, categoryOrder, setCategoryOrder]);
 
   return (
     <div className="space-y-6">
