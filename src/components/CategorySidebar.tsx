@@ -58,7 +58,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   // 键盘快捷键支持 (Ctrl/Cmd + B)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const active = document.activeElement;
+      const active = document.activeElement as HTMLElement | null;
       const isEditable = active?.tagName === 'INPUT' ||
                          active?.tagName === 'TEXTAREA' ||
                          active?.isContentEditable ||
@@ -348,7 +348,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     const isDragTarget = dragOverCategoryId === category.id;
 
                     return (
-                      <div key={category.id} className="group">
+                      <div key={category.id} className="group relative">
                         <button
                           onClick={() => onCategorySelect(category.id)}
                           onDragOver={(event) => {
@@ -362,7 +362,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             }
                           }}
                           onDrop={(event) => handleDropOnCategory(event, category)}
-                          className={`relative flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                             isSelected
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                               : isDragTarget
@@ -376,7 +376,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             <span className="text-sm font-medium truncate">{category.name}</span>
                           </div>
 
-                          {/* 数字 badge - 正常状态显示，hover 时隐藏 */}
+                          {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
                             className={`text-xs px-2 py-1 rounded-full shrink-0 transition-opacity ${
                               isSelected
@@ -384,50 +384,50 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 : isDragTarget
                                   ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200'
                                   : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'
-                            } group-hover:opacity-0`}
+                            } group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
                           </span>
+                        </button>
 
-                          {/* 操作按钮 - 绝对定位，hover 时显示，不占位 */}
-                          {category.id !== 'all' && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                        {/* 操作按钮 - 绝对定位，hover/focus-within 时显示，不占位 */}
+                        {category.id !== 'all' && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditCategory(category);
+                              }}
+                              className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                              title={t('编辑分类', 'Edit category')}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            {category.isCustom ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleEditCategory(category);
+                                  void handleDeleteCategory(category);
                                 }}
-                                className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
-                                title={t('编辑分类', 'Edit category')}
+                                className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                title={t('删除分类', 'Delete category')}
                               >
-                                <Edit3 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                              {category.isCustom ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleDeleteCategory(category);
-                                  }}
-                                  className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
-                                  title={t('删除分类', 'Delete category')}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleHideDefaultCategory(category);
-                                  }}
-                                  className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
-                                  title={t('隐藏默认分类', 'Hide default category')}
-                                >
-                                  <EyeOff className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleHideDefaultCategory(category);
+                                }}
+                                className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                title={t('隐藏默认分类', 'Hide default category')}
+                              >
+                                <EyeOff className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
