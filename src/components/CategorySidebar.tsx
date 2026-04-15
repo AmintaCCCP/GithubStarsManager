@@ -183,7 +183,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     setIsCreatingCategory(false);
   };
 
-  const handleDropOnCategory = async (event: React.DragEvent<HTMLButtonElement>, category: Category) => {
+  const handleDropOnCategory = async (event: React.DragEvent<HTMLDivElement>, category: Category) => {
     event.preventDefault();
     setDragOverCategoryId(null);
 
@@ -232,20 +232,23 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               const isDragTarget = dragOverCategoryId === category.id;
 
               return (
-                <div key={category.id} className="group shrink-0">
+                <div
+                  key={category.id}
+                  className="group shrink-0"
+                  onDragOver={(event) => {
+                    if (category.id === 'all') return;
+                    event.preventDefault();
+                    setDragOverCategoryId(category.id);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverCategoryId === category.id) {
+                      setDragOverCategoryId(null);
+                    }
+                  }}
+                  onDrop={(event) => handleDropOnCategory(event, category)}
+                >
                   <button
                     onClick={() => onCategorySelect(category.id)}
-                    onDragOver={(event) => {
-                      if (category.id === 'all') return;
-                      event.preventDefault();
-                      setDragOverCategoryId(category.id);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverCategoryId === category.id) {
-                        setDragOverCategoryId(null);
-                      }
-                    }}
-                    onDrop={(event) => handleDropOnCategory(event, category)}
                     className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                       isSelected
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -308,38 +311,52 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                 {/* 折叠状态下的分类图标列表 */}
                 <div className="flex flex-col items-center space-y-2">
-                  {allCategories.slice(0, 8).map((category) => {
-                    const isSelected = selectedCategory === category.id;
-                    const isDragTarget = dragOverCategoryId === category.id;
-                    return (
-                      <button
-                    key={category.id}
-                    onClick={() => onCategorySelect(category.id)}
-                    onDragOver={(event) => {
-                      if (category.id === 'all') return;
-                      event.preventDefault();
-                      setDragOverCategoryId(category.id);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverCategoryId === category.id) {
-                        setDragOverCategoryId(null);
-                      }
-                    }}
-                    onDrop={(event) => handleDropOnCategory(event, category)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
-                        : isDragTarget
-                          ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                    title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
-                    aria-label={category.name}
-                  >
-                    {category.icon}
-                  </button>
-                    );
-                  })}
+                  {(() => {
+                    // 确保选中分类在前8个显示列表中
+                    const selectedIndex = allCategories.findIndex(c => c.id === selectedCategory);
+                    const isSelectedHidden = selectedIndex >= 8;
+                    let displayCategories = allCategories.slice(0, 8);
+                    if (isSelectedHidden && selectedIndex !== -1) {
+                      // 用选中分类替换最后一个
+                      displayCategories = [...allCategories.slice(0, 7), allCategories[selectedIndex]];
+                    }
+                    return displayCategories.map((category) => {
+                      const isSelected = selectedCategory === category.id;
+                      const isDragTarget = dragOverCategoryId === category.id;
+                      return (
+                        <div
+                          key={category.id}
+                          className="group relative"
+                          onDragOver={(event) => {
+                            if (category.id === 'all') return;
+                            event.preventDefault();
+                            setDragOverCategoryId(category.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverCategoryId === category.id) {
+                              setDragOverCategoryId(null);
+                            }
+                          }}
+                          onDrop={(event) => handleDropOnCategory(event, category)}
+                        >
+                          <button
+                            onClick={() => onCategorySelect(category.id)}
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
+                              isSelected
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
+                                : isDragTarget
+                                  ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
+                                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                            title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
+                            aria-label={category.name}
+                          >
+                            {category.icon}
+                          </button>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
 
                 {/* 添加分类按钮 */}
@@ -394,20 +411,23 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     const isDragTarget = dragOverCategoryId === category.id;
 
                     return (
-                      <div key={category.id} className="group relative">
+                      <div
+                        key={category.id}
+                        className="group relative"
+                        onDragOver={(event) => {
+                          if (category.id === 'all') return;
+                          event.preventDefault();
+                          setDragOverCategoryId(category.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverCategoryId === category.id) {
+                            setDragOverCategoryId(null);
+                          }
+                        }}
+                        onDrop={(event) => handleDropOnCategory(event, category)}
+                      >
                         <button
                           onClick={() => onCategorySelect(category.id)}
-                          onDragOver={(event) => {
-                            if (category.id === 'all') return;
-                            event.preventDefault();
-                            setDragOverCategoryId(category.id);
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverCategoryId === category.id) {
-                              setDragOverCategoryId(null);
-                            }
-                          }}
-                          onDrop={(event) => handleDropOnCategory(event, category)}
                           className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                             isSelected
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'

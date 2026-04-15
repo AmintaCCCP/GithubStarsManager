@@ -3,6 +3,7 @@ import { X, Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { useAppStore } from '../store/useAppStore';
@@ -25,22 +26,7 @@ interface MarkdownLinkComponentProps extends MarkdownLinkProps {
 
 const MarkdownLink: React.FC<MarkdownLinkComponentProps> = ({ href, children, baseUrl }) => {
   if (!href) return <>{children}</>;
-<<<<<<< HEAD
 
-=======
-  
-  // 获取当前仓库的基础URL用于解析相对链接
-  const getBaseUrl = () => {
-    if (typeof window === 'undefined') return '';
-    // 从当前URL提取仓库信息
-    const pathMatch = window.location.pathname.match(/\/([^/]+)\/([^/]+)/);
-    if (pathMatch) {
-      return `https://github.com/${pathMatch[1]}/${pathMatch[2]}`;
-    }
-    return '';
-  };
-  
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
   // 处理相对链接
   const resolveHref = (link: string): string => {
     // 绝对链接保持不变
@@ -51,29 +37,18 @@ const MarkdownLink: React.FC<MarkdownLinkComponentProps> = ({ href, children, ba
     if (link.startsWith('#')) {
       return link;
     }
-    // 相对链接转换为绝对链接
-<<<<<<< HEAD
-=======
-    const baseUrl = getBaseUrl();
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
+    // 相对链接转换为绝对链接，指向仓库文件视图
     if (baseUrl) {
       try {
-        return new URL(link, baseUrl + '/').href;
+        return new URL(link, baseUrl + '/blob/HEAD/').href;
       } catch {
         return link;
       }
     }
     return link;
   };
-<<<<<<< HEAD
 
   const resolvedHref = resolveHref(href);
-
-=======
-  
-  const resolvedHref = resolveHref(href);
-  
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
   return (
     <a
       href={resolvedHref}
@@ -296,7 +271,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
                   components={{
                     a: (props) => <MarkdownLink {...props} baseUrl={repository?.html_url} />,
                     img: MarkdownImage,

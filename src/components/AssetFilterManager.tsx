@@ -247,6 +247,10 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     <button
                       onClick={() => onFilterToggle(filter.id)}
                       className="flex items-center space-x-2 flex-1"
+                      aria-pressed={selectedFilters.includes(filter.id)}
+                      aria-label={`${filter.name} (${filter.keywords.join(', ')})`}
+                      title={`${filter.name} (${filter.keywords.join(', ')})`}
+                      type="button"
                     >
                       <span className="font-medium text-sm">{filter.name}</span>
                       <span className="text-xs opacity-75 hidden lg:inline">

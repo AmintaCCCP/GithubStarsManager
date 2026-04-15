@@ -484,54 +484,80 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             return;
           }
 
-          const githubApi = new GitHubApiService(githubToken);
-          const aiService = new AIService(activeConfig, language);
-          const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+          // 设置加载状态
+          setLoading(true);
+          isAnalyzingRef.current = true;
 
-          let successCount = 0;
-          const concurrency = activeConfig.concurrency || 1;
+          try {
+            const githubApi = new GitHubApiService(githubToken);
+            const aiService = new AIService(activeConfig, language);
+            const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
 
-          for (let i = 0; i < repos.length; i += concurrency) {
-            const batch = repos.slice(i, i + concurrency);
-            const promises = batch.map(async (repo) => {
-              try {
-                const [owner, name] = repo.full_name.split('/');
-                const readmeContent = await githubApi.getRepositoryReadme(owner, name);
-                const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
-                const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
-                
-                updateRepository({
-                  ...repo,
-                  ai_summary: analysis.summary,
-                  ai_tags: analysis.tags,
-                  ai_platforms: analysis.platforms,
-                  custom_category: resolvedCategory,
-                  analyzed_at: new Date().toISOString(),
-                  analysis_failed: false
-                });
-                successCount++;
-              } catch (error) {
-                console.error(`Failed to analyze ${repo.full_name}:`, error);
-                updateRepository({
-                  ...repo,
-                  analyzed_at: new Date().toISOString(),
-                  analysis_failed: true
-                });
+            let successCount = 0;
+            const concurrency = activeConfig.concurrency || 1;
+
+            for (let i = 0; i < repos.length; i += concurrency) {
+              // 检查是否需要停止
+              if (shouldStopRef.current) {
+                console.log('AI analysis stopped by user');
+                break;
               }
-            });
 
-            await Promise.all(promises);
-            
-            if (i + concurrency < repos.length) {
-              await new Promise(resolve => setTimeout(resolve, 500));
+              const batch = repos.slice(i, i + concurrency);
+              const promises = batch.map(async (repo) => {
+                // 检查是否需要停止
+                if (shouldStopRef.current) {
+                  return;
+                }
+
+                try {
+                  const [owner, name] = repo.full_name.split('/');
+                  const readmeContent = await githubApi.getRepositoryReadme(owner, name);
+                  const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
+                  const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
+
+                  updateRepository({
+                    ...repo,
+                    ai_summary: analysis.summary,
+                    ai_tags: analysis.tags,
+                    ai_platforms: analysis.platforms,
+                    custom_category: resolvedCategory,
+                    analyzed_at: new Date().toISOString(),
+                    analysis_failed: false
+                  });
+                  successCount++;
+                } catch (error) {
+                  console.error(`Failed to analyze ${repo.full_name}:`, error);
+                  updateRepository({
+                    ...repo,
+                    analyzed_at: new Date().toISOString(),
+                    analysis_failed: true
+                  });
+                }
+              });
+
+              await Promise.all(promises);
+
+              if (i + concurrency < repos.length) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
             }
-          }
 
-          await forceSyncToBackend();
-          alert(language === 'zh' 
-            ? `成功分析 ${successCount} 个仓库` 
-            : `Successfully analyzed ${successCount} repositories`
-          );
+            await forceSyncToBackend();
+            alert(language === 'zh'
+              ? `成功分析 ${successCount} 个仓库`
+              : `Successfully analyzed ${successCount} repositories`
+            );
+          } catch (error) {
+            console.error('Bulk AI analysis failed:', error);
+            alert(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed');
+          } finally {
+            // 确保状态重置
+            isAnalyzingRef.current = false;
+            shouldStopRef.current = false;
+            setLoading(false);
+            setAnalysisProgress({ current: 0, total: 0 });
+          }
           break;
         }
 
@@ -574,11 +600,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleBulkCategorize = async (categoryName: string) => {
-<<<<<<< HEAD
-    const failedRepos: string[] = [];
-
-    for (const repo of selectedRepositories) {
-=======
     const selectedRepos = filteredRepositories.filter(repo =>
       selectedRepoIds.has(repo.id)
     );
@@ -586,7 +607,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     const failedRepos: string[] = [];
 
     for (const repo of selectedRepos) {
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
       try {
         updateRepository({
           ...repo,
@@ -601,11 +621,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     await forceSyncToBackend();
 
     // 汇总结果显示
-<<<<<<< HEAD
-    const successCount = selectedRepositories.length - failedRepos.length;
-=======
     const successCount = selectedRepos.length - failedRepos.length;
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
     if (failedRepos.length > 0) {
       alert(language === 'zh'
         ? `成功为 ${successCount} 个仓库设置分类：${categoryName}\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
@@ -832,13 +848,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       {/* Repository Grid with consistent card widths */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {visibleRepositories.map(repo => (
-          <RepositoryCard 
+          <RepositoryCard
             key={repo.id}
-            repository={repo} 
+            repository={repo}
             showAISummary={showAISummary}
             searchQuery={useAppStore.getState().searchFilters.query}
             isSelected={selectedRepoIds.has(repo.id)}
             onSelect={handleSelectRepo}
+            selectionMode={showBulkToolbar}
           />
         ))}
       </div>

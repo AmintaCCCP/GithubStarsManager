@@ -51,8 +51,8 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = 
           ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,
-          code: ({ children, className }) => {
-            const isInline = !className;
+          code: ({ children, className, inline }) => {
+            const isInline = inline || !className;
             return isInline ? (
               <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                 {children}
@@ -752,13 +752,28 @@ export const ReleaseTimeline: React.FC = () => {
                   
                   <div className="flex items-center space-x-1.5 flex-shrink-0">
                     {/* Expand/Collapse indicator */}
-                    <div className={`p-1.5 rounded-lg transition-all duration-300 ${
-                      isExpanded
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rotate-180'
-                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                    }`}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleReleaseExpansion(release.id);
+                      }}
+                      className={`p-1.5 rounded-lg transition-all duration-300 ${
+                        isExpanded
+                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rotate-180'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                      aria-label={isExpanded ? t('折叠', 'Collapse') : t('展开', 'Expand')}
+                      aria-expanded={isExpanded}
+                      aria-controls={`release-content-${release.id}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleReleaseExpansion(release.id);
+                        }
+                      }}
+                    >
                       <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
+                    </button>
                   </div>
                 </div>
 
@@ -823,6 +838,8 @@ export const ReleaseTimeline: React.FC = () => {
                             : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                         title={openDropdowns.has(release.id) ? t('隐藏文件', 'Hide Files') : t('显示文件', 'Show Files')}
+                        aria-label={openDropdowns.has(release.id) ? t('隐藏文件', 'Hide Files') : t('显示文件', 'Show Files')}
+                        aria-pressed={openDropdowns.has(release.id)}
                       >
                         <Folder className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="hidden sm:inline">{openDropdowns.has(release.id) ? t('隐藏文件', 'Hide Files') : t('显示文件', 'Show Files')}</span>
@@ -836,6 +853,7 @@ export const ReleaseTimeline: React.FC = () => {
                       }}
                       className="p-2 sm:p-2.5 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       title={t('取消订阅 Release', 'Unsubscribe from releases')}
+                      aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
                     >
                       <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
@@ -845,6 +863,7 @@ export const ReleaseTimeline: React.FC = () => {
                       rel="noopener noreferrer"
                       className="p-2 sm:p-2.5 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       title={t('在GitHub上查看', 'View on GitHub')}
+                      aria-label={t('在GitHub上查看', 'View on GitHub')}
                       onClick={(e) => {
                         e.stopPropagation();
                         markReleaseAsRead(release.id);
@@ -857,9 +876,12 @@ export const ReleaseTimeline: React.FC = () => {
               </div>
 
               {/* Expanded Content */}
-              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
-              }`}>
+              <div
+                id={`release-content-${release.id}`}
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 dark:border-gray-700">
                   {/* Download Links Section */}
                   {downloadLinks.length > 0 && (

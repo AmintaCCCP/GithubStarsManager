@@ -16,6 +16,7 @@ interface RepositoryCardProps {
   searchQuery?: string; // 新增：用于高亮搜索关键词
   isSelected?: boolean;
   onSelect?: (id: number) => void;
+  selectionMode?: boolean; // 新增：是否处于选择模式
 }
 
 export const RepositoryCard: React.FC<RepositoryCardProps> = ({
@@ -23,7 +24,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   showAISummary = true,
   searchQuery = '',
   isSelected = false,
-  onSelect
+  onSelect,
+  selectionMode = false
 }) => {
   const {
     releaseSubscriptions,
@@ -45,7 +47,6 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const [unstarring, setUnstarring] = useState(false);
-  const [isSelecting, setIsSelecting] = useState(false);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
@@ -367,18 +368,21 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  // 处理卡片空白区域点击，打开 README 模态框
+  // 处理卡片空白区域点击
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    // 如果正在选择模式，不触发点击
-    if (isSelecting) return;
-
     // 检查点击目标是否是交互元素或其子元素
     const target = event.target as HTMLElement;
     // 排除卡片本身的 role="button"，只检查子元素的交互元素
     const isInteractiveElement = target.closest('button, a, input, textarea, select');
 
-    // 如果点击的是交互元素，不打开模态框
+    // 如果点击的是交互元素，不处理
     if (isInteractiveElement) return;
+
+    // 如果选择模式下，点击卡片切换选择状态
+    if (selectionMode && onSelect) {
+      onSelect(repository.id);
+      return;
+    }
 
     // 打开 README 模态框
     setReadmeModalOpen(true);
@@ -428,31 +432,33 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         <div className="flex items-center space-x-2">
           <button
             onClick={handleAIAnalyze}
-            disabled={isLoading}
+            disabled={isLoading || selectionMode}
             className={`p-2 rounded-lg transition-colors ${
               repository.analysis_failed
                 ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
                 : repository.analyzed_at
                   ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
                   : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
-              } disabled:opacity-50`}
+              } disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
             title={getAIButtonTitle()}
           >
             <Bot className="w-4 h-4" />
           </button>
           <button
             onClick={() => toggleReleaseSubscription(repository.id)}
+            disabled={selectionMode}
             className={`p-2 rounded-lg transition-colors ${isSubscribed
               ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
               : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+              } disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
             {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setEditModalOpen(true)}
-            className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+            disabled={selectionMode}
+            className={`p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors disabled:opacity-50 ${selectionMode ? 'pointer-events-none' : ''}`}
             title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
           >
             <Edit3 className="w-4 h-4" />
@@ -465,7 +471,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+            onClick={(e) => selectionMode && e.preventDefault()}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -474,15 +481,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             href={repository.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            onClick={(e) => selectionMode && e.preventDefault()}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />
           </a>
           <button
             onClick={handleUnstar}
-            disabled={unstarring}
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={unstarring || selectionMode}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${selectionMode ? 'pointer-events-none' : ''}`}
             title={language === 'zh' ? '取消 Star' : 'Unstar'}
           >
             <Star className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
@@ -655,13 +663,9 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              onMouseEnter={() => setIsSelecting(true)}
-              onMouseLeave={() => setIsSelecting(false)}
               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                 isSelected
                   ? 'bg-blue-500 border-blue-500 text-white'
-                  : isSelecting
-                  ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30'
                   : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
               }`}
               title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
