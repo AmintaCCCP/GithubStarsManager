@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   Edit3,
@@ -46,15 +46,28 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   // 控制文字显示的状态：等侧栏展开动效完成后再显示文字
   const [showText, setShowText] = useState(!isSidebarCollapsed);
 
+  // 用于存储 showText 定时器的 ref
+  const showTextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 用于存储 toggleSidebar 定时器的 ref
+  const toggleSidebarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 监听侧栏状态变化，同步更新文字显示状态
   useEffect(() => {
     if (isSidebarCollapsed) {
       setShowText(false);
     } else {
+      // 清除之前的定时器
+      if (showTextTimerRef.current) {
+        clearTimeout(showTextTimerRef.current);
+      }
       // 侧栏展开时，延迟显示文字
-      const timer = setTimeout(() => setShowText(true), 200);
-      return () => clearTimeout(timer);
+      showTextTimerRef.current = setTimeout(() => setShowText(true), 200);
     }
+    return () => {
+      if (showTextTimerRef.current) {
+        clearTimeout(showTextTimerRef.current);
+      }
+    };
   }, [isSidebarCollapsed]);
 
   // 检测屏幕尺寸
@@ -69,16 +82,29 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   // 切换侧栏折叠状态
   const toggleSidebar = useCallback(() => {
+    // 清除之前的定时器
+    if (toggleSidebarTimerRef.current) {
+      clearTimeout(toggleSidebarTimerRef.current);
+    }
     if (isSidebarCollapsed) {
       // 展开侧栏：先展开，再显示文字
       setSidebarCollapsed(false);
-      setTimeout(() => setShowText(true), 200); // 200ms 后显示文字，配合动效
+      toggleSidebarTimerRef.current = setTimeout(() => setShowText(true), 200); // 200ms 后显示文字，配合动效
     } else {
       // 折叠侧栏：先隐藏文字，再折叠
       setShowText(false);
-      setTimeout(() => setSidebarCollapsed(true), 150); // 150ms 后折叠，文字先消失
+      toggleSidebarTimerRef.current = setTimeout(() => setSidebarCollapsed(true), 150); // 150ms 后折叠，文字先消失
     }
   }, [isSidebarCollapsed, setSidebarCollapsed]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (toggleSidebarTimerRef.current) {
+        clearTimeout(toggleSidebarTimerRef.current);
+      }
+    };
+  }, []);
 
   // 键盘快捷键支持 (Ctrl/Cmd + B)
   useEffect(() => {
@@ -183,6 +209,16 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     setIsCreatingCategory(false);
   };
 
+  const handleSyncError = (originalRepo: Repository) => {
+    updateRepository(originalRepo);
+    setDragOverCategoryId(null);
+    alert(
+      language === 'zh'
+        ? `同步到后端失败，已恢复分类更改。`
+        : `Failed to sync to backend. Category change has been reverted.`
+    );
+  };
+
   const handleDropOnCategory = async (event: React.DragEvent<HTMLDivElement>, category: Category) => {
     event.preventDefault();
     setDragOverCategoryId(null);
@@ -193,6 +229,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     const repository = repositoryMap.get(repoId);
     if (!repository) return;
 
+    const originalRepo = { ...repository };
+
     const nextRepo = {
       ...repository,
       custom_category: category.name,
@@ -201,7 +239,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     };
 
     updateRepository(nextRepo);
-    await forceSyncToBackend();
+
+    try {
+      await forceSyncToBackend();
+    } catch (error) {
+      handleSyncError(originalRepo);
+    }
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;

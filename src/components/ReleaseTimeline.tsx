@@ -51,18 +51,21 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = 
           ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,
-          code: ({ children, className, inline }) => {
-            const isInline = inline || !className;
+          code: ({ node, className, children }) => {
+            const isInline = node?.parent?.tagName !== 'pre';
             return isInline ? (
               <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                 {children}
               </code>
             ) : (
-              <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3">
-                <code className="text-xs font-mono text-gray-800 dark:text-gray-200">{children}</code>
-              </pre>
+              <code className="text-xs font-mono text-gray-800 dark:text-gray-200">{children}</code>
             );
           },
+          pre: ({ children }) => (
+            <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3">
+              {children}
+            </pre>
+          ),
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
               {children}
@@ -441,9 +444,44 @@ export const ReleaseTimeline: React.FC = () => {
       result += (result ? '\n\n' : '') + line;
     }
 
-    // 如果按段落截断后内容太少，改用字符截断
+    // 如果按段落截断后内容太少，改用字符截断并寻找安全截断点
     if (result.length < maxLength * 0.3) {
-      result = body.substring(0, maxLength);
+      // 从 maxLength 位置向前搜索安全截断点
+      let cutPoint = maxLength;
+      const safeBreakpoints = ['\n', ' ', ')', ']', '`', '*', '_', '.', ',', ';', '!', '?'];
+
+      // 优先在空白字符或 markdown 闭合符号处截断
+      for (let i = maxLength; i >= maxLength * 0.5; i--) {
+        if (safeBreakpoints.includes(body[i])) {
+          cutPoint = i + 1;
+          break;
+        }
+      }
+
+      // 检查是否处于 markdown 链接或代码块中间
+      const beforeCut = body.substring(0, cutPoint);
+      const openBrackets = (beforeCut.match(/\[/g) || []).length - (beforeCut.match(/\]/g) || []).length;
+      const openParens = (beforeCut.match(/\(/g) || []).length - (beforeCut.match(/\)/g) || []).length;
+      const openBackticks = (beforeCut.match(/`/g) || []).length;
+
+      // 如果在链接中间，尝试找到链接开始前的位置
+      if (openBrackets > 0 || openParens > 0) {
+        const lastOpenBracket = beforeCut.lastIndexOf('[');
+        const lastOpenParen = beforeCut.lastIndexOf('(');
+        if (lastOpenBracket > maxLength * 0.5 || lastOpenParen > maxLength * 0.5) {
+          cutPoint = Math.min(lastOpenBracket, lastOpenParen);
+        }
+      }
+
+      // 如果在代码块中间，尝试找到代码块开始前的位置
+      if (openBackticks % 2 !== 0) {
+        const lastBacktick = beforeCut.lastIndexOf('`');
+        if (lastBacktick > maxLength * 0.5) {
+          cutPoint = lastBacktick;
+        }
+      }
+
+      result = body.substring(0, cutPoint).trimEnd();
     }
 
     return result + '...';
