@@ -8,6 +8,7 @@ import { AIService } from '../services/aiService';
 import { forceSyncToBackend } from '../services/autoSync';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
+import { ReadmeModal } from './ReadmeModal';
 
 interface RepositoryCardProps {
   repository: Repository;
@@ -40,6 +41,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   } = useAppStore();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [readmeModalOpen, setReadmeModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const [unstarring, setUnstarring] = useState(false);
@@ -365,13 +367,30 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  // 处理卡片空白区域点击，打开 README 模态框
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    // 如果正在选择模式，不触发点击
+    if (isSelecting) return;
+    
+    // 检查点击目标是否是交互元素或其子元素
+    const target = event.target as HTMLElement;
+    const isInteractiveElement = target.closest('button, a, input, textarea, select, [role="button"]');
+    
+    // 如果点击的是交互元素，不打开模态框
+    if (isInteractiveElement) return;
+    
+    // 打开 README 模态框
+    setReadmeModalOpen(true);
+  };
+
   return (
     <div
-      className={`repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full ${
+      className={`repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full cursor-pointer ${
         isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
       }`}
       draggable={!onSelect}
       onDragStart={handleDragStart}
+      onClick={handleCardClick}
     >
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
@@ -644,6 +663,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       <RepositoryEditModal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
+        repository={repository}
+      />
+
+      {/* README Modal */}
+      <ReadmeModal
+        isOpen={readmeModalOpen}
+        onClose={() => setReadmeModalOpen(false)}
         repository={repository}
       />
     </div>

@@ -88,9 +88,15 @@ export class GitHubApiService {
       const response = await this.makeRequest<{ content: string; encoding: string }>(
         `/repos/${owner}/${repo}/readme`
       );
-      
+
       if (response.encoding === 'base64') {
-        return atob(response.content);
+        // 使用 TextDecoder 正确处理 UTF-8 编码，避免中文乱码
+        const binaryString = atob(response.content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return new TextDecoder('utf-8').decode(bytes);
       }
       return response.content;
     } catch (error) {
