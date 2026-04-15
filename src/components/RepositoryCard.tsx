@@ -17,6 +17,7 @@ interface RepositoryCardProps {
   isSelected?: boolean;
   onSelect?: (id: number) => void;
   selectionMode?: boolean; // 新增：是否处于选择模式
+  isExitingSelection?: boolean; // 新增：是否正在退出多选模式
 }
 
 export const RepositoryCard: React.FC<RepositoryCardProps> = ({
@@ -25,7 +26,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   searchQuery = '',
   isSelected = false,
   onSelect,
-  selectionMode = false
+  selectionMode = false,
+  isExitingSelection = false
 }) => {
   const {
     releaseSubscriptions,
@@ -380,6 +382,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
     // 如果选择模式下，点击卡片切换选择状态
     if (selectionMode && onSelect) {
+      // 阻止默认行为以防止焦点改变导致页面滚动
+      event.preventDefault();
       onSelect(repository.id);
       return;
     }
@@ -399,15 +403,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   return (
     <div
       className={`repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full cursor-pointer ${
-        isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
-      }`}
+        isSelected ? 'shadow-[0_0_0_2px_theme(colors.blue.500)] dark:shadow-[0_0_0_2px_theme(colors.blue.400)] bg-blue-50 dark:bg-blue-900/20' : ''
+      } ${isExitingSelection && isSelected ? 'animate-selection-exit' : ''}`}
       draggable={!onSelect}
       onDragStart={handleDragStart}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
-      tabIndex={0}
+      tabIndex={selectionMode ? -1 : 0}
       role="button"
       aria-label={`${repository.full_name} - ${repository.description || 'No description'}`}
+      data-selection-mode={selectionMode}
     >
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
@@ -659,6 +664,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           {/* Checkbox - Bottom Right */}
           {onSelect && (
             <button
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(repository.id);

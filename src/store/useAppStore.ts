@@ -64,7 +64,10 @@ interface AppActions {
   deleteCustomCategory: (id: string) => void;
   hideDefaultCategory: (id: string) => void;
   showDefaultCategory: (id: string) => void;
-  
+  setCategoryOrder: (order: string[]) => void;
+  reorderCategories: (oldIndex: number, newIndex: number) => void;
+  setCollapsedSidebarCategoryCount: (count: number) => void;
+
   // Asset Filter actions
   addAssetFilter: (filter: AssetFilter) => void;
   updateAssetFilter: (id: string, updates: Partial<AssetFilter>) => void;
@@ -115,6 +118,8 @@ type PersistedAppState = Partial<
     | 'releases'
     | 'customCategories'
     | 'hiddenDefaultCategoryIds'
+    | 'categoryOrder'
+    | 'collapsedSidebarCategoryCount'
     | 'assetFilters'
     | 'theme'
     | 'currentView'
@@ -168,6 +173,8 @@ const normalizePersistedState = (
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: Array.isArray((safePersisted as any).hiddenDefaultCategoryIds) ? (safePersisted as any).hiddenDefaultCategoryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
+    categoryOrder: Array.isArray(safePersisted.categoryOrder) ? safePersisted.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') : [],
+    collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 8,
     assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
@@ -292,6 +299,8 @@ export const useAppStore = create<AppState & AppActions>()(
       readReleases: new Set<number>(),
       customCategories: [],
       hiddenDefaultCategoryIds: [],
+      categoryOrder: [],
+      collapsedSidebarCategoryCount: 8,
       assetFilters: defaultPresetFilters,
       theme: 'light',
       currentView: 'repositories',
@@ -488,6 +497,16 @@ export const useAppStore = create<AppState & AppActions>()(
       showDefaultCategory: (id) => set((state) => ({
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds.filter(categoryId => categoryId !== id)
       })),
+      setCategoryOrder: (order) => set({ categoryOrder: order }),
+      reorderCategories: (oldIndex, newIndex) => set((state) => {
+        const allCategories = getAllCategories(state.customCategories, state.language, state.hiddenDefaultCategoryIds);
+        const orderedCategories = sortCategoriesByOrder(allCategories, state.categoryOrder);
+        const newOrder = orderedCategories.map(c => c.id);
+        const [movedId] = newOrder.splice(oldIndex, 1);
+        newOrder.splice(newIndex, 0, movedId);
+        return { categoryOrder: newOrder };
+      }),
+      setCollapsedSidebarCategoryCount: (count) => set({ collapsedSidebarCategoryCount: count }),
 
       // Asset Filter actions
       addAssetFilter: (filter) => set((state) => ({
@@ -520,7 +539,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -549,6 +568,8 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化自定义分类
         customCategories: state.customCategories,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+        categoryOrder: state.categoryOrder,
+        collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
 
         // 持久化资源过滤器
         assetFilters: state.assetFilters,
@@ -568,7 +589,24 @@ export const useAppStore = create<AppState & AppActions>()(
           sortOrder: state.searchFilters.sortOrder,
         },
       }),
-      migrate: (persistedState) => persistedState as PersistedAppState,
+      migrate: (persistedState, _version) => {
+        // 版本升级适配处理
+        const state = persistedState as PersistedAppState | undefined;
+
+        // 从旧版本升级时，确保 categoryOrder 字段存在
+        if (state && !Array.isArray(state.categoryOrder)) {
+          console.log('Migrating from old version: initializing categoryOrder');
+          state.categoryOrder = [];
+        }
+
+        // 从旧版本升级时，确保 collapsedSidebarCategoryCount 字段存在
+        if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
+          console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
+          state.collapsedSidebarCategoryCount = 8;
+        }
+
+        return state as PersistedAppState;
+      },
       merge: (persistedState, currentState) => {
         const normalized = normalizePersistedState(
           persistedState as PersistedAppState | undefined,
@@ -593,6 +631,34 @@ export const useAppStore = create<AppState & AppActions>()(
   )
 );
 
+// Helper function to sort categories by order
+export const sortCategoriesByOrder = (
+  categories: Category[],
+  categoryOrder: string[]
+): Category[] => {
+  if (!categoryOrder || categoryOrder.length === 0) {
+    return categories;
+  }
+
+  const orderMap = new Map(categoryOrder.map((id, index) => [id, index]));
+
+  return [...categories].sort((a, b) => {
+    const orderA = orderMap.get(a.id);
+    const orderB = orderMap.get(b.id);
+
+    // 如果两个都有顺序，按顺序排序
+    if (orderA !== undefined && orderB !== undefined) {
+      return orderA - orderB;
+    }
+    // 如果只有a有顺序，a排在前面
+    if (orderA !== undefined) return -1;
+    // 如果只有b有顺序，b排在前面
+    if (orderB !== undefined) return 1;
+    // 都没有顺序，保持原顺序
+    return 0;
+  });
+};
+
 // Helper function to get all categories (default + custom)
 export const getAllCategories = (
   customCategories: Category[],
@@ -605,7 +671,7 @@ export const getAllCategories = (
       ...cat,
       name: language === 'en' ? translateCategoryName(cat.name) : cat.name
     }));
-  
+
   return [...translatedDefaults, ...customCategories];
 };
 

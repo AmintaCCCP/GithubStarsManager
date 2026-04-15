@@ -45,7 +45,10 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
+        'slide-down': 'slideDown 0.5s ease-out',
         'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',
+        'shake': 'shake 0.3s ease-in-out',
+        'bounce-twice': 'bounceTwice 0.6s ease-in-out',
       },
       keyframes: {
         fadeIn: {
@@ -56,10 +59,25 @@ export default {
           '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+        slideDown: {
+          '0%': { transform: 'translateY(0)', opacity: '1' },
+          '100%': { transform: 'translateY(10px)', opacity: '0' },
+        },
         bounceGentle: {
           '0%, 20%, 50%, 80%, 100%': { transform: 'translateY(0)' },
           '40%': { transform: 'translateY(-4px)' },
           '60%': { transform: 'translateY(-2px)' },
+        },
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '5%, 15%, 25%, 35%, 45%, 55%, 65%, 75%, 85%, 95%': { transform: 'translateX(-8px)' },
+          '10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%': { transform: 'translateX(8px)' },
+        },
+        bounceTwice: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '25%': { transform: 'translateY(-12px)' },
+          '50%': { transform: 'translateY(0)' },
+          '75%': { transform: 'translateY(-8px)' },
         }
       }
     },

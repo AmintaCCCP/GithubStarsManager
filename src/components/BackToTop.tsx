@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isBouncing, setIsBouncing] = useState(false);
   const language = useAppStore(state => state.language);
+  const bounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleVisibility = useCallback(() => {
     if (window.scrollY > 300) {
@@ -21,6 +23,17 @@ export const BackToTop: React.FC = () => {
     });
   }, []);
 
+  // 触发跳跃动画
+  const triggerBounce = useCallback(() => {
+    if (bounceTimeoutRef.current) {
+      clearTimeout(bounceTimeoutRef.current);
+    }
+    setIsBouncing(true);
+    bounceTimeoutRef.current = setTimeout(() => {
+      setIsBouncing(false);
+    }, 600);
+  }, []);
+
   useEffect(() => {
     window.addEventListener('scroll', toggleVisibility, { passive: true });
     toggleVisibility();
@@ -28,6 +41,23 @@ export const BackToTop: React.FC = () => {
       window.removeEventListener('scroll', toggleVisibility);
     };
   }, [toggleVisibility]);
+
+  // 监听全局跳跃动画事件
+  useEffect(() => {
+    const handleBounceEvent = () => {
+      if (isVisible) {
+        triggerBounce();
+      }
+    };
+
+    window.addEventListener('gsm:back-to-top-bounce', handleBounceEvent);
+    return () => {
+      window.removeEventListener('gsm:back-to-top-bounce', handleBounceEvent);
+      if (bounceTimeoutRef.current) {
+        clearTimeout(bounceTimeoutRef.current);
+      }
+    };
+  }, [isVisible, triggerBounce]);
 
   return (
     <button
@@ -50,6 +80,7 @@ export const BackToTop: React.FC = () => {
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
+        ${isBouncing ? 'animate-bounce-twice' : ''}
         /* 移动端：上移避免遮挡底部工具栏 */
         bottom-20 right-4
         /* 平板：适度位置 */

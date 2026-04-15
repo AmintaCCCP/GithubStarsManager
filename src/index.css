@@ -68,6 +68,26 @@
   .animate-fade-in {
     animation: fade-in 0.2s ease-out;
   }
+
+  /* 退出多选模式时的选中卡片动画 */
+  @keyframes selection-exit {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.02);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-selection-exit {
+    animation: selection-exit 0.2s ease-out;
+  }
 }
 
 .hd-drag {
@@ -84,4 +104,14 @@
 .repository-list-syncing .repository-card * {
   animation: none !important;
   transition: none !important;
+}
+
+/* 防止多选时选中卡片导致页面滚动 */
+.repository-card {
+  scroll-margin: 20px;
+}
+
+/* 多选模式下防止焦点导致的滚动 */
+.repository-card[data-selection-mode="true"] {
+  scroll-margin: 0;
 }

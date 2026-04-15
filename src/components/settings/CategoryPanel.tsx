@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff } from 'lucide-react';
-import { useAppStore, getAllCategories } from '../../store/useAppStore';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
+import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
 
 interface CategoryPanelProps {
   t: (zh: string, en: string) => string;
@@ -10,12 +10,16 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const {
     customCategories,
     hiddenDefaultCategoryIds,
+    categoryOrder,
+    collapsedSidebarCategoryCount,
     language,
     addCustomCategory,
     deleteCustomCategory,
     updateCustomCategory,
     hideDefaultCategory,
     showDefaultCategory,
+    setCategoryOrder,
+    setCollapsedSidebarCategoryCount,
   } = useAppStore();
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -24,14 +28,23 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const [newCategoryIcon, setNewCategoryIcon] = useState('📁');
   const [editName, setEditName] = useState('');
   const [editIcon, setEditIcon] = useState('');
+  const [isReordering, setIsReordering] = useState(false);
+
+  // 拖拽排序状态
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragItemIndex = useRef<number | null>(null);
 
   const allDefaultCategories = getAllCategories([], language, []);
-  const hiddenDefaultCategories = allDefaultCategories.filter(category => 
+  const hiddenDefaultCategories = allDefaultCategories.filter(category =>
     hiddenDefaultCategoryIds.includes(category.id)
   );
-  const visibleDefaultCategories = allDefaultCategories.filter(category => 
-    !hiddenDefaultCategoryIds.includes(category.id)
-  );
+
+  // 获取所有可见分类（用于排序）
+  const allVisibleCategories = useMemo(() => {
+    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    return sortCategoriesByOrder(categories, categoryOrder);
+  }, [customCategories, language, hiddenDefaultCategoryIds, categoryOrder]);
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) {
@@ -44,6 +57,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       name: newCategoryName.trim(),
       icon: newCategoryIcon,
       isCustom: true,
+      keywords: [],
     };
 
     addCustomCategory(newCategory);
@@ -87,6 +101,91 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     }
   };
 
+  // 处理分类排序 - 上下移动
+  const handleMoveCategory = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= allVisibleCategories.length) return;
+
+    const newOrder = allVisibleCategories.map(c => c.id);
+    const [movedId] = newOrder.splice(index, 1);
+    newOrder.splice(newIndex, 0, movedId);
+    setCategoryOrder(newOrder);
+  };
+
+  // 快速置顶
+  const handleMoveToTop = (index: number) => {
+    if (index === 0) return;
+    const newOrder = allVisibleCategories.map(c => c.id);
+    const [movedId] = newOrder.splice(index, 1);
+    newOrder.unshift(movedId);
+    setCategoryOrder(newOrder);
+  };
+
+  // 快速置底
+  const handleMoveToBottom = (index: number) => {
+    if (index === allVisibleCategories.length - 1) return;
+    const newOrder = allVisibleCategories.map(c => c.id);
+    const [movedId] = newOrder.splice(index, 1);
+    newOrder.push(movedId);
+    setCategoryOrder(newOrder);
+  };
+
+  // 重置分类排序
+  const handleResetOrder = () => {
+    if (confirm(t('确定要重置分类排序吗？这将恢复默认顺序。', 'Are you sure you want to reset category order? This will restore the default order.'))) {
+      setCategoryOrder([]);
+    }
+  };
+
+  // 拖拽开始
+  const handleDragStart = useCallback((e: React.DragEvent, index: number, categoryId: string) => {
+    dragItemIndex.current = index;
+    setDraggingId(categoryId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', categoryId);
+    // 设置拖拽时的透明度
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  }, []);
+
+  // 拖拽结束
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    setDraggingId(null);
+    setDragOverId(null);
+    dragItemIndex.current = null;
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  }, []);
+
+  // 拖拽经过
+  const handleDragOver = useCallback((e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverId(categoryId);
+  }, []);
+
+  // 拖拽离开
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null);
+  }, []);
+
+  // 放置
+  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number, categoryId: string) => {
+    e.preventDefault();
+    setDragOverId(null);
+
+    if (dragItemIndex.current === null || dragItemIndex.current === dropIndex) return;
+
+    const newOrder = allVisibleCategories.map(c => c.id);
+    const [movedId] = newOrder.splice(dragItemIndex.current, 1);
+    newOrder.splice(dropIndex, 0, movedId);
+    setCategoryOrder(newOrder);
+    dragItemIndex.current = null;
+    setDraggingId(null);
+  }, [allVisibleCategories, setCategoryOrder]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -103,6 +202,45 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           <Plus className="w-4 h-4" />
           <span>{t('添加分类', 'Add Category')}</span>
         </button>
+      </div>
+
+      {/* 折叠侧边栏显示设置 */}
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <LayoutGrid className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white">
+                {t('折叠侧边栏显示设置', 'Collapsed Sidebar Display')}
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('设置折叠状态下显示的分类个数', 'Set the number of categories to display when collapsed')}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                {t(
+                  '提示：折叠侧边栏仅影响显示，所有分类仍可在展开状态下查看。只显示分类顺序前N个分类。',
+                  'Tip: The collapsed sidebar only affects display; all categories remain accessible when expanded. Only the first N categories in the order are displayed.'
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <input
+              type="range"
+              min="3"
+              max="15"
+              value={collapsedSidebarCategoryCount}
+              onChange={(e) => {
+                const value = Math.max(3, Math.min(15, parseInt(e.target.value) || 8));
+                setCollapsedSidebarCategoryCount(value);
+              }}
+              className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+            />
+            <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
+              {collapsedSidebarCategoryCount}
+            </span>
+          </div>
+        </div>
       </div>
 
       {showAddForm && (
@@ -161,78 +299,150 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       )}
 
       <div className="space-y-4">
-        <div>
-          <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-            <Eye className="w-4 h-4 mr-2" />
-            {t('自定义分类', 'Custom Categories')}
-            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-              ({customCategories.length})
-            </span>
-          </h4>
-          {customCategories.length === 0 ? (
+        {/* 分类排序区域 */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
+              <GripVertical className="w-4 h-4 mr-2" />
+              {t('分类排序', 'Category Order')}
+              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                ({allVisibleCategories.length})
+              </span>
+            </h4>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsReordering(!isReordering)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  isReordering
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {isReordering ? t('完成', 'Done') : t('调整顺序', 'Reorder')}
+              </button>
+              {categoryOrder.length > 0 && (
+                <button
+                  onClick={handleResetOrder}
+                  className="px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('重置', 'Reset')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isReordering && (
+            <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                {t('提示：拖拽分类可快速调整顺序，或使用按钮进行置顶/置底操作', 'Tip: Drag categories to quickly reorder, or use buttons to move to top/bottom')}
+              </p>
+            </div>
+          )}
+
+          {allVisibleCategories.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400 py-4">
-              {t('暂无自定义分类', 'No custom categories yet')}
+              {t('暂无可见分类', 'No visible categories')}
             </p>
           ) : (
-            <div className="space-y-2">
-              {customCategories.map((category) => (
+            <div className="space-y-1">
+              {allVisibleCategories.map((category, index) => (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
+                  draggable={isReordering}
+                  onDragStart={(e) => handleDragStart(e, index, category.id)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleDragOver(e, category.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index, category.id)}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                    category.isCustom
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
+                  } ${draggingId === category.id ? 'opacity-50' : ''} ${
+                    dragOverId === category.id && draggingId !== category.id
+                      ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      : ''
+                  } ${isReordering ? 'cursor-move' : ''}`}
                 >
-                  {editingId === category.id ? (
-                    <div className="flex-1 flex items-center space-x-3">
-                      <input
-                        type="text"
-                        value={editIcon}
-                        onChange={(e) => setEditIcon(e.target.value)}
-                        className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-center"
-                        maxLength={2}
-                      />
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                      />
+                  <div className="flex items-center space-x-3">
+                    {isReordering && (
+                      <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    )}
+                    <span className="text-xl">{category.icon}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {category.name}
+                    </span>
+                    {category.isCustom && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                        {t('自定义', 'Custom')}
+                      </span>
+                    )}
+                  </div>
+
+                  {isReordering ? (
+                    <div className="flex items-center space-x-1">
                       <button
-                        onClick={handleSaveEdit}
-                        className="p-1.5 rounded bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800"
+                        onClick={() => handleMoveToTop(index)}
+                        disabled={index === 0}
+                        className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title={t('置顶', 'Move to top')}
                       >
-                        <Save className="w-4 h-4" />
+                        <ArrowUpToLine className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={handleCancelEdit}
-                        className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        onClick={() => handleMoveCategory(index, 'up')}
+                        disabled={index === 0}
+                        className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title={t('上移', 'Move up')}
                       >
-                        <X className="w-4 h-4" />
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveCategory(index, 'down')}
+                        disabled={index === allVisibleCategories.length - 1}
+                        className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title={t('下移', 'Move down')}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveToBottom(index)}
+                        disabled={index === allVisibleCategories.length - 1}
+                        className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title={t('置底', 'Move to bottom')}
+                      >
+                        <ArrowDownToLine className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <>
-                      <div className="flex items-center space-x-3">
-                        <span className="text-xl">{category.icon}</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {category.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1">
+                      {category.isCustom ? (
+                        <>
+                          <button
+                            onClick={() => handleStartEdit(category)}
+                            className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
+                            title={t('编辑', 'Edit')}
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(category.id)}
+                            className="p-1.5 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
+                            title={t('删除', 'Delete')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={() => handleStartEdit(category)}
-                          className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
-                          title={t('编辑', 'Edit')}
+                          onClick={() => hideDefaultCategory(category.id)}
+                          className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          title={t('隐藏', 'Hide')}
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <EyeOff className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteCategory(category.id)}
-                          className="p-1.5 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
-                          title={t('删除', 'Delete')}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -240,25 +450,62 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           )}
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-            <EyeOff className="w-4 h-4 mr-2" />
-            {t('隐藏的默认分类', 'Hidden Default Categories')}
-            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-              ({hiddenDefaultCategories.length})
-            </span>
-          </h4>
-          {hiddenDefaultCategories.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400 py-4">
-              {t('没有隐藏的默认分类', 'No hidden default categories')}
-            </p>
-          ) : (
+        {/* 编辑模态框 */}
+        {editingId && (
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+              {t('编辑分类', 'Edit Category')}
+            </h4>
+            <div className="flex items-center space-x-3">
+              <input
+                type="text"
+                value={editIcon}
+                onChange={(e) => setEditIcon(e.target.value)}
+                className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-center text-lg"
+                maxLength={2}
+                placeholder="📁"
+              />
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                placeholder={t('分类名称', 'Category name')}
+              />
+              <button
+                onClick={handleSaveEdit}
+                className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800"
+                title={t('保存', 'Save')}
+              >
+                <Save className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                title={t('取消', 'Cancel')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 隐藏的默认分类 */}
+        {hiddenDefaultCategories.length > 0 && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
+              <EyeOff className="w-4 h-4 mr-2" />
+              {t('隐藏的默认分类', 'Hidden Default Categories')}
+              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                ({hiddenDefaultCategories.length})
+              </span>
+            </h4>
             <div className="flex flex-wrap gap-2">
               {hiddenDefaultCategories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => showDefaultCategory(category.id)}
-                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span>{category.icon}</span>
@@ -266,31 +513,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 </button>
               ))}
             </div>
-          )}
-        </div>
-
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-            <Eye className="w-4 h-4 mr-2" />
-            {t('显示的默认分类', 'Visible Default Categories')}
-            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-              ({visibleDefaultCategories.length})
-            </span>
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {visibleDefaultCategories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => hideDefaultCategory(category.id)}
-                className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                <EyeOff className="w-4 h-4" />
-                <span>{category.icon}</span>
-                <span>{category.name}</span>
-              </button>
-            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

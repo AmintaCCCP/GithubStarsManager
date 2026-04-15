@@ -8,7 +8,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Category, Repository } from '../types';
-import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
 import { CategoryEditModal } from './CategoryEditModal';
 import { forceSyncToBackend } from '../services/autoSync';
 
@@ -26,6 +26,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const {
     customCategories,
     hiddenDefaultCategoryIds,
+    categoryOrder,
+    collapsedSidebarCategoryCount,
     deleteCustomCategory,
     hideDefaultCategory,
     language,
@@ -128,7 +130,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleSidebar, isMobile]);
 
-  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+  const allCategories = useMemo(() => {
+    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    return sortCategoriesByOrder(categories, categoryOrder);
+  }, [customCategories, language, hiddenDefaultCategoryIds, categoryOrder]);
 
   const repositoryMap = useMemo(() => new Map(repositories.map(repo => [String(repo.id), repo])), [repositories]);
 
@@ -355,13 +360,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 折叠状态下的分类图标列表 */}
                 <div className="flex flex-col items-center space-y-2">
                   {(() => {
-                    // 确保选中分类在前8个显示列表中
+                    // 确保选中分类在显示列表中
                     const selectedIndex = allCategories.findIndex(c => c.id === selectedCategory);
-                    const isSelectedHidden = selectedIndex >= 8;
-                    let displayCategories = allCategories.slice(0, 8);
+                    const isSelectedHidden = selectedIndex >= collapsedSidebarCategoryCount;
+                    let displayCategories = allCategories.slice(0, collapsedSidebarCategoryCount);
                     if (isSelectedHidden && selectedIndex !== -1) {
                       // 用选中分类替换最后一个
-                      displayCategories = [...allCategories.slice(0, 7), allCategories[selectedIndex]];
+                      displayCategories = [...allCategories.slice(0, collapsedSidebarCategoryCount - 1), allCategories[selectedIndex]];
                     }
                     return displayCategories.map((category) => {
                       const isSelected = selectedCategory === category.id;

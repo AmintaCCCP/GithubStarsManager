@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Star, FolderOpen, Bot, Bell, CheckSquare, Square } from 'lucide-react';
+import { X, Star, FolderOpen, Bot, Bell, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -27,7 +27,9 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [shouldRender, setShouldRender] = useState(isVisible);
+  const [isShaking, setIsShaking] = useState(false);
   const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 处理可见性变化，播放动画后再卸载
   React.useEffect(() => {
@@ -42,6 +44,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isVisible]);
+
+  // 触发抖动动画
+  const triggerShake = () => {
+    setIsShaking(true);
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current);
+    }
+    shakeTimeoutRef.current = setTimeout(() => {
+      setIsShaking(false);
+    }, 500);
+  };
 
   const handleAction = async (action: string) => {
     if (showConfirm === action) {
@@ -81,14 +94,25 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     }, 300);
   };
 
+  // 处理点击工具栏背景（非按钮区域）
+  const handleToolbarClick = (e: React.MouseEvent) => {
+    // 如果点击的是工具栏背景本身（不是按钮），触发抖动提示
+    if (e.target === e.currentTarget) {
+      triggerShake();
+    }
+  };
+
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   if (!shouldRender) return null;
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-50 ${
-      isClosing ? 'animate-slide-down' : 'animate-slide-up'
-    }`}>
+    <div
+      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-50 ${
+        isClosing ? 'animate-slide-down' : 'animate-slide-up'
+      } ${isShaking ? 'animate-shake' : ''}`}
+      onClick={handleToolbarClick}
+    >
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
           {/* Selection Info */}
@@ -134,9 +158,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('取消 Star', 'Unstar')}
             >
-              <Star className="w-3 h-3 sm:w-4 sm:h-4" />
+              {isProcessing && showConfirm === 'unstar' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <Star className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <span className="hidden sm:inline">
-                {showConfirm === 'unstar' ? t('再次确认', 'Confirm Again') : t('取消 Star', 'Unstar')}
+                {isProcessing && showConfirm === 'unstar'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'unstar'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('取消 Star', 'Unstar')}
               </span>
             </button>
 
@@ -150,9 +182,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('批量分类', 'Categorize')}
             >
-              <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              {isProcessing && showConfirm === 'categorize' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <span className="hidden sm:inline">
-                {showConfirm === 'categorize' ? t('再次确认', 'Confirm Again') : t('分类', 'Categorize')}
+                {isProcessing && showConfirm === 'categorize'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'categorize'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('分类', 'Categorize')}
               </span>
             </button>
 
@@ -166,9 +206,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('AI 总结', 'AI Summary')}
             >
-              <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
+              {isProcessing && showConfirm === 'ai-summary' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <span className="hidden sm:inline">
-                {showConfirm === 'ai-summary' ? t('再次确认', 'Confirm Again') : t('AI 总结', 'AI Summary')}
+                {isProcessing && showConfirm === 'ai-summary'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'ai-summary'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('AI 总结', 'AI Summary')}
               </span>
             </button>
 
@@ -182,9 +230,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('订阅发布', 'Subscribe Releases')}
             >
-              <Bell className="w-3 h-3 sm:w-4 sm:h-4" />
+              {isProcessing && showConfirm === 'subscribe' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <Bell className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
               <span className="hidden sm:inline">
-                {showConfirm === 'subscribe' ? t('再次确认', 'Confirm Again') : t('订阅版本发布', 'Subscribe')}
+                {isProcessing && showConfirm === 'subscribe'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'subscribe'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('订阅版本发布', 'Subscribe')}
               </span>
             </button>
 
@@ -200,14 +256,6 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Processing Indicator */}
-        {isProcessing && (
-          <div className="mt-2 sm:mt-3 flex items-center space-x-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>{t('处理中...', 'Processing...')}</span>
-          </div>
-        )}
       </div>
     </div>
   );

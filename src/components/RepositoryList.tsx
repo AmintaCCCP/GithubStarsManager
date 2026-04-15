@@ -54,6 +54,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<number>>(new Set());
   const [showBulkToolbar, setShowBulkToolbar] = useState(false);
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
+  const [isExitingSelection, setIsExitingSelection] = useState(false);
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
@@ -416,8 +417,29 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleDeselectAll = () => {
-    setSelectedRepoIds(new Set());
-    setShowBulkToolbar(false);
+    setIsExitingSelection(true);
+    setTimeout(() => {
+      setSelectedRepoIds(new Set());
+      setShowBulkToolbar(false);
+      setIsExitingSelection(false);
+    }, 200);
+  };
+
+  // 处理单击空白处 - 触发回到顶部按钮跳跃动画
+  const handleClick = (e: React.MouseEvent) => {
+    // 检查点击的是否是空白区域（不是卡片或其他元素）
+    if (showBulkToolbar && e.target === e.currentTarget) {
+      // 触发自定义事件，让回到顶部按钮跳跃两下
+      window.dispatchEvent(new CustomEvent('gsm:back-to-top-bounce'));
+    }
+  };
+
+  // 处理双击空白处退出多选模式
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // 检查点击的是否是空白区域（不是卡片或其他元素）
+    if (showBulkToolbar && e.target === e.currentTarget) {
+      handleDeselectAll();
+    }
   };
 
   const handleBulkAction = async (action: string, repos: Repository[]) => {
@@ -846,7 +868,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       </div>
 
       {/* Repository Grid with consistent card widths */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div
+        className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 min-h-[200px]"
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
         {visibleRepositories.map(repo => (
           <RepositoryCard
             key={repo.id}
@@ -856,6 +882,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             isSelected={selectedRepoIds.has(repo.id)}
             onSelect={handleSelectRepo}
             selectionMode={showBulkToolbar}
+            isExitingSelection={isExitingSelection}
           />
         ))}
       </div>
