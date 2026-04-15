@@ -165,6 +165,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        role="tablist"
         className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
         style={{
           scrollbarWidth: 'none',
@@ -179,6 +180,10 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
               if (el) tabRefs.current.set(tab.id, el);
             }}
             onClick={() => onTabChange(tab.id)}
+            role="tab"
+            id={`tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls={`tabpanel-${tab.id}`}
             className={`
               flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
               transition-all duration-200 ease-out snap-center
@@ -315,6 +320,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     return (
       <div
+        role="tabpanel"
+        id={`tabpanel-${displayTab}`}
+        aria-labelledby={`tab-${displayTab}`}
         className={`
           transition-all duration-100 ease-out
           ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}
@@ -350,11 +358,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
             <div className="hidden md:block w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
-              <nav className="p-4 space-y-1">
+              <nav className="p-4 space-y-1" role="tablist">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
+                    role="tab"
+                    id={`tab-${tab.id}`}
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={`tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
@@ -403,11 +415,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <nav className="p-2 space-y-1">
+            <nav className="p-2 space-y-1" role="tablist">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`tabpanel-${tab.id}`}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-left ${
                     activeTab === tab.id
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
