@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Star, FolderOpen, Bot, Bell, CheckSquare, Square } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -27,6 +27,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [shouldRender, setShouldRender] = useState(isVisible);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 处理可见性变化，播放动画后再卸载
   React.useEffect(() => {
@@ -45,6 +46,10 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   const handleAction = async (action: string) => {
     if (showConfirm === action) {
       setIsProcessing(true);
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+        confirmTimeoutRef.current = null;
+      }
       try {
         await onBulkAction(action, repositories);
       } finally {
@@ -52,8 +57,11 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         setShowConfirm(null);
       }
     } else {
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
       setShowConfirm(action);
-      setTimeout(() => setShowConfirm(null), 3000);
+      confirmTimeoutRef.current = setTimeout(() => setShowConfirm(null), 3000);
     }
   };
 
@@ -158,7 +166,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             >
               <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">
-                {showConfirm === 'ai-summary' ? t('再次确认', 'Confirm Again') : t('IA 总结', 'AI Summary')}
+                {showConfirm === 'ai-summary' ? t('再次确认', 'Confirm Again') : t('AI 总结', 'AI Summary')}
               </span>
             </button>
 

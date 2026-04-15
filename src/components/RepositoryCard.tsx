@@ -371,16 +371,25 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     // 如果正在选择模式，不触发点击
     if (isSelecting) return;
-    
+
     // 检查点击目标是否是交互元素或其子元素
     const target = event.target as HTMLElement;
-    const isInteractiveElement = target.closest('button, a, input, textarea, select, [role="button"]');
-    
+    // 排除卡片本身的 role="button"，只检查子元素的交互元素
+    const isInteractiveElement = target.closest('button, a, input, textarea, select');
+
     // 如果点击的是交互元素，不打开模态框
     if (isInteractiveElement) return;
-    
+
     // 打开 README 模态框
     setReadmeModalOpen(true);
+  };
+
+  // 处理键盘事件，使卡片可键盘操作
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setReadmeModalOpen(true);
+    }
   };
 
   return (
@@ -391,6 +400,10 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       draggable={!onSelect}
       onDragStart={handleDragStart}
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-label={`${repository.full_name} - ${repository.description || 'No description'}`}
     >
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">

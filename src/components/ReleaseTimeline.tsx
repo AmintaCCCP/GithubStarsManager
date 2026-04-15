@@ -8,15 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-// 预设筛选器定义
-const PRESET_FILTERS = [
-  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'] },
-  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'] },
-  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'] },
-  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'] },
-  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'] },
-];
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 // Markdown链接组件
 interface MarkdownLinkProps {

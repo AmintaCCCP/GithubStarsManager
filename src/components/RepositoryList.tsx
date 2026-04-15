@@ -34,7 +34,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     analysisProgress,
     setAnalysisProgress,
     searchFilters,
-    toggleReleaseSubscription
+    toggleReleaseSubscription,
+    releaseSubscriptions
   } = useAppStore();
 
   const [showAISummary, setShowAISummary] = useState(true);
@@ -528,9 +529,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           for (const repo of repos) {
             try {
+              // 显式设置订阅为 true，避免误取消已订阅仓库
               const updatedRepo = { ...repo, subscribed_to_releases: true };
               updateRepository(updatedRepo);
-              toggleReleaseSubscription(repo.id);
+              // 只在未订阅时才调用 toggle，避免误取消
+              if (!releaseSubscriptions.has(repo.id)) {
+                toggleReleaseSubscription(repo.id);
+              }
               successCount++;
             } catch (error) {
               console.error(`Failed to subscribe ${repo.full_name}:`, error);
@@ -538,8 +543,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
 
           await forceSyncToBackend();
-          alert(language === 'zh' 
-            ? `成功订阅 ${successCount} 个仓库的版本发布` 
+          alert(language === 'zh'
+            ? `成功订阅 ${successCount} 个仓库的版本发布`
             : `Successfully subscribed to ${successCount} repositories releases`
           );
           break;
@@ -558,23 +563,40 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleBulkCategorize = async (categoryName: string) => {
-    const selectedRepos = filteredRepositories.filter(repo => 
+    const selectedRepos = filteredRepositories.filter(repo =>
       selectedRepoIds.has(repo.id)
     );
 
+    const failedRepos: string[] = [];
+
     for (const repo of selectedRepos) {
-      updateRepository({
-        ...repo,
-        custom_category: categoryName
-      });
+      try {
+        updateRepository({
+          ...repo,
+          custom_category: categoryName
+        });
+      } catch (error) {
+        console.error(`Failed to categorize ${repo.full_name}:`, error);
+        failedRepos.push(repo.full_name);
+      }
     }
 
     await forceSyncToBackend();
-    alert(language === 'zh' 
-      ? `成功为 ${selectedRepos.length} 个仓库设置分类：${categoryName}` 
-      : `Successfully categorized ${selectedRepos.length} repositories as: ${categoryName}`
-    );
-    
+
+    // 汇总结果显示
+    const successCount = selectedRepos.length - failedRepos.length;
+    if (failedRepos.length > 0) {
+      alert(language === 'zh'
+        ? `成功为 ${successCount} 个仓库设置分类：${categoryName}\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
+        : `Successfully categorized ${successCount} repositories as: ${categoryName}\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+      );
+    } else {
+      alert(language === 'zh'
+        ? `成功为 ${successCount} 个仓库设置分类：${categoryName}`
+        : `Successfully categorized ${successCount} repositories as: ${categoryName}`
+      );
+    }
+
     handleDeselectAll();
   };
 
@@ -623,24 +645,24 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     <div className="space-y-6">
 
 
-      {/* AI Analysis Controls */}
-      <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex items-center space-x-4">
+      {/* AI Analysis Controls - 移动端优化布局 */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 gap-3 sm:gap-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               disabled={isLoading}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50"
+              className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50 text-sm sm:text-base"
             >
-              <Bot className="w-4 h-4" />
-              <span>
-                {isLoading 
-                  ? t(`AI分析中... (${analysisProgress.current}/${analysisProgress.total})`, `AI Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
+              <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="whitespace-nowrap">
+                {isLoading
+                  ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
                   : t('AI分析', 'AI Analysis')
                 }
               </span>
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* Dropdown Menu */}
@@ -685,63 +707,63 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             )}
           </div>
 
-          {/* Progress Bar and Controls */}
+          {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (
-            <div className="flex items-center space-x-3">
-              <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="w-20 sm:w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
                   className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 {Math.round((analysisProgress.current / analysisProgress.total) * 100)}%
               </span>
               <button
                 onClick={handlePauseResume}
-                className="p-1.5 rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
+                className="p-1 sm:p-1.5 rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
-                {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </button>
               <button
                 onClick={handleStop}
-                className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors text-sm"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors text-xs sm:text-sm"
               >
                 {t('停止', 'Stop')}
               </button>
             </div>
           )}
 
-          {/* Description Toggle - Radio Style */}
+          {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {t('显示内容:', 'Display:')}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                {t('显示:', 'Display:')}
               </span>
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <label className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer">
                   <input
                     type="radio"
                     name="displayContent"
                     checked={showAISummary}
                     onChange={() => setShowAISummary(true)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('AI总结', 'AI Summary')}
                   </span>
                 </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
+                <label className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer">
                   <input
                     type="radio"
                     name="displayContent"
                     checked={!showAISummary}
                     onChange={() => setShowAISummary(false)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('原始描述', 'Original Description')}
+                  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('原始描述', 'Original')}
                   </span>
                 </label>
               </div>
@@ -764,19 +786,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   </span>
                 )}
               </div>
-              <div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {analyzedCount > 0 && (
-                  <span className="mr-3">
+                  <span className="text-xs sm:text-sm">
                     • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
                   </span>
                 )}
                 {failedCount > 0 && (
-                  <span className="mr-3">
+                  <span className="text-xs sm:text-sm">
                     • {failedCount} {t('个分析失败', 'analysis failed')}
                   </span>
                 )}
                 {unanalyzedCount > 0 && (
-                  <span>
+                  <span className="text-xs sm:text-sm">
                     • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
                   </span>
                 )}

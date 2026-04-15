@@ -3,6 +3,7 @@ import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple,
 import { useAppStore } from '../store/useAppStore';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 // 图标映射
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -13,14 +14,21 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Terminal,
 };
 
+// 图标名称映射（基于 PRESET_FILTERS 的 id）
+const PRESET_ICON_MAP: Record<string, string> = {
+  'preset-windows': 'Monitor',
+  'preset-macos': 'Apple',
+  'preset-linux': 'Terminal',
+  'preset-android': 'Smartphone',
+  'preset-source': 'Package',
+};
+
 // 默认预设筛选器（用于重置）
-const DEFAULT_PRESET_FILTERS: AssetFilter[] = [
-  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'], isPreset: true, icon: 'Monitor' },
-  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'], isPreset: true, icon: 'Apple' },
-  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'], isPreset: true, icon: 'Terminal' },
-  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'], isPreset: true, icon: 'Smartphone' },
-  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'], isPreset: true, icon: 'Package' },
-];
+const DEFAULT_PRESET_FILTERS: AssetFilter[] = PRESET_FILTERS.map(pf => ({
+  ...pf,
+  isPreset: true,
+  icon: PRESET_ICON_MAP[pf.id],
+}));
 
 interface AssetFilterManagerProps {
   selectedFilters: string[];

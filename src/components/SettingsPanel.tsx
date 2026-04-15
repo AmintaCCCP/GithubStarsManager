@@ -197,6 +197,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [displayTab, setDisplayTab] = useState<SettingsTab>('general');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const tabChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tabResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
 
@@ -213,19 +215,39 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleTabChange = useCallback((tabId: SettingsTab) => {
     if (tabId === activeTab || isTransitioning) return;
 
+    // 清除旧定时器，避免重叠
+    if (tabChangeTimeoutRef.current) {
+      clearTimeout(tabChangeTimeoutRef.current);
+    }
+    if (tabResetTimeoutRef.current) {
+      clearTimeout(tabResetTimeoutRef.current);
+    }
+
     setIsTransitioning(true);
 
     // 等待淡出动画完成后再切换标签
-    setTimeout(() => {
+    tabChangeTimeoutRef.current = setTimeout(() => {
       setActiveTab(tabId);
       setDisplayTab(tabId);
 
       // 等待淡入动画完成后重置状态
-      setTimeout(() => {
+      tabResetTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
       }, 100);
     }, 100);
   }, [activeTab, isTransitioning]);
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (tabChangeTimeoutRef.current) {
+        clearTimeout(tabChangeTimeoutRef.current);
+      }
+      if (tabResetTimeoutRef.current) {
+        clearTimeout(tabResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const tabs: SettingsTabItem[] = [
     {
@@ -307,18 +329,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 模态框模式
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+      >
         <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center space-x-3">
               <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
                 {t('设置', 'Settings')}
               </h2>
             </div>
             <button
               onClick={handleClose}
               className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Close settings"
             >
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>

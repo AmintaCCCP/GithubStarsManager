@@ -38,7 +38,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  // isMobile 初始值从 window.innerWidth 同步获取（SSR安全）
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
 
   // 检测屏幕尺寸
   useEffect(() => {
@@ -65,6 +69,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                          active?.getAttribute('role') === 'textbox';
       if (isEditable) return;
 
+      // 移动端时键盘快捷键不执行折叠切换，避免修改持久化状态
+      if (isMobile) return;
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
         toggleSidebar();
@@ -72,7 +79,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
+  }, [toggleSidebar, isMobile]);
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
@@ -269,7 +276,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 <button
                   onClick={toggleSidebar}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title={t('展开侧栏 (Ctrl+B)', 'Expand Sidebar (Ctrl+B)')}
+                  title={t('展开侧栏 (Ctrl/Cmd+B)', 'Expand Sidebar (Ctrl/Cmd+B)')}
                   aria-label={t('展开侧栏', 'Expand Sidebar')}
                   aria-expanded="false"
                 >
@@ -345,7 +352,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     <button
                       onClick={toggleSidebar}
                       className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      title={t('折叠侧栏 (Ctrl+B)', 'Collapse Sidebar (Ctrl+B)')}
+                      title={t('折叠侧栏 (Ctrl/Cmd+B)', 'Collapse Sidebar (Ctrl/Cmd+B)')}
                       aria-label={t('折叠侧栏', 'Collapse Sidebar')}
                       aria-expanded="true"
                     >
@@ -414,6 +421,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               }}
                               className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
                               title={t('编辑分类', 'Edit category')}
+                              aria-label={t('编辑分类', 'Edit category')}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -425,6 +433,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 }}
                                 className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
                                 title={t('删除分类', 'Delete category')}
+                                aria-label={t('删除分类', 'Delete category')}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -436,6 +445,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 }}
                                 className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
                                 title={t('隐藏默认分类', 'Hide default category')}
+                                aria-label={t('隐藏默认分类', 'Hide default category')}
                               >
                                 <EyeOff className="w-3.5 h-3.5" />
                               </button>

@@ -4,7 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
-  const { language } = useAppStore();
+  const language = useAppStore(state => state.language);
 
   const toggleVisibility = useCallback(() => {
     if (window.scrollY > 300) {
@@ -31,6 +31,7 @@ export const BackToTop: React.FC = () => {
 
   return (
     <button
+      type="button"
       onClick={scrollToTop}
       className={`
         fixed z-50
@@ -45,8 +46,8 @@ export const BackToTop: React.FC = () => {
         hover:scale-110
         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
-        ${isVisible 
-          ? 'opacity-100 translate-y-0 pointer-events-auto' 
+        ${isVisible
+          ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
         /* 移动端：上移避免遮挡底部工具栏 */
