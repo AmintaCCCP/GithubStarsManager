@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { X, Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -19,11 +19,39 @@ interface MarkdownLinkProps {
   children?: React.ReactNode;
 }
 
-const MarkdownLink: React.FC<MarkdownLinkProps> = ({ href, children }) => {
+interface MarkdownLinkComponentProps extends MarkdownLinkProps {
+  baseUrl?: string;
+}
+
+const MarkdownLink: React.FC<MarkdownLinkComponentProps> = ({ href, children, baseUrl }) => {
   if (!href) return <>{children}</>;
+
+  // 处理相对链接
+  const resolveHref = (link: string): string => {
+    // 绝对链接保持不变
+    if (link.startsWith('http://') || link.startsWith('https://') || link.startsWith('//')) {
+      return link;
+    }
+    // 锚点链接保持不变
+    if (link.startsWith('#')) {
+      return link;
+    }
+    // 相对链接转换为绝对链接
+    if (baseUrl) {
+      try {
+        return new URL(link, baseUrl + '/').href;
+      } catch {
+        return link;
+      }
+    }
+    return link;
+  };
+
+  const resolvedHref = resolveHref(href);
+
   return (
     <a
-      href={href}
+      href={resolvedHref}
       target="_blank"
       rel="noopener noreferrer"
       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
@@ -41,6 +69,8 @@ interface MarkdownImageProps {
 }
 
 const MarkdownImage: React.FC<MarkdownImageProps> = ({ src, alt }) => {
+  const [hasError, setHasError] = useState(false);
+  
   if (!src) return null;
 
   // 确保图片路径是完整的 URL
@@ -54,17 +84,21 @@ const MarkdownImage: React.FC<MarkdownImageProps> = ({ src, alt }) => {
     );
   }
 
+  // 图片加载失败时显示安全回退元素
+  if (hasError) {
+    return (
+      <span className="text-gray-500 italic">
+        [图片加载失败: {alt || 'image'}]
+      </span>
+    );
+  }
+
   return (
     <img
       src={imageUrl}
       alt={alt || ''}
       className="max-w-full h-auto rounded-lg my-4"
-      onError={(e) => {
-        // 图片加载失败时显示占位符
-        const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
-        target.parentElement!.innerHTML = `<span class="text-gray-500 italic">[图片加载失败: ${alt || 'image'}]</span>`;
-      }}
+      onError={() => setHasError(true)}
     />
   );
 };
@@ -78,6 +112,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const fetchReadme = useCallback(async () => {
     if (!repository || !githubToken) return;
@@ -118,7 +154,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     }
   }, [isOpen]);
 
-  // Close modal on Escape key press
+  // Close modal on Escape key press and manage focus
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -127,29 +163,47 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     };
 
     if (isOpen) {
+      // Save previous focus
+      previousFocusRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      // Focus the modal container
+      setTimeout(() => {
+        modalRef.current?.focus();
+      }, 0);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
+      // Restore previous focus
+      previousFocusRef.current?.focus();
     };
   }, [isOpen, onClose]);
 
   if (!isOpen || !repository) return null;
 
+  // 处理遮罩层点击，确保只有点击真正的背景时才关闭
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    // 只有点击的是 flex 容器本身（即背景区域）时才关闭
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
+      {/* Modal Container - 点击背景区域关闭 */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
+        className="flex min-h-full items-center justify-center p-4 bg-black bg-opacity-50 transition-opacity"
+        onClick={handleBackdropClick}
+      >
         <div
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="readme-modal-title"
+          tabIndex={-1}
           className="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-xl shadow-xl transform transition-all max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
@@ -162,7 +216,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 className="w-8 h-8 rounded-full"
               />
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 id="readme-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
                   {repository.full_name}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -184,6 +238,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -218,7 +273,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw]}
                   components={{
-                    a: MarkdownLink,
+                    a: (props) => <MarkdownLink {...props} baseUrl={repository?.html_url} />,
                     img: MarkdownImage,
                     h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{children}</h1>,
                     h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-3">{children}</h2>,

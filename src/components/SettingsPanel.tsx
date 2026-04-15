@@ -45,7 +45,7 @@ interface MobileTabNavProps {
 const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChange }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<SettingsTab, HTMLButtonElement>>(new Map());
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+  const [indicatorStyle, setIndicatorStyle] = useState({ translateX: 0, width: 0 });
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -55,16 +55,16 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
-    
+
     rafRef.current = requestAnimationFrame(() => {
       const activeButton = tabRefs.current.get(activeTab);
       if (activeButton && scrollContainerRef.current) {
         // 使用 offsetLeft 代替 getBoundingClientRect，避免重排导致的闪烁
         const container = scrollContainerRef.current;
-        const left = activeButton.offsetLeft - container.scrollLeft;
+        const translateX = activeButton.offsetLeft - container.scrollLeft;
         const width = activeButton.offsetWidth;
-        
-        setIndicatorStyle({ left, width });
+
+        setIndicatorStyle({ translateX, width });
       }
     });
   }, [activeTab]);
@@ -150,9 +150,9 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             }}
             onClick={() => onTabChange(tab.id)}
             role="tab"
-            id={`tab-${tab.id}`}
+            id={`mobile-tab-${tab.id}`}
             aria-selected={activeTab === tab.id}
-            aria-controls={`tabpanel-${tab.id}`}
+            aria-controls={`mobile-tabpanel-${tab.id}`}
             className={`
               flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
               transition-all duration-200 ease-out snap-center
@@ -174,9 +174,9 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       
       {/* 底部活动指示器 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-transform duration-300 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300 ease-out will-change-transform"
         style={{
-          left: indicatorStyle.left,
+          transform: `translateX(${indicatorStyle.translateX}px)`,
           width: indicatorStyle.width,
         }}
       />
@@ -197,6 +197,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [displayTab, setDisplayTab] = useState<SettingsTab>('general');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const tabChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tabResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
 
@@ -213,19 +215,39 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleTabChange = useCallback((tabId: SettingsTab) => {
     if (tabId === activeTab || isTransitioning) return;
 
+    // 清除旧定时器，避免重叠
+    if (tabChangeTimeoutRef.current) {
+      clearTimeout(tabChangeTimeoutRef.current);
+    }
+    if (tabResetTimeoutRef.current) {
+      clearTimeout(tabResetTimeoutRef.current);
+    }
+
     setIsTransitioning(true);
 
     // 等待淡出动画完成后再切换标签
-    setTimeout(() => {
+    tabChangeTimeoutRef.current = setTimeout(() => {
       setActiveTab(tabId);
       setDisplayTab(tabId);
 
       // 等待淡入动画完成后重置状态
-      setTimeout(() => {
+      tabResetTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
       }, 100);
     }, 100);
   }, [activeTab, isTransitioning]);
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (tabChangeTimeoutRef.current) {
+        clearTimeout(tabChangeTimeoutRef.current);
+      }
+      if (tabResetTimeoutRef.current) {
+        clearTimeout(tabResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const tabs: SettingsTabItem[] = [
     {
@@ -265,7 +287,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     },
   ];
 
-  const renderTabContent = () => {
+  const renderTabContent = (idPrefix: string = 'desktop') => {
     const content = (() => {
       switch (displayTab) {
         case 'general':
@@ -290,8 +312,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     return (
       <div
         role="tabpanel"
-        id={`tabpanel-${displayTab}`}
-        aria-labelledby={`tab-${displayTab}`}
+        id={`${idPrefix}-tabpanel-${displayTab}`}
+        aria-labelledby={`${idPrefix}-tab-${displayTab}`}
         className={`
           transition-all duration-100 ease-out
           ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}
@@ -307,18 +329,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 模态框模式
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+      >
         <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center space-x-3">
               <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
                 {t('设置', 'Settings')}
               </h2>
             </div>
             <button
               onClick={handleClose}
               className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              aria-label={t('settings.close', 'Close settings')}
             >
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
@@ -327,15 +355,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
             <div className="hidden md:block w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
-              <nav className="p-4 space-y-1" role="tablist">
+              <nav className="p-4 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
                     role="tab"
-                    id={`tab-${tab.id}`}
+                    id={`desktop-tab-${tab.id}`}
                     aria-selected={activeTab === tab.id}
-                    aria-controls={`tabpanel-${tab.id}`}
+                    aria-controls={`desktop-tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
@@ -361,7 +389,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {/* 内容区域 */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-3xl mx-auto">
-                {renderTabContent()}
+                {renderTabContent('desktop')}
               </div>
             </div>
           </div>
@@ -384,15 +412,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <nav className="p-2 space-y-1" role="tablist">
+            <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   role="tab"
-                  id={`tab-${tab.id}`}
+                  id={`desktop-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
-                  aria-controls={`tabpanel-${tab.id}`}
+                  aria-controls={`desktop-tabpanel-${tab.id}`}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-left ${
                     activeTab === tab.id
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
@@ -419,7 +447,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-            {renderTabContent()}
+            {renderTabContent('desktop')}
           </div>
         </div>
       </div>

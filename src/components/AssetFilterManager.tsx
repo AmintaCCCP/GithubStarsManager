@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 // 图标映射
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -13,14 +14,21 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Terminal,
 };
 
+// 图标名称映射（基于 PRESET_FILTERS 的 id）
+const PRESET_ICON_MAP: Record<string, string> = {
+  'preset-windows': 'Monitor',
+  'preset-macos': 'Apple',
+  'preset-linux': 'Terminal',
+  'preset-android': 'Smartphone',
+  'preset-source': 'Package',
+};
+
 // 默认预设筛选器（用于重置）
-const DEFAULT_PRESET_FILTERS: AssetFilter[] = [
-  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'], isPreset: true, icon: 'Monitor' },
-  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'], isPreset: true, icon: 'Apple' },
-  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'], isPreset: true, icon: 'Terminal' },
-  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'], isPreset: true, icon: 'Smartphone' },
-  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'], isPreset: true, icon: 'Package' },
-];
+const DEFAULT_PRESET_FILTERS: AssetFilter[] = PRESET_FILTERS.map(pf => ({
+  ...pf,
+  isPreset: true,
+  icon: PRESET_ICON_MAP[pf.id],
+}));
 
 interface AssetFilterManagerProps {
   selectedFilters: string[];
@@ -38,9 +46,18 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   const [editingFilter, setEditingFilter] = useState<AssetFilter | undefined>();
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // 归一化 assetFilters：匹配预设标识的项设为 isPreset=true
+  const normalizedFilters = useMemo(() => assetFilters.map(f => {
+    const isPresetId = PRESET_ICON_MAP[f.id] !== undefined;
+    if (isPresetId && !f.isPreset) {
+      return { ...f, isPreset: true };
+    }
+    return f;
+  }), [assetFilters]);
+
   // 分离预设筛选器和自定义筛选器
-  const presetFilters = assetFilters.filter(f => f.isPreset);
-  const customFilters = assetFilters.filter(f => !f.isPreset);
+  const presetFilters = normalizedFilters.filter(f => f.isPreset);
+  const customFilters = normalizedFilters.filter(f => !f.isPreset);
 
   const handleCreateFilter = () => {
     setEditingFilter(undefined);
@@ -100,10 +117,13 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all group"
           title={isExpanded ? t('收起过滤器', 'Collapse filters') : t('展开过滤器', 'Expand filters')}
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls="asset-filter-panel"
         >
           <Filter className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${
             isExpanded ? 'text-blue-600 dark:text-blue-400' : ''
-          }`} />
+          }`} aria-hidden="true" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {t('过滤器', 'Filters')}
           </span>
@@ -113,9 +133,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             </span>
           )}
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" />
+            <ChevronUp className="w-4 h-4 text-gray-500" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+            <ChevronDown className="w-4 h-4 text-gray-500" aria-hidden="true" />
           )}
         </button>
 
@@ -125,8 +145,10 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               onClick={onClearFilters}
               className="flex items-center space-x-1 px-2 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title={t('清除所有筛选', 'Clear all filters')}
+              type="button"
+              aria-label={t('清除所有筛选', 'Clear all filters')}
             >
-              <X className="w-3 h-3" />
+              <X className="w-3 h-3" aria-hidden="true" />
               <span className="hidden sm:inline">{t('清除', 'Clear')}</span>
             </button>
           )}
@@ -134,8 +156,10 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             onClick={handleCreateFilter}
             className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
             title={t('新建过滤器', 'New Filter')}
+            type="button"
+            aria-label={t('新建过滤器', 'New Filter')}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">{t('新建', 'New')}</span>
           </button>
         </div>
@@ -143,7 +167,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
       {/* Expandable Content */}
       {isExpanded && (
-        <div className="animate-fade-in space-y-3">
+        <div id="asset-filter-panel" className="animate-fade-in space-y-3">
           {/* Preset Filters */}
           {presetFilters.length > 0 && (
             <div>
@@ -155,8 +179,10 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                   onClick={handleResetPresets}
                   className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                   title={t('重置预设筛选器', 'Reset preset filters')}
+                  type="button"
+                  aria-label={t('重置预设筛选器', 'Reset preset filters')}
                 >
-                  <RotateCcw className="w-3 h-3" />
+                  <RotateCcw className="w-3 h-3" aria-hidden="true" />
                   <span>{t('重置', 'Reset')}</span>
                 </button>
               </div>
@@ -177,18 +203,22 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         onClick={() => handlePresetToggle(preset.id)}
                         className="flex items-center space-x-1.5"
                         title={preset.keywords.join(', ')}
+                        type="button"
+                        aria-pressed={isSelected}
                       >
-                        {Icon && <Icon className="w-3.5 h-3.5" />}
+                        {Icon && <Icon className="w-3.5 h-3.5" aria-hidden="true" />}
                         <span>{preset.name}</span>
                       </button>
-                      
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
                         <button
                           onClick={() => handleEditFilter(preset)}
                           className="p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
                           title={t('编辑', 'Edit')}
+                          type="button"
+                          aria-label={t('编辑', 'Edit')}
                         >
-                          <Edit3 className="w-3 h-3" />
+                          <Edit3 className="w-3 h-3" aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -224,20 +254,24 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       </span>
                     </button>
                     
-                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleEditFilter(filter)}
                         className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         title={t('编辑', 'Edit')}
+                        type="button"
+                        aria-label={t('编辑', 'Edit')}
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3 h-3" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() => handleDeleteFilter(filter.id)}
                         className="p-1 rounded hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-400 transition-colors"
                         title={t('删除', 'Delete')}
+                        type="button"
+                        aria-label={t('删除', 'Delete')}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3 h-3" aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -262,6 +296,8 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               <button
                 onClick={onClearFilters}
                 className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                type="button"
+                aria-label={t('清除选择', 'Clear Selection')}
               >
                 {t('清除选择', 'Clear Selection')}
               </button>

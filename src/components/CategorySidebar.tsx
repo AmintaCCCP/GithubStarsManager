@@ -38,7 +38,24 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  // isMobile 初始值从 window.innerWidth 同步获取（SSR安全）
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
+  // 控制文字显示的状态：等侧栏展开动效完成后再显示文字
+  const [showText, setShowText] = useState(!isSidebarCollapsed);
+
+  // 监听侧栏状态变化，同步更新文字显示状态
+  useEffect(() => {
+    if (isSidebarCollapsed) {
+      setShowText(false);
+    } else {
+      // 侧栏展开时，延迟显示文字
+      const timer = setTimeout(() => setShowText(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarCollapsed]);
 
   // 检测屏幕尺寸
   useEffect(() => {
@@ -52,7 +69,15 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   // 切换侧栏折叠状态
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(!isSidebarCollapsed);
+    if (isSidebarCollapsed) {
+      // 展开侧栏：先展开，再显示文字
+      setSidebarCollapsed(false);
+      setTimeout(() => setShowText(true), 200); // 200ms 后显示文字，配合动效
+    } else {
+      // 折叠侧栏：先隐藏文字，再折叠
+      setShowText(false);
+      setTimeout(() => setSidebarCollapsed(true), 150); // 150ms 后折叠，文字先消失
+    }
   }, [isSidebarCollapsed, setSidebarCollapsed]);
 
   // 键盘快捷键支持 (Ctrl/Cmd + B)
@@ -65,6 +90,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                          active?.getAttribute('role') === 'textbox';
       if (isEditable) return;
 
+      // 移动端时键盘快捷键不执行折叠切换，避免修改持久化状态
+      if (isMobile) return;
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
         toggleSidebar();
@@ -72,7 +100,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
+  }, [toggleSidebar, isMobile]);
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
@@ -225,7 +253,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
                           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
-                    title={category.id !== 'all' ? t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
+                    title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                   >
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
                       <span className="text-base flex-shrink-0">{category.icon}</span>
@@ -269,7 +297,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 <button
                   onClick={toggleSidebar}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title={t('展开侧栏 (Ctrl+B)', 'Expand Sidebar (Ctrl+B)')}
+                  title={t('展开侧栏 (Ctrl/Cmd+B)', 'Expand Sidebar (Ctrl/Cmd+B)')}
                   aria-label={t('展开侧栏', 'Expand Sidebar')}
                   aria-expanded="false"
                 >
@@ -305,7 +333,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
-                    title={category.id !== 'all' ? t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
+                    title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
                     aria-label={category.name}
                   >
                     {category.icon}
@@ -329,7 +357,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               <div>
                 {/* 头部 - 包含折叠按钮 */}
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3
+                    className={`text-lg font-semibold text-gray-900 dark:text-white transition-opacity duration-200 ${
+                      showText ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  >
                     {t('应用分类', 'Categories')}
                   </h3>
                   <div className="flex items-center gap-1">
@@ -345,7 +377,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     <button
                       onClick={toggleSidebar}
                       className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      title={t('折叠侧栏 (Ctrl+B)', 'Collapse Sidebar (Ctrl+B)')}
+                      title={t('折叠侧栏 (Ctrl/Cmd+B)', 'Collapse Sidebar (Ctrl/Cmd+B)')}
                       aria-label={t('折叠侧栏', 'Collapse Sidebar')}
                       aria-expanded="true"
                     >
@@ -383,22 +415,28 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
-                          title={category.id !== 'all' ? t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
+                          title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                         >
                           <div className="flex items-center space-x-3 min-w-0 flex-1">
                             <span className="text-base flex-shrink-0">{category.icon}</span>
-                            <span className="text-sm font-medium truncate">{category.name}</span>
+                            <span
+                              className={`text-sm font-medium truncate transition-opacity duration-200 ${
+                                showText ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            >
+                              {category.name}
+                            </span>
                           </div>
 
                           {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
-                            className={`text-xs px-2 py-1 rounded-full shrink-0 transition-opacity ${
+                            className={`text-xs px-2 py-1 rounded-full shrink-0 transition-opacity duration-200 ${
                               isSelected
                                 ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
                                 : isDragTarget
                                   ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200'
                                   : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'
-                            } group-hover:opacity-0 group-focus-within:opacity-0`}
+                            } ${showText ? 'opacity-100' : 'opacity-0'} group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
                           </span>
@@ -414,6 +452,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               }}
                               className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
                               title={t('编辑分类', 'Edit category')}
+                              aria-label={t('编辑分类', 'Edit category')}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -425,6 +464,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 }}
                                 className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
                                 title={t('删除分类', 'Delete category')}
+                                aria-label={t('删除分类', 'Delete category')}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -436,6 +476,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 }}
                                 className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600"
                                 title={t('隐藏默认分类', 'Hide default category')}
+                                aria-label={t('隐藏默认分类', 'Hide default category')}
                               >
                                 <EyeOff className="w-3.5 h-3.5" />
                               </button>

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, BellOff, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, BellOff, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, Folder } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -8,15 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-// 预设筛选器定义
-const PRESET_FILTERS = [
-  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'] },
-  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'] },
-  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'] },
-  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'] },
-  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'] },
-];
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 // Markdown链接组件
 interface MarkdownLinkProps {
@@ -127,12 +119,16 @@ export const ReleaseTimeline: React.FC = () => {
   const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
   const [expandedReleases, setExpandedReleases] = useState<Set<number>>(new Set());
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
+  const [collapsedReleaseNotes, setCollapsedReleaseNotes] = useState<Set<number>>(new Set());
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      if (!target.closest('.download-dropdown')) {
+      // 只有在点击文件列表内部但不是按钮时才关闭
+      const dropdown = target.closest('.download-dropdown');
+      const button = target.closest('.file-toggle-btn');
+      if (!dropdown && !button) {
         setOpenDropdowns(new Set());
       }
     };
@@ -153,7 +149,7 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   // Helper function to check if a link matches any active filter
-  const matchesActiveFilters = (linkName: string): boolean => {
+  const matchesActiveFilters = useCallback((linkName: string): boolean => {
     if (selectedFilters.length === 0) return true;
     
     const lowerLinkName = linkName.toLowerCase();
@@ -169,7 +165,7 @@ export const ReleaseTimeline: React.FC = () => {
     );
     
     return matchesCustom || matchesPreset;
-  };
+  }, [selectedFilters, assetFilters]);
 
   // Toggle dropdown for a specific release
   const toggleDropdown = (releaseId: number, e?: React.MouseEvent) => {
@@ -204,6 +200,20 @@ export const ReleaseTimeline: React.FC = () => {
   const toggleFullContent = (releaseId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setFullContentReleases(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(releaseId)) {
+        newSet.delete(releaseId);
+      } else {
+        newSet.add(releaseId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle release notes collapse
+  const toggleReleaseNotes = (releaseId: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCollapsedReleaseNotes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(releaseId)) {
         newSet.delete(releaseId);
@@ -271,38 +281,16 @@ export const ReleaseTimeline: React.FC = () => {
 
     // Custom asset filters (including presets)
     if (selectedFilters.length > 0) {
-      const activeCustomFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-      const activePresetFilters = PRESET_FILTERS.filter(filter => selectedFilters.includes(filter.id));
-      
       filtered = filtered.filter(release => {
         const downloadLinks = getDownloadLinks(release);
-        
-        return downloadLinks.some(link => {
-          const linkName = link.name.toLowerCase();
-          
-          // Check custom filters
-          const matchesCustom = activeCustomFilters.some(filter => 
-            filter.keywords.some(keyword => 
-              linkName.includes(keyword.toLowerCase())
-            )
-          );
-          
-          // Check preset filters
-          const matchesPreset = activePresetFilters.some(filter => 
-            filter.keywords.some(keyword => 
-              linkName.includes(keyword.toLowerCase())
-            )
-          );
-          
-          return matchesCustom || matchesPreset;
-        });
+        return downloadLinks.some(link => matchesActiveFilters(link.name));
       });
     }
 
-    return filtered.sort((a, b) => 
+    return filtered.sort((a, b) =>
       new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
     );
-  }, [subscribedReleases, searchQuery, selectedFilters, assetFilters]);
+  }, [subscribedReleases, searchQuery, selectedFilters, assetFilters, matchesActiveFilters]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReleases.length / itemsPerPage);
@@ -441,10 +429,24 @@ export const ReleaseTimeline: React.FC = () => {
     return !readReleases.has(releaseId);
   };
 
-  // Truncate body for preview
+  // Truncate body for preview - 按段落/换行截断保证 Markdown 完整
   const getTruncatedBody = (body: string, maxLength = 300) => {
     if (body.length <= maxLength) return body;
-    return body.substring(0, maxLength) + '...';
+
+    // 优先按段落/换行截断
+    const lines = body.split(/\n\n|\r\n\r\n|\n|\r\n/);
+    let result = '';
+    for (const line of lines) {
+      if ((result + line).length > maxLength) break;
+      result += (result ? '\n\n' : '') + line;
+    }
+
+    // 如果按段落截断后内容太少，改用字符截断
+    if (result.length < maxLength * 0.3) {
+      result = body.substring(0, maxLength);
+    }
+
+    return result + '...';
   };
 
   const handleUnsubscribeRelease = async (repoId: number) => {
@@ -708,6 +710,7 @@ export const ReleaseTimeline: React.FC = () => {
           const isUnread = isReleaseUnread(release.id);
           const isExpanded = expandedReleases.has(release.id);
           const isFullContent = fullContentReleases.has(release.id);
+          const isReleaseNotesCollapsed = collapsedReleaseNotes.has(release.id);
           
           return (
             <div
@@ -720,38 +723,38 @@ export const ReleaseTimeline: React.FC = () => {
             >
               {/* Card Header - Clickable to expand */}
               <div
-                className="p-4 sm:p-6 cursor-pointer select-none"
+                className="p-3 sm:p-4 cursor-pointer select-none"
                 onClick={() => toggleReleaseExpansion(release.id)}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
                     {/* Unread indicator */}
                     {isUnread && (
-                      <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
+                      <div className="w-2.5 h-2.5 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
                     )}
-                    <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-xl flex-shrink-0">
-                      <GitBranch className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
+                    <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-lg flex-shrink-0">
+                      <GitBranch className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base truncate">
+                      <h4 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg truncate">
                         {release.repository.name} <span className="text-blue-600 dark:text-blue-400">{release.tag_name}</span>
                       </h4>
-                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 truncate">
                         {release.repository.full_name}
                       </p>
                       {release.name && release.name !== release.tag_name && (
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 truncate">
                           {release.name}
                         </p>
                       )}
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 flex-shrink-0">
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
                     {/* Expand/Collapse indicator */}
-                    <div className={`p-2 rounded-lg transition-all duration-300 ${
-                      isExpanded 
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rotate-180' 
+                    <div className={`p-1.5 rounded-lg transition-all duration-300 ${
+                      isExpanded
+                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rotate-180'
                         : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                     }`}>
                       <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -760,11 +763,11 @@ export const ReleaseTimeline: React.FC = () => {
                 </div>
 
                 {/* Quick info row */}
-                <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                   {/* Download Links Summary */}
                   {downloadLinks.length > 0 && (
-                    <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                      <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <div className="flex items-center space-x-1.5 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                      <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>
                         {(() => {
                           const filteredLinks = downloadLinks.filter(link => matchesActiveFilters(link.name));
@@ -776,37 +779,78 @@ export const ReleaseTimeline: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Time */}
-                  <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <div className="flex items-center space-x-1.5 text-sm sm:text-base text-gray-500 dark:text-gray-400">
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex items-center space-x-1 ml-auto">
+                  <div className="flex items-center space-x-2 ml-auto">
+                    {/* 文件夹按钮 - 智能切换文件列表 */}
+                    {downloadLinks.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // 如果主卡片未展开，先展开主卡片，再展开文件表
+                          // 如果主卡片已展开，只切换文件表
+                          if (!isExpanded) {
+                            // 展开主卡片
+                            toggleReleaseExpansion(release.id);
+                            // 展开文件表
+                            setOpenDropdowns(prev => {
+                              const newSet = new Set(prev);
+                              newSet.add(release.id);
+                              return newSet;
+                            });
+                          } else {
+                            // 主卡片已展开，只切换文件表
+                            setOpenDropdowns(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(release.id)) {
+                                newSet.delete(release.id);
+                              } else {
+                                newSet.add(release.id);
+                              }
+                              return newSet;
+                            });
+                          }
+                        }}
+                        className={`file-toggle-btn flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all duration-200 text-xs sm:text-sm font-medium ${
+                          openDropdowns.has(release.id)
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                        title={openDropdowns.has(release.id) ? t('隐藏文件', 'Hide Files') : t('显示文件', 'Show Files')}
+                      >
+                        <Folder className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="hidden sm:inline">{openDropdowns.has(release.id) ? t('隐藏文件', 'Hide Files') : t('显示文件', 'Show Files')}</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleUnsubscribeRelease(release.repository.id);
                       }}
-                      className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="p-2 sm:p-2.5 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       title={t('取消订阅 Release', 'Unsubscribe from releases')}
                     >
-                      <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                     <a
                       href={release.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="p-2 sm:p-2.5 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       title={t('在GitHub上查看', 'View on GitHub')}
                       onClick={(e) => {
                         e.stopPropagation();
                         markReleaseAsRead(release.id);
                       }}
                     >
-                      <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5" />
                     </a>
                   </div>
                 </div>
@@ -814,14 +858,22 @@ export const ReleaseTimeline: React.FC = () => {
 
               {/* Expanded Content */}
               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
               }`}>
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 dark:border-gray-700">
                   {/* Download Links Section */}
                   {downloadLinks.length > 0 && (
                     <div className="py-4 relative download-dropdown">
                       <div className="flex items-center justify-between mb-3">
-                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-2">
+                        {/* 可点击的下载文件标题 */}
+                        <button
+                          onClick={(e) => toggleDropdown(release.id, e)}
+                          className={`flex items-center space-x-2 text-sm font-medium transition-all duration-200 ${
+                            openDropdowns.has(release.id)
+                              ? 'text-blue-700 dark:text-blue-300'
+                              : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                          }`}
+                        >
                           <Download className="w-4 h-4" />
                           <span>
                             {(() => {
@@ -832,13 +884,7 @@ export const ReleaseTimeline: React.FC = () => {
                                 : `${t('下载文件', 'Downloads')} (${downloadLinks.length})`;
                             })()}
                           </span>
-                        </h6>
-                        <button
-                          onClick={(e) => toggleDropdown(release.id, e)}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-xs sm:text-sm"
-                        >
-                          <span>{openDropdowns.has(release.id) ? t('收起', 'Collapse') : t('查看全部', 'View All')}</span>
-                          <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
                       
@@ -899,54 +945,70 @@ export const ReleaseTimeline: React.FC = () => {
                   {/* Release Notes Section */}
                   {release.body && (
                     <div className="py-4">
-                      <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center space-x-2">
-                        <BookOpen className="w-4 h-4" />
-                        <span>{t('Release 说明', 'Release Notes')}</span>
-                      </h6>
+                      {/* Collapsible Header */}
+                      <button
+                        onClick={(e) => toggleReleaseNotes(release.id, e)}
+                        className="w-full flex items-center justify-between mb-3 group"
+                      >
+                        <h6 className={`text-sm font-medium flex items-center space-x-2 transition-colors duration-200 ${
+                          isReleaseNotesCollapsed
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-blue-700 dark:text-blue-300'
+                        }`}>
+                          <BookOpen className="w-4 h-4" />
+                          <span>{t('Release 说明', 'Release Notes')}</span>
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isReleaseNotesCollapsed ? '' : 'rotate-180'}`} />
+                        </h6>
+                      </button>
                       
-                      {/* Markdown Content */}
-                      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                        <MarkdownContent 
-                          content={isFullContent ? release.body : getTruncatedBody(release.body, 500)}
-                        />
-                      </div>
+                      {/* Collapsible Content */}
+                      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isReleaseNotesCollapsed ? 'max-h-0 opacity-0' : 'max-h-[5000px] opacity-100'
+                      }`}>
+                        {/* Markdown Content */}
+                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                          <MarkdownContent 
+                            content={isFullContent ? release.body : getTruncatedBody(release.body, 500)}
+                          />
+                        </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
-                        {/* Read Full Content Button */}
-                        {release.body.length > 500 && (
-                          <button
-                            onClick={(e) => toggleFullContent(release.id, e)}
-                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+                        {/* Action Buttons */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
+                          {/* Read Full Content Button */}
+                          {release.body.length > 500 && (
+                            <button
+                              onClick={(e) => toggleFullContent(release.id, e)}
+                              className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+                            >
+                              {isFullContent ? (
+                                <>
+                                  <ChevronUp className="w-4 h-4" />
+                                  <span>{t('收起内容', 'Collapse Content')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <BookOpen className="w-4 h-4" />
+                                  <span>{t('在本地阅读全文', 'Read Full Content Locally')}</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {/* View on GitHub Button */}
+                          <a
+                            href={release.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 transition-all duration-200 text-xs sm:text-sm font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markReleaseAsRead(release.id);
+                            }}
                           >
-                            {isFullContent ? (
-                              <>
-                                <ChevronUp className="w-4 h-4" />
-                                <span>{t('收起内容', 'Collapse Content')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <BookOpen className="w-4 h-4" />
-                                <span>{t('在本地阅读全文', 'Read Full Content Locally')}</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        {/* View on GitHub Button */}
-                        <a
-                          href={release.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 transition-all duration-200 text-xs sm:text-sm font-medium"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markReleaseAsRead(release.id);
-                          }}
-                        >
-                          <ArrowUpRight className="w-4 h-4" />
-                          <span>{t('前往查看完整Release说明', 'View Full Release Notes')}</span>
-                        </a>
+                            <ArrowUpRight className="w-4 h-4" />
+                            <span>{t('前往查看完整Release说明', 'View Full Release Notes')}</span>
+                          </a>
+                        </div>
                       </div>
                     </div>
                   )}
