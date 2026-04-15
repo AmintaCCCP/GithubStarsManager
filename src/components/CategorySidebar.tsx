@@ -43,7 +43,6 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 1024;
   });
-<<<<<<< HEAD
   // 控制文字显示的状态：等侧栏展开动效完成后再显示文字
   const [showText, setShowText] = useState(!isSidebarCollapsed);
 
@@ -57,8 +56,6 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isSidebarCollapsed]);
-=======
->>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
 
   // 检测屏幕尺寸
   useEffect(() => {
