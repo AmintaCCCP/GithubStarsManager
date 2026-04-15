@@ -574,9 +574,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleBulkCategorize = async (categoryName: string) => {
+<<<<<<< HEAD
     const failedRepos: string[] = [];
 
     for (const repo of selectedRepositories) {
+=======
+    const selectedRepos = filteredRepositories.filter(repo =>
+      selectedRepoIds.has(repo.id)
+    );
+
+    const failedRepos: string[] = [];
+
+    for (const repo of selectedRepos) {
+>>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
       try {
         updateRepository({
           ...repo,
@@ -591,7 +601,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     await forceSyncToBackend();
 
     // 汇总结果显示
+<<<<<<< HEAD
     const successCount = selectedRepositories.length - failedRepos.length;
+=======
+    const successCount = selectedRepos.length - failedRepos.length;
+>>>>>>> c8d3c340d2bac250c336ddcb682bffe8c7fa8919
     if (failedRepos.length > 0) {
       alert(language === 'zh'
         ? `成功为 ${successCount} 个仓库设置分类：${categoryName}\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
