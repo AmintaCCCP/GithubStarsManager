@@ -168,7 +168,7 @@ const normalizePersistedState = (
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: Array.isArray((safePersisted as any).hiddenDefaultCategoryIds) ? (safePersisted as any).hiddenDefaultCategoryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
-    assetFilters: Array.isArray(safePersisted.assetFilters) ? safePersisted.assetFilters : [],
+    assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
   };
@@ -261,6 +261,15 @@ const defaultCategories: Category[] = [
   }
 ];
 
+// 默认预设筛选器
+const defaultPresetFilters: AssetFilter[] = [
+  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'], isPreset: true, icon: 'Monitor' },
+  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'], isPreset: true, icon: 'Apple' },
+  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'], isPreset: true, icon: 'Terminal' },
+  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'], isPreset: true, icon: 'Smartphone' },
+  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'], isPreset: true, icon: 'Package' },
+];
+
 export const useAppStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
@@ -283,7 +292,7 @@ export const useAppStore = create<AppState & AppActions>()(
       readReleases: new Set<number>(),
       customCategories: [],
       hiddenDefaultCategoryIds: [],
-      assetFilters: [],
+      assetFilters: defaultPresetFilters,
       theme: 'light',
       currentView: 'repositories',
       selectedCategory: 'all',

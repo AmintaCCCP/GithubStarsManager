@@ -1,11 +1,107 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ExternalLink, GitBranch, Calendar, Package, Bell, BellOff, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Download, ChevronDown } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Package, Bell, BellOff, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// 预设筛选器定义
+const PRESET_FILTERS = [
+  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'] },
+  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'] },
+  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'] },
+  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'] },
+  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'] },
+];
+
+// Markdown链接组件
+interface MarkdownLinkProps {
+  href?: string;
+  children?: React.ReactNode;
+}
+
+const MarkdownLink: React.FC<MarkdownLinkProps> = ({ href, children }) => {
+  if (!href) return <>{children}</>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </a>
+  );
+};
+
+// Markdown渲染组件
+interface MarkdownContentProps {
+  content: string;
+  className?: string;
+}
+
+const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = '' }) => {
+  return (
+    <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: MarkdownLink,
+          h1: ({ children }) => <h1 className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>,
+          p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-2 leading-relaxed">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="ml-2">{children}</li>,
+          code: ({ children, className }) => {
+            const isInline = !className;
+            return isInline ? (
+              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                {children}
+              </code>
+            ) : (
+              <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3">
+                <code className="text-xs font-mono text-gray-800 dark:text-gray-200">{children}</code>
+              </pre>
+            );
+          },
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-4 border-gray-200 dark:border-gray-700" />,
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-3">
+              <table className="min-w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>,
+          th: ({ children }) => (
+            <th className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-gray-700 dark:text-gray-300">
+              {children}
+            </td>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 export const ReleaseTimeline: React.FC = () => {
   const { 
@@ -16,7 +112,6 @@ export const ReleaseTimeline: React.FC = () => {
     githubToken, 
     language,
     assetFilters,
-    setReleases,
     addReleases,
     markReleaseAsRead,
     toggleReleaseSubscription,
@@ -29,8 +124,9 @@ export const ReleaseTimeline: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
-  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
   const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
+  const [expandedReleases, setExpandedReleases] = useState<Set<number>>(new Set());
+  const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -56,8 +152,28 @@ export const ReleaseTimeline: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  // Helper function to check if a link matches any active filter
+  const matchesActiveFilters = (linkName: string): boolean => {
+    if (selectedFilters.length === 0) return true;
+    
+    const lowerLinkName = linkName.toLowerCase();
+    const activeCustomFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+    const activePresetFilters = PRESET_FILTERS.filter(filter => selectedFilters.includes(filter.id));
+    
+    const matchesCustom = activeCustomFilters.some(filter => 
+      filter.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
+    );
+    
+    const matchesPreset = activePresetFilters.some(filter => 
+      filter.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
+    );
+    
+    return matchesCustom || matchesPreset;
+  };
+
   // Toggle dropdown for a specific release
-  const toggleDropdown = (releaseId: number) => {
+  const toggleDropdown = (releaseId: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setOpenDropdowns(prev => {
       const newSet = new Set(prev);
       if (newSet.has(releaseId)) {
@@ -69,7 +185,34 @@ export const ReleaseTimeline: React.FC = () => {
     });
   };
 
+  // Toggle release expansion
+  const toggleReleaseExpansion = (releaseId: number) => {
+    setExpandedReleases(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(releaseId)) {
+        newSet.delete(releaseId);
+      } else {
+        newSet.add(releaseId);
+        // Mark as read when expanding
+        markReleaseAsRead(releaseId);
+      }
+      return newSet;
+    });
+  };
 
+  // Toggle full content view
+  const toggleFullContent = (releaseId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFullContentReleases(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(releaseId)) {
+        newSet.delete(releaseId);
+      } else {
+        newSet.add(releaseId);
+      }
+      return newSet;
+    });
+  };
 
   const getDownloadLinks = (release: Release) => {
     const links: Array<{ name: string; url: string; size: number; downloadCount: number }> = [];
@@ -87,7 +230,7 @@ export const ReleaseTimeline: React.FC = () => {
     }
 
     // Fallback: Extract download links from release body (for custom links)
-    const downloadRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+    const downloadRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
     let match;
     while ((match = downloadRegex.exec(release.body)) !== null) {
       const [, name, url] = match;
@@ -126,20 +269,33 @@ export const ReleaseTimeline: React.FC = () => {
       );
     }
 
-    // Custom asset filters
+    // Custom asset filters (including presets)
     if (selectedFilters.length > 0) {
-      const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+      const activeCustomFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
+      const activePresetFilters = PRESET_FILTERS.filter(filter => selectedFilters.includes(filter.id));
       
       filtered = filtered.filter(release => {
         const downloadLinks = getDownloadLinks(release);
         
-        return downloadLinks.some(link => 
-          activeFilters.some(filter => 
+        return downloadLinks.some(link => {
+          const linkName = link.name.toLowerCase();
+          
+          // Check custom filters
+          const matchesCustom = activeCustomFilters.some(filter => 
             filter.keywords.some(keyword => 
-              link.name.toLowerCase().includes(keyword.toLowerCase())
+              linkName.includes(keyword.toLowerCase())
             )
-          )
-        );
+          );
+          
+          // Check preset filters
+          const matchesPreset = activePresetFilters.some(filter => 
+            filter.keywords.some(keyword => 
+              linkName.includes(keyword.toLowerCase())
+            )
+          );
+          
+          return matchesCustom || matchesPreset;
+        });
       });
     }
 
@@ -279,17 +435,16 @@ export const ReleaseTimeline: React.FC = () => {
     return rangeWithDots;
   };
 
-
-
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const truncateBody = (body: string, maxLength = 200) => {
-    if (body.length <= maxLength) return body;
-    return body.substring(0, maxLength) + '...';
+  const isReleaseUnread = (releaseId: number) => {
+    return !readReleases.has(releaseId);
   };
 
-  const handleReleaseClick = (releaseId: number) => {
-    markReleaseAsRead(releaseId);
+  // Truncate body for preview
+  const getTruncatedBody = (body: string, maxLength = 300) => {
+    if (body.length <= maxLength) return body;
+    return body.substring(0, maxLength) + '...';
   };
 
   const handleUnsubscribeRelease = async (repoId: number) => {
@@ -322,10 +477,6 @@ export const ReleaseTimeline: React.FC = () => {
     }
 
     alert(t('已取消订阅该仓库的 Release。', 'Unsubscribed from repository releases.'));
-  };
-
-  const isReleaseUnread = (releaseId: number) => {
-    return !readReleases.has(releaseId);
   };
 
   if (subscribedReleases.length === 0) {
@@ -392,32 +543,6 @@ export const ReleaseTimeline: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* View Mode Toggle */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('compact')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'compact'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-                title={t('精简视图', 'Compact View')}
-              >
-                <EyeOff className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('detailed')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'detailed'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-                title={t('详细视图', 'Detailed View')}
-              >
-                <Eye className="w-4 h-4" />
-              </button>
-            </div>
-
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-gray-500 dark:text-gray-400 lg:w-auto">
@@ -581,124 +706,149 @@ export const ReleaseTimeline: React.FC = () => {
         {paginatedReleases.map(release => {
           const downloadLinks = getDownloadLinks(release);
           const isUnread = isReleaseUnread(release.id);
+          const isExpanded = expandedReleases.has(release.id);
+          const isFullContent = fullContentReleases.has(release.id);
           
           return (
             <div
               key={release.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleReleaseClick(release.id)}
+              className={`bg-white dark:bg-gray-800 rounded-xl border transition-all duration-300 ease-in-out ${
+                isExpanded 
+                  ? 'border-blue-300 dark:border-blue-700 shadow-lg ring-1 ring-blue-100 dark:ring-blue-900' 
+                  : 'border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
             >
-              {viewMode === 'detailed' ? (
-                // Detailed View
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      {/* Unread indicator */}
-                      {isUnread && (
-                        <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
-                      )}
-                      <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
-                        <GitBranch className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-white truncate">
-                          {release.repository.name} {release.tag_name}
-                        </h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {release.repository.full_name}
-                        </p>
-                      </div>
+              {/* Card Header - Clickable to expand */}
+              <div
+                className="p-4 sm:p-6 cursor-pointer select-none"
+                onClick={() => toggleReleaseExpansion(release.id)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    {/* Unread indicator */}
+                    {isUnread && (
+                      <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
+                    )}
+                    <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-xl flex-shrink-0">
+                      <GitBranch className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
                     </div>
-                    <div className="flex items-center space-x-2 flex-shrink-0">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUnsubscribeRelease(release.repository.id);
-                        }}
-                        className="p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        title={t('取消订阅 Release', 'Unsubscribe from releases')}
-                      >
-                        <BellOff className="w-4 h-4" />
-                      </button>
-                      <a
-                        href={release.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        title={t('在GitHub上查看', 'View on GitHub')}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReleaseClick(release.id);
-                        }}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base truncate">
+                        {release.repository.name} <span className="text-blue-600 dark:text-blue-400">{release.tag_name}</span>
+                      </h4>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {release.repository.full_name}
+                      </p>
+                      {release.name && release.name !== release.tag_name && (
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">
+                          {release.name}
+                        </p>
+                      )}
                     </div>
                   </div>
+                  
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    {/* Expand/Collapse indicator */}
+                    <div className={`p-2 rounded-lg transition-all duration-300 ${
+                      isExpanded 
+                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rotate-180' 
+                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                    }`}>
+                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+                </div>
 
-                  {release.name && release.name !== release.tag_name && (
-                    <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-2">
-                      {release.name}
-                    </h5>
-                  )}
-
-                  {/* Download Links - Dropdown */}
+                {/* Quick info row */}
+                <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                  {/* Download Links Summary */}
                   {downloadLinks.length > 0 && (
-                    <div className="mb-4 relative download-dropdown">
-                      <div className="flex items-center justify-between mb-2">
-                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {(() => {
-                            // 计算过滤后的文件数量
-                            let filteredCount = downloadLinks.length;
-                            if (selectedFilters.length > 0) {
-                              const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-                              const filteredLinks = downloadLinks.filter(link => 
-                                activeFilters.some(filter => 
-                                  filter.keywords.some(keyword => 
-                                    link.name.toLowerCase().includes(keyword.toLowerCase())
-                                  )
-                                )
-                              );
-                              filteredCount = filteredLinks.length;
-                            }
-                            
-                            return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
-                              ? `${t('下载:', 'Downloads:')} (${filteredCount}/${downloadLinks.length})`
-                              : `${t('下载:', 'Downloads:')} (${downloadLinks.length})`;
-                          })()}
+                    <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>
+                        {(() => {
+                          const filteredLinks = downloadLinks.filter(link => matchesActiveFilters(link.name));
+                          const filteredCount = filteredLinks.length;
+                          return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
+                            ? `${filteredCount}/${downloadLinks.length} ${t('个文件', 'files')}`
+                            : `${downloadLinks.length} ${t('个文件', 'files')}`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Time */}
+                  <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center space-x-1 ml-auto">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUnsubscribeRelease(release.repository.id);
+                      }}
+                      className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      title={t('取消订阅 Release', 'Unsubscribe from releases')}
+                    >
+                      <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <a
+                      href={release.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      title={t('在GitHub上查看', 'View on GitHub')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markReleaseAsRead(release.id);
+                      }}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded Content */}
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+              }`}>
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 dark:border-gray-700">
+                  {/* Download Links Section */}
+                  {downloadLinks.length > 0 && (
+                    <div className="py-4 relative download-dropdown">
+                      <div className="flex items-center justify-between mb-3">
+                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-2">
+                          <Download className="w-4 h-4" />
+                          <span>
+                            {(() => {
+                              const filteredLinks = downloadLinks.filter(link => matchesActiveFilters(link.name));
+                              const filteredCount = filteredLinks.length;
+                              return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
+                                ? `${t('下载文件', 'Downloads')} (${filteredCount}/${downloadLinks.length})`
+                                : `${t('下载文件', 'Downloads')} (${downloadLinks.length})`;
+                            })()}
+                          </span>
                         </h6>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleDropdown(release.id);
-                          }}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm"
+                          onClick={(e) => toggleDropdown(release.id, e)}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-xs sm:text-sm"
                         >
-                          <Download className="w-4 h-4" />
-                          <span>{t('查看下载', 'View Downloads')}</span>
+                          <span>{openDropdowns.has(release.id) ? t('收起', 'Collapse') : t('查看全部', 'View All')}</span>
                           <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
                       
-                      {openDropdowns.has(release.id) && (
-                        <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                      {/* Download Links Dropdown */}
+                      <div className={`overflow-hidden transition-all duration-300 ${
+                        openDropdowns.has(release.id) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      }`}>
+                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 max-h-80 overflow-y-auto">
                           {(() => {
-                            // 如果有激活的过滤器，只显示匹配的文件
-                            let filteredLinks = downloadLinks;
-                            if (selectedFilters.length > 0) {
-                              const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-                              filteredLinks = downloadLinks.filter(link => 
-                                activeFilters.some(filter => 
-                                  filter.keywords.some(keyword => 
-                                    link.name.toLowerCase().includes(keyword.toLowerCase())
-                                  )
-                                )
-                              );
-                            }
-                            
+                            const filteredLinks = downloadLinks.filter(link => matchesActiveFilters(link.name));
                             return filteredLinks.length > 0 ? filteredLinks.map((link, index) => {
                               const asset = release.assets.find(asset => asset.name === link.name);
                               return (
@@ -707,15 +857,14 @@ export const ReleaseTimeline: React.FC = () => {
                                   href={link.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
+                                  className="flex items-center justify-between px-4 py-3 hover:bg-white dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0 group"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleReleaseClick(release.id);
-                                    toggleDropdown(release.id);
+                                    markReleaseAsRead(release.id);
                                   }}
                                 >
                                   <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                    <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                       {link.name}
                                     </div>
                                     <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -732,222 +881,77 @@ export const ReleaseTimeline: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
+                                  <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0 transition-colors" />
                                 </a>
                               );
                             }) : (
                               <div className="px-4 py-6 text-center text-gray-500 dark:text-gray-400">
-                                <div className="text-sm">
-                                  {t('没有匹配过滤器的文件', 'No files match the selected filters')}
-                                </div>
-                                <div className="text-xs mt-1">
-                                  {t('尝试调整过滤器设置', 'Try adjusting your filter settings')}
-                                </div>
+                                <div className="text-sm">{t('没有匹配过滤器的文件', 'No files match the selected filters')}</div>
+                                <div className="text-xs mt-1 opacity-75">{t('尝试调整过滤器设置', 'Try adjusting your filter settings')}</div>
                               </div>
                             );
                           })()}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
+                  {/* Release Notes Section */}
                   {release.body && (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {truncateBody(release.body)}
+                    <div className="py-4">
+                      <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center space-x-2">
+                        <BookOpen className="w-4 h-4" />
+                        <span>{t('Release 说明', 'Release Notes')}</span>
+                      </h6>
+                      
+                      {/* Markdown Content */}
+                      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                        <MarkdownContent 
+                          content={isFullContent ? release.body : getTruncatedBody(release.body, 500)}
+                        />
                       </div>
-                      {release.body.length > 200 && (
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
+                        {/* Read Full Content Button */}
+                        {release.body.length > 500 && (
+                          <button
+                            onClick={(e) => toggleFullContent(release.id, e)}
+                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+                          >
+                            {isFullContent ? (
+                              <>
+                                <ChevronUp className="w-4 h-4" />
+                                <span>{t('收起内容', 'Collapse Content')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <BookOpen className="w-4 h-4" />
+                                <span>{t('在本地阅读全文', 'Read Full Content Locally')}</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* View on GitHub Button */}
                         <a
                           href={release.html_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-sm mt-2 inline-block"
+                          className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 transition-all duration-200 text-xs sm:text-sm font-medium"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleReleaseClick(release.id);
+                            markReleaseAsRead(release.id);
                           }}
                         >
-                          {t('阅读完整Release说明 →', 'Read full release notes →')}
+                          <ArrowUpRight className="w-4 h-4" />
+                          <span>{t('前往查看完整Release说明', 'View Full Release Notes')}</span>
                         </a>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
-              ) : (
-                // Compact View - Table-like layout
-                <div className="p-4">
-                  <div className="grid grid-cols-12 gap-4 items-center">
-                    {/* Repository and Version - 缩小列宽 */}
-                    <div className="col-span-3 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        {/* Unread indicator */}
-                        {isUnread && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                        )}
-                        <div className="w-6 h-6 bg-green-100 dark:bg-green-900 rounded flex items-center justify-center flex-shrink-0">
-                          <GitBranch className="w-3 h-3 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                            {release.repository.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {release.tag_name}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Release Name */}
-                    <div className="col-span-3 min-w-0">
-                      <p className="text-sm text-gray-900 dark:text-white truncate" title={release.name || release.tag_name}>
-                        {release.name || release.tag_name}
-                      </p>
-                    </div>
-
-                    {/* Download Links - Dropdown */}
-                    <div className="col-span-4 min-w-0 relative download-dropdown">
-                      {downloadLinks.length > 0 ? (
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleDropdown(release.id);
-                            }}
-                            className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm w-full justify-between"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <Download className="w-4 h-4" />
-                              <span>
-                                {(() => {
-                                  // 计算过滤后的文件数量
-                                  let filteredCount = downloadLinks.length;
-                                  if (selectedFilters.length > 0) {
-                                    const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-                                    const filteredLinks = downloadLinks.filter(link => 
-                                      activeFilters.some(filter => 
-                                        filter.keywords.some(keyword => 
-                                          link.name.toLowerCase().includes(keyword.toLowerCase())
-                                        )
-                                      )
-                                    );
-                                    filteredCount = filteredLinks.length;
-                                  }
-                                  
-                                  return selectedFilters.length > 0 && filteredCount !== downloadLinks.length
-                                    ? `${filteredCount}/${downloadLinks.length} ${t('个文件', 'files')}`
-                                    : `${downloadLinks.length} ${t('个文件', 'files')}`;
-                                })()}
-                              </span>
-                            </div>
-                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns.has(release.id) ? 'rotate-180' : ''}`} />
-                          </button>
-                          
-                          {openDropdowns.has(release.id) && (
-                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                              {(() => {
-                                // 如果有激活的过滤器，只显示匹配的文件
-                                let filteredLinks = downloadLinks;
-                                if (selectedFilters.length > 0) {
-                                  const activeFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-                                  filteredLinks = downloadLinks.filter(link => 
-                                    activeFilters.some(filter => 
-                                      filter.keywords.some(keyword => 
-                                        link.name.toLowerCase().includes(keyword.toLowerCase())
-                                      )
-                                    )
-                                  );
-                                }
-                                
-                                return filteredLinks.length > 0 ? filteredLinks.map((link, index) => {
-                                  const asset = release.assets.find(asset => asset.name === link.name);
-                                  return (
-                                    <a
-                                      key={index}
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0 group"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleReleaseClick(release.id);
-                                        toggleDropdown(release.id);
-                                      }}
-                                    >
-                                      <div className="min-w-0 flex-1">
-                                        <div className="text-xs font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                          {link.name}
-                                        </div>
-                                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                          {link.size > 0 && (
-                                            <span>{formatFileSize(link.size)}</span>
-                                          )}
-                                          {asset?.updated_at && (
-                                            <span>
-                                              {formatDistanceToNow(new Date(asset.updated_at), { addSuffix: true })}
-                                            </span>
-                                          )}
-                                          {link.downloadCount > 0 && (
-                                            <span>{link.downloadCount.toLocaleString()} {t('次下载', 'downloads')}</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <Download className="w-3 h-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex-shrink-0" />
-                                    </a>
-                                  );
-                                }) : (
-                                  <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
-                                    <div className="text-xs">
-                                      {t('没有匹配过滤器的文件', 'No files match the selected filters')}
-                                    </div>
-                                    <div className="text-xs mt-1 opacity-75">
-                                      {t('尝试调整过滤器设置', 'Try adjusting your filter settings')}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                          {t('无下载', 'No downloads')}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Time and Actions */}
-                    <div className="col-span-2 flex items-center justify-end space-x-2">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUnsubscribeRelease(release.repository.id);
-                        }}
-                        className="p-1.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        title={t('取消订阅 Release', 'Unsubscribe from releases')}
-                      >
-                        <BellOff className="w-3 h-3" />
-                      </button>
-                      <a
-                        href={release.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        title={t('在GitHub上查看', 'View on GitHub')}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReleaseClick(release.id);
-                        }}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           );
         })}

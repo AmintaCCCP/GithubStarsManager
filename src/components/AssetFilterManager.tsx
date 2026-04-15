@@ -1,8 +1,26 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Filter } from 'lucide-react';
+import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
+
+// 图标映射
+const ICON_MAP: Record<string, React.ElementType> = {
+  Monitor,
+  Apple,
+  Smartphone,
+  Package,
+  Terminal,
+};
+
+// 默认预设筛选器（用于重置）
+const DEFAULT_PRESET_FILTERS: AssetFilter[] = [
+  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'], isPreset: true, icon: 'Monitor' },
+  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'], isPreset: true, icon: 'Apple' },
+  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'], isPreset: true, icon: 'Terminal' },
+  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'], isPreset: true, icon: 'Smartphone' },
+  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'], isPreset: true, icon: 'Package' },
+];
 
 interface AssetFilterManagerProps {
   selectedFilters: string[];
@@ -18,6 +36,11 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<AssetFilter | undefined>();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // 分离预设筛选器和自定义筛选器
+  const presetFilters = assetFilters.filter(f => f.isPreset);
+  const customFilters = assetFilters.filter(f => !f.isPreset);
 
   const handleCreateFilter = () => {
     setEditingFilter(undefined);
@@ -47,100 +70,203 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     }
   };
 
+  const handlePresetToggle = (presetId: string) => {
+    onFilterToggle(presetId);
+  };
+
+  const handleResetPresets = () => {
+    if (confirm(language === 'zh' ? '确定要重置所有预设筛选器吗？这将恢复默认设置。' : 'Are you sure you want to reset all preset filters? This will restore default settings.')) {
+      // 删除所有现有的预设筛选器
+      presetFilters.forEach(filter => {
+        deleteAssetFilter(filter.id);
+        if (selectedFilters.includes(filter.id)) {
+          onFilterToggle(filter.id);
+        }
+      });
+      // 添加默认预设筛选器
+      DEFAULT_PRESET_FILTERS.forEach(filter => {
+        addAssetFilter(filter);
+      });
+    }
+  };
+
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-3">
+      {/* Compact Header with Toggle */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            {t('自定义过滤器', 'Custom Filters')}
-          </h3>
-        </div>
         <button
-          onClick={handleCreateFilter}
-          className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all group"
+          title={isExpanded ? t('收起过滤器', 'Collapse filters') : t('展开过滤器', 'Expand filters')}
         >
-          <Plus className="w-4 h-4" />
-          <span>{t('新建过滤器', 'New Filter')}</span>
+          <Filter className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${
+            isExpanded ? 'text-blue-600 dark:text-blue-400' : ''
+          }`} />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('过滤器', 'Filters')}
+          </span>
+          {selectedFilters.length > 0 && (
+            <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+              {selectedFilters.length}
+            </span>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-500" />
+          )}
         </button>
+
+        <div className="flex items-center space-x-2">
+          {selectedFilters.length > 0 && (
+            <button
+              onClick={onClearFilters}
+              className="flex items-center space-x-1 px-2 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={t('清除所有筛选', 'Clear all filters')}
+            >
+              <X className="w-3 h-3" />
+              <span className="hidden sm:inline">{t('清除', 'Clear')}</span>
+            </button>
+          )}
+          <button
+            onClick={handleCreateFilter}
+            className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            title={t('新建过滤器', 'New Filter')}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('新建', 'New')}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Filters List */}
-      {assetFilters.length > 0 ? (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {assetFilters.map(filter => (
-              <div
-                key={filter.id}
-                className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
-                  selectedFilters.includes(filter.id)
-                    ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'
-                    : 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
+      {/* Expandable Content */}
+      {isExpanded && (
+        <div className="animate-fade-in space-y-3">
+          {/* Preset Filters */}
+          {presetFilters.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('预设筛选器', 'Preset Filters')}
+                </p>
                 <button
-                  onClick={() => onFilterToggle(filter.id)}
-                  className="flex items-center space-x-2 flex-1"
+                  onClick={handleResetPresets}
+                  className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  title={t('重置预设筛选器', 'Reset preset filters')}
                 >
-                  <span className="font-medium">{filter.name}</span>
-                  <span className="text-xs opacity-75">
-                    ({filter.keywords.join(', ')})
-                  </span>
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{t('重置', 'Reset')}</span>
                 </button>
-                
-                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleEditFilter(filter)}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    title={t('编辑', 'Edit')}
-                  >
-                    <Edit3 className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteFilter(filter.id)}
-                    className="p-1 rounded hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-400 transition-colors"
-                    title={t('删除', 'Delete')}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap gap-2">
+                {presetFilters.map(preset => {
+                  const Icon = preset.icon ? ICON_MAP[preset.icon] : Filter;
+                  const isSelected = selectedFilters.includes(preset.id);
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
+                        isSelected
+                          ? 'bg-indigo-100 border-indigo-300 text-indigo-700 dark:bg-indigo-900 dark:border-indigo-700 dark:text-indigo-300'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <button
+                        onClick={() => handlePresetToggle(preset.id)}
+                        className="flex items-center space-x-1.5"
+                        title={preset.keywords.join(', ')}
+                      >
+                        {Icon && <Icon className="w-3.5 h-3.5" />}
+                        <span>{preset.name}</span>
+                      </button>
+                      
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                        <button
+                          onClick={() => handleEditFilter(preset)}
+                          className="p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                          title={t('编辑', 'Edit')}
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Filters */}
+          {customFilters.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {t('自定义筛选器', 'Custom Filters')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {customFilters.map(filter => (
+                  <div
+                    key={filter.id}
+                    className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
+                      selectedFilters.includes(filter.id)
+                        ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'
+                        : 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <button
+                      onClick={() => onFilterToggle(filter.id)}
+                      className="flex items-center space-x-2 flex-1"
+                    >
+                      <span className="font-medium text-sm">{filter.name}</span>
+                      <span className="text-xs opacity-75 hidden lg:inline">
+                        ({filter.keywords.join(', ')})
+                      </span>
+                    </button>
+                    
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => handleEditFilter(filter)}
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        title={t('编辑', 'Edit')}
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFilter(filter.id)}
+                        className="p-1 rounded hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-400 transition-colors"
+                        title={t('删除', 'Delete')}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {presetFilters.length === 0 && customFilters.length === 0 && (
+            <div className="text-center py-4 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('暂无过滤器，点击"新建"创建', 'No filters, click "New" to create')}
+              </p>
+            </div>
+          )}
 
           {selectedFilters.length > 0 && (
             <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-gray-600 dark:text-gray-400">
                 {t(`已选择 ${selectedFilters.length} 个过滤器`, `${selectedFilters.length} filters selected`)}
               </span>
               <button
                 onClick={onClearFilters}
-                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
                 {t('清除选择', 'Clear Selection')}
               </button>
             </div>
           )}
-        </div>
-      ) : (
-        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-          <Filter className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3" />
-          <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {t('暂无自定义过滤器', 'No Custom Filters')}
-          </h4>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {t('创建过滤器来快速筛选特定类型的文件', 'Create filters to quickly find specific types of files')}
-          </p>
-          <button
-            onClick={handleCreateFilter}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('创建第一个过滤器', 'Create First Filter')}</span>
-          </button>
         </div>
       )}
 

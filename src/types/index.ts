@@ -124,6 +124,8 @@ export interface AssetFilter {
   id: string;
   name: string;
   keywords: string[];
+  isPreset?: boolean;
+  icon?: string;
 }
 
 export interface AppState {

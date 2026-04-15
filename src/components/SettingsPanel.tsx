@@ -48,8 +48,6 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
   const rafRef = useRef<number | null>(null);
 
   // 使用 requestAnimationFrame 更新指示器，避免闪烁
@@ -117,33 +115,6 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
     }, 150);
   }, [updateIndicator]);
 
-  // 触摸滑动处理
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    
-    const deltaX = touchStartX.current - touchEndX;
-    const deltaY = touchStartY.current - touchEndY;
-    
-    // 水平滑动且滑动距离足够
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-      const currentIndex = tabs.findIndex(tab => tab.id === activeTab);
-      
-      if (deltaX > 0 && currentIndex < tabs.length - 1) {
-        // 向左滑动，切换到下一个标签
-        onTabChange(tabs[currentIndex + 1].id);
-      } else if (deltaX < 0 && currentIndex > 0) {
-        // 向右滑动，切换到上一个标签
-        onTabChange(tabs[currentIndex - 1].id);
-      }
-    }
-  }, [activeTab, tabs, onTabChange]);
-
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current) {
@@ -158,8 +129,6 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
   return (
     <div 
       className="relative w-full border-b border-gray-200 dark:border-gray-700 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       {/* 滚动容器 */}
       <div

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, GitFork, Eye, ExternalLink, Calendar, Tag, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Zap } from 'lucide-react';
-import { Category, Repository } from '../types';
+import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Check } from 'lucide-react';
+import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { GitHubApiService } from '../services/githubApi';
@@ -13,12 +13,16 @@ interface RepositoryCardProps {
   repository: Repository;
   showAISummary?: boolean;
   searchQuery?: string; // 新增：用于高亮搜索关键词
+  isSelected?: boolean;
+  onSelect?: (id: number) => void;
 }
 
 export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   repository,
   showAISummary = true,
-  searchQuery = ''
+  searchQuery = '',
+  isSelected = false,
+  onSelect
 }) => {
   const {
     releaseSubscriptions,
@@ -39,6 +43,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const [unstarring, setUnstarring] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
@@ -362,8 +367,10 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   return (
     <div
-      className="repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full"
-      draggable
+      className={`repository-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full ${
+        isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
+      }`}
+      draggable={!onSelect}
       onDragStart={handleDragStart}
     >
       {/* Header - Repository Info */}
@@ -601,13 +608,35 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time - Single Row */}
-        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
           <div className="flex items-center space-x-1">
             <Calendar className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
             </span>
           </div>
+
+          {/* Checkbox - Bottom Right */}
+          {onSelect && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(repository.id);
+              }}
+              onMouseEnter={() => setIsSelecting(true)}
+              onMouseLeave={() => setIsSelecting(false)}
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                isSelected
+                  ? 'bg-blue-500 border-blue-500 text-white'
+                  : isSelecting
+                  ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
+              }`}
+              title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
+            >
+              {isSelected && <Check className="w-3 h-3" />}
+            </button>
+          )}
         </div>
       </div>
 

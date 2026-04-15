@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
+import { BulkActionToolbar } from './BulkActionToolbar';
+import { BulkCategorizeModal } from './BulkCategorizeModal';
 
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
+import { forceSyncToBackend } from '../services/autoSync';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -24,12 +27,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     isLoading,
     setLoading,
     updateRepository,
+    deleteRepository,
     language,
     customCategories,
     hiddenDefaultCategoryIds,
     analysisProgress,
     setAnalysisProgress,
-    searchFilters
+    searchFilters,
+    toggleReleaseSubscription
   } = useAppStore();
 
   const [showAISummary, setShowAISummary] = useState(true);
@@ -43,6 +48,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
   const isAnalyzingRef = useRef(false);
+
+  // 批量选择状态
+  const [selectedRepoIds, setSelectedRepoIds] = useState<Set<number>>(new Set());
+  const [showBulkToolbar, setShowBulkToolbar] = useState(false);
+  const [showCategorizeModal, setShowCategorizeModal] = useState(false);
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
@@ -367,7 +377,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     if (!isAnalyzingRef.current) return;
     
     const confirmMessage = language === 'zh'
-      ? '确定要停止AI分析吗？已分析的结果将会保存。'
+      ? '确定要停止 AI 分析吗？已分析的结果将会保存。'
       : 'Are you sure you want to stop AI analysis? Analyzed results will be saved.';
     
     if (confirm(confirmMessage)) {
@@ -375,6 +385,197 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       setIsPaused(false);
       console.log('Stop requested by user');
     }
+  };
+
+  // 批量操作处理函数
+  const handleSelectRepo = (id: number) => {
+    setSelectedRepoIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      // 显示工具栏
+      setShowBulkToolbar(newSet.size > 0);
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allIds = new Set(filteredRepositories.map(repo => repo.id));
+    setSelectedRepoIds(allIds);
+    setShowBulkToolbar(true);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedRepoIds(new Set());
+    setShowBulkToolbar(false);
+  };
+
+  const handleBulkAction = async (action: string, repos: Repository[]) => {
+    if (!githubToken) {
+      alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
+      return;
+    }
+
+    try {
+      switch (action) {
+        case 'unstar': {
+          const confirmMessage = language === 'zh'
+            ? `确定要取消 ${repos.length} 个仓库的 Star 吗？此操作不可撤销！`
+            : `Are you sure you want to unstar ${repos.length} repositories? This action cannot be undone!`;
+          
+          if (!confirm(confirmMessage)) return;
+
+          const githubApi = new GitHubApiService(githubToken);
+          let successCount = 0;
+
+          for (const repo of repos) {
+            try {
+              const [owner, name] = repo.full_name.split('/');
+              await githubApi.unstarRepository(owner, name);
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to unstar ${repo.full_name}:`, error);
+            }
+          }
+
+          // 从 store 中删除已取消 star 的仓库
+          for (const repo of repos) {
+            deleteRepository(repo.id);
+          }
+
+          await forceSyncToBackend();
+          alert(language === 'zh' 
+            ? `成功取消 ${successCount} 个仓库的 Star` 
+            : `Successfully unstarred ${successCount} repositories`
+          );
+          break;
+        }
+
+        case 'categorize': {
+          setShowCategorizeModal(true);
+          return;
+        }
+
+        case 'ai-summary': {
+          const confirmMessage = language === 'zh'
+            ? `将对 ${repos.length} 个仓库进行 AI 分析，这可能需要几分钟时间。是否继续？`
+            : `Will analyze ${repos.length} repositories with AI. This may take several minutes. Continue?`;
+          
+          if (!confirm(confirmMessage)) return;
+
+          const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
+          if (!activeConfig) {
+            alert(language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.');
+            return;
+          }
+
+          const githubApi = new GitHubApiService(githubToken);
+          const aiService = new AIService(activeConfig, language);
+          const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+
+          let successCount = 0;
+          const concurrency = activeConfig.concurrency || 1;
+
+          for (let i = 0; i < repos.length; i += concurrency) {
+            const batch = repos.slice(i, i + concurrency);
+            const promises = batch.map(async (repo) => {
+              try {
+                const [owner, name] = repo.full_name.split('/');
+                const readmeContent = await githubApi.getRepositoryReadme(owner, name);
+                const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
+                const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
+                
+                updateRepository({
+                  ...repo,
+                  ai_summary: analysis.summary,
+                  ai_tags: analysis.tags,
+                  ai_platforms: analysis.platforms,
+                  custom_category: resolvedCategory,
+                  analyzed_at: new Date().toISOString(),
+                  analysis_failed: false
+                });
+                successCount++;
+              } catch (error) {
+                console.error(`Failed to analyze ${repo.full_name}:`, error);
+                updateRepository({
+                  ...repo,
+                  analyzed_at: new Date().toISOString(),
+                  analysis_failed: true
+                });
+              }
+            });
+
+            await Promise.all(promises);
+            
+            if (i + concurrency < repos.length) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+
+          await forceSyncToBackend();
+          alert(language === 'zh' 
+            ? `成功分析 ${successCount} 个仓库` 
+            : `Successfully analyzed ${successCount} repositories`
+          );
+          break;
+        }
+
+        case 'subscribe': {
+          let successCount = 0;
+
+          for (const repo of repos) {
+            try {
+              const updatedRepo = { ...repo, subscribed_to_releases: true };
+              updateRepository(updatedRepo);
+              toggleReleaseSubscription(repo.id);
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to subscribe ${repo.full_name}:`, error);
+            }
+          }
+
+          await forceSyncToBackend();
+          alert(language === 'zh' 
+            ? `成功订阅 ${successCount} 个仓库的版本发布` 
+            : `Successfully subscribed to ${successCount} repositories releases`
+          );
+          break;
+        }
+
+        default:
+          alert(language === 'zh' ? '未知操作' : 'Unknown action');
+      }
+
+      // 清除选择
+      handleDeselectAll();
+    } catch (error) {
+      console.error('Bulk action failed:', error);
+      alert(language === 'zh' ? '批量操作失败' : 'Bulk action failed');
+    }
+  };
+
+  const handleBulkCategorize = async (categoryName: string) => {
+    const selectedRepos = filteredRepositories.filter(repo => 
+      selectedRepoIds.has(repo.id)
+    );
+
+    for (const repo of selectedRepos) {
+      updateRepository({
+        ...repo,
+        custom_category: categoryName
+      });
+    }
+
+    await forceSyncToBackend();
+    alert(language === 'zh' 
+      ? `成功为 ${selectedRepos.length} 个仓库设置分类：${categoryName}` 
+      : `Successfully categorized ${selectedRepos.length} repositories as: ${categoryName}`
+    );
+    
+    handleDeselectAll();
   };
 
   if (filteredRepositories.length === 0) {
@@ -593,6 +794,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             repository={repo} 
             showAISummary={showAISummary}
             searchQuery={useAppStore.getState().searchFilters.query}
+            isSelected={selectedRepoIds.has(repo.id)}
+            onSelect={handleSelectRepo}
           />
         ))}
       </div>
@@ -601,6 +804,26 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       {visibleCount < filteredRepositories.length && (
         <div ref={sentinelRef} className="h-8" />
       )}
+
+      {/* Bulk Action Toolbar */}
+      {showBulkToolbar && (
+        <BulkActionToolbar
+          selectedCount={selectedRepoIds.size}
+          repositories={filteredRepositories.filter(repo => selectedRepoIds.has(repo.id))}
+          onSelectAll={handleSelectAll}
+          onDeselectAll={handleDeselectAll}
+          onBulkAction={handleBulkAction}
+          onClose={handleDeselectAll}
+        />
+      )}
+
+      {/* Bulk Categorize Modal */}
+      <BulkCategorizeModal
+        isOpen={showCategorizeModal}
+        onClose={() => setShowCategorizeModal(false)}
+        repositories={filteredRepositories.filter(repo => selectedRepoIds.has(repo.id))}
+        onCategorize={handleBulkCategorize}
+      />
     </div>
   );
 };

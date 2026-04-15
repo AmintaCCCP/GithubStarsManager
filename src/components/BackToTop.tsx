@@ -33,7 +33,7 @@ export const BackToTop: React.FC = () => {
     <button
       onClick={scrollToTop}
       className={`
-        fixed bottom-6 right-6 z-50
+        fixed z-50
         flex items-center justify-center
         w-12 h-12
         bg-blue-600 hover:bg-blue-700
@@ -49,7 +49,11 @@ export const BackToTop: React.FC = () => {
           ? 'opacity-100 translate-y-0 pointer-events-auto' 
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
-        sm:bottom-8 sm:right-8
+        /* 移动端：上移避免遮挡底部工具栏 */
+        bottom-20 right-4
+        /* 平板：适度位置 */
+        sm:bottom-24 sm:right-6
+        /* 桌面：标准位置 */
         lg:bottom-10 lg:right-10
       `}
       aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}

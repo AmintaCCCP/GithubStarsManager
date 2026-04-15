@@ -282,16 +282,30 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 <div className="flex flex-col items-center space-y-2">
                   {allCategories.slice(0, 8).map((category) => {
                     const isSelected = selectedCategory === category.id;
+                    const isDragTarget = dragOverCategoryId === category.id;
                     return (
                       <button
                     key={category.id}
                     onClick={() => onCategorySelect(category.id)}
+                    onDragOver={(event) => {
+                      if (category.id === 'all') return;
+                      event.preventDefault();
+                      setDragOverCategoryId(category.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverCategoryId === category.id) {
+                        setDragOverCategoryId(null);
+                      }
+                    }}
+                    onDrop={(event) => handleDropOnCategory(event, category)}
                     className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
                       isSelected
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : isDragTarget
+                          ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
-                    title={category.name}
+                    title={category.id !== 'all' ? t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
                     aria-label={category.name}
                   >
                     {category.icon}
