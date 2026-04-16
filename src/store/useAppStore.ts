@@ -90,6 +90,15 @@ interface AppActions {
 
   // Backend actions
   setBackendApiSecret: (secret: string | null) => void;
+
+  // Release Timeline View actions
+  setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
+  setReleaseSelectedFilters: (filters: string[]) => void;
+  toggleReleaseSelectedFilter: (filterId: string) => void;
+  clearReleaseSelectedFilters: () => void;
+  setReleaseSearchQuery: (query: string) => void;
+  toggleReleaseExpandedRepository: (repoId: number) => void;
+  setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -128,10 +137,14 @@ type PersistedAppState = Partial<
     | 'language'
     | 'searchFilters'
     | 'isSidebarCollapsed'
+    | 'releaseViewMode'
+    | 'releaseSelectedFilters'
+    | 'releaseSearchQuery'
   >
 > & {
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
+  releaseExpandedRepositories?: unknown;
 };
 
 const normalizeNumberSet = (value: unknown): Set<number> => {
@@ -166,6 +179,7 @@ const normalizePersistedState = (
     searchResults: repositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
+    releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     searchFilters: {
       ...initialSearchFilters,
       sortBy: savedSortBy,
@@ -173,12 +187,20 @@ const normalizePersistedState = (
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
-    hiddenDefaultCategoryIds: Array.isArray((safePersisted as any).hiddenDefaultCategoryIds) ? (safePersisted as any).hiddenDefaultCategoryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
+    hiddenDefaultCategoryIds: (() => {
+      const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
+      return Array.isArray(persistedIds)
+        ? persistedIds.filter((id): id is string => typeof id === 'string')
+        : [];
+    })(),
     categoryOrder: Array.isArray(safePersisted.categoryOrder) ? safePersisted.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') : [],
-    collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 8,
+    collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
     assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
+    releaseViewMode: safePersisted.releaseViewMode || 'timeline',
+    releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
+    releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
   };
 };
 
@@ -280,7 +302,7 @@ const defaultPresetFilters: AssetFilter[] = [
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -301,7 +323,7 @@ export const useAppStore = create<AppState & AppActions>()(
       customCategories: [],
       hiddenDefaultCategoryIds: [],
       categoryOrder: [],
-      collapsedSidebarCategoryCount: 8,
+      collapsedSidebarCategoryCount: 20,
       assetFilters: defaultPresetFilters,
       theme: 'light',
       currentView: 'repositories',
@@ -311,6 +333,10 @@ export const useAppStore = create<AppState & AppActions>()(
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
       isSidebarCollapsed: false,
+      releaseViewMode: 'timeline',
+      releaseSelectedFilters: [],
+      releaseSearchQuery: '',
+      releaseExpandedRepositories: new Set<number>(),
 
       // Auth actions
       setUser: (user) => {
@@ -397,9 +423,21 @@ export const useAppStore = create<AppState & AppActions>()(
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       // Search actions
-      setSearchFilters: (filters) => set((state) => ({
-        searchFilters: { ...state.searchFilters, ...filters }
-      })),
+      setSearchFilters: (filters) => set((state) => {
+        const newFilters = { ...state.searchFilters, ...filters };
+        
+        // 处理互斥筛选器：isAnalyzed 和 analysisFailed 不能同时设置
+        if (filters.isAnalyzed !== undefined && filters.isAnalyzed !== null) {
+          // 如果设置了 isAnalyzed，清除 analysisFailed
+          newFilters.analysisFailed = undefined;
+        }
+        if (filters.analysisFailed !== undefined && filters.analysisFailed !== null) {
+          // 如果设置了 analysisFailed，清除 isAnalyzed
+          newFilters.isAnalyzed = undefined;
+        }
+        
+        return { searchFilters: newFilters };
+      }),
       setSearchResults: (searchResults) => set({ searchResults }),
 
       // Release actions
@@ -544,6 +582,27 @@ export const useAppStore = create<AppState & AppActions>()(
         writeSessionBackendSecret(backendApiSecret);
         set({ backendApiSecret });
       },
+
+      // Release Timeline View actions
+      setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
+      setReleaseSelectedFilters: (releaseSelectedFilters) => set({ releaseSelectedFilters }),
+      toggleReleaseSelectedFilter: (filterId) => set((state) => ({
+        releaseSelectedFilters: state.releaseSelectedFilters.includes(filterId)
+          ? state.releaseSelectedFilters.filter(id => id !== filterId)
+          : [...state.releaseSelectedFilters, filterId]
+      })),
+      clearReleaseSelectedFilters: () => set({ releaseSelectedFilters: [] }),
+      setReleaseSearchQuery: (releaseSearchQuery) => set({ releaseSearchQuery }),
+      toggleReleaseExpandedRepository: (repoId) => set((state) => {
+        const newSet = new Set(state.releaseExpandedRepositories);
+        if (newSet.has(repoId)) {
+          newSet.delete(repoId);
+        } else {
+          newSet.add(repoId);
+        }
+        return { releaseExpandedRepositories: newSet };
+      }),
+      setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
     }),
     {
       name: 'github-stars-manager',
@@ -596,8 +655,14 @@ export const useAppStore = create<AppState & AppActions>()(
           sortBy: state.searchFilters.sortBy,
           sortOrder: state.searchFilters.sortOrder,
         },
+
+        // 持久化Release页面视图设置
+        releaseViewMode: state.releaseViewMode,
+        releaseSelectedFilters: state.releaseSelectedFilters,
+        releaseSearchQuery: state.releaseSearchQuery,
+        releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
       }),
-      migrate: (persistedState, _version) => {
+      migrate: (persistedState) => {
         // 版本升级适配处理
         const state = persistedState as PersistedAppState | undefined;
 
@@ -610,7 +675,7 @@ export const useAppStore = create<AppState & AppActions>()(
         // 从旧版本升级时，确保 collapsedSidebarCategoryCount 字段存在
         if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
           console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
-          state.collapsedSidebarCategoryCount = 8;
+          state.collapsedSidebarCategoryCount = 20;
         }
 
         return state as PersistedAppState;

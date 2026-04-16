@@ -190,7 +190,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               aria-label={t('清除所有筛选', 'Clear all filters')}
             >
               <X className="w-3 h-3" aria-hidden="true" />
-              <span className="hidden sm:inline">{t('清除', 'Clear')}</span>
+              <span className="hidden sm:inline">{t('清除所有筛选', 'Clear all filters')}</span>
             </button>
           )}
           <button
@@ -342,9 +342,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 onClick={onClearFilters}
                 className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                 type="button"
-                aria-label={t('清除选择', 'Clear Selection')}
+                aria-label={t('清除所有筛选', 'Clear all filters')}
               >
-                {t('清除选择', 'Clear Selection')}
+                {t('清除所有筛选', 'Clear all filters')}
               </button>
             </div>
           )}

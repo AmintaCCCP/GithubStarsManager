@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Filter, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
@@ -24,6 +24,58 @@ export const SearchBar: React.FC = () => {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
+  
+  // 统计各种状态的数量
+  const statusStats = useMemo(() => {
+    const stats = {
+      analyzed: 0,      // 已AI分析（成功）
+      notAnalyzed: 0,   // 未AI分析
+      failed: 0,        // 分析失败
+      subscribed: 0,    // 已订阅Release
+      notSubscribed: 0, // 未订阅Release
+      edited: 0,        // 已编辑
+      notEdited: 0,     // 未编辑
+      locked: 0,        // 分类已锁定
+      notLocked: 0,     // 分类未锁定
+    };
+    
+    repositories.forEach(repo => {
+      // AI分析状态统计
+      if (repo.analyzed_at && repo.analysis_failed) {
+        stats.failed++;
+      } else if (repo.analyzed_at && !repo.analysis_failed) {
+        stats.analyzed++;
+      } else {
+        stats.notAnalyzed++;
+      }
+      
+      // 订阅状态统计
+      if (releaseSubscriptions.has(repo.id)) {
+        stats.subscribed++;
+      } else {
+        stats.notSubscribed++;
+      }
+      
+      // 编辑状态统计
+      const isEdited = !!(repo.last_edited || repo.custom_description || 
+        (repo.custom_tags && repo.custom_tags.length > 0) || repo.custom_category);
+      if (isEdited) {
+        stats.edited++;
+      } else {
+        stats.notEdited++;
+      }
+      
+      // 锁定状态统计
+      const isLocked = !!(repo.category_locked && repo.custom_category);
+      if (isLocked) {
+        stats.locked++;
+      } else {
+        stats.notLocked++;
+      }
+    });
+    
+    return stats;
+  }, [repositories, releaseSubscriptions]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
@@ -32,13 +84,13 @@ export const SearchBar: React.FC = () => {
 
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
-    const languages = [...new Set(repositories.map(r => r.language).filter(Boolean))];
+    const languages = [...new Set(repositories.map(r => r.language).filter(Boolean))] as string[];
     const tags = [...new Set([
       ...repositories.flatMap(r => r.ai_tags || []),
       ...repositories.flatMap(r => r.topics || [])
     ])];
-    const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))];
-    
+    const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))] as string[];
+
     setAvailableLanguages(languages);
     setAvailableTags(tags);
     setAvailablePlatforms(platforms);
@@ -73,7 +125,7 @@ export const SearchBar: React.FC = () => {
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -124,43 +176,6 @@ export const SearchBar: React.FC = () => {
     
     const endTime = performance.now();
     console.log(`Real-time search completed in ${(endTime - startTime).toFixed(2)}ms`);
-  };
-
-  const performAdvancedSearch = async () => {
-    const startTime = performance.now();
-    let filtered = repositories;
-
-    // AI-powered natural language search with semantic understanding and re-ranking
-    if (searchFilters.query) {
-      const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-      if (activeConfig) {
-        try {
-          const aiService = new AIService(activeConfig, language);
-          // Use enhanced AI search with semantic understanding and relevance scoring
-          filtered = await aiService.searchRepositoriesWithReranking(filtered, searchFilters.query);
-        } catch (error) {
-          console.warn('AI search failed, falling back to basic search:', error);
-          // Fallback to basic text search
-          filtered = performBasicTextSearch(filtered, searchFilters.query);
-        }
-      } else {
-        // Basic text search if no AI config
-        filtered = performBasicTextSearch(filtered, searchFilters.query);
-      }
-    }
-
-    // Apply other filters
-    filtered = applyFilters(filtered);
-    setSearchResults(filtered);
-    
-    const endTime = performance.now();
-    const searchTime = endTime - startTime;
-    console.log(`AI search completed in ${searchTime.toFixed(2)}ms`);
-    
-    // 通知搜索完成时间（可以通过store或其他方式传递给统计组件）
-    if (searchFilters.query) {
-      localStorage.setItem('lastSearchTime', searchTime.toString());
-    }
   };
 
   const performBasicFilter = () => {
@@ -215,10 +230,10 @@ export const SearchBar: React.FC = () => {
       });
     }
 
-    // AI analyzed filter
-    if (searchFilters.isAnalyzed !== undefined) {
+    // AI analyzed filter - 与 analysisFailed 互斥
+    if (searchFilters.isAnalyzed !== undefined && searchFilters.analysisFailed === undefined) {
       filtered = filtered.filter(repo => 
-        searchFilters.isAnalyzed ? !!repo.analyzed_at : !repo.analyzed_at
+        searchFilters.isAnalyzed ? (!!repo.analyzed_at && !repo.analysis_failed) : !repo.analyzed_at
       );
     }
 
@@ -227,6 +242,31 @@ export const SearchBar: React.FC = () => {
       filtered = filtered.filter(repo => 
         searchFilters.isSubscribed ? releaseSubscriptions.has(repo.id) : !releaseSubscriptions.has(repo.id)
       );
+    }
+
+    // Edited filter - 检查仓库是否被编辑过（包括自定义描述、标签、分类、锁定状态）
+    if (searchFilters.isEdited !== undefined) {
+      filtered = filtered.filter(repo => {
+        const isRepoEdited = !!(repo.last_edited || repo.custom_description || 
+          (repo.custom_tags && repo.custom_tags.length > 0) || repo.custom_category);
+        return searchFilters.isEdited ? isRepoEdited : !isRepoEdited;
+      });
+    }
+
+    // Category locked filter - 检查分类是否被锁定（需要有自定义分类才视为有效锁定）
+    if (searchFilters.isCategoryLocked !== undefined) {
+      filtered = filtered.filter(repo => {
+        const isLocked = !!(repo.category_locked && repo.custom_category);
+        return searchFilters.isCategoryLocked ? isLocked : !isLocked;
+      });
+    }
+
+    // Analysis failed filter - 检查分析是否失败（需要有分析记录且标记为失败），与 isAnalyzed 互斥
+    if (searchFilters.analysisFailed !== undefined && searchFilters.isAnalyzed === undefined) {
+      filtered = filtered.filter(repo => {
+        const hasFailed = !!(repo.analyzed_at && repo.analysis_failed);
+        return searchFilters.analysisFailed ? hasFailed : !hasFailed;
+      });
     }
 
     // Star count filter
@@ -412,7 +452,7 @@ export const SearchBar: React.FC = () => {
 
 
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleAISearch();
     }
@@ -453,17 +493,23 @@ export const SearchBar: React.FC = () => {
       maxStars: undefined,
       isAnalyzed: undefined,
       isSubscribed: undefined,
+      isEdited: undefined,
+      isCategoryLocked: undefined,
+      analysisFailed: undefined,
     });
   };
 
-  const activeFiltersCount = 
-    searchFilters.languages.length + 
-    searchFilters.tags.length + 
+  const activeFiltersCount =
+    searchFilters.languages.length +
+    searchFilters.tags.length +
     searchFilters.platforms.length +
     (searchFilters.minStars !== undefined ? 1 : 0) +
     (searchFilters.maxStars !== undefined ? 1 : 0) +
     (searchFilters.isAnalyzed !== undefined ? 1 : 0) +
-    (searchFilters.isSubscribed !== undefined ? 1 : 0);
+    (searchFilters.isSubscribed !== undefined ? 1 : 0) +
+    (searchFilters.isEdited !== undefined ? 1 : 0) +
+    (searchFilters.isCategoryLocked !== undefined ? 1 : 0) +
+    (searchFilters.analysisFailed !== undefined ? 1 : 0);
 
   const getPlatformIcon = (platform: string) => {
     const platformLower = platform.toLowerCase();
@@ -541,7 +587,7 @@ export const SearchBar: React.FC = () => {
           )}
           value={searchQuery}
           onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
@@ -716,58 +762,132 @@ export const SearchBar: React.FC = () => {
               {t('状态过滤', 'Status Filters')}
             </h4>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSearchFilters({ 
-                  isAnalyzed: searchFilters.isAnalyzed === true ? undefined : true 
-                })}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  searchFilters.isAnalyzed === true
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>{t('已AI分析', 'AI Analyzed')}</span>
-              </button>
-              <button
-                onClick={() => setSearchFilters({ 
-                  isAnalyzed: searchFilters.isAnalyzed === false ? undefined : false 
-                })}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  searchFilters.isAnalyzed === false
-                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <X className="w-4 h-4" />
-                <span>{t('未AI分析', 'Not Analyzed')}</span>
-              </button>
-              <button
-                onClick={() => setSearchFilters({ 
-                  isSubscribed: searchFilters.isSubscribed === true ? undefined : true 
-                })}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  searchFilters.isSubscribed === true
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Bell className="w-4 h-4" />
-                <span>{t('已订阅Release', 'Subscribed to Releases')}</span>
-              </button>
-              <button
-                onClick={() => setSearchFilters({ 
-                  isSubscribed: searchFilters.isSubscribed === false ? undefined : false 
-                })}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  searchFilters.isSubscribed === false
-                    ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <BellOff className="w-4 h-4" />
-                <span>{t('未订阅Release', 'Not Subscribed to Releases')}</span>
-              </button>
+              {/* 已AI分析 - 仅在存在已分析仓库或当前已选择时显示，且与"分析失败"互斥 */}
+              {(statusStats.analyzed > 0 || searchFilters.isAnalyzed === true) && searchFilters.analysisFailed !== true && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isAnalyzed: searchFilters.isAnalyzed === true ? undefined : true 
+                  })}
+                  title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isAnalyzed === true
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{t('已AI分析', 'AI Analyzed')}</span>
+                  <span className="text-xs opacity-70">({statusStats.analyzed})</span>
+                </button>
+              )}
+              {/* 未AI分析 - 仅在存在未分析仓库时显示 */}
+              {statusStats.notAnalyzed > 0 && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isAnalyzed: searchFilters.isAnalyzed === false ? undefined : false 
+                  })}
+                  title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isAnalyzed === false
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                  <span>{t('未AI分析', 'Not Analyzed')}</span>
+                  <span className="text-xs opacity-70">({statusStats.notAnalyzed})</span>
+                </button>
+              )}
+              {/* 分析失败 - 仅在存在失败仓库或当前已选择时显示，且与"已AI分析"互斥 */}
+              {(statusStats.failed > 0 || searchFilters.analysisFailed === true) && searchFilters.isAnalyzed !== true && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    analysisFailed: searchFilters.analysisFailed === true ? undefined : true 
+                  })}
+                  title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.analysisFailed === true
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{t('分析失败', 'Analysis Failed')}</span>
+                  <span className="text-xs opacity-70">({statusStats.failed})</span>
+                </button>
+              )}
+              {/* 已订阅Release - 仅在存在已订阅仓库或当前已选择时显示 */}
+              {(statusStats.subscribed > 0 || searchFilters.isSubscribed === true) && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isSubscribed: searchFilters.isSubscribed === true ? undefined : true 
+                  })}
+                  title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isSubscribed === true
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Bell className="w-4 h-4" />
+                  <span>{t('已订阅Release', 'Subscribed to Releases')}</span>
+                  <span className="text-xs opacity-70">({statusStats.subscribed})</span>
+                </button>
+              )}
+              {/* 未订阅Release - 仅在存在未订阅仓库时显示 */}
+              {statusStats.notSubscribed > 0 && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isSubscribed: searchFilters.isSubscribed === false ? undefined : false 
+                  })}
+                  title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isSubscribed === false
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <BellOff className="w-4 h-4" />
+                  <span>{t('未订阅Release', 'Not Subscribed to Releases')}</span>
+                  <span className="text-xs opacity-70">({statusStats.notSubscribed})</span>
+                </button>
+              )}
+              {/* 已编辑 - 仅在存在已编辑仓库或当前已选择时显示 */}
+              {(statusStats.edited > 0 || searchFilters.isEdited === true) && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isEdited: searchFilters.isEdited === true ? undefined : true 
+                  })}
+                  title={t('显示已编辑的仓库（包括自定义描述、标签、分类）', 'Show edited repositories (including custom description, tags, category)')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isEdited === true
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>{t('已编辑', 'Edited')}</span>
+                  <span className="text-xs opacity-70">({statusStats.edited})</span>
+                </button>
+              )}
+              {/* 分类已锁定 - 仅在存在已锁定仓库或当前已选择时显示 */}
+              {(statusStats.locked > 0 || searchFilters.isCategoryLocked === true) && (
+                <button
+                  onClick={() => setSearchFilters({ 
+                    isCategoryLocked: searchFilters.isCategoryLocked === true ? undefined : true 
+                  })}
+                  title={t('显示分类已锁定的仓库（同步时不会自动更改分类）', 'Show repositories with locked category (won\'t auto-change during sync)')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isCategoryLocked === true
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{t('分类已锁定', 'Category Locked')}</span>
+                  <span className="text-xs opacity-70">({statusStats.locked})</span>
+                </button>
+              )}
             </div>
           </div>
 

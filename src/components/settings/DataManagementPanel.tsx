@@ -52,7 +52,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     customCategories,
     setRepositories,
     setReleases,
-    logout,
+    deleteCustomCategory,
   } = useAppStore();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
@@ -206,7 +206,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       useAppStore.setState({ 
         hiddenDefaultCategoryIds: [],
         categoryOrder: [],
-        collapsedSidebarCategoryCount: 5,
+        collapsedSidebarCategoryCount: 20,
         isSidebarCollapsed: false
       });
       addLog(t('删除分类显示设置数据', 'Delete category display settings'), true);
@@ -224,12 +224,67 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteAllData = async () => {
     try {
-      // Perform logout which clears most data
-      logout();
-      // Clear all storage
+      // 先清除存储，确保存储清除成功后再重置状态
+      // 这样可以避免状态已重置但存储清除失败导致的数据不一致
       await clearAllStorage();
+
+      // 存储清除成功后，重置所有状态到初始值
+      useAppStore.setState({
+        // 用户和认证
+        user: null,
+        githubToken: null,
+        isAuthenticated: false,
+
+        // 仓库数据
+        repositories: [],
+        searchResults: [],
+        lastSync: null,
+
+        // Release 数据
+        releases: [],
+        releaseSubscriptions: new Set<number>(),
+        readReleases: new Set<number>(),
+
+        // AI 配置
+        aiConfigs: [],
+        activeAIConfig: null,
+
+        // WebDAV 配置
+        webdavConfigs: [],
+        activeWebDAVConfig: null,
+        lastBackup: null,
+
+        // 分类设置
+        hiddenDefaultCategoryIds: [],
+        categoryOrder: [],
+        collapsedSidebarCategoryCount: 20,
+
+        // 资源过滤器
+        assetFilters: [],
+
+        // UI 设置
+        selectedCategory: 'all',
+        isSidebarCollapsed: false,
+        searchFilters: {
+          query: '',
+          tags: [],
+          languages: [],
+          platforms: [],
+          sortBy: 'stars',
+          sortOrder: 'desc',
+          isAnalyzed: undefined,
+          isSubscribed: undefined,
+        },
+      });
+
+      // 清除所有分类相关数据（在状态重置之后）
+      customCategories.forEach((cat) => {
+        deleteCustomCategory(cat.id);
+      });
+
       addLog(t('删除所有数据', 'Delete all data'), true);
       showSuccess(t('所有数据已删除，应用将重新加载', 'All data deleted, app will reload'));
+
       // Reload page after a short delay
       setTimeout(() => {
         window.location.reload();

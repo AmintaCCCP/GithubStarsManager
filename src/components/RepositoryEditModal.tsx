@@ -213,34 +213,44 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </p>
           )}
 
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-2">
-            <div className="flex items-center space-x-2">
+          {/* 分类锁定说明 */}
+          <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+            <div className="flex items-start space-x-2">
               {formData.categoryLocked ? (
-                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
               ) : (
-                <Unlock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <Unlock className="w-4 h-4 text-gray-500 dark:text-gray-400 mt-0.5 flex-shrink-0" />
               )}
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {t('分类锁定', 'Category Lock')}
-              </span>
-            </div>
-            <label
-              className="inline-flex items-center cursor-pointer"
-              title={t(
-                '开启后，同步时不会自动修改该仓库分类。手动修改分类会自动开启此开关。',
-                'When enabled, sync will not auto-change this repository category. Manually changing category will enable this lock by default.'
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={formData.categoryLocked}
-                onChange={(e) => setFormData(prev => ({ ...prev, categoryLocked: e.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="relative w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:bg-blue-600">
-                <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform peer-checked:translate-x-full"></div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    {t('分类锁定', 'Category Lock')}
+                  </span>
+                  <label
+                    className="inline-flex items-center cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.categoryLocked}
+                      onChange={(e) => setFormData(prev => ({ ...prev, categoryLocked: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="relative w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:bg-amber-500">
+                      <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform peer-checked:translate-x-full"></div>
+                    </div>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                  {formData.categoryLocked 
+                    ? t('已锁定：同步时将保持当前分类不变，不会被AI自动重新分类。', 'Locked: Category will remain unchanged during sync and will not be auto-reclassified by AI.')
+                    : t('未锁定：同步时可能会被AI自动重新分类。建议对确认的分类开启锁定。', 'Unlocked: Category may be auto-reclassified by AI during sync. Recommended to enable lock for confirmed categories.')
+                  }
+                </p>
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  {t('提示：手动修改分类时会自动开启锁定。', 'Tip: Changing category manually will auto-enable the lock.')}
+                </p>
               </div>
-            </label>
+            </div>
           </div>
         </div>
 

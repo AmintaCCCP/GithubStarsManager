@@ -81,12 +81,12 @@ export const BackToTop: React.FC = () => {
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
         ${isBouncing ? 'animate-bounce-twice' : ''}
-        /* 移动端：上移避免遮挡底部工具栏 */
-        bottom-20 right-4
-        /* 平板：适度位置 */
-        sm:bottom-24 sm:right-6
-        /* 桌面：标准位置 */
-        lg:bottom-10 lg:right-10
+        /* 移动端：大幅上移避免遮挡底部多选工具栏 */
+        bottom-24 right-4
+        /* 平板：继续上移 */
+        sm:bottom-28 sm:right-6
+        /* 桌面：适度上移 */
+        lg:bottom-24 lg:right-10
       `}
       aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}
       aria-hidden={!isVisible}

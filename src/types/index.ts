@@ -109,6 +109,9 @@ export interface SearchFilters {
   maxStars?: number;
   isAnalyzed?: boolean; // 新增：是否已AI分析
   isSubscribed?: boolean; // 新增：是否订阅Release
+  isEdited?: boolean; // 新增：是否已编辑
+  isCategoryLocked?: boolean; // 新增：分类是否已锁定
+  analysisFailed?: boolean; // 新增：分析是否失败
 }
 
 export interface Category {
@@ -181,6 +184,12 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+
+  // Release Timeline View
+  releaseViewMode: 'timeline' | 'repository';
+  releaseSelectedFilters: string[];
+  releaseSearchQuery: string;
+  releaseExpandedRepositories: Set<number>;
 }
 
 export interface UpdateNotification {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -59,41 +59,57 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
 
-  // Filter repositories by selected category
-  const filteredRepositories = repositories.filter(repo => {
-    if (selectedCategory === 'all') return true;
+  // 使用 useMemo 缓存分类过滤结果
+  const filteredRepositories = useMemo(() => {
+    if (selectedCategory === 'all') return repositories;
     
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
-    if (!selectedCategoryObj) return false;
+    if (!selectedCategoryObj) return [];
 
-    // Check custom category first
-    if (repo.custom_category === selectedCategoryObj.name) {
-      return true;
-    }
-    
-    // 优先使用AI标签进行匹配
-    if (repo.ai_tags && repo.ai_tags.length > 0) {
-      return repo.ai_tags.some(tag => 
-        selectedCategoryObj.keywords.some(keyword => 
-          tag.toLowerCase().includes(keyword.toLowerCase()) ||
-          keyword.toLowerCase().includes(tag.toLowerCase())
-        )
+    return repositories.filter(repo => {
+      // 如果仓库有自定义分类，只根据 custom_category 判断是否属于当前分类
+      if (repo.custom_category) {
+        return repo.custom_category === selectedCategoryObj.name;
+      }
+      
+      // 如果没有自定义分类，使用AI标签和关键词匹配
+      // 优先使用AI标签进行匹配
+      if (repo.ai_tags && repo.ai_tags.length > 0) {
+        return repo.ai_tags.some(tag => 
+          selectedCategoryObj.keywords.some(keyword => 
+            tag.toLowerCase().includes(keyword.toLowerCase()) ||
+            keyword.toLowerCase().includes(tag.toLowerCase())
+          )
+        );
+      }
+      
+      // 如果没有AI标签，使用传统方式匹配
+      const repoText = [
+        repo.name,
+        repo.description || '',
+        repo.language || '',
+        ...(repo.topics || []),
+        repo.ai_summary || ''
+      ].join(' ').toLowerCase();
+      
+      return selectedCategoryObj.keywords.some(keyword => 
+        repoText.includes(keyword.toLowerCase())
       );
+    });
+  }, [repositories, selectedCategory, allCategories]);
+
+  // 根据当前筛选的仓库中是否有AI分析内容来动态设置默认显示模式
+  const hasAnalyzedRepos = useMemo(() => 
+    filteredRepositories.some(repo => repo.analyzed_at && !repo.analysis_failed),
+    [filteredRepositories]
+  );
+  
+  // 当筛选的仓库变化时，如果没有AI分析的仓库，自动切换到原始描述
+  useEffect(() => {
+    if (!hasAnalyzedRepos && showAISummary) {
+      setShowAISummary(false);
     }
-    
-    // 如果没有AI标签，使用传统方式匹配
-    const repoText = [
-      repo.name,
-      repo.description || '',
-      repo.language || '',
-      ...(repo.topics || []),
-      repo.ai_summary || ''
-    ].join(' ').toLowerCase();
-    
-    return selectedCategoryObj.keywords.some(keyword => 
-      repoText.includes(keyword.toLowerCase())
-    );
-  });
+  }, [hasAnalyzedRepos]);
 
   // Infinite scroll (瀑布流按需加载)
   const LOAD_BATCH = 50;
@@ -109,6 +125,26 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     filteredRepositories.filter(repo => selectedRepoIds.has(repo.id)),
     [filteredRepositories, selectedRepoIds]
   );
+
+  // 使用 useMemo 缓存统计计数，避免每次渲染重新计算
+  const repositoryStats = useMemo(() => {
+    let unanalyzedCount = 0;
+    let analyzedCount = 0;
+    let failedCount = 0;
+
+    for (const repo of filteredRepositories) {
+      if (repo.analysis_failed) {
+        failedCount++;
+      } else if (repo.analyzed_at) {
+        analyzedCount++;
+      } else {
+        unanalyzedCount++;
+      }
+    }
+
+    return { unanalyzedCount, analyzedCount, failedCount };
+  }, [filteredRepositories]);
+
   const filterResetKey = useMemo(() => JSON.stringify({
     selectedCategory,
     query: searchFilters.query,
@@ -121,6 +157,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     maxStars: searchFilters.maxStars,
     isAnalyzed: searchFilters.isAnalyzed,
     isSubscribed: searchFilters.isSubscribed,
+    isEdited: searchFilters.isEdited,
+    isCategoryLocked: searchFilters.isCategoryLocked,
+    analysisFailed: searchFilters.analysisFailed,
   }), [
     selectedCategory,
     searchFilters.query,
@@ -133,6 +172,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     searchFilters.maxStars,
     searchFilters.isAnalyzed,
     searchFilters.isSubscribed,
+    searchFilters.isEdited,
+    searchFilters.isCategoryLocked,
+    searchFilters.analysisFailed,
   ]);
 
   // Reset visible count only when filter context changes.
@@ -397,7 +439,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   // 批量操作处理函数
-  const handleSelectRepo = (id: number) => {
+  // 使用 useCallback 优化事件处理函数
+  const handleSelectRepo = useCallback((id: number) => {
     setSelectedRepoIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -405,43 +448,53 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       } else {
         newSet.add(id);
       }
-      // 显示工具栏
-      setShowBulkToolbar(newSet.size > 0);
       return newSet;
     });
-  };
+    // 使用 requestAnimationFrame 延迟显示工具栏，避免布局抖动
+    requestAnimationFrame(() => {
+      setSelectedRepoIds(current => {
+        setShowBulkToolbar(current.size > 0);
+        return current;
+      });
+    });
+  }, []);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     const allIds = new Set(filteredRepositories.map(repo => repo.id));
     setSelectedRepoIds(allIds);
     setShowBulkToolbar(true);
-  };
+  }, [filteredRepositories]);
 
-  const handleDeselectAll = () => {
+  const handleDeselectAll = useCallback(() => {
+    // 先触发动画，然后清除选择
     setIsExitingSelection(true);
+    // 延长动画时间，让视觉效果更平滑
     setTimeout(() => {
       setSelectedRepoIds(new Set());
       setShowBulkToolbar(false);
-      setIsExitingSelection(false);
-    }, 200);
-  };
+      // 动画结束后再重置状态
+      requestAnimationFrame(() => {
+        setIsExitingSelection(false);
+      });
+    }, 250);
+  }, []);
 
   // 处理单击空白处 - 触发回到顶部按钮跳跃动画
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
     // 检查点击的是否是空白区域（不是卡片或其他元素）
     if (showBulkToolbar && e.target === e.currentTarget) {
       // 触发自定义事件，让回到顶部按钮跳跃两下
       window.dispatchEvent(new CustomEvent('gsm:back-to-top-bounce'));
     }
-  };
+  }, [showBulkToolbar]);
 
   // 处理双击空白处退出多选模式
-  const handleDoubleClick = (e: React.MouseEvent) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     // 检查点击的是否是空白区域（不是卡片或其他元素）
     if (showBulkToolbar && e.target === e.currentTarget) {
       handleDeselectAll();
     }
-  };
+  }, [showBulkToolbar, handleDeselectAll]);
 
   const handleBulkAction = async (action: string, repos: Repository[]) => {
     try {
@@ -661,6 +714,103 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           break;
         }
 
+        case 'lock-category': {
+          const reposWithoutCategory = repos.filter(repo => !repo.custom_category);
+          if (reposWithoutCategory.length > 0) {
+            const confirmMessage = language === 'zh'
+              ? `${reposWithoutCategory.length} 个仓库没有设置分类，锁定操作将同时设置当前推断的分类。是否继续？`
+              : `${reposWithoutCategory.length} repositories don't have a category. Locking will also set the inferred category. Continue?`;
+            if (!confirm(confirmMessage)) return;
+          }
+
+          const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+          let successCount = 0;
+          const failedRepos: string[] = [];
+
+          for (const repo of repos) {
+            try {
+              // 如果没有自定义分类，先推断一个
+              let categoryToSet = repo.custom_category;
+              if (!categoryToSet) {
+                // 根据AI标签或其他信息推断分类
+                for (const category of allCategories) {
+                  if (category.id === 'all') continue;
+                  if (repo.ai_tags && repo.ai_tags.length > 0) {
+                    const hasMatch = repo.ai_tags.some(tag =>
+                      category.keywords.some(keyword =>
+                        tag.toLowerCase().includes(keyword.toLowerCase()) ||
+                        keyword.toLowerCase().includes(tag.toLowerCase())
+                      )
+                    );
+                    if (hasMatch) {
+                      categoryToSet = category.name;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              updateRepository({
+                ...repo,
+                custom_category: categoryToSet || repo.custom_category,
+                category_locked: true,
+                last_edited: new Date().toISOString()
+              });
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to lock category for ${repo.full_name}:`, error);
+              failedRepos.push(repo.full_name);
+            }
+          }
+
+          await forceSyncToBackend();
+          if (failedRepos.length > 0) {
+            alert(language === 'zh'
+              ? `成功锁定 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
+              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+            );
+          } else {
+            alert(language === 'zh'
+              ? `成功锁定 ${successCount} 个仓库的分类`
+              : `Successfully locked categories for ${successCount} repositories`
+            );
+          }
+          break;
+        }
+
+        case 'unlock-category': {
+          let successCount = 0;
+          const failedRepos: string[] = [];
+
+          for (const repo of repos) {
+            try {
+              updateRepository({
+                ...repo,
+                category_locked: false,
+                last_edited: new Date().toISOString()
+              });
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to unlock category for ${repo.full_name}:`, error);
+              failedRepos.push(repo.full_name);
+            }
+          }
+
+          await forceSyncToBackend();
+          if (failedRepos.length > 0) {
+            alert(language === 'zh'
+              ? `成功解锁 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
+              : `Successfully unlocked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+            );
+          } else {
+            alert(language === 'zh'
+              ? `成功解锁 ${successCount} 个仓库的分类`
+              : `Successfully unlocked categories for ${successCount} repositories`
+            );
+          }
+          break;
+        }
+
         default:
           alert(language === 'zh' ? '未知操作' : 'Unknown action');
       }
@@ -746,9 +896,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     );
   }
 
-  const unanalyzedCount = filteredRepositories.filter(r => !r.analyzed_at).length;
-  const analyzedCount = filteredRepositories.filter(r => r.analyzed_at && !r.analysis_failed).length;
-  const failedCount = filteredRepositories.filter(r => r.analysis_failed).length;
+  const { unanalyzedCount, analyzedCount, failedCount } = repositoryStats;
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
@@ -850,22 +998,29 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           {!isLoading && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
               <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {t('显示:', 'Display:')}
+                {t('显示内容:', 'Display:')}
               </span>
               <div className="flex items-center space-x-3 sm:space-x-4">
-                <label className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer">
+                <label 
+                  className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                  title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}
+                >
                   <input
                     type="radio"
                     name="displayContent"
                     checked={showAISummary}
-                    onChange={() => setShowAISummary(true)}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    onChange={() => hasAnalyzedRepos && setShowAISummary(true)}
+                    disabled={!hasAnalyzedRepos}
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   />
                   <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('AI总结', 'AI Summary')}
+                    {t('AI分析内容', 'AI Analysis')}
                   </span>
                 </label>
-                <label className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer">
+                <label 
+                  className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer"
+                  title={t('显示仓库原始描述', 'Show repository original description')}
+                >
                   <input
                     type="radio"
                     name="displayContent"
@@ -947,12 +1102,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       {/* Bulk Action Toolbar */}
       {showBulkToolbar && (
         <BulkActionToolbar
-          selectedCount={selectedRepositories.length}
+          selectedCount={selectedRepoIds.size}
           repositories={selectedRepositories}
           onSelectAll={handleSelectAll}
           onDeselectAll={handleDeselectAll}
           onBulkAction={handleBulkAction}
-          onClose={handleDeselectAll}
+          onClose={() => {
+            // 直接关闭工具栏，不触发卡片退出动画
+            setShowBulkToolbar(false);
+            setSelectedRepoIds(new Set());
+          }}
         />
       )}
 

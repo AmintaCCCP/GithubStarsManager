@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2 } from 'lucide-react';
+import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -274,6 +274,54 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                   : showConfirm === 'unsubscribe'
                     ? t('再次确认', 'Confirm Again')
                     : t('取消订阅', 'Unsubscribe')}
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleAction('lock-category')}
+              disabled={isProcessing}
+              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+                showConfirm === 'lock-category'
+                  ? 'bg-amber-700 text-white hover:bg-amber-800'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={t('批量锁定分类', 'Lock Categories')}
+            >
+              {isProcessing && showConfirm === 'lock-category' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isProcessing && showConfirm === 'lock-category'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'lock-category'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('锁定分类', 'Lock Category')}
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleAction('unlock-category')}
+              disabled={isProcessing}
+              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+                showConfirm === 'unlock-category'
+                  ? 'bg-gray-700 text-white hover:bg-gray-800'
+                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={t('批量解锁分类', 'Unlock Categories')}
+            >
+              {isProcessing && showConfirm === 'unlock-category' ? (
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+              ) : (
+                <Unlock className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isProcessing && showConfirm === 'unlock-category'
+                  ? t('处理中...', 'Processing...')
+                  : showConfirm === 'unlock-category'
+                    ? t('再次确认', 'Confirm Again')
+                    : t('解锁分类', 'Unlock Category')}
               </span>
             </button>
 

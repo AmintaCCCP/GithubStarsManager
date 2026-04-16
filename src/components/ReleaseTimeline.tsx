@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -10,48 +10,46 @@ import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
 
 export const ReleaseTimeline: React.FC = () => {
-  const { 
-    releases, 
-    repositories, 
-    releaseSubscriptions, 
+  const {
+    releases,
+    repositories,
+    releaseSubscriptions,
     readReleases,
-    githubToken, 
+    githubToken,
     language,
     assetFilters,
     addReleases,
     markReleaseAsRead,
     toggleReleaseSubscription,
     updateRepository,
+    // Release Timeline View State from global store
+    releaseViewMode,
+    releaseSelectedFilters,
+    releaseSearchQuery,
+    releaseExpandedRepositories,
+    setReleaseViewMode,
+    toggleReleaseSelectedFilter,
+    clearReleaseSelectedFilters,
+    setReleaseSearchQuery,
+    toggleReleaseExpandedRepository,
   } = useAppStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
-  const [expandedReleases, setExpandedReleases] = useState<Set<number>>(new Set());
+  // 独立的展开状态：下载资产和更新日志分开控制（本地状态，不持久化）
+  const [expandedAssets, setExpandedAssets] = useState<Set<number>>(new Set());
+  const [expandedReleaseNotes, setExpandedReleaseNotes] = useState<Set<number>>(new Set());
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
-  const [collapsedReleaseNotes, setCollapsedReleaseNotes] = useState<Set<number>>(new Set());
+  // 视图切换下拉菜单状态（本地UI状态）
+  const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      // 只有在点击文件列表内部但不是按钮时才关闭
-      const dropdown = target.closest('.download-dropdown');
-      const button = target.closest('.file-toggle-btn');
-      if (!dropdown && !button) {
-        setOpenDropdowns(new Set());
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  // 使用全局状态的别名，保持代码一致性
+  const viewMode = releaseViewMode;
+  const selectedFilters = releaseSelectedFilters;
+  const searchQuery = releaseSearchQuery;
+  const expandedRepositories = releaseExpandedRepositories;
 
   // Format file size helper function
   const formatFileSize = (bytes: number): string => {
@@ -81,29 +79,30 @@ export const ReleaseTimeline: React.FC = () => {
     return matchesCustom || matchesPreset;
   }, [selectedFilters, assetFilters]);
 
-  // Toggle dropdown for a specific release
-  const toggleDropdown = (releaseId: number, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setOpenDropdowns(prev => {
+  // Toggle assets expansion for a specific release
+  const toggleAssets = (releaseId: number) => {
+    setExpandedAssets(prev => {
       const newSet = new Set(prev);
       if (newSet.has(releaseId)) {
         newSet.delete(releaseId);
       } else {
         newSet.add(releaseId);
+        // Mark as read when expanding assets
+        markReleaseAsRead(releaseId);
       }
       return newSet;
     });
   };
 
-  // Toggle release expansion
-  const toggleReleaseExpansion = (releaseId: number) => {
-    setExpandedReleases(prev => {
+  // Toggle release notes expansion for a specific release
+  const toggleReleaseNotes = (releaseId: number) => {
+    setExpandedReleaseNotes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(releaseId)) {
         newSet.delete(releaseId);
       } else {
         newSet.add(releaseId);
-        // Mark as read when expanding
+        // Mark as read when expanding release notes
         markReleaseAsRead(releaseId);
       }
       return newSet;
@@ -114,20 +113,6 @@ export const ReleaseTimeline: React.FC = () => {
   const toggleFullContent = (releaseId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setFullContentReleases(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(releaseId)) {
-        newSet.delete(releaseId);
-      } else {
-        newSet.add(releaseId);
-      }
-      return newSet;
-    });
-  };
-
-  // Toggle release notes collapse
-  const toggleReleaseNotes = (releaseId: number, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setCollapsedReleaseNotes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(releaseId)) {
         newSet.delete(releaseId);
@@ -173,12 +158,29 @@ export const ReleaseTimeline: React.FC = () => {
     [releases, releaseSubscriptions]
   );
 
-  const filteredReleases = useMemo(() => {
-    let filtered = subscribedReleases;
+  // 预计算每个 release 的下载链接和过滤后的链接
+  const releasesWithLinks = useMemo(() => {
+    return subscribedReleases.map(release => {
+      const allLinks = getDownloadLinks(release);
+      const filteredLinks = selectedFilters.length > 0
+        ? allLinks.filter(link => matchesActiveFilters(link.name))
+        : allLinks;
+      return {
+        release,
+        allLinks,
+        filteredLinks,
+        hasMatchingAssets: filteredLinks.length > 0
+      };
+    });
+  }, [subscribedReleases, getDownloadLinks, selectedFilters, matchesActiveFilters]);
 
+  const filteredReleases = useMemo(() => {
+    let filtered = releasesWithLinks;
+
+    // 搜索过滤
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(release => 
+      filtered = filtered.filter(({ release }) =>
         release.repository.name.toLowerCase().includes(query) ||
         release.repository.full_name.toLowerCase().includes(query) ||
         release.tag_name.toLowerCase().includes(query) ||
@@ -187,42 +189,71 @@ export const ReleaseTimeline: React.FC = () => {
       );
     }
 
+    // 资产类型过滤 - 只显示包含匹配资产的 release
     if (selectedFilters.length > 0) {
-      filtered = filtered.filter(release => {
-        const downloadLinks = getDownloadLinks(release);
-        return downloadLinks.some(link => matchesActiveFilters(link.name));
-      });
+      filtered = filtered.filter(({ hasMatchingAssets }) => hasMatchingAssets);
     }
 
-    return filtered.sort((a, b) =>
-      new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-    );
-  }, [subscribedReleases, searchQuery, selectedFilters, matchesActiveFilters, getDownloadLinks]);
+    return filtered
+      .sort((a, b) =>
+        new Date(b.release.published_at).getTime() - new Date(a.release.published_at).getTime()
+      )
+      .map(({ release, allLinks, filteredLinks }) => ({
+        release,
+        // 如果有过滤器，只显示匹配的资产；否则显示全部
+        displayLinks: selectedFilters.length > 0 ? filteredLinks : allLinks
+      }));
+  }, [releasesWithLinks, searchQuery, selectedFilters]);
 
-  const totalPages = Math.ceil(filteredReleases.length / itemsPerPage);
+  // 按仓库分组的 Release 数据
+  const repositoryGroups = useMemo(() => {
+    const groups = new Map<number, {
+      repository: Release['repository'];
+      releases: typeof filteredReleases;
+      latestRelease: Release;
+    }>();
+
+    filteredReleases.forEach(({ release, displayLinks }) => {
+      const repoId = release.repository.id;
+      if (!groups.has(repoId)) {
+        groups.set(repoId, {
+          repository: release.repository,
+          releases: [],
+          latestRelease: release,
+        });
+      }
+      const group = groups.get(repoId)!;
+      group.releases.push({ release, displayLinks });
+      // 更新最新发布
+      if (new Date(release.published_at) > new Date(group.latestRelease.published_at)) {
+        group.latestRelease = release;
+      }
+    });
+
+    // 按最新发布时间排序仓库组
+    return Array.from(groups.values()).sort((a, b) =>
+      new Date(b.latestRelease.published_at).getTime() - new Date(a.latestRelease.published_at).getTime()
+    );
+  }, [filteredReleases]);
+
+  // 根据视图模式计算分页
+  const totalPages = viewMode === 'timeline'
+    ? Math.ceil(filteredReleases.length / itemsPerPage)
+    : Math.ceil(repositoryGroups.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedRepositoryGroups = repositoryGroups.slice(startIndex, startIndex + itemsPerPage);
 
-  const releasesDownloadLinks = useMemo(() => {
-    const map = new Map<number, ReturnType<typeof getDownloadLinks>>();
-    paginatedReleases.forEach(release => {
-      map.set(release.id, getDownloadLinks(release));
-    });
-    return map;
-  }, [paginatedReleases, getDownloadLinks]);
 
-  // Filter handlers
+
+  // Filter handlers - 使用全局状态
   const handleFilterToggle = (filterId: string) => {
-    setSelectedFilters(prev => 
-      prev.includes(filterId)
-        ? prev.filter(id => id !== filterId)
-        : [...prev, filterId]
-    );
+    toggleReleaseSelectedFilter(filterId);
     setCurrentPage(1); // Reset to first page when filtering
   };
 
   const handleClearFilters = () => {
-    setSelectedFilters([]);
+    clearReleaseSelectedFilters();
     setCurrentPage(1);
   };
 
@@ -299,12 +330,6 @@ export const ReleaseTimeline: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
-
-  const clearAllFilters = () => {
-    setSearchQuery('');
-    setSelectedFilters([]);
-    setCurrentPage(1);
   };
 
   const handlePageChange = (page: number) => {
@@ -396,7 +421,7 @@ export const ReleaseTimeline: React.FC = () => {
 
   const releasesTruncatedBody = useMemo(() => {
     const map = new Map<number, string>();
-    paginatedReleases.forEach(release => {
+    paginatedReleases.forEach(({ release }) => {
       map.set(release.id, getTruncatedBody(release.body, 500));
     });
     return map;
@@ -485,7 +510,7 @@ export const ReleaseTimeline: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-full mx-auto px-2 sm:px-4">
       {/* Header */}
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -518,16 +543,16 @@ export const ReleaseTimeline: React.FC = () => {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 mb-4">
           {/* Search Bar */}
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder={t('搜索Release...', 'Search releases...')}
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
+                setReleaseSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
               className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -535,7 +560,7 @@ export const ReleaseTimeline: React.FC = () => {
             {searchQuery && (
               <button
                 onClick={() => {
-                  setSearchQuery('');
+                  setReleaseSearchQuery('');
                   setCurrentPage(1);
                 }}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -545,35 +570,95 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
 
-          {/* Custom Asset Filters */}
-          <AssetFilterManager
-            selectedFilters={selectedFilters}
-            onFilterToggle={handleFilterToggle}
-            onClearFilters={handleClearFilters}
-          />
-
-          {/* Clear All Filters */}
-          {(searchQuery || selectedFilters.length > 0) && (
-            <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={clearAllFilters}
-                className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-                <span>{t('清除所有筛选', 'Clear All Filters')}</span>
-              </button>
+          {/* Filters and View Toggle Row */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex-1">
+              <AssetFilterManager
+                selectedFilters={selectedFilters}
+                onFilterToggle={handleFilterToggle}
+                onClearFilters={handleClearFilters}
+              />
             </div>
-          )}
+
+            {/* View Mode Toggle Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsViewDropdownOpen(!isViewDropdownOpen)}
+                className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
+              >
+                {viewMode === 'timeline' ? (
+                  <CalendarDays className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                ) : (
+                  <LayoutGrid className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                )}
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {viewMode === 'timeline' ? t('按日期', 'Timeline') : t('按仓库', 'Repository')}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isViewDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isViewDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsViewDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 py-1">
+                    <button
+                      onClick={() => {
+                        setReleaseViewMode('timeline');
+                        setIsViewDropdownOpen(false);
+                        setCurrentPage(1);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                        viewMode === 'timeline' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <CalendarDays className={`w-4 h-4 ${viewMode === 'timeline' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('按日期排序', 'Timeline View')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('按发布时间排序', 'Sort by publish date')}</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReleaseViewMode('repository');
+                        setIsViewDropdownOpen(false);
+                        setCurrentPage(1);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                        viewMode === 'repository' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <LayoutGrid className={`w-4 h-4 ${viewMode === 'repository' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('仓库分类', 'Repository View')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('按仓库分组折叠', 'Group by repository')}</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Results Info and Pagination Controls */}
-        <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-gray-600 dark:text-gray-400">
-              {t(
-                `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
-                `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
-              )}
+              {viewMode === 'timeline'
+                ? t(
+                    `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
+                    `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
+                  )
+                : t(
+                    `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个仓库`,
+                    `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} repositories`
+                  )
+              }
             </span>
             {(searchQuery || selectedFilters.length > 0) && (
               <span className="text-sm text-blue-600 dark:text-blue-400">
@@ -657,40 +742,145 @@ export const ReleaseTimeline: React.FC = () => {
       </div>
 
       {/* Releases List */}
-      <div className="space-y-4">
-        {paginatedReleases.map(release => {
-          const downloadLinks = releasesDownloadLinks.get(release.id) || [];
-          const isUnread = isReleaseUnread(release.id);
-          const isExpanded = expandedReleases.has(release.id);
-          const isFullContent = fullContentReleases.has(release.id);
-          const isReleaseNotesCollapsed = collapsedReleaseNotes.has(release.id);
-          const isDropdownOpen = openDropdowns.has(release.id);
-          const truncatedBody = releasesTruncatedBody.get(release.id) || release.body;
-          
-          return (
-            <ReleaseCard
-              key={release.id}
-              release={release}
-              downloadLinks={downloadLinks}
-              isUnread={isUnread}
-              isExpanded={isExpanded}
-              isFullContent={isFullContent}
-              isReleaseNotesCollapsed={isReleaseNotesCollapsed}
-              isDropdownOpen={isDropdownOpen}
-              truncatedBody={truncatedBody}
-              matchesActiveFilters={matchesActiveFilters}
-              selectedFilters={selectedFilters}
-              onToggleExpansion={() => toggleReleaseExpansion(release.id)}
-              onToggleDropdown={() => toggleDropdown(release.id)}
-              onToggleFullContent={(e) => toggleFullContent(release.id, e)}
-              onToggleReleaseNotes={() => toggleReleaseNotes(release.id)}
-              onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
-              onMarkAsRead={() => markReleaseAsRead(release.id)}
-              language={language}
-              formatFileSize={formatFileSize}
-            />
-          );
-        })}
+      <div className="space-y-3">
+        {paginatedReleases.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
+            <Package className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('无符合条件的结果', 'No matching results')}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {selectedFilters.length > 0
+                ? t('当前过滤器没有匹配到任何资产，请尝试其他过滤条件', 'No assets match the current filters. Try different filter criteria.')
+                : t('没有找到匹配的 Release', 'No matching releases found.')}
+            </p>
+            {selectedFilters.length > 0 && (
+              <button
+                onClick={handleClearFilters}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                {t('清除过滤器', 'Clear Filters')}
+              </button>
+            )}
+          </div>
+        ) : viewMode === 'timeline' ? (
+          // 按日期排序视图
+          paginatedReleases.map(({ release, displayLinks }) => {
+            const isUnread = isReleaseUnread(release.id);
+            const isAssetsExpanded = expandedAssets.has(release.id);
+            const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
+            const isFullContent = fullContentReleases.has(release.id);
+            const truncatedBody = releasesTruncatedBody.get(release.id) || release.body;
+
+            return (
+              <ReleaseCard
+                key={release.id}
+                release={release}
+                downloadLinks={displayLinks}
+                isUnread={isUnread}
+                isAssetsExpanded={isAssetsExpanded}
+                isReleaseNotesExpanded={isReleaseNotesExpanded}
+                isFullContent={isFullContent}
+                truncatedBody={truncatedBody}
+                matchesActiveFilters={matchesActiveFilters}
+                selectedFilters={selectedFilters}
+                onToggleAssets={() => toggleAssets(release.id)}
+                onToggleReleaseNotes={() => toggleReleaseNotes(release.id)}
+                onToggleFullContent={(e) => toggleFullContent(release.id, e)}
+                onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
+                onMarkAsRead={() => markReleaseAsRead(release.id)}
+                language={language}
+                formatFileSize={formatFileSize}
+              />
+            );
+          })
+        ) : (
+          // 仓库分类视图
+          paginatedRepositoryGroups.map(({ repository, releases }) => {
+            const isExpanded = expandedRepositories.has(repository.id);
+            const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
+            const latestRelease = releases[0]?.release;
+
+            return (
+              <div key={repository.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                {/* Repository Header */}
+                <button
+                  onClick={() => toggleReleaseExpandedRepository(repository.id)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    {hasUnread && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
+                    )}
+                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-lg flex-shrink-0">
+                      <LayoutGrid className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {repository.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {repository.full_name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {releases.length} {t('个版本', 'releases')}
+                      </p>
+                      {latestRelease && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t('最新:', 'Latest:')} {latestRelease.tag_name}
+                        </p>
+                      )}
+                    </div>
+                    <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Repository Releases (Collapsible) */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="p-3 space-y-2">
+                      {releases.map(({ release, displayLinks }) => {
+                        const isUnread = isReleaseUnread(release.id);
+                        const isAssetsExpanded = expandedAssets.has(release.id);
+                        const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
+                        const isFullContent = fullContentReleases.has(release.id);
+                        const truncatedBody = releasesTruncatedBody.get(release.id) || release.body;
+
+                        return (
+                          <ReleaseCard
+                            key={release.id}
+                            release={release}
+                            downloadLinks={displayLinks}
+                            isUnread={isUnread}
+                            isAssetsExpanded={isAssetsExpanded}
+                            isReleaseNotesExpanded={isReleaseNotesExpanded}
+                            isFullContent={isFullContent}
+                            truncatedBody={truncatedBody}
+                            matchesActiveFilters={matchesActiveFilters}
+                            selectedFilters={selectedFilters}
+                            onToggleAssets={() => toggleAssets(release.id)}
+                            onToggleReleaseNotes={() => toggleReleaseNotes(release.id)}
+                            onToggleFullContent={(e) => toggleFullContent(release.id, e)}
+                            onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
+                            onMarkAsRead={() => markReleaseAsRead(release.id)}
+                            language={language}
+                            formatFileSize={formatFileSize}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Bottom Pagination */}

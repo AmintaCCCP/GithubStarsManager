@@ -232,18 +232,27 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           </div>
           <div className="flex items-center space-x-3">
             <input
-              type="range"
-              min="3"
-              max="15"
+              type="number"
+              min="1"
               value={collapsedSidebarCategoryCount}
               onChange={(e) => {
-                const value = Math.max(3, Math.min(15, parseInt(e.target.value) || 8));
-                setCollapsedSidebarCategoryCount(value);
+                const inputValue = e.target.value;
+                if (inputValue === '') return;
+                const value = parseInt(inputValue);
+                if (!isNaN(value) && value >= 1) {
+                  setCollapsedSidebarCategoryCount(value);
+                }
               }}
-              className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+              onBlur={(e) => {
+                const value = parseInt(e.target.value);
+                if (isNaN(value) || value < 1) {
+                  setCollapsedSidebarCategoryCount(1);
+                }
+              }}
+              className="w-20 px-3 py-1.5 text-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="≥1"
             />
-            <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
-              {collapsedSidebarCategoryCount}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
             </span>
           </div>
         </div>

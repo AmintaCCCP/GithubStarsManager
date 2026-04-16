@@ -40,6 +40,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+  // 用于防止拖拽后触发点击的标志
+  const justDroppedRef = useRef(false);
+  const dropTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // isMobile 初始值从 window.innerWidth 同步获取（SSR安全）
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -52,6 +55,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const showTextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 用于存储 toggleSidebar 定时器的 ref
   const toggleSidebarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 分类列表滚动容器的 ref
+  const categoryListRef = useRef<HTMLDivElement>(null);
+  // 滚动条显示定时器 ref
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   // 监听侧栏状态变化，同步更新文字显示状态
   useEffect(() => {
@@ -62,8 +70,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       if (showTextTimerRef.current) {
         clearTimeout(showTextTimerRef.current);
       }
-      // 侧栏展开时，延迟显示文字
-      showTextTimerRef.current = setTimeout(() => setShowText(true), 200);
+      // 侧栏展开时，延迟显示文字，使用更短的延迟让体验更流畅
+      showTextTimerRef.current = setTimeout(() => setShowText(true), 150);
     }
     return () => {
       if (showTextTimerRef.current) {
@@ -91,19 +99,37 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (isSidebarCollapsed) {
       // 展开侧栏：先展开，再显示文字
       setSidebarCollapsed(false);
-      toggleSidebarTimerRef.current = setTimeout(() => setShowText(true), 200); // 200ms 后显示文字，配合动效
+      toggleSidebarTimerRef.current = setTimeout(() => setShowText(true), 150); // 150ms 后显示文字，配合动效
     } else {
       // 折叠侧栏：先隐藏文字，再折叠
       setShowText(false);
-      toggleSidebarTimerRef.current = setTimeout(() => setSidebarCollapsed(true), 150); // 150ms 后折叠，文字先消失
+      toggleSidebarTimerRef.current = setTimeout(() => setSidebarCollapsed(true), 120); // 120ms 后折叠，文字先消失
     }
   }, [isSidebarCollapsed, setSidebarCollapsed]);
+
+  // 处理分类列表滚动事件
+  const handleCategoryScroll = useCallback(() => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    // 滚动停止 1 秒后隐藏滚动条
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 1000);
+  }, []);
 
   // 组件卸载时清理定时器
   useEffect(() => {
     return () => {
       if (toggleSidebarTimerRef.current) {
         clearTimeout(toggleSidebarTimerRef.current);
+      }
+      if (dropTimeoutRef.current) {
+        clearTimeout(dropTimeoutRef.current);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
       }
     };
   }, []);
@@ -141,10 +167,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (category.id === 'all') return repositories.length;
 
     return repositories.filter(repo => {
-      if (repo.custom_category === category.name) {
-        return true;
+      // 如果仓库有自定义分类，只根据 custom_category 判断是否属于当前分类
+      if (repo.custom_category) {
+        return repo.custom_category === category.name;
       }
 
+      // 如果没有自定义分类，使用AI标签和关键词匹配
       if (repo.ai_tags && repo.ai_tags.length > 0) {
         return repo.ai_tags.some(tag =>
           category.keywords.some(keyword =>
@@ -213,7 +241,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     try {
       await forceSyncToBackend();
     } catch (error) {
-      // Revert local change on failure
+      // Revert local change on failure - 回滚时调用 showDefaultCategory 恢复显示
       showDefaultCategory(category.id);
       alert(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'));
     }
@@ -239,6 +267,15 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     event.preventDefault();
     setDragOverCategoryId(null);
 
+    // 设置标志防止拖拽后触发点击
+    justDroppedRef.current = true;
+    if (dropTimeoutRef.current) {
+      clearTimeout(dropTimeoutRef.current);
+    }
+    dropTimeoutRef.current = setTimeout(() => {
+      justDroppedRef.current = false;
+    }, 300);
+
     if (category.id === 'all') return;
 
     const repoId = event.dataTransfer.getData('application/x-gsm-repository-id');
@@ -261,6 +298,14 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     } catch (error) {
       handleSyncError(originalRepo);
     }
+  };
+
+  // 处理分类点击，防止拖拽后立即触发
+  const handleCategoryClick = (categoryId: string) => {
+    if (justDroppedRef.current) {
+      return;
+    }
+    onCategorySelect(categoryId);
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
@@ -307,7 +352,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   onDrop={(event) => handleDropOnCategory(event, category)}
                 >
                   <button
-                    onClick={() => onCategorySelect(category.id)}
+                    onClick={() => handleCategoryClick(category.id)}
                     className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                       isSelected
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -345,18 +390,19 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start">
           {/* 侧栏容器 */}
           <div
-            className={`relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 ease-in-out ${
+            className={`relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
             }`}
             style={{
               maxHeight: isSidebarCollapsed ? 'auto' : 'calc(100vh - 8rem)',
+              transitionProperty: 'width, padding, max-height',
             }}
           >
             {/* 折叠状态：简洁视图 */}
             {isSidebarCollapsed ? (
-              <div className="flex flex-col items-center space-y-3">
+              <div className="flex flex-col items-center space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto scrollbar-hide">
                 {/* 展开按钮 - 放在折叠状态的顶部 */}
                 <button
                   onClick={toggleSidebar}
@@ -401,7 +447,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onDrop={(event) => handleDropOnCategory(event, category)}
                         >
                           <button
-                            onClick={() => onCategorySelect(category.id)}
+                            onClick={() => handleCategoryClick(category.id)}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
                               isSelected
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400'
@@ -436,8 +482,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 头部 - 包含折叠按钮 */}
                 <div className="flex items-center justify-between mb-4">
                   <h3
-                    className={`text-lg font-semibold text-gray-900 dark:text-white transition-opacity duration-200 ${
-                      showText ? 'opacity-100' : 'opacity-0'
+                    className={`text-lg font-semibold text-gray-900 dark:text-white transition-all duration-200 ease-out ${
+                      showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                     }`}
                   >
                     {t('应用分类', 'Categories')}
@@ -465,8 +511,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 </div>
 
                 {/* 分类列表 */}
-                <div className="space-y-1 lg:overflow-y-auto lg:max-h-[calc(100vh-12rem)]">
-                  {allCategories.map(category => {
+                <div
+                  ref={categoryListRef}
+                  onScroll={handleCategoryScroll}
+                  className={`space-y-1 overflow-y-auto max-h-[calc(100vh-12rem)] pr-1 category-scrollbar ${isScrolling ? 'is-scrolling' : ''}`}
+                >
+                  {allCategories.map((category, index) => {
                     const count = getCategoryCount(category);
                     const isSelected = selectedCategory === category.id;
                     const isDragTarget = dragOverCategoryId === category.id;
@@ -475,6 +525,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       <div
                         key={category.id}
                         className="group relative"
+                        style={{
+                          transitionDelay: showText ? `${Math.min(index * 30, 300)}ms` : '0ms',
+                        }}
                         onDragOver={(event) => {
                           if (category.id === 'all') return;
                           event.preventDefault();
@@ -488,21 +541,21 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                         onDrop={(event) => handleDropOnCategory(event, category)}
                       >
                         <button
-                          onClick={() => onCategorySelect(category.id)}
-                          className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          onClick={() => handleCategoryClick(category.id)}
+                          className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ease-out ${
                             isSelected
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                               : isDragTarget
                                 ? 'bg-green-100 text-green-700 ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                          }`}
+                          } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
                           title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                         >
                           <div className="flex items-center space-x-3 min-w-0 flex-1">
                             <span className="text-base flex-shrink-0">{category.icon}</span>
                             <span
-                              className={`text-sm font-medium truncate transition-opacity duration-200 ${
-                                showText ? 'opacity-100' : 'opacity-0'
+                              className={`text-sm font-medium truncate transition-all duration-200 ease-out ${
+                                showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                               }`}
                             >
                               {category.name}
@@ -511,13 +564,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                           {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
-                            className={`text-xs px-2 py-1 rounded-full shrink-0 transition-opacity duration-200 ${
+                            className={`text-xs px-2 py-1 rounded-full shrink-0 transition-all duration-200 ease-out ${
                               isSelected
                                 ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
                                 : isDragTarget
                                   ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200'
                                   : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'
-                            } ${showText ? 'opacity-100' : 'opacity-0'} group-hover:opacity-0 group-focus-within:opacity-0`}
+                            } ${showText ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
                           </span>
