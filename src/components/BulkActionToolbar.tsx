@@ -13,6 +13,13 @@ interface BulkActionToolbarProps {
   isVisible?: boolean;
 }
 
+interface TooltipState {
+  action: string;
+  message: string;
+  x: number;
+  y: number;
+}
+
 export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   selectedCount,
   repositories,
@@ -28,8 +35,10 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [shouldRender, setShouldRender] = useState(isVisible);
   const [isShaking, setIsShaking] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 处理可见性变化，播放动画后再卸载
   React.useEffect(() => {
@@ -45,11 +54,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     }
   }, [isVisible]);
 
-  // 清理 shake timeout on unmount
+  // 清理 shake timeout 和 confirm timeout on unmount
   React.useEffect(() => {
     return () => {
       if (shakeTimeoutRef.current) {
         clearTimeout(shakeTimeoutRef.current);
+      }
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
       }
     };
   }, []);
@@ -65,13 +80,18 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
     }, 500);
   };
 
-  const handleAction = async (action: string) => {
+  const handleAction = async (action: string, e?: React.MouseEvent) => {
     if (showConfirm === action) {
       setIsProcessing(true);
       if (confirmTimeoutRef.current) {
         clearTimeout(confirmTimeoutRef.current);
         confirmTimeoutRef.current = null;
       }
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+      }
+      setTooltip(null);
       try {
         await onBulkAction(action, repositories);
       } finally {
@@ -82,7 +102,36 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       if (confirmTimeoutRef.current) {
         clearTimeout(confirmTimeoutRef.current);
       }
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
       setShowConfirm(action);
+
+      // 显示弱气泡提示
+      if (e) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const actionLabels: Record<string, { zh: string; en: string }> = {
+          unstar: { zh: '取消 Star', en: 'Unstar' },
+          categorize: { zh: '批量分类', en: 'Categorize' },
+          'ai-summary': { zh: 'AI 总结', en: 'AI Summary' },
+          subscribe: { zh: '订阅版本发布', en: 'Subscribe Releases' },
+          unsubscribe: { zh: '取消订阅发布', en: 'Unsubscribe Releases' },
+          'lock-category': { zh: '批量锁定分类', en: 'Lock Categories' },
+          'unlock-category': { zh: '批量解锁分类', en: 'Unlock Categories' },
+        };
+        const label = actionLabels[action];
+        const message = language === 'zh'
+          ? `再次点击确认${label?.zh || ''}`
+          : `Click again to confirm ${label?.en || ''}`;
+        setTooltip({
+          action,
+          message,
+          x: rect.left + rect.width / 2,
+          y: rect.top - 40,
+        });
+        tooltipTimeoutRef.current = setTimeout(() => setTooltip(null), 3000);
+      }
+
       confirmTimeoutRef.current = setTimeout(() => setShowConfirm(null), 3000);
     }
   };
@@ -158,171 +207,115 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center justify-between sm:justify-start space-x-1 sm:space-x-2 overflow-x-auto pb-1 sm:pb-0 -mx-2 px-2 sm:mx-0 sm:px-0">
             <button
-              onClick={() => handleAction('unstar')}
+              onClick={(e) => handleAction('unstar', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unstar'
                   ? 'bg-red-700 text-white hover:bg-red-800'
                   : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('取消 Star', 'Unstar')}
             >
               {isProcessing && showConfirm === 'unstar' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <Star className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Star className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'unstar'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'unstar'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('取消 Star', 'Unstar')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('categorize')}
+              onClick={(e) => handleAction('categorize', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'categorize'
                   ? 'bg-blue-700 text-white hover:bg-blue-800'
                   : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('批量分类', 'Categorize')}
             >
               {isProcessing && showConfirm === 'categorize' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+                <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'categorize'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'categorize'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('分类', 'Categorize')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('ai-summary')}
+              onClick={(e) => handleAction('ai-summary', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'ai-summary'
                   ? 'bg-purple-700 text-white hover:bg-purple-800'
                   : 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('AI 总结', 'AI Summary')}
             >
               {isProcessing && showConfirm === 'ai-summary' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'ai-summary'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'ai-summary'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('AI 总结', 'AI Summary')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('subscribe')}
+              onClick={(e) => handleAction('subscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'subscribe'
                   ? 'bg-green-700 text-white hover:bg-green-800'
                   : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('订阅发布', 'Subscribe Releases')}
             >
               {isProcessing && showConfirm === 'subscribe' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <Bell className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'subscribe'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'subscribe'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('订阅版本发布', 'Subscribe')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('unsubscribe')}
+              onClick={(e) => handleAction('unsubscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unsubscribe'
                   ? 'bg-orange-700 text-white hover:bg-orange-800'
                   : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('取消订阅发布', 'Unsubscribe Releases')}
             >
               {isProcessing && showConfirm === 'unsubscribe' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <BellOff className="w-3 h-3 sm:w-4 sm:h-4" />
+                <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'unsubscribe'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'unsubscribe'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('取消订阅', 'Unsubscribe')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('lock-category')}
+              onClick={(e) => handleAction('lock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'lock-category'
                   ? 'bg-amber-700 text-white hover:bg-amber-800'
                   : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('批量锁定分类', 'Lock Categories')}
             >
               {isProcessing && showConfirm === 'lock-category' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'lock-category'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'lock-category'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('锁定分类', 'Lock Category')}
-              </span>
             </button>
 
             <button
-              onClick={() => handleAction('unlock-category')}
+              onClick={(e) => handleAction('unlock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
                   ? 'bg-gray-700 text-white hover:bg-gray-800'
                   : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={t('批量解锁分类', 'Unlock Categories')}
             >
               {isProcessing && showConfirm === 'unlock-category' ? (
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
-                <Unlock className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Unlock className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-              <span className="hidden sm:inline">
-                {isProcessing && showConfirm === 'unlock-category'
-                  ? t('处理中...', 'Processing...')
-                  : showConfirm === 'unlock-category'
-                    ? t('再次确认', 'Confirm Again')
-                    : t('解锁分类', 'Unlock Category')}
-              </span>
             </button>
 
             <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2"></div>
@@ -338,6 +331,21 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 弱气泡提示 */}
+      {tooltip && (
+        <div
+          className="fixed z-[60] px-3 py-1.5 text-xs text-white bg-gray-800 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none animate-fade-in"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {tooltip.message}
+          <div className="absolute left-1/2 -bottom-1 w-2 h-2 bg-gray-800 dark:bg-gray-700 transform -translate-x-1/2 rotate-45"></div>
+        </div>
+      )}
     </div>
   );
 };

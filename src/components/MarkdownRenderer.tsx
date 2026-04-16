@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import { useAppStore } from '../store/useAppStore';
 
 interface MarkdownRendererProps {
   content: string;
@@ -59,6 +60,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   baseUrl 
 }) => {
   const [hasError, setHasError] = React.useState(false);
+  const { language } = useAppStore();
   
   if (!src) return null;
 
@@ -68,8 +70,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     }
     if (baseUrl) {
       try {
-        const cleanSrc = imageSrc.replace(/^\.\.?\//, '');
-        return new URL(cleanSrc, baseUrl + '/raw/HEAD/').href;
+        return new URL(imageSrc, baseUrl + '/raw/HEAD/').href;
       } catch {
         return imageSrc;
       }
@@ -82,7 +83,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   if (hasError) {
     return (
       <span className="text-gray-500 italic">
-        [图片加载失败: {alt || 'image'}]
+        [{language === 'zh' ? '图片加载失败' : 'Image failed to load'}: {alt || 'image'}]
       </span>
     );
   }
@@ -126,14 +127,16 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,
-          code: ({ node, children }) => {
-            const isInline = !node || (node as { parent?: { tagName?: string } }).parent?.tagName !== 'pre';
+          code: ({ className, children, ...props }) => {
+            const isInline = !className;
             return isInline ? (
-              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
                 {children}
               </code>
             ) : (
-              <code className="text-xs font-mono text-gray-800 dark:text-gray-200">{children}</code>
+              <code className="text-xs font-mono text-gray-800 dark:text-gray-200" {...props}>
+                {children}
+              </code>
             );
           },
           pre: ({ children }) => (

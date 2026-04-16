@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import { DB_NAME } from '../services/indexedDbStorage';
 
 interface Props {
   children: ReactNode;
@@ -9,6 +10,24 @@ interface State {
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
 }
+
+const getLocalizedStrings = () => {
+  const lang = navigator.language?.startsWith('zh') ? 'zh' : 'en';
+  return {
+    title: lang === 'zh' ? '应用加载出错' : 'Application Error',
+    description: lang === 'zh'
+      ? '抱歉，应用遇到了问题。这可能是由于浏览器兼容性或数据损坏导致的。'
+      : 'Sorry, the application encountered an issue. This may be due to browser compatibility or data corruption.',
+    reload: lang === 'zh' ? '重新加载页面' : 'Reload Page',
+    clearData: lang === 'zh' ? '清除本地数据并重启' : 'Clear Local Data & Restart',
+    browserHint: lang === 'zh' ? '建议使用的浏览器：' : 'Recommended browsers:',
+    fallbackTitle: lang === 'zh' ? '应用加载失败' : 'Application Failed to Load',
+    fallbackDesc: lang === 'zh'
+      ? '您的浏览器可能不支持运行此应用。请尝试使用最新版本的 Chrome、Firefox、Safari 或 Edge。'
+      : 'Your browser may not support running this app. Please try using the latest version of Chrome, Firefox, Safari, or Edge.',
+    fallbackButton: lang === 'zh' ? '重新加载' : 'Reload',
+  };
+};
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -35,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
       localStorage.clear();
       sessionStorage.clear();
       // Clear IndexedDB
-      const req = indexedDB.deleteDatabase('github-stars-manager-db');
+      const req = indexedDB.deleteDatabase(DB_NAME);
       req.onsuccess = () => {
         console.log('[ErrorBoundary] IndexedDB cleared');
         window.location.reload();
@@ -52,16 +71,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const strings = getLocalizedStrings();
       return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="text-center">
               <div className="text-5xl mb-4">😵</div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                应用加载出错
+                {strings.title}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                抱歉，应用遇到了问题。这可能是由于浏览器兼容性或数据损坏导致的。
+                {strings.description}
               </p>
               
               {this.state.error && (
@@ -77,18 +97,18 @@ export class ErrorBoundary extends Component<Props, State> {
                   onClick={this.handleReload}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  重新加载页面
+                  {strings.reload}
                 </button>
                 <button
                   onClick={this.handleClearStorage}
                   className="w-full px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
                 >
-                  清除本地数据并重启
+                  {strings.clearData}
                 </button>
               </div>
 
               <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                <p>建议使用的浏览器：</p>
+                <p>{strings.browserHint}</p>
                 <p>Chrome 80+ / Firefox 75+ / Safari 13+ / Edge 80+</p>
               </div>
             </div>

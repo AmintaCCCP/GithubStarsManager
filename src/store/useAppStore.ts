@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
 
@@ -110,6 +111,9 @@ const initialSearchFilters: SearchFilters = {
   sortOrder: 'desc',
   isAnalyzed: undefined,
   isSubscribed: undefined,
+  isEdited: undefined,
+  isCategoryLocked: undefined,
+  analysisFailed: undefined,
 };
 
 type PersistedAppState = Partial<
@@ -168,9 +172,6 @@ const normalizePersistedState = (
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
-  const savedSortBy = safePersisted.searchFilters?.sortBy || 'stars';
-  const savedSortOrder = safePersisted.searchFilters?.sortOrder || 'desc';
-
   return {
     ...currentState,
     ...safePersisted,
@@ -182,8 +183,9 @@ const normalizePersistedState = (
     releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     searchFilters: {
       ...initialSearchFilters,
-      sortBy: savedSortBy,
-      sortOrder: savedSortOrder,
+      ...safePersisted.searchFilters,
+      sortBy: safePersisted.searchFilters?.sortBy || 'stars',
+      sortOrder: safePersisted.searchFilters?.sortOrder || 'desc',
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
@@ -291,18 +293,25 @@ const defaultCategories: Category[] = [
   }
 ];
 
+// 预设筛选器图标映射
+const PRESET_FILTER_ICONS: Record<string, string> = {
+  'preset-windows': 'Monitor',
+  'preset-macos': 'Apple',
+  'preset-linux': 'Terminal',
+  'preset-android': 'Smartphone',
+  'preset-source': 'Package',
+};
+
 // 默认预设筛选器
-const defaultPresetFilters: AssetFilter[] = [
-  { id: 'preset-windows', name: 'Windows', keywords: ['windows', 'win', 'exe', 'msi', '.zip'], isPreset: true, icon: 'Monitor' },
-  { id: 'preset-macos', name: 'macOS', keywords: ['mac', 'macos', 'darwin', 'dmg', 'pkg'], isPreset: true, icon: 'Apple' },
-  { id: 'preset-linux', name: 'Linux', keywords: ['linux', 'appimage', 'deb', 'rpm', 'tar.gz'], isPreset: true, icon: 'Terminal' },
-  { id: 'preset-android', name: 'Android', keywords: ['android', 'apk'], isPreset: true, icon: 'Smartphone' },
-  { id: 'preset-source', name: 'Source', keywords: ['source', 'src', 'tar.gz', 'tar.xz', 'zip'], isPreset: true, icon: 'Package' },
-];
+const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
+  ...pf,
+  isPreset: true,
+  icon: PRESET_FILTER_ICONS[pf.id] || 'Package',
+}));
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, _get) => ({
+    (set) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -606,7 +615,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -676,6 +685,22 @@ export const useAppStore = create<AppState & AppActions>()(
         if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
           console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
           state.collapsedSidebarCategoryCount = 20;
+        }
+
+        // 迁移仓库数据中的旧标记
+        if (state && Array.isArray(state.repositories)) {
+          let migratedCount = 0;
+          state.repositories = state.repositories.map((repo: Repository) => {
+            // 将旧的 '__EMPTY__' 标记转换为空字符串（表示用户明确清空）
+            if (repo.custom_description === '__EMPTY__') {
+              migratedCount++;
+              return { ...repo, custom_description: '' };
+            }
+            return repo;
+          });
+          if (migratedCount > 0) {
+            console.log(`Migrated ${migratedCount} repositories: converted '__EMPTY__' to empty string`);
+          }
         }
 
         return state as PersistedAppState;

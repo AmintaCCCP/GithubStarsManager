@@ -93,13 +93,11 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
   const handleResetPresets = () => {
     if (confirm(language === 'zh' ? '确定要重置所有预设筛选器吗？这将恢复默认设置。' : 'Are you sure you want to reset all preset filters? This will restore default settings.')) {
-      // 保存完整状态快照以便回滚（使用深拷贝确保状态独立）
       const previousFilters = assetFilters.map(f => ({ ...f }));
       const previousSelected = [...selectedFilters];
       const addedFilterIds: string[] = [];
       
       try {
-        // 删除所有现有的预设筛选器
         presetFilters.forEach(filter => {
           if (assetFilters.find(f => f.id === filter.id)) {
             deleteAssetFilter(filter.id);
@@ -108,7 +106,6 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             onFilterToggle(filter.id);
           }
         });
-        // 添加默认预设筛选器
         DEFAULT_PRESET_FILTERS.forEach(filter => {
           if (!assetFilters.find(f => f.id === filter.id)) {
             addAssetFilter(filter);
@@ -116,32 +113,24 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           }
         });
       } catch (error) {
-        // 回滚到之前的状态
         console.error('Failed to reset presets:', error);
         
-        // 1. 移除新添加的筛选器
         addedFilterIds.forEach(id => {
           if (assetFilters.find(f => f.id === id)) {
             deleteAssetFilter(id);
           }
         });
         
-        // 2. 恢复之前的筛选器（包括被删除的）
         previousFilters.forEach(filter => {
           if (!assetFilters.find(f => f.id === filter.id)) {
             addAssetFilter(filter);
           }
         });
         
-        // 3. 完全恢复之前的选择状态（先清除所有，再恢复）
         // 清除当前所有选择
-        [...selectedFilters].forEach(id => {
-          onFilterToggle(id);
-        });
+        selectedFilters.forEach(id => onFilterToggle(id));
         // 恢复之前的选择
-        previousSelected.forEach(id => {
-          onFilterToggle(id);
-        });
+        previousSelected.forEach(id => onFilterToggle(id));
         
         alert(language === 'zh' ? '重置预设筛选器失败，已恢复之前的状态。' : 'Failed to reset preset filters. Previous state has been restored.');
       }
@@ -207,8 +196,12 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
       </div>
 
       {/* Expandable Content */}
-      {isExpanded && (
-        <div id="asset-filter-panel" className="animate-fade-in space-y-3">
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden min-h-0">
+          <div id="asset-filter-panel" className="space-y-3">
           {/* Preset Filters */}
           {presetFilters.length > 0 && (
             <div>
@@ -348,8 +341,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               </button>
             </div>
           )}
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Filter Modal */}
       <FilterModal

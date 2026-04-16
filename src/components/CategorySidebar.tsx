@@ -11,6 +11,7 @@ import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
 import { CategoryEditModal } from './CategoryEditModal';
 import { forceSyncToBackend } from '../services/autoSync';
+import { getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
 
 interface CategorySidebarProps {
   repositories: Repository[];
@@ -30,6 +31,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     collapsedSidebarCategoryCount,
     deleteCustomCategory,
     hideDefaultCategory,
+    showDefaultCategory,
     language,
     updateRepository,
     isSidebarCollapsed,
@@ -167,12 +169,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     if (category.id === 'all') return repositories.length;
 
     return repositories.filter(repo => {
-      // 如果仓库有自定义分类，只根据 custom_category 判断是否属于当前分类
-      if (repo.custom_category) {
+      if (repo.custom_category !== undefined) {
+        if (repo.custom_category === '') {
+          return false;
+        }
         return repo.custom_category === category.name;
       }
 
-      // 如果没有自定义分类，使用AI标签和关键词匹配
       if (repo.ai_tags && repo.ai_tags.length > 0) {
         return repo.ai_tags.some(tag =>
           category.keywords.some(keyword =>
@@ -221,7 +224,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     deleteCustomCategory(category.id);
     try {
       await forceSyncToBackend();
-    } catch (error) {
+    } catch {
       // Revert local change on failure
       alert(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'));
     }
@@ -240,7 +243,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     hideDefaultCategory(category.id);
     try {
       await forceSyncToBackend();
-    } catch (error) {
+    } catch {
       // Revert local change on failure - 回滚时调用 showDefaultCategory 恢复显示
       showDefaultCategory(category.id);
       alert(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'));
@@ -284,10 +287,19 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     const originalRepo = { ...repository };
 
+    // 获取所有分类用于计算AI和默认分类
+    const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    const aiCat = getAICategory(repository, allCategoriesList);
+    const defaultCat = getDefaultCategory(repository, allCategoriesList);
+
+    // 使用通用函数计算应该保存的自定义分类值
+    // 如果拖拽的分类与AI/默认一致，则清除自定义标记
+    const customCategoryValue = computeCustomCategory(category.name, aiCat, defaultCat);
+
     const nextRepo = {
       ...repository,
-      custom_category: category.name,
-      category_locked: true,
+      custom_category: customCategoryValue,
+      category_locked: customCategoryValue !== undefined && customCategoryValue !== '',
       last_edited: new Date().toISOString(),
     };
 
@@ -295,7 +307,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     try {
       await forceSyncToBackend();
-    } catch (error) {
+    } catch {
       handleSyncError(originalRepo);
     }
   };

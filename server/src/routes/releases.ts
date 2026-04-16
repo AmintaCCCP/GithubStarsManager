@@ -86,8 +86,8 @@ router.put('/api/releases', (req, res) => {
     }
 
     for (const release of releases) {
-      if (!release.id) {
-        res.status(400).json({ error: 'Each release must have an id', code: 'RELEASE_ID_REQUIRED' });
+      if (!release.id || typeof release.id !== 'number' || release.id <= 0) {
+        res.status(400).json({ error: 'Each release must have a valid positive integer id', code: 'RELEASE_ID_REQUIRED' });
         return;
       }
     }

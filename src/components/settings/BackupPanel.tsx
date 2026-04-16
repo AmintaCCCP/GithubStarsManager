@@ -127,13 +127,16 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         }
 
         try {
-          if (Array.isArray(customCategories)) {
-            for (const cat of customCategories) {
+          // 先获取当前所有自定义分类并删除
+          const currentCategories = useAppStore.getState().customCategories;
+          if (Array.isArray(currentCategories)) {
+            for (const cat of currentCategories) {
               if (cat && cat.id) {
                 deleteCustomCategory(cat.id);
               }
             }
           }
+          // 添加备份中的分类
           if (Array.isArray(backupData.customCategories)) {
             for (const cat of backupData.customCategories) {
               if (cat && cat.id && cat.name) {
@@ -181,6 +184,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
               if (existing) {
                 updateAIConfig(cfg.id, {
                   name: cfg.name,
+                  apiType: cfg.apiType,
                   baseUrl: cfg.baseUrl,
                   model: cfg.model,
                   customPrompt: cfg.customPrompt,

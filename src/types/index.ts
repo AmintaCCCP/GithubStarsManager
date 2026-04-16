@@ -45,8 +45,8 @@ export interface ReleaseAsset {
 export interface Release {
   id: number;
   tag_name: string;
-  name: string;
-  body: string;
+  name: string | null;
+  body: string | null;
   published_at: string;
   html_url: string;
   assets: ReleaseAsset[];
@@ -55,7 +55,6 @@ export interface Release {
     full_name: string;
     name: string;
   };
-  // Read status
   is_read?: boolean;
 }
 

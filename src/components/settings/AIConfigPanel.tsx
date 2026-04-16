@@ -118,7 +118,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       customPrompt: config.customPrompt || '',
       useCustomPrompt: config.useCustomPrompt || false,
       concurrency: config.concurrency || 1,
-      reasoningEffort: (config.reasoningEffort === 'minimal' ? 'low' : config.reasoningEffort) || '',
+      reasoningEffort: config.reasoningEffort || '',
     });
     setEditingId(config.id);
     setShowForm(true);

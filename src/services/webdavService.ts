@@ -45,25 +45,25 @@ export class WebDAVService {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
-      } catch (error) {
+      } catch (error: unknown) {
         lastError = error as Error;
 
         if (attempt === maxRetries) {
           throw lastError;
         }
 
-        // 对特定错误进行重试
+        const errMsg = lastError.message;
         const shouldRetry =
-          error.message.includes('超时') ||
-          error.message.includes('timeout') ||
-          error.message.includes('NetworkError') ||
-          error.message.includes('fetch');
+          errMsg.includes('超时') ||
+          errMsg.includes('timeout') ||
+          errMsg.includes('NetworkError') ||
+          errMsg.includes('fetch');
 
         if (!shouldRetry) {
           throw lastError;
         }
 
-        console.warn(`上传失败，第${attempt}次重试 (${delay}ms后):`, error.message);
+        console.warn(`上传失败，第${attempt}次重试 (${delay}ms后):`, errMsg);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; // 指数退避
       }
@@ -82,15 +82,15 @@ export class WebDAVService {
     return `${this.config.url}${basePath}${filename}`;
   }
 
-  private handleNetworkError(error: any, operation: string): never {
+  private handleNetworkError(error: unknown, operation: string): never {
     console.error(`WebDAV ${operation} failed:`, error);
     
-    // Check for CORS-related errors (most common issue)
+    const err = error as Error;
     const isCorsError = (
-      (error.name === 'TypeError' && error.message.includes('Failed to fetch')) ||
-      (error.message && error.message.includes('NetworkError when attempting to fetch resource')) ||
-      (error.name === 'NetworkError') ||
-      (error.message && error.message.includes('NetworkError'))
+      (err.name === 'TypeError' && err.message.includes('Failed to fetch')) ||
+      (err.message && err.message.includes('NetworkError when attempting to fetch resource')) ||
+      (err.name === 'NetworkError') ||
+      (err.message && err.message.includes('NetworkError'))
     );
 
     if (isCorsError) {
@@ -120,10 +120,10 @@ export class WebDAVService {
    • 验证URL格式正确（包含协议 http:// 或 https://）
    • 如果应用使用HTTPS，WebDAV服务器也应使用HTTPS
 
-技术详情: ${error.message}`);
+技术详情: ${err.message}`);
     }
     
-    throw new Error(`WebDAV ${operation} 失败: ${error.message || '未知错误'}`);
+    throw new Error(`WebDAV ${operation} 失败: ${err.message || '未知错误'}`);
   }
 
   async testConnection(): Promise<boolean> {
@@ -163,16 +163,16 @@ export class WebDAVService {
         });
 
         return propfindResponse.ok || propfindResponse.status === 207;
-      } catch (fetchError) {
+      } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
         
-        if (fetchError.name === 'AbortError') {
+        if ((fetchError as Error).name === 'AbortError') {
           throw new Error('连接超时。请检查WebDAV服务器是否可访问。');
         }
         
         throw fetchError;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.handleNetworkError(error, '连接测试');
     }
   }
@@ -236,10 +236,10 @@ export class WebDAVService {
           }
 
           return true;
-        } catch (fetchError) {
+        } catch (fetchError: unknown) {
           clearTimeout(timeoutId);
 
-          if (fetchError.name === 'AbortError') {
+          if ((fetchError as Error).name === 'AbortError') {
             throw new Error(`上传超时 (${finalSizeKB}KB文件，${dynamicTimeout/1000}秒限制)。建议检查网络连接或联系管理员优化服务器配置。`);
           }
 
@@ -248,15 +248,16 @@ export class WebDAVService {
       };
 
       return await this.retryUpload(uploadOperation);
-    } catch (error) {
-      if (error.message.includes('身份验证失败') || 
-          error.message.includes('访问被拒绝') || 
-          error.message.includes('路径未找到') ||
-          error.message.includes('存储空间不足') ||
-          error.message.includes('上传失败，HTTP状态码') ||
-          error.message.includes('上传超时') ||
-          error.message.includes('WebDAV URL必须')) {
-        throw error; // 重新抛出特定错误
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (err.message.includes('身份验证失败') || 
+          err.message.includes('访问被拒绝') || 
+          err.message.includes('路径未找到') ||
+          err.message.includes('存储空间不足') ||
+          err.message.includes('上传失败，HTTP状态码') ||
+          err.message.includes('上传超时') ||
+          err.message.includes('WebDAV URL必须')) {
+        throw error;
       }
       this.handleNetworkError(error, '上传');
     }
@@ -330,21 +331,22 @@ export class WebDAVService {
         }
         
         throw new Error(`下载失败，HTTP状态码 ${response.status}: ${response.statusText}`);
-      } catch (fetchError) {
+      } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
         
-        if (fetchError.name === 'AbortError') {
+        if ((fetchError as Error).name === 'AbortError') {
           throw new Error('下载超时。请检查网络连接。');
         }
         
         throw fetchError;
       }
-    } catch (error) {
-      if (error.message.includes('身份验证失败') || 
-          error.message.includes('下载超时')) {
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (err.message.includes('身份验证失败') || 
+          err.message.includes('下载超时')) {
         throw error;
       }
-      if (error.message.includes('HTTP 404')) {
+      if (err.message.includes('HTTP 404')) {
         return null;
       }
       this.handleNetworkError(error, '下载');
@@ -434,13 +436,13 @@ export class WebDAVService {
                 if (last.toLowerCase().endsWith('.json')) {
                   results.push(last.trim());
                 }
-              } catch (_e) {
+              } catch {
                 // 忽略单个条目解析失败
               }
             }
 
             if (results.length > 0) return results;
-          } catch (_e) {
+          } catch {
             // DOMParser 失败时降级为正则提取 href/displayname
             const namesFromDisplay = (xmlText.match(/<D:displayname>([^<]+)<\/D:displayname>/gi) || [])
               .map(m => m.replace(/<\/?D:displayname>/gi, ''))
@@ -464,18 +466,19 @@ export class WebDAVService {
           throw new Error(`列出文件失败，HTTP状态码 ${response.status}: ${response.statusText}`);
         }
         return [];
-      } catch (fetchError) {
+      } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
         
-        if (fetchError.name === 'AbortError') {
+        if ((fetchError as Error).name === 'AbortError') {
           throw new Error('列出文件超时。请检查网络连接。');
         }
         
         throw fetchError;
       }
-    } catch (error) {
-      if (error.message.includes('身份验证失败') || 
-          error.message.includes('列出文件超时')) {
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (err.message.includes('身份验证失败') || 
+          err.message.includes('列出文件超时')) {
         throw error;
       }
       this.handleNetworkError(error, '列出文件');

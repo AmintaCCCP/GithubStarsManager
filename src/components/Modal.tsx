@@ -39,11 +39,17 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
       />
       
       {/* Modal */}

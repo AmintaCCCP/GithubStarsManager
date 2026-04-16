@@ -176,21 +176,23 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, []);
 
   // 放置
-  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number, _categoryId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     setDragOverId(null);
 
     if (dragItemIndex.current === null || dragItemIndex.current === dropIndex) return;
 
-    // Compute new visible sequence and merge into existing categoryOrder preserving hidden IDs
-    const visibleIds = allVisibleCategories.map(c => c.id);
+    const state = useAppStore.getState();
+    const currentCategories = getAllCategories(state.customCategories, state.language, state.hiddenDefaultCategoryIds);
+    const currentVisible = sortCategoriesByOrder(currentCategories, state.categoryOrder);
+    const visibleIds = currentVisible.map(c => c.id);
     const [movedId] = visibleIds.splice(dragItemIndex.current, 1);
     visibleIds.splice(dropIndex, 0, movedId);
-    const hiddenIds = categoryOrder.filter(id => !visibleIds.includes(id));
+    const hiddenIds = state.categoryOrder.filter(id => !visibleIds.includes(id));
     setCategoryOrder([...visibleIds, ...hiddenIds]);
     dragItemIndex.current = null;
     setDraggingId(null);
-  }, [allVisibleCategories, categoryOrder, setCategoryOrder]);
+  }, [setCategoryOrder]);
 
   return (
     <div className="space-y-6">
@@ -368,7 +370,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   onDragEnd={handleDragEnd}
                   onDragOver={(e) => handleDragOver(e, category.id)}
                   onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index, category.id)}
+                  onDrop={(e) => handleDrop(e, index)}
                   className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
                     category.isCustom
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'

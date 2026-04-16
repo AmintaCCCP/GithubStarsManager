@@ -3,6 +3,7 @@ import { X, Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
+import { backend } from '../services/backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
 interface ReadmeModalProps {
@@ -25,9 +26,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchReadme = useCallback(async () => {
-    if (!repository || !githubToken) return;
+    if (!repository) return;
 
-    // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -38,11 +38,20 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     setError(null);
 
     try {
-      const githubApi = new GitHubApiService(githubToken);
       const [owner, name] = repository.full_name.split('/');
-      const content = await githubApi.getRepositoryReadme(owner, name);
+      let content = '';
 
-      // Check if request was aborted before updating state
+      if (backend.isAvailable) {
+        content = await backend.getRepositoryReadme(owner, name);
+      } else if (githubToken) {
+        const githubApi = new GitHubApiService(githubToken);
+        content = await githubApi.getRepositoryReadme(owner, name, abortController.signal);
+      } else {
+        setError(language === 'zh' ? '未登录且后端不可用，无法加载 README' : 'Not logged in and backend unavailable, cannot load README');
+        setLoading(false);
+        return;
+      }
+
       if (abortController.signal.aborted) return;
 
       if (content.trim()) {
@@ -51,7 +60,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setError(language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file');
       }
     } catch (err) {
-      // Check if request was aborted before updating state
       if (abortController.signal.aborted) return;
       console.error('Failed to fetch README:', err);
       setError(language === 'zh' ? '加载 README 失败，请检查网络连接或稍后重试' : 'Failed to load README. Please check your network connection and try again later');
@@ -63,14 +71,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   }, [repository, githubToken, language]);
 
   useEffect(() => {
-    if (isOpen && repository && githubToken) {
+    if (isOpen && repository) {
       fetchReadme();
     }
-  }, [isOpen, repository, githubToken, fetchReadme]);
+  }, [isOpen, repository, fetchReadme]);
 
-  // Reset state when modal closes and cleanup abortController on unmount
+  // Reset state when modal closes and cancel pending requests
   useEffect(() => {
     if (!isOpen) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setReadmeContent('');
       setError(null);
       setLoading(false);
@@ -96,11 +108,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     };
 
     if (isOpen) {
-      // Save previous focus
       previousFocusRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
-      // Focus the modal container
       setTimeout(() => {
         modalRef.current?.focus();
       }, 0);
@@ -108,8 +118,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-      // Restore previous focus
+      if (document.body.style.overflow === 'hidden') {
+        document.body.style.overflow = 'unset';
+      }
       previousFocusRef.current?.focus();
     };
   }, [isOpen, onClose]);

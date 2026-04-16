@@ -83,71 +83,6 @@
   .touch-manipulation {
     touch-action: manipulation;
   }
-
-  /* 动画工具类 */
-  @keyframes slide-up {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  .animate-slide-up {
-    animation: slide-up 0.3s ease-out;
-  }
-
-  @keyframes slide-down {
-    from {
-      transform: translateY(0);
-      opacity: 1;
-    }
-    to {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-  }
-
-  .animate-slide-down {
-    animation: slide-down 0.3s ease-in forwards;
-  }
-
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.2s ease-out;
-  }
-
-  /* 退出多选模式时的选中卡片动画 - 优化版本，减少闪烁 */
-  @keyframes selection-exit {
-    0% {
-      transform: scale(1);
-      box-shadow: 0 0 0 2px theme('colors.blue.500');
-    }
-    50% {
-      transform: scale(1.01);
-      box-shadow: 0 0 0 3px theme('colors.blue.400');
-    }
-    100% {
-      transform: scale(1);
-      box-shadow: 0 0 0 0 transparent;
-    }
-  }
-
-  .animate-selection-exit {
-    animation: selection-exit 0.25s ease-out forwards;
-    will-change: transform, box-shadow;
-  }
 }
 
 .hd-drag {
@@ -174,57 +109,6 @@
 /* 多选模式下防止焦点导致的滚动 */
 .repository-card[data-selection-mode="true"] {
   scroll-margin: 0;
-}
-
-/* 高性能展开动画 - 使用 CSS Grid 替代 max-height */
-.expandable-container {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s ease-in-out;
-  will-change: grid-template-rows;
-}
-
-.expandable-container.expanded {
-  grid-template-rows: 1fr;
-}
-
-.expandable-content {
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* GPU 加速优化 */
-.gpu-accelerated {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-}
-
-/* 内容懒加载优化 */
-.content-lazy {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 500px;
-}
-
-/* 展开动画性能优化 */
-.release-card-expand {
-  will-change: transform, opacity;
-  transform: translateZ(0);
-}
-
-.release-card-expand.expanding {
-  animation: expand-fade 0.3s ease-out;
-}
-
-@keyframes expand-fade {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) translateZ(0);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) translateZ(0);
-  }
 }
 
 /* 分类侧栏自定义滚动条样式 */

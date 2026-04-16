@@ -152,7 +152,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             role="tab"
             id={`mobile-tab-${tab.id}`}
             aria-selected={activeTab === tab.id}
-            aria-controls={`mobile-tabpanel-${tab.id}`}
+            aria-controls={`tabpanel-${tab.id}`}
             className={`
               flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
               transition-all duration-200 ease-out snap-center
@@ -215,7 +215,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleTabChange = useCallback((tabId: SettingsTab) => {
     if (tabId === activeTab || isTransitioning) return;
 
-    // 清除旧定时器，避免重叠
     if (tabChangeTimeoutRef.current) {
       clearTimeout(tabChangeTimeoutRef.current);
     }
@@ -225,16 +224,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     setIsTransitioning(true);
 
-    // 等待淡出动画完成后再切换标签
     tabChangeTimeoutRef.current = setTimeout(() => {
       setActiveTab(tabId);
       setDisplayTab(tabId);
 
-      // 等待淡入动画完成后重置状态
       tabResetTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
-      }, 100);
-    }, 100);
+      }, 200);
+    }, 150);
   }, [activeTab, isTransitioning]);
 
   // 清理定时器
@@ -287,7 +284,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     },
   ];
 
-  const renderTabContent = (idPrefix: string = 'desktop') => {
+  const renderTabContent = () => {
     const content = (() => {
       switch (displayTab) {
         case 'general':
@@ -312,10 +309,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     return (
       <div
         role="tabpanel"
-        id={`${idPrefix}-tabpanel-${displayTab}`}
-        aria-labelledby={`${idPrefix}-tab-${displayTab}`}
+        id={`tabpanel-${displayTab}`}
+        aria-labelledby={`mobile-tab-${displayTab}`}
         className={`
-          transition-all duration-100 ease-out
+          transition-all duration-150 ease-out
           ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}
         `}
       >
@@ -389,7 +386,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {/* 内容区域 */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-3xl mx-auto">
-                {renderTabContent('desktop')}
+                {renderTabContent()}
               </div>
             </div>
           </div>
@@ -447,7 +444,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-            {renderTabContent('desktop')}
+            {renderTabContent()}
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
+import { backend } from '../services/backendAdapter';
 import { forceSyncToBackend } from '../services/autoSync';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
@@ -23,6 +24,7 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   variant = 'default',
   className = '',
   disabled,
+  onClick,
   ...props
 }) => {
   const baseClasses = 'p-2 rounded-lg transition-colors disabled:opacity-50';
@@ -36,9 +38,16 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
     unstar: 'flex items-center justify-center w-8 h-8 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 disabled:cursor-not-allowed',
   };
 
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // 阻止事件冒泡，防止触发卡片的点击事件
+    e.stopPropagation();
+    onClick?.(e);
+  };
+
   return (
     <button
       {...props}
+      onClick={handleClick}
       disabled={disabled || selectionMode}
       className={`${baseClasses} ${variantClasses[variant]} ${selectionClasses} ${className}`}
     >
@@ -260,7 +269,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       // 获取README内容
       const [owner, name] = repository.full_name.split('/');
-      const readmeContent = await githubApi.getRepositoryReadme(owner, name);
+      const readmeContent = backend.isAvailable
+        ? await backend.getRepositoryReadme(owner, name)
+        : await githubApi.getRepositoryReadme(owner, name);
 
       // 获取可用分类名称列表
       const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
@@ -269,15 +280,18 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames);
       const resolvedCategory = resolveCategoryAssignment(repository, analysis.tags, allCategories);
 
-      // 更新仓库信息
+      const wasCategoryLocked = !!repository.category_locked;
+      const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
+
       const updatedRepo = {
         ...repository,
         ai_summary: analysis.summary,
         ai_tags: analysis.tags,
         ai_platforms: analysis.platforms,
         custom_category: resolvedCategory,
+        category_locked: shouldKeepLocked || wasCategoryLocked,
         analyzed_at: new Date().toISOString(),
-        analysis_failed: false // 分析成功，清除失败标记
+        analysis_failed: false
       };
 
       updateRepository(updatedRepo);
@@ -316,51 +330,142 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   };
 
   // 使用 useMemo 缓存显示内容计算
+  // 方案一：分离内容与状态指示，同时显示多个状态标签
   const displayContent = useMemo(() => {
-    if (repository.custom_description) {
-      return {
-        content: repository.custom_description,
-        isCustom: true
-      };
-    } else if (showAISummary && repository.analysis_failed) {
-      return {
-        content: repository.description || (language === 'zh' ? '暂无描述' : 'No description available'),
-        isAI: false,
-        isFailed: true
-      };
+    // 确定显示的内容（按优先级）
+    // custom_description === '' 表示用户明确清空，应显示为空
+    // custom_description === undefined 表示无自定义，回退到AI/原始
+    let content: string;
+    let contentSource: 'custom' | 'ai' | 'original' | 'empty';
+
+    // 检查是否有明确的自定义描述（包括空标记）
+    const hasExplicitCustomDesc = repository.custom_description !== undefined;
+    const isExplicitlyCleared = repository.custom_description === '';
+
+    if (isExplicitlyCleared) {
+      // 用户明确清空描述
+      content = language === 'zh' ? '（无描述）' : '(No description)';
+      contentSource = 'empty';
+    } else if (repository.custom_description) {
+      // 有自定义描述
+      content = repository.custom_description;
+      contentSource = 'custom';
     } else if (showAISummary && repository.ai_summary) {
-      return {
-        content: repository.ai_summary,
-        isAI: true
-      };
+      // 显示AI总结
+      content = repository.ai_summary;
+      contentSource = 'ai';
     } else if (repository.description) {
-      return {
-        content: repository.description,
-        isAI: false
-      };
+      // 显示原始描述
+      content = repository.description;
+      contentSource = 'original';
     } else {
-      return {
-        content: language === 'zh' ? '暂无描述' : 'No description available',
-        isAI: false
-      };
+      // 无可用描述
+      content = language === 'zh' ? '暂无描述' : 'No description available';
+      contentSource = 'empty';
     }
-  }, [repository.custom_description, repository.description, repository.ai_summary, repository.analysis_failed, showAISummary, language]);
+
+    if (showAISummary && repository.analysis_failed) {
+      if (isExplicitlyCleared) {
+        content = language === 'zh' ? '（无描述）' : '(No description)';
+        contentSource = 'empty';
+      } else if (repository.custom_description) {
+        content = repository.custom_description;
+        contentSource = 'custom';
+      } else if (repository.description) {
+        content = repository.description;
+        contentSource = 'original';
+      } else {
+        content = language === 'zh' ? '暂无描述' : 'No description available';
+        contentSource = 'empty';
+      }
+    }
+
+    // 判断仓库是否有任何自定义行为（与筛选器逻辑一致）
+    // 描述：有自定义描述标记（包括明确清空），且内容与AI/原始不同
+    const hasCustomDesc = repository.custom_description !== undefined;
+    const repoDesc = (repository.description || '').trim();
+    const aiDesc = (repository.ai_summary || '').trim();
+    const customDesc = (repository.custom_description || '').trim();
+    const isDescEdited = hasCustomDesc &&
+      (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
+
+    // 标签：有自定义标签标记（包括明确清空），且内容与AI/Topics不同
+    const hasCustomTags = repository.custom_tags !== undefined;
+    const aiTags = repository.ai_tags || [];
+    const topics = repository.topics || [];
+    const customTags = repository.custom_tags || [];
+    const isTagsEdited = hasCustomTags &&
+      (customTags.length === 0 || (
+        JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
+        JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
+      ));
+
+    // 分类：有自定义分类标记（包括明确清空）
+    const isCategoryEdited = repository.custom_category !== undefined &&
+      (repository.custom_category === '' || repository.custom_category.trim() !== '');
+
+    // 任意一个为true则显示已自定义（注意：分类锁定不算自定义）
+    const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
+
+    return {
+      content,
+      contentSource,
+      hasCustomDescription: hasExplicitCustomDesc,
+      hasAISummary: !!repository.ai_summary,
+      isAnalysisFailed: !!repository.analysis_failed,
+      isAnalyzed: !!repository.analyzed_at,
+      analyzedAt: repository.analyzed_at,
+      isExplicitlyCleared,
+      isCustomized
+    };
+  }, [repository.custom_description, repository.description, repository.ai_summary, repository.analysis_failed, repository.analyzed_at, repository.custom_tags, repository.ai_tags, repository.topics, repository.custom_category, repository.category_locked, showAISummary, language]);
 
   // 使用 useMemo 缓存标签计算
+  // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics
   const displayTags = useMemo(() => {
-    if (repository.custom_tags && repository.custom_tags.length > 0) {
-      return { tags: repository.custom_tags, isCustom: true };
-    } else if (repository.ai_tags && repository.ai_tags.length > 0) {
-      return { tags: repository.ai_tags, isCustom: false };
-    } else {
-      return { tags: repository.topics || [], isCustom: false };
-    }
-  }, [repository.custom_tags, repository.ai_tags, repository.topics]);
+    // 检查是否有明确的自定义标签设置（包括空数组）
+    const hasExplicitCustomTags = repository.custom_tags !== undefined;
+    const isExplicitlyCleared = hasExplicitCustomTags && repository.custom_tags!.length === 0;
 
-  // 使用 useMemo 缓存分类计算
-  const displayCategory = useMemo(() => {
-    return repository.custom_category || null;
-  }, [repository.custom_category]);
+    // 优先显示自定义标签（如果非空）
+    if (repository.custom_tags && repository.custom_tags.length > 0) {
+      return {
+        tags: repository.custom_tags.map(tag => ({ tag, source: 'custom' as const })),
+        tagType: 'custom' as const,
+        hasExplicitCustomTags,
+        isExplicitlyCleared
+      };
+    }
+
+    // 如果用户明确清空标签，显示空状态
+    if (isExplicitlyCleared) {
+      return {
+        tags: [],
+        tagType: 'empty' as const,
+        hasExplicitCustomTags,
+        isExplicitlyCleared
+      };
+    }
+
+    // 没有自定义标签时，按AI分析状态显示
+    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
+    if (isAnalyzed && repository.ai_tags && repository.ai_tags.length > 0) {
+      return {
+        tags: repository.ai_tags.map(tag => ({ tag, source: 'ai' as const })),
+        tagType: 'ai' as const,
+        hasExplicitCustomTags,
+        isExplicitlyCleared
+      };
+    } else {
+      const topics = repository.topics || [];
+      return {
+        tags: topics.map(tag => ({ tag, source: 'topic' as const })),
+        tagType: 'topic' as const,
+        hasExplicitCustomTags,
+        isExplicitlyCleared
+      };
+    }
+  }, [repository.custom_tags, repository.analyzed_at, repository.analysis_failed, repository.ai_tags, repository.topics]);
 
   // 使用 useMemo 缓存AI分析按钮提示文本
   const aiButtonTitle = useMemo(() => {
@@ -473,7 +578,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     }
   };
 
-  const handleTouchEnd = (_event: React.TouchEvent) => {
+  const handleTouchEnd = () => {
     if (isTouchDraggingRef.current) {
       // 如果发生了拖拽，阻止后续点击事件
       (window as Window & { __isDraggingRepo?: boolean }).__isDraggingRepo = true;
@@ -547,7 +652,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, [selectionMode, onSelect]);
 
   // 处理键盘事件，使卡片可键盘操作
+  // 当编辑模态框或README模态框打开时，禁用卡片键盘事件
+  const isModalOpen = editModalOpen || readmeModalOpen;
+  
   const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    // 如果任何模态框打开，不处理键盘事件
+    if (isModalOpen) return;
+    
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (selectionMode && onSelect) {
@@ -556,7 +667,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         setReadmeModalOpen(true);
       }
     }
-  }, [selectionMode, onSelect, repository.id]);
+  }, [selectionMode, onSelect, repository.id, isModalOpen]);
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
@@ -574,10 +685,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       onClick={handleCardClick}
       onMouseDown={handleMouseDown}
       onKeyDown={handleCardKeyDown}
-      tabIndex={0}
+      tabIndex={isModalOpen ? -1 : 0}
       role="button"
       aria-label={`${repository.full_name} - ${repository.description || 'No description'}`}
       data-selection-mode={selectionMode}
+      aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
       <div className="flex items-center space-x-3 mb-3">
@@ -735,60 +847,58 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
-          {displayContent.isCustom && (
-            <div className="flex items-center space-x-1 text-xs text-orange-600 dark:text-orange-400">
+        {/* 方案一：同时显示多个状态标签 */}
+        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+          {/* 已自定义标签 - 与筛选器逻辑一致 */}
+          {displayContent.isCustomized && (
+            <div className="flex items-center space-x-1 text-xs text-orange-600 dark:text-orange-400" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
               <Edit3 className="w-3 h-3" />
-              <span>{language === 'zh' ? '自定义' : 'Custom'}</span>
+              <span>{language === 'zh' ? '已自定义' : 'Customized'}</span>
             </div>
           )}
-          {displayContent.isFailed && (
-            <div className="flex items-center space-x-1 text-xs text-red-600 dark:text-red-400">
-              <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? '分析失败' : 'Analysis Failed'}</span>
-            </div>
-          )}
-          {displayContent.isAI && !displayContent.isFailed && (
-            <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400">
+          {/* 当前内容来源标签 - 仅显示非自定义来源 */}
+          {displayContent.contentSource === 'ai' && (
+            <div className="flex items-center space-x-1 text-xs text-purple-600 dark:text-purple-400" title={language === 'zh' ? '当前显示的是AI总结' : 'Currently showing AI summary'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? 'AI总结' : 'AI Summary'}</span>
+            </div>
+          )}
+
+          {/* AI分析状态标签 - 与内容来源独立显示 */}
+          {displayContent.isAnalysisFailed && (
+            <div className="flex items-center space-x-1 text-xs text-red-600 dark:text-red-400" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
+              <Bot className="w-3 h-3" />
+              <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
+            </div>
+          )}
+          {displayContent.isAnalyzed && !displayContent.isAnalysisFailed && (
+            <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400" title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}>
+              <Bot className="w-3 h-3" />
+              <span>{language === 'zh' ? 'AI已分析' : 'AI Analyzed'}</span>
+            </div>
+          )}
+
+          {/* 显示存在但未使用的AI总结提示 */}
+          {displayContent.hasAISummary && displayContent.contentSource !== 'ai' && (
+            <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400" title={language === 'zh' ? '有AI总结，但当前显示其他来源' : 'AI summary available but showing other source'}>
+              <Bot className="w-3 h-3" />
+              <span>{language === 'zh' ? 'AI可用' : 'AI Available'}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Category Display */}
-      {displayCategory && (
-        <div className="mb-3">
-          <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-md text-xs font-medium">
-            {displayCategory}
-          </span>
-        </div>
-      )}
-
-      {/* Tags */}
+      {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {displayTags.tags.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {displayTags.tags.slice(0, 3).map((tag, index) => (
+          {displayTags.tags.map((tagItem, index) => (
             <span
-              key={index}
-              className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+              key={`tag-${index}`}
+              className="px-2 py-1 rounded-md text-xs font-medium bg-blue-50/50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
             >
-              {highlightSearchTerm(tag, searchQuery)}
+              {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
           ))}
-          {repository.topics && repository.topics.length > 0 && !displayTags.isCustom && (
-            <>
-              {repository.topics.slice(0, 2).map((topic, index) => (
-                <span
-                  key={`topic-${index}`}
-                  className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-md text-xs font-medium"
-                >
-                  {topic}
-                </span>
-              ))}
-            </>
-          )}
         </div>
       )}
 
@@ -820,41 +930,19 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Stats */}
       <div className="space-y-3 mt-auto">
         {/* Language and Stars */}
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-          <div className="flex items-center space-x-4">
-            {repository.language && (
-              <div className="flex items-center space-x-1">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: getLanguageColor(repository.language) }}
-                />
-                <span className="truncate max-w-20">{repository.language}</span>
-              </div>
-            )}
+        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+          {repository.language && (
             <div className="flex items-center space-x-1">
-              <Star className="w-4 h-4" />
-              <span>{formatNumber(repository.stargazers_count)}</span>
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: getLanguageColor(repository.language) }}
+              />
+              <span className="truncate max-w-20">{repository.language}</span>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {repository.last_edited && (
-              <div className="flex items-center space-x-1 text-xs">
-                <Edit3 className="w-3 h-3 text-orange-500" />
-                <span>{language === 'zh' ? '已编辑' : 'Edited'}</span>
-              </div>
-            )}
-            {repository.analysis_failed ? (
-              <div className="flex items-center space-x-1 text-xs">
-                <div className="w-2 h-2 bg-red-500 rounded-full" />
-                <span>{language === 'zh' ? '分析失败' : 'Analysis failed'}</span>
-              </div>
-            ) : repository.analyzed_at && (
-              <div className="flex items-center space-x-1 text-xs">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span>{language === 'zh' ? 'AI已分析' : 'AI analyzed'}</span>
-              </div>
-            )}
+          )}
+          <div className="flex items-center space-x-1">
+            <Star className="w-4 h-4" />
+            <span>{formatNumber(repository.stargazers_count)}</span>
           </div>
         </div>
 
@@ -907,16 +995,19 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
 // 使用 React.memo 优化，避免不必要的重渲染
 export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, nextProps) => {
-  // 自定义比较函数，只在必要时重新渲染
   return (
     prevProps.repository.id === nextProps.repository.id &&
     prevProps.repository.analyzed_at === nextProps.repository.analyzed_at &&
     prevProps.repository.analysis_failed === nextProps.repository.analysis_failed &&
     prevProps.repository.ai_summary === nextProps.repository.ai_summary &&
     prevProps.repository.ai_tags === nextProps.repository.ai_tags &&
+    prevProps.repository.ai_platforms === nextProps.repository.ai_platforms &&
     prevProps.repository.custom_description === nextProps.repository.custom_description &&
     prevProps.repository.custom_tags === nextProps.repository.custom_tags &&
     prevProps.repository.custom_category === nextProps.repository.custom_category &&
+    prevProps.repository.category_locked === nextProps.repository.category_locked &&
+    prevProps.repository.description === nextProps.repository.description &&
+    prevProps.repository.topics === nextProps.repository.topics &&
     prevProps.repository.stargazers_count === nextProps.repository.stargazers_count &&
     prevProps.repository.pushed_at === nextProps.repository.pushed_at &&
     prevProps.repository.updated_at === nextProps.repository.updated_at &&

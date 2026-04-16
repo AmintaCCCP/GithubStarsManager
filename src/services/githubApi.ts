@@ -1,5 +1,18 @@
 import { Repository, Release, GitHubUser } from '../types';
 
+interface GitHubStarredItem {
+  starred_at?: string;
+  repo?: Repository;
+  [key: string]: unknown;
+}
+
+interface GitHubRateLimitResponse {
+  rate: {
+    remaining: number;
+    reset: number;
+  };
+}
+
 const GITHUB_API_BASE = 'https://api.github.com';
 
 export class GitHubApiService {
@@ -9,9 +22,10 @@ export class GitHubApiService {
     this.token = token;
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
     const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
       ...options,
+      signal,
       headers: {
         'Authorization': `Bearer ${this.token}`,
         'Accept': 'application/vnd.github.v3+json',
@@ -31,7 +45,7 @@ export class GitHubApiService {
 
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
-      return data.map((item: any) => {
+      return data.map((item: GitHubStarredItem) => {
         // 如果使用了star+json格式，数据结构会不同
         if (item.starred_at && item.repo) {
           return {
@@ -83,10 +97,12 @@ export class GitHubApiService {
     return allRepos;
   }
 
-  async getRepositoryReadme(owner: string, repo: string): Promise<string> {
+  async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
     try {
       const response = await this.makeRequest<{ content: string; encoding: string }>(
-        `/repos/${owner}/${repo}/readme`
+        `/repos/${owner}/${repo}/readme`,
+        undefined,
+        signal
       );
 
       if (response.encoding === 'base64') {
@@ -107,7 +123,7 @@ export class GitHubApiService {
 
   async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Release[]> {
     try {
-      const releases = await this.makeRequest<any[]>(
+      const releases = await this.makeRequest<Release[]>(
         `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
       );
       
@@ -163,9 +179,9 @@ export class GitHubApiService {
     perPage = 10
   ): Promise<Release[]> {
     try {
-      let endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
+      const endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
       
-      const releases = await this.makeRequest<any[]>(endpoint);
+      const releases = await this.makeRequest<Release[]>(endpoint);
       
       const mappedReleases = releases.map(release => ({
         id: release.id,
@@ -204,7 +220,7 @@ export class GitHubApiService {
   }
 
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
-    const response = await this.makeRequest<any>('/rate_limit');
+    const response = await this.makeRequest<GitHubRateLimitResponse>('/rate_limit');
     return {
       remaining: response.rate.remaining,
       reset: response.rate.reset,

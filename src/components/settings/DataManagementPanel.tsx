@@ -198,10 +198,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteCategorySettings = async () => {
     try {
       const store = useAppStore.getState();
+      // 先复制分类数组，避免在迭代过程中修改原数组
+      const categoriesToDelete = [...store.customCategories];
       // Reset category-related state
-      store.customCategories.forEach((cat) => {
+      for (const cat of categoriesToDelete) {
         store.deleteCustomCategory(cat.id);
-      });
+      }
       // Clear hidden default categories and reset category-related settings
       useAppStore.setState({ 
         hiddenDefaultCategoryIds: [],
@@ -277,10 +279,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         },
       });
 
-      // 清除所有分类相关数据（在状态重置之后）
-      customCategories.forEach((cat) => {
-        deleteCustomCategory(cat.id);
-      });
+      // 清除所有分类相关数据（在状态重置之后，使用 getState 获取最新值）
+      const latestCategories = useAppStore.getState().customCategories;
+      for (const cat of latestCategories) {
+        if (cat && cat.id) {
+          deleteCustomCategory(cat.id);
+        }
+      }
 
       addLog(t('删除所有数据', 'Delete all data'), true);
       showSuccess(t('所有数据已删除，应用将重新加载', 'All data deleted, app will reload'));

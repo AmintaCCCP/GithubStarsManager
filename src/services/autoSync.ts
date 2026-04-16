@@ -26,7 +26,7 @@ let _pollTimer: ReturnType<typeof setInterval> | null = null;
 const POLL_INTERVAL = 5000;
 
 // Last known backend data fingerprints — skip store update if unchanged
-let _lastHash = {
+const _lastHash = {
   repos: '',
   releases: '',
   ai: '',
@@ -115,7 +115,10 @@ export async function syncFromBackend(): Promise<void> {
     }
 
     // Only update store if backend data actually changed
-    if (!Object.values(changed).some(Boolean)) return;
+    if (!Object.values(changed).some(Boolean)) {
+      _isSyncingFromBackendActive = false;
+      return;
+    }
 
     _isSyncingFromBackend = true;
     if (changed.repos || changed.releases) {

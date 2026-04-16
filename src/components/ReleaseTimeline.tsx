@@ -137,9 +137,10 @@ export const ReleaseTimeline: React.FC = () => {
       });
     }
 
+    const bodyText = release.body || '';
     const downloadRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
     let match;
-    while ((match = downloadRegex.exec(release.body)) !== null) {
+    while ((match = downloadRegex.exec(bodyText)) !== null) {
       const [, name, url] = match;
       if (url.includes('/download/') || url.includes('/releases/') || 
           name.toLowerCase().includes('download') ||
@@ -184,8 +185,8 @@ export const ReleaseTimeline: React.FC = () => {
         release.repository.name.toLowerCase().includes(query) ||
         release.repository.full_name.toLowerCase().includes(query) ||
         release.tag_name.toLowerCase().includes(query) ||
-        release.name.toLowerCase().includes(query) ||
-        release.body.toLowerCase().includes(query)
+        (release.name || '').toLowerCase().includes(query) ||
+        (release.body || '').toLowerCase().includes(query)
       );
     }
 
@@ -240,7 +241,8 @@ export const ReleaseTimeline: React.FC = () => {
   const totalPages = viewMode === 'timeline'
     ? Math.ceil(filteredReleases.length / itemsPerPage)
     : Math.ceil(repositoryGroups.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const clampedPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const startIndex = (clampedPage - 1) * itemsPerPage;
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
   const paginatedRepositoryGroups = repositoryGroups.slice(startIndex, startIndex + itemsPerPage);
 
@@ -422,10 +424,17 @@ export const ReleaseTimeline: React.FC = () => {
   const releasesTruncatedBody = useMemo(() => {
     const map = new Map<number, string>();
     paginatedReleases.forEach(({ release }) => {
-      map.set(release.id, getTruncatedBody(release.body, 500));
+      map.set(release.id, getTruncatedBody(release.body || '', 500));
+    });
+    paginatedRepositoryGroups.forEach(({ releases }) => {
+      releases.forEach(({ release }) => {
+        if (!map.has(release.id)) {
+          map.set(release.id, getTruncatedBody(release.body || '', 500));
+        }
+      });
     });
     return map;
-  }, [paginatedReleases, getTruncatedBody]);
+  }, [paginatedReleases, paginatedRepositoryGroups, getTruncatedBody]);
 
   const handleUnsubscribeRelease = async (repoId: number) => {
     const repo = repositories.find((item) => item.id === repoId);
@@ -495,14 +504,30 @@ export const ReleaseTimeline: React.FC = () => {
         )}
 
         {subscribedRepoCount === 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mx-auto">
-            <div className="flex items-center space-x-2 text-blue-700 dark:text-blue-300">
-              <Bell className="w-5 h-5" />
-              <span className="font-medium">{t('如何订阅:', 'How to subscribe:')}</span>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6 max-w-lg mx-auto">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center">
+                <Bell className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                  {t('订阅仓库Release', 'Subscribe to Repository Releases')}
+                </h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-3 leading-relaxed">
+                  {t('订阅后，您可以在这里查看所有关注仓库的最新发布版本，第一时间获取更新动态。', 'Subscribe to receive the latest release updates from your favorite repositories in one place.')}
+                </p>
+                <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-3 text-sm">
+                  <div className="flex items-center space-x-2 text-blue-800 dark:text-blue-300 font-medium mb-2">
+                    <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs">1</span>
+                    <span>{t('前往仓库页面', 'Go to Repositories')}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-blue-800 dark:text-blue-300 font-medium">
+                    <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs">2</span>
+                    <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
-              {t('转到仓库页面，点击任何仓库卡片上的铃铛图标以订阅其Release。', 'Go to the Repositories tab and click the bell icon on any repository card to subscribe to its releases.')}
-            </p>
           </div>
         )}
       </div>
@@ -742,7 +767,7 @@ export const ReleaseTimeline: React.FC = () => {
       </div>
 
       {/* Releases List */}
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {paginatedReleases.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
             <Package className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3" />
@@ -770,7 +795,7 @@ export const ReleaseTimeline: React.FC = () => {
             const isAssetsExpanded = expandedAssets.has(release.id);
             const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
             const isFullContent = fullContentReleases.has(release.id);
-            const truncatedBody = releasesTruncatedBody.get(release.id) || release.body;
+            const truncatedBody = releasesTruncatedBody.get(release.id) || release.body || '';
 
             return (
               <ReleaseCard
@@ -806,51 +831,55 @@ export const ReleaseTimeline: React.FC = () => {
                 {/* Repository Header */}
                 <button
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  className="w-full flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     {hasUnread && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 animate-pulse"></div>
                     )}
-                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-lg flex-shrink-0">
-                      <LayoutGrid className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div className="flex items-center justify-center w-6 h-6 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded flex-shrink-0">
+                      <LayoutGrid className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                      <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
                         {repository.name}
                       </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
                         {repository.full_name}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
                     <div className="text-right hidden sm:block">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {releases.length} {t('个版本', 'releases')}
                       </p>
                       {latestRelease && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
                           {t('最新:', 'Latest:')} {latestRelease.tag_name}
                         </p>
                       )}
                     </div>
                     <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
                     </div>
                   </div>
                 </button>
 
                 {/* Repository Releases (Collapsible) */}
-                {isExpanded && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <div className="p-3 space-y-2">
+                <div
+                  className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                  style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                >
+                  <div className="overflow-hidden min-h-0">
+                    <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="p-1.5 space-y-1.5">
                       {releases.map(({ release, displayLinks }) => {
                         const isUnread = isReleaseUnread(release.id);
                         const isAssetsExpanded = expandedAssets.has(release.id);
                         const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
                         const isFullContent = fullContentReleases.has(release.id);
-                        const truncatedBody = releasesTruncatedBody.get(release.id) || release.body;
+                        const truncatedBody = releasesTruncatedBody.get(release.id) || release.body || '';
 
                         return (
                           <ReleaseCard
@@ -874,9 +903,10 @@ export const ReleaseTimeline: React.FC = () => {
                           />
                         );
                       })}
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })

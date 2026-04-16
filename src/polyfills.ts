@@ -60,7 +60,7 @@ if (typeof window !== 'undefined' && !window.CustomEvent) {
       super(type, eventInitDict);
       this.detail = eventInitDict?.detail as T;
     }
-  } as any;
+  } as typeof window.CustomEvent;
 }
 
 console.log('[polyfills] Polyfills loaded');

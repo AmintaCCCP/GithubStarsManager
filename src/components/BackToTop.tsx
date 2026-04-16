@@ -72,7 +72,7 @@ export const BackToTop: React.FC = () => {
         text-white
         rounded-full
         shadow-lg hover:shadow-xl
-        transform transition-all duration-300 ease-out
+        transform transition-[opacity,transform] duration-300 ease-out
         hover:scale-110
         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
@@ -81,11 +81,8 @@ export const BackToTop: React.FC = () => {
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
         ${isBouncing ? 'animate-bounce-twice' : ''}
-        /* 移动端：大幅上移避免遮挡底部多选工具栏 */
         bottom-24 right-4
-        /* 平板：继续上移 */
         sm:bottom-28 sm:right-6
-        /* 桌面：适度上移 */
         lg:bottom-24 lg:right-10
       `}
       aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}

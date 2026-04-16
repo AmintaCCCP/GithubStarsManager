@@ -30,6 +30,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   const token = authHeader.slice(7);
 
   // Constant-time comparison
+  // 使用固定时间的比较来防止时序攻击
   const tokenBuf = Buffer.from(token);
   const secretBuf = Buffer.from(config.apiSecret);
 

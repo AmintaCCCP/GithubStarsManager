@@ -34,6 +34,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     const checkBackend = async () => {
       setStatus('checking');
       try {
+        await backend.init();
         const healthData = await backend.checkHealth();
         if (healthData) {
           setStatus('connected');
@@ -42,7 +43,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           setStatus('disconnected');
           setHealth(null);
         }
-      } catch (error) {
+      } catch {
         setStatus('disconnected');
         setHealth(null);
       }
@@ -69,7 +70,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           'Backend connection failed. Please check the server status or whether the API Secret is correct.'
         ));
       }
-    } catch (error) {
+    } catch {
       setStatus('disconnected');
       setHealth(null);
       alert(t(

@@ -103,7 +103,12 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         
         <div className="flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => window.open('https://x.com/GoodMan_Lee', '_blank')}
+            onClick={() => {
+              const newWindow = window.open('https://x.com/GoodMan_Lee', '_blank', 'noopener,noreferrer');
+              if (newWindow) {
+                newWindow.opener = null;
+              }
+            }}
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
           >
             <Twitter className="w-5 h-5" />
@@ -112,7 +117,12 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </button>
           
           <button
-            onClick={() => window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank')}
+            onClick={() => {
+              const newWindow = window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank', 'noopener,noreferrer');
+              if (newWindow) {
+                newWindow.opener = null;
+              }
+            }}
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
           >
             <Github className="w-5 h-5" />

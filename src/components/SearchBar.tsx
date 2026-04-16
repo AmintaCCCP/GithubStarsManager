@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, AlertCircle } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
+import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 
 
@@ -56,18 +57,41 @@ export const SearchBar: React.FC = () => {
         stats.notSubscribed++;
       }
       
-      // 编辑状态统计
-      const isEdited = !!(repo.last_edited || repo.custom_description || 
-        (repo.custom_tags && repo.custom_tags.length > 0) || repo.custom_category);
-      if (isEdited) {
+      // 自定义状态统计 - 与编辑页面逻辑一致
+      // 描述：有自定义描述标记（包括明确清空），且内容与AI/原始不同
+      const hasCustomDesc = repo.custom_description !== undefined;
+      const repoDesc = (repo.description || '').trim();
+      const aiDesc = (repo.ai_summary || '').trim();
+      const customDesc = (repo.custom_description || '').trim();
+      const isDescEdited = hasCustomDesc &&
+        (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
+
+      // 标签：有自定义标签标记（包括明确清空），且内容与AI/Topics不同
+      const hasCustomTags = repo.custom_tags !== undefined;
+      const aiTags = repo.ai_tags || [];
+      const topics = repo.topics || [];
+      const customTags = repo.custom_tags || [];
+      const isTagsEdited = hasCustomTags &&
+        (customTags.length === 0 || (
+          JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
+          JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
+        ));
+
+      // 分类：有自定义分类标记（包括明确清空）
+      const isCategoryEdited = repo.custom_category !== undefined &&
+        (repo.custom_category === '' || repo.custom_category.trim() !== '');
+
+      // 任意一个为true则视为已编辑（注意：分类锁定不算编辑）
+      const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
+      if (isCustomized) {
         stats.edited++;
       } else {
         stats.notEdited++;
       }
-      
+
       // 锁定状态统计
-      const isLocked = !!(repo.category_locked && repo.custom_category);
-      if (isLocked) {
+      const isCategoryLocked = !!repo.category_locked;
+      if (isCategoryLocked) {
         stats.locked++;
       } else {
         stats.notLocked++;
@@ -85,9 +109,11 @@ export const SearchBar: React.FC = () => {
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
     const languages = [...new Set(repositories.map(r => r.language).filter(Boolean))] as string[];
+    // 标签包含AI标签、GitHub topics和用户自定义标签
     const tags = [...new Set([
       ...repositories.flatMap(r => r.ai_tags || []),
-      ...repositories.flatMap(r => r.topics || [])
+      ...repositories.flatMap(r => r.topics || []),
+      ...repositories.flatMap(r => r.custom_tags || [])
     ])];
     const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))] as string[];
 
@@ -116,16 +142,18 @@ export const SearchBar: React.FC = () => {
   }, [repositories]);
 
   useEffect(() => {
-    // Only perform search when filters change (not when query changes from AI search)
     const performSearch = async () => {
       if (!searchFilters.query) {
         performBasicFilter();
+      } else {
+        const textResults = performBasicTextSearch(repositories, searchFilters.query);
+        const finalFiltered = applyFilters(textResults);
+        setSearchResults(finalFiltered);
       }
-      // Note: AI search is handled by handleAISearch function directly
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -191,14 +219,15 @@ export const SearchBar: React.FC = () => {
         repo.name,
         repo.full_name,
         repo.description || '',
+        repo.custom_description || '',
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        ...(repo.custom_tags || []),
       ].join(' ').toLowerCase();
       
-      // Split query into words and check if all words are present
       const queryWords = normalizedQuery.split(/\s+/);
       return queryWords.every(word => searchableText.includes(word));
     });
@@ -214,10 +243,14 @@ export const SearchBar: React.FC = () => {
       );
     }
 
-    // Tag filter
+    // Tag filter - 包含AI标签、GitHub topics和用户自定义标签
     if (searchFilters.tags.length > 0) {
       filtered = filtered.filter(repo => {
-        const repoTags = [...(repo.ai_tags || []), ...(repo.topics || [])];
+        const repoTags = [
+          ...(repo.ai_tags || []),
+          ...(repo.topics || []),
+          ...(repo.custom_tags || [])
+        ];
         return searchFilters.tags.some(tag => repoTags.includes(tag));
       });
     }
@@ -244,19 +277,38 @@ export const SearchBar: React.FC = () => {
       );
     }
 
-    // Edited filter - 检查仓库是否被编辑过（包括自定义描述、标签、分类、锁定状态）
+    // 自定义筛选 - 与编辑页面逻辑一致
     if (searchFilters.isEdited !== undefined) {
       filtered = filtered.filter(repo => {
-        const isRepoEdited = !!(repo.last_edited || repo.custom_description || 
-          (repo.custom_tags && repo.custom_tags.length > 0) || repo.custom_category);
-        return searchFilters.isEdited ? isRepoEdited : !isRepoEdited;
+        const hasCustomDesc = repo.custom_description !== undefined;
+        const repoDesc = (repo.description || '').trim();
+        const aiDesc = (repo.ai_summary || '').trim();
+        const customDesc = (repo.custom_description || '').trim();
+        const isDescEdited = hasCustomDesc &&
+          (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
+
+        const hasCustomTags = repo.custom_tags !== undefined;
+        const aiTags = repo.ai_tags || [];
+        const topics = repo.topics || [];
+        const customTags = repo.custom_tags || [];
+        const isTagsEdited = hasCustomTags &&
+          (customTags.length === 0 || (
+            JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
+            JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
+          ));
+
+        const isCategoryEdited = repo.custom_category !== undefined &&
+          (repo.custom_category === '' || repo.custom_category.trim() !== '');
+
+        const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
+        return searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized;
       });
     }
 
-    // Category locked filter - 检查分类是否被锁定（需要有自定义分类才视为有效锁定）
+    // Category locked filter - 检查分类是否被锁定
     if (searchFilters.isCategoryLocked !== undefined) {
       filtered = filtered.filter(repo => {
-        const isLocked = !!(repo.category_locked && repo.custom_category);
+        const isLocked = !!repo.category_locked;
         return searchFilters.isCategoryLocked ? isLocked : !isLocked;
       });
     }
@@ -278,37 +330,117 @@ export const SearchBar: React.FC = () => {
     }
 
     // Sort
-    filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
-      
+    const getSortValue = (repo: Repository): number | string => {
       switch (searchFilters.sortBy) {
         case 'stars':
-          aValue = a.stargazers_count;
-          bValue = b.stargazers_count;
-          break;
+          return repo.stargazers_count;
         case 'updated':
-          aValue = new Date(a.pushed_at || a.updated_at).getTime();
-          bValue = new Date(b.pushed_at || b.updated_at).getTime();
-          break;
+          return new Date(repo.pushed_at || repo.updated_at).getTime();
         case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
+          return repo.name.toLowerCase();
         case 'starred':
-          aValue = a.starred_at ? new Date(a.starred_at).getTime() : 0;
-          bValue = b.starred_at ? new Date(b.starred_at).getTime() : 0;
-          break;
+          return repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
         default:
-          aValue = new Date(a.pushed_at || a.updated_at).getTime();
-          bValue = new Date(b.pushed_at || b.updated_at).getTime();
+          return new Date(repo.pushed_at || repo.updated_at).getTime();
       }
+    };
 
-      if (searchFilters.sortOrder === 'desc') {
-        return bValue > aValue ? 1 : -1;
-      } else {
-        return aValue > bValue ? 1 : -1;
-      }
+    filtered.sort((a, b) => {
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+      if (aValue < bValue) return searchFilters.sortOrder === 'desc' ? 1 : -1;
+      if (aValue > bValue) return searchFilters.sortOrder === 'desc' ? -1 : 1;
+      return 0;
     });
+
+    // 如果分类锁定筛选导致结果为0，自动清除该筛选条件
+    if (searchFilters.isCategoryLocked !== undefined && filtered.length === 0) {
+      // 检查是否是分类锁定筛选导致的结果为空
+      const filteredWithoutCategoryLock = repos.filter(repo => {
+        // 复制当前的筛选条件，但排除分类锁定
+        let tempFiltered = true;
+
+        // Language filter
+        if (searchFilters.languages.length > 0) {
+          tempFiltered = tempFiltered && !!(repo.language && searchFilters.languages.includes(repo.language));
+        }
+
+        // Tag filter
+        if (searchFilters.tags.length > 0) {
+          const repoTags = [...(repo.ai_tags || []), ...(repo.topics || []), ...(repo.custom_tags || [])];
+          tempFiltered = tempFiltered && searchFilters.tags.some(tag => repoTags.includes(tag));
+        }
+
+        // Platform filter
+        if (searchFilters.platforms.length > 0) {
+          const repoPlatforms = repo.ai_platforms || [];
+          tempFiltered = tempFiltered && searchFilters.platforms.some(platform => repoPlatforms.includes(platform));
+        }
+
+        // AI analyzed filter
+        if (searchFilters.isAnalyzed !== undefined && searchFilters.analysisFailed === undefined) {
+          tempFiltered = tempFiltered && (searchFilters.isAnalyzed ? (!!repo.analyzed_at && !repo.analysis_failed) : !repo.analyzed_at);
+        }
+
+        // Release subscription filter
+        if (searchFilters.isSubscribed !== undefined) {
+          tempFiltered = tempFiltered && (searchFilters.isSubscribed ? releaseSubscriptions.has(repo.id) : !releaseSubscriptions.has(repo.id));
+        }
+
+        // Edited filter
+        if (searchFilters.isEdited !== undefined) {
+          const hasCustomDesc = repo.custom_description !== undefined;
+          const repoDesc = (repo.description || '').trim();
+          const aiDesc = (repo.ai_summary || '').trim();
+          const customDesc = (repo.custom_description || '').trim();
+          const isDescEdited = hasCustomDesc &&
+            (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
+          const hasCustomTags = repo.custom_tags !== undefined;
+          const aiTags = repo.ai_tags || [];
+          const topics = repo.topics || [];
+          const customTags = repo.custom_tags || [];
+          const isTagsEdited = hasCustomTags &&
+            (customTags.length === 0 || (
+              JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
+              JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
+            ));
+          const isCategoryEdited = repo.custom_category !== undefined &&
+            (repo.custom_category === '' || repo.custom_category.trim() !== '');
+          const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
+          tempFiltered = tempFiltered && (searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized);
+        }
+
+        // Analysis failed filter
+        if (searchFilters.analysisFailed !== undefined && searchFilters.isAnalyzed === undefined) {
+          const hasFailed = !!(repo.analyzed_at && repo.analysis_failed);
+          tempFiltered = tempFiltered && (searchFilters.analysisFailed ? hasFailed : !hasFailed);
+        }
+
+        // Star count filter
+        if (searchFilters.minStars !== undefined) {
+          tempFiltered = tempFiltered && repo.stargazers_count >= searchFilters.minStars;
+        }
+        if (searchFilters.maxStars !== undefined) {
+          tempFiltered = tempFiltered && repo.stargazers_count <= searchFilters.maxStars;
+        }
+
+        return tempFiltered;
+      });
+
+      // 如果去掉分类锁定筛选后有结果，说明是分类锁定导致的结果为空，自动清除
+      if (filteredWithoutCategoryLock.length > 0) {
+        console.log('分类锁定筛选导致结果为空，自动清除该筛选条件');
+        setSearchFilters({ isCategoryLocked: undefined });
+        // 返回去掉分类锁定筛选的结果
+        return filteredWithoutCategoryLock.sort((a, b) => {
+          const aValue = getSortValue(a);
+          const bValue = getSortValue(b);
+          if (aValue < bValue) return searchFilters.sortOrder === 'desc' ? 1 : -1;
+          if (aValue > bValue) return searchFilters.sortOrder === 'desc' ? -1 : 1;
+          return 0;
+        });
+      }
+    }
 
     return filtered;
   };
@@ -436,6 +568,10 @@ export const SearchBar: React.FC = () => {
     setIsRealTimeSearch(false);
     setSearchFilters({ query: historyQuery });
     setShowSearchHistory(false);
+
+    const textResults = performBasicTextSearch(repositories, historyQuery);
+    const finalFiltered = applyFilters(textResults);
+    setSearchResults(finalFiltered);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -852,13 +988,13 @@ export const SearchBar: React.FC = () => {
                   <span className="text-xs opacity-70">({statusStats.notSubscribed})</span>
                 </button>
               )}
-              {/* 已编辑 - 仅在存在已编辑仓库或当前已选择时显示 */}
+              {/* 已自定义 - 仅在存在已自定义仓库或当前已选择时显示 */}
               {(statusStats.edited > 0 || searchFilters.isEdited === true) && (
                 <button
-                  onClick={() => setSearchFilters({ 
-                    isEdited: searchFilters.isEdited === true ? undefined : true 
+                  onClick={() => setSearchFilters({
+                    isEdited: searchFilters.isEdited === true ? undefined : true
                   })}
-                  title={t('显示已编辑的仓库（包括自定义描述、标签、分类）', 'Show edited repositories (including custom description, tags, category)')}
+                  title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isEdited === true
                       ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
@@ -866,15 +1002,15 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <Edit3 className="w-4 h-4" />
-                  <span>{t('已编辑', 'Edited')}</span>
+                  <span>{t('已自定义', 'Customized')}</span>
                   <span className="text-xs opacity-70">({statusStats.edited})</span>
                 </button>
               )}
               {/* 分类已锁定 - 仅在存在已锁定仓库或当前已选择时显示 */}
               {(statusStats.locked > 0 || searchFilters.isCategoryLocked === true) && (
                 <button
-                  onClick={() => setSearchFilters({ 
-                    isCategoryLocked: searchFilters.isCategoryLocked === true ? undefined : true 
+                  onClick={() => setSearchFilters({
+                    isCategoryLocked: searchFilters.isCategoryLocked === true ? undefined : true
                   })}
                   title={t('显示分类已锁定的仓库（同步时不会自动更改分类）', 'Show repositories with locked category (won\'t auto-change during sync)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
@@ -886,6 +1022,24 @@ export const SearchBar: React.FC = () => {
                   <Lock className="w-4 h-4" />
                   <span>{t('分类已锁定', 'Category Locked')}</span>
                   <span className="text-xs opacity-70">({statusStats.locked})</span>
+                </button>
+              )}
+              {/* 分类未锁定 - 仅在存在未锁定仓库或当前已选择时显示 */}
+              {(statusStats.notLocked > 0 || searchFilters.isCategoryLocked === false) && (
+                <button
+                  onClick={() => setSearchFilters({
+                    isCategoryLocked: searchFilters.isCategoryLocked === false ? undefined : false
+                  })}
+                  title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    searchFilters.isCategoryLocked === false
+                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>{t('分类未锁定', 'Category Unlocked')}</span>
+                  <span className="text-xs opacity-70">({statusStats.notLocked})</span>
                 </button>
               )}
             </div>
@@ -977,7 +1131,7 @@ export const SearchBar: React.FC = () => {
                 <input
                   type="number"
                   placeholder="0"
-                  value={searchFilters.minStars || ''}
+                  value={searchFilters.minStars !== undefined ? searchFilters.minStars : ''}
                   onChange={(e) => setSearchFilters({ 
                     minStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
@@ -991,7 +1145,7 @@ export const SearchBar: React.FC = () => {
                 <input
                   type="number"
                   placeholder="∞"
-                  value={searchFilters.maxStars || ''}
+                  value={searchFilters.maxStars !== undefined ? searchFilters.maxStars : ''}
                   onChange={(e) => setSearchFilters({ 
                     maxStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}

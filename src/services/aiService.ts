@@ -1,6 +1,29 @@
 import { Repository, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 
+interface OpenAIResponseContentPart {
+  text?: string;
+}
+
+interface OpenAIResponseOutputItem {
+  content?: OpenAIResponseContentPart[];
+}
+
+interface OpenAIResponseMessage {
+  content?: string;
+  reasoning_content?: string;
+}
+
+interface OpenAIResponseChoice {
+  message?: OpenAIResponseMessage;
+}
+
+interface OpenAIResponse {
+  output_text?: string;
+  output?: OpenAIResponseOutputItem[];
+  choices?: OpenAIResponseChoice[];
+}
+
 export class AIService {
   private config: AIConfig;
   private language: string;
@@ -15,9 +38,7 @@ export class AIService {
   }
 
   private getOpenAIReasoningPayload(): { effort: 'none' | 'low' | 'medium' | 'high' | 'xhigh' } | undefined {
-    const effort = this.config.reasoningEffort === 'minimal'
-      ? 'low'
-      : this.config.reasoningEffort;
+    const effort = this.config.reasoningEffort;
     return effort ? { effort } : undefined;
   }
 
@@ -87,9 +108,9 @@ export class AIService {
             ...(!isDeepSeekReasoner && reasoning ? { reasoning } : {}),
           };
 
-      let data: any;
+      let data: Record<string, unknown>;
       if (backend.isAvailable && this.config.id) {
-        data = await backend.proxyAIRequest(this.config.id, requestBody);
+        data = await backend.proxyAIRequest(this.config.id, requestBody) as Record<string, unknown>;
       } else {
         const url = this.buildApiUrl(apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
         const response = await fetch(url, {
@@ -109,25 +130,26 @@ export class AIService {
       }
 
       if (apiType === 'openai-responses') {
-        const outputText = typeof data?.output_text === 'string' ? data.output_text : '';
+        const typedData = data as OpenAIResponse;
+        const outputText = typedData.output_text;
         if (outputText) return outputText;
 
-        const output = data?.output;
+        const output = typedData.output;
         if (Array.isArray(output)) {
           const text = output
-            .flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
-            .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+            .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
+            .map((part) => part?.text || '')
             .join('');
           if (text) return text;
         }
       } else {
-        const message = data?.choices?.[0]?.message;
-        const content = typeof message?.content === 'string' ? message.content : '';
+        const typedData = data as { choices?: OpenAIResponseChoice[] };
+        const choices = typedData.choices;
+        const message = choices?.[0]?.message;
+        const content = message?.content;
         if (content) return content;
 
-        const reasoningContent = typeof message?.reasoning_content === 'string'
-          ? message.reasoning_content
-          : '';
+        const reasoningContent = message?.reasoning_content;
         if (reasoningContent) return reasoningContent;
       }
 
@@ -445,103 +467,6 @@ Focus on practicality and accurate categorization to help users quickly understa
     }
   }
 
-  private fallbackAnalysis(repository: Repository): { summary: string; tags: string[]; platforms: string[] } {
-    const summary = repository.description 
-      ? `${repository.description}（${repository.language || (this.language === 'zh' ? '未知语言' : 'Unknown language')}${this.language === 'zh' ? '项目' : ' project'}）`
-      : (this.language === 'zh' 
-          ? `一个${repository.language || '软件'}项目，拥有${repository.stargazers_count}个星标`
-          : `A ${repository.language || 'software'} project with ${repository.stargazers_count} stars`
-        );
-
-    const tags: string[] = [];
-    const platforms: string[] = [];
-    
-    // Add language-based tags and platforms
-    if (repository.language) {
-      const langMap: Record<string, { tag: string; platforms: string[] }> = this.language === 'zh' ? {
-        'JavaScript': { tag: 'Web应用', platforms: ['web', 'cli'] },
-        'TypeScript': { tag: 'Web应用', platforms: ['web', 'cli'] }, 
-        'Python': { tag: 'Python工具', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'Java': { tag: 'Java应用', platforms: ['linux', 'mac', 'windows'] },
-        'Go': { tag: '系统工具', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'Rust': { tag: '系统工具', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'C++': { tag: '系统软件', platforms: ['linux', 'mac', 'windows'] },
-        'C': { tag: '系统软件', platforms: ['linux', 'mac', 'windows'] },
-        'Swift': { tag: '移动应用', platforms: ['ios', 'mac'] },
-        'Kotlin': { tag: '移动应用', platforms: ['android'] },
-        'Dart': { tag: '移动应用', platforms: ['ios', 'android'] },
-        'PHP': { tag: 'Web应用', platforms: ['web', 'linux'] },
-        'Ruby': { tag: 'Web应用', platforms: ['web', 'linux', 'mac'] },
-        'Shell': { tag: '脚本工具', platforms: ['linux', 'mac', 'cli'] }
-      } : {
-        'JavaScript': { tag: 'Web App', platforms: ['web', 'cli'] },
-        'TypeScript': { tag: 'Web App', platforms: ['web', 'cli'] }, 
-        'Python': { tag: 'Python Tool', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'Java': { tag: 'Java App', platforms: ['linux', 'mac', 'windows'] },
-        'Go': { tag: 'System Tool', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'Rust': { tag: 'System Tool', platforms: ['linux', 'mac', 'windows', 'cli'] },
-        'C++': { tag: 'System Software', platforms: ['linux', 'mac', 'windows'] },
-        'C': { tag: 'System Software', platforms: ['linux', 'mac', 'windows'] },
-        'Swift': { tag: 'Mobile App', platforms: ['ios', 'mac'] },
-        'Kotlin': { tag: 'Mobile App', platforms: ['android'] },
-        'Dart': { tag: 'Mobile App', platforms: ['ios', 'android'] },
-        'PHP': { tag: 'Web App', platforms: ['web', 'linux'] },
-        'Ruby': { tag: 'Web App', platforms: ['web', 'linux', 'mac'] },
-        'Shell': { tag: 'Script Tool', platforms: ['linux', 'mac', 'cli'] }
-      };
-      
-      const langInfo = langMap[repository.language];
-      if (langInfo) {
-        tags.push(langInfo.tag);
-        platforms.push(...langInfo.platforms);
-      }
-    }
-    
-    // Add category based on keywords
-    const desc = (repository.description || '').toLowerCase();
-    const name = repository.name.toLowerCase();
-    const searchText = `${desc} ${name}`;
-    
-    const keywordMap = this.language === 'zh' ? {
-      web: { keywords: ['web', 'frontend', 'website'], tag: 'Web应用', platforms: ['web'] },
-      api: { keywords: ['api', 'backend', 'server'], tag: '后端服务', platforms: ['linux', 'docker'] },
-      cli: { keywords: ['cli', 'command', 'tool'], tag: '命令行工具', platforms: ['cli', 'linux', 'mac', 'windows'] },
-      library: { keywords: ['library', 'framework', 'sdk'], tag: '开发库', platforms: [] },
-      mobile: { keywords: ['mobile', 'android', 'ios'], tag: '移动应用', platforms: [] },
-      game: { keywords: ['game', 'gaming'], tag: '游戏', platforms: ['windows', 'mac', 'linux'] },
-      ai: { keywords: ['ai', 'ml', 'machine learning'], tag: 'AI工具', platforms: ['linux', 'mac', 'windows'] },
-      database: { keywords: ['database', 'db', 'storage'], tag: '数据库', platforms: ['linux', 'docker'] },
-      docker: { keywords: ['docker', 'container'], tag: '容器化', platforms: ['docker'] }
-    } : {
-      web: { keywords: ['web', 'frontend', 'website'], tag: 'Web App', platforms: ['web'] },
-      api: { keywords: ['api', 'backend', 'server'], tag: 'Backend Service', platforms: ['linux', 'docker'] },
-      cli: { keywords: ['cli', 'command', 'tool'], tag: 'CLI Tool', platforms: ['cli', 'linux', 'mac', 'windows'] },
-      library: { keywords: ['library', 'framework', 'sdk'], tag: 'Development Library', platforms: [] },
-      mobile: { keywords: ['mobile', 'android', 'ios'], tag: 'Mobile App', platforms: [] },
-      game: { keywords: ['game', 'gaming'], tag: 'Game', platforms: ['windows', 'mac', 'linux'] },
-      ai: { keywords: ['ai', 'ml', 'machine learning'], tag: 'AI Tool', platforms: ['linux', 'mac', 'windows'] },
-      database: { keywords: ['database', 'db', 'storage'], tag: 'Database', platforms: ['linux', 'docker'] },
-      docker: { keywords: ['docker', 'container'], tag: 'Containerized', platforms: ['docker'] }
-    };
-
-    Object.values(keywordMap).forEach(({ keywords, tag, platforms: keywordPlatforms }) => {
-      if (keywords.some(keyword => searchText.includes(keyword))) {
-        tags.push(tag);
-        platforms.push(...keywordPlatforms);
-      }
-    });
-
-    // Handle specific mobile platforms
-    if (searchText.includes('android')) platforms.push('android');
-    if (searchText.includes('ios')) platforms.push('ios');
-
-    return {
-      summary: summary.substring(0, 50),
-      tags: [...new Set(tags)].slice(0, 5), // Remove duplicates and limit to 5
-      platforms: [...new Set(platforms)].slice(0, 8), // Remove duplicates and limit to 8
-    };
-  }
-
   async testConnection(): Promise<boolean> {
     try {
       const base = new URL(this.config.baseUrl);
@@ -563,7 +488,7 @@ Focus on practicality and accurate categorization to help users quickly understa
       } finally {
         clearTimeout(timeoutId);
       }
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -718,74 +643,6 @@ Reply in JSON format:
     }
   }
 
-  private createEnhancedSearchPrompt(query: string): string {
-    if (this.language === 'zh') {
-      return `
-用户搜索查询: "${query}"
-
-请深度分析这个搜索查询并提供：
-1. 核心搜索意图和目标
-2. 多语言关键词（中文、英文、技术术语）
-3. 相关的应用类型、技术栈、平台类型
-4. 同义词和相关概念
-5. 重要性权重（用于排序）
-
-以JSON格式回复：
-{
-  "intent": "用户的核心搜索意图",
-  "keywords": {
-    "primary": ["主要关键词1", "primary keyword1"],
-    "secondary": ["次要关键词1", "secondary keyword1"],
-    "technical": ["技术术语1", "technical term1"]
-  },
-  "categories": ["应用分类1", "category1"],
-  "platforms": ["平台类型1", "platform1"],
-  "synonyms": ["同义词1", "synonym1"],
-  "weights": {
-    "name_match": 0.4,
-    "description_match": 0.3,
-    "tags_match": 0.2,
-    "summary_match": 0.1
-  }
-}
-
-注意：请确保能够跨语言匹配，即使用户用中文搜索，也要能匹配到英文仓库，反之亦然。
-      `.trim();
-    } else {
-      return `
-User search query: "${query}"
-
-Please deeply analyze this search query and provide:
-1. Core search intent and objectives
-2. Multilingual keywords (Chinese, English, technical terms)
-3. Related application types, tech stacks, platform types
-4. Synonyms and related concepts
-5. Importance weights (for ranking)
-
-Reply in JSON format:
-{
-  "intent": "User's core search intent",
-  "keywords": {
-    "primary": ["primary keyword1", "主要关键词1"],
-    "secondary": ["secondary keyword1", "次要关键词1"],
-    "technical": ["technical term1", "技术术语1"]
-  },
-  "categories": ["category1", "应用分类1"],
-  "platforms": ["platform1", "平台类型1"],
-  "synonyms": ["synonym1", "同义词1"],
-  "weights": {
-    "name_match": 0.4,
-    "description_match": 0.3,
-    "tags_match": 0.2,
-    "summary_match": 0.1
-  }
-}
-
-Note: Ensure cross-language matching, so Chinese queries can match English repositories and vice versa.
-      `.trim();
-    }
-  }
-
   private parseSearchResponse(content: string): string[] {
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -802,61 +659,6 @@ Note: Ensure cross-language matching, so Chinese queries can match English repos
       console.warn('Failed to parse AI search response:', error);
     }
     return [];
-  }
-
-  private parseEnhancedSearchResponse(content: string): {
-    intent: string;
-    keywords: {
-      primary: string[];
-      secondary: string[];
-      technical: string[];
-    };
-    categories: string[];
-    platforms: string[];
-    synonyms: string[];
-    weights: {
-      name_match: number;
-      description_match: number;
-      tags_match: number;
-      summary_match: number;
-    };
-  } {
-    const defaultResponse = {
-      intent: '',
-      keywords: { primary: [], secondary: [], technical: [] },
-      categories: [],
-      platforms: [],
-      synonyms: [],
-      weights: { name_match: 0.4, description_match: 0.3, tags_match: 0.2, summary_match: 0.1 }
-    };
-
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          intent: parsed.intent || '',
-          keywords: {
-            primary: Array.isArray(parsed.keywords?.primary) ? parsed.keywords.primary : [],
-            secondary: Array.isArray(parsed.keywords?.secondary) ? parsed.keywords.secondary : [],
-            technical: Array.isArray(parsed.keywords?.technical) ? parsed.keywords.technical : []
-          },
-          categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-          platforms: Array.isArray(parsed.platforms) ? parsed.platforms : [],
-          synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
-          weights: {
-            name_match: parsed.weights?.name_match || 0.4,
-            description_match: parsed.weights?.description_match || 0.3,
-            tags_match: parsed.weights?.tags_match || 0.2,
-            summary_match: parsed.weights?.summary_match || 0.1
-          }
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to parse enhanced AI search response:', error);
-    }
-    
-    return defaultResponse;
   }
 
   private performEnhancedSearch(repositories: Repository[], originalQuery: string, aiTerms: string[]): Repository[] {
@@ -882,145 +684,6 @@ Note: Ensure cross-language matching, so Chinese queries can match English repos
                normalizedTerm.split(/\s+/).every(word => searchableText.includes(word));
       });
     });
-  }
-
-  private performSemanticSearchWithReranking(
-    repositories: Repository[], 
-    originalQuery: string, 
-    searchAnalysis: any
-  ): Repository[] {
-    // Collect all search terms from the analysis
-    const allSearchTerms = [
-      originalQuery,
-      ...searchAnalysis.keywords.primary,
-      ...searchAnalysis.keywords.secondary,
-      ...searchAnalysis.keywords.technical,
-      ...searchAnalysis.categories,
-      ...searchAnalysis.platforms,
-      ...searchAnalysis.synonyms
-    ].filter(term => term && typeof term === 'string');
-
-    // First, filter repositories that match any search terms
-    const matchedRepos = repositories.filter(repo => {
-      const searchableFields = {
-        name: repo.name.toLowerCase(),
-        fullName: repo.full_name.toLowerCase(),
-        description: (repo.description || '').toLowerCase(),
-        language: (repo.language || '').toLowerCase(),
-        topics: (repo.topics || []).join(' ').toLowerCase(),
-        aiSummary: (repo.ai_summary || '').toLowerCase(),
-        aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
-        aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
-        customDescription: (repo.custom_description || '').toLowerCase(),
-        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
-      };
-
-      // Check if any search term matches any field
-      return allSearchTerms.some(term => {
-        const normalizedTerm = term.toLowerCase();
-        return Object.values(searchableFields).some(fieldValue => {
-          return fieldValue.includes(normalizedTerm) ||
-                 // Fuzzy matching for partial matches
-                 normalizedTerm.split(/\s+/).every(word => fieldValue.includes(word));
-        });
-      });
-    });
-
-    // If no matches found, return empty array (don't show irrelevant results)
-    if (matchedRepos.length === 0) {
-      return [];
-    }
-
-    // Calculate relevance scores for matched repositories
-    const scoredRepos = matchedRepos.map(repo => {
-      let score = 0;
-      const weights = searchAnalysis.weights;
-
-      const searchableFields = {
-        name: repo.name.toLowerCase(),
-        fullName: repo.full_name.toLowerCase(),
-        description: (repo.description || '').toLowerCase(),
-        language: (repo.language || '').toLowerCase(),
-        topics: (repo.topics || []).join(' ').toLowerCase(),
-        aiSummary: (repo.ai_summary || '').toLowerCase(),
-        aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
-        aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
-        customDescription: (repo.custom_description || '').toLowerCase(),
-        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
-      };
-
-      // Score based on different types of matches
-      allSearchTerms.forEach(term => {
-        const normalizedTerm = term.toLowerCase();
-        
-        // Name matches (highest weight)
-        if (searchableFields.name.includes(normalizedTerm) || searchableFields.fullName.includes(normalizedTerm)) {
-          score += weights.name_match;
-        }
-
-        // Description matches
-        if (searchableFields.description.includes(normalizedTerm) || searchableFields.customDescription.includes(normalizedTerm)) {
-          score += weights.description_match;
-        }
-
-        // Tags and topics matches
-        if (searchableFields.topics.includes(normalizedTerm) || 
-            searchableFields.aiTags.includes(normalizedTerm) || 
-            searchableFields.customTags.includes(normalizedTerm)) {
-          score += weights.tags_match;
-        }
-
-        // AI summary matches
-        if (searchableFields.aiSummary.includes(normalizedTerm)) {
-          score += weights.summary_match;
-        }
-
-        // Platform matches
-        if (searchableFields.aiPlatforms.includes(normalizedTerm)) {
-          score += weights.tags_match * 0.8; // Slightly lower than tags
-        }
-
-        // Language matches
-        if (searchableFields.language.includes(normalizedTerm)) {
-          score += weights.tags_match * 0.6;
-        }
-      });
-
-      // Boost score for primary keywords
-      searchAnalysis.keywords.primary.forEach(primaryTerm => {
-        const normalizedTerm = primaryTerm.toLowerCase();
-        Object.values(searchableFields).forEach(fieldValue => {
-          if (fieldValue.includes(normalizedTerm)) {
-            score += 0.2; // Additional boost for primary keywords
-          }
-        });
-      });
-
-      // Boost score for exact matches
-      const exactMatch = allSearchTerms.some(term => {
-        const normalizedTerm = term.toLowerCase();
-        return searchableFields.name === normalizedTerm || 
-               searchableFields.name.includes(` ${normalizedTerm} `) ||
-               searchableFields.name.startsWith(`${normalizedTerm} `) ||
-               searchableFields.name.endsWith(` ${normalizedTerm}`);
-      });
-      
-      if (exactMatch) {
-        score += 0.5;
-      }
-
-      // Consider repository popularity as a tie-breaker
-      const popularityScore = Math.log10(repo.stargazers_count + 1) * 0.05;
-      score += popularityScore;
-
-      return { repo, score };
-    });
-
-    // Sort by relevance score (descending) and return only repositories with meaningful scores
-    return scoredRepos
-      .filter(item => item.score > 0.1) // Filter out very low relevance matches
-      .sort((a, b) => b.score - a.score)
-      .map(item => item.repo);
   }
 
   private performBasicSearch(repositories: Repository[], query: string): Repository[] {

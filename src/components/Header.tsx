@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 

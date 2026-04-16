@@ -8,7 +8,8 @@ import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
-import { resolveCategoryAssignment } from '../utils/categoryUtils';
+import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
+import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 
 interface RepositoryListProps {
@@ -50,6 +51,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
   const shouldStopRef = useRef(false);
   const isAnalyzingRef = useRef(false);
+  const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
 
   // 批量选择状态
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<number>>(new Set());
@@ -67,8 +69,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     if (!selectedCategoryObj) return [];
 
     return repositories.filter(repo => {
-      // 如果仓库有自定义分类，只根据 custom_category 判断是否属于当前分类
-      if (repo.custom_category) {
+      if (repo.custom_category !== undefined) {
+        if (repo.custom_category === '') {
+          return false;
+        }
         return repo.custom_category === selectedCategoryObj.name;
       }
       
@@ -305,102 +309,83 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     setShowDropdown(false);
     setIsPaused(false);
 
+    // 创建优化器实例并保存到 ref
+    optimizerRef.current = new AIAnalysisOptimizer({
+      initialConcurrency: activeConfig.concurrency || 3,
+      maxConcurrency: 10,
+      minConcurrency: 1,
+      targetResponseTime: 5000,
+      batchDelayMs: 100,
+      maxRetries: 3,
+      retryDelayBaseMs: 1000,
+      enableAdaptiveConcurrency: true,
+    });
+
     try {
       const githubApi = new GitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
-      
-      // 获取可用分类名称列表
       const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
-      
-      let analyzed = 0;
-      const concurrency = activeConfig.concurrency || 1;
-      
-      // 并发分析函数
-      const analyzeRepository = async (repo: Repository) => {
-        // 检查是否需要停止
-        if (shouldStopRef.current) {
-          return false;
-        }
 
-        // 处理暂停
-        while (isPaused && !shouldStopRef.current) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      let successCount = 0;
+      let failedCount = 0;
 
-        // 再次检查停止状态（暂停期间可能被停止）
-        if (shouldStopRef.current) {
-          return false;
-        }
+      const handleResult = (result: AnalysisResult) => {
+        if (result.success) {
+          const resolvedCategory = resolveCategoryAssignment(
+            result.repo,
+            result.tags || [],
+            allCategories
+          );
 
-        try {
-          // 获取README内容
-          const [owner, name] = repo.full_name.split('/');
-          const readmeContent = await githubApi.getRepositoryReadme(owner, name);
-          
-          // AI分析
-          const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
-          const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
-          
-          // 更新仓库信息
-          const updatedRepo = {
-            ...repo,
-            ai_summary: analysis.summary,
-            ai_tags: analysis.tags,
-            ai_platforms: analysis.platforms,
+          const wasCategoryLocked = !!result.repo.category_locked;
+          const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
+
+          updateRepository({
+            ...result.repo,
+            ai_summary: result.summary,
+            ai_tags: result.tags,
+            ai_platforms: result.platforms,
             custom_category: resolvedCategory,
+            category_locked: shouldKeepLocked || wasCategoryLocked,
             analyzed_at: new Date().toISOString(),
-            analysis_failed: false // 分析成功，清除失败标记
-          };
-          
-          updateRepository(updatedRepo);
-          analyzed++;
-          setAnalysisProgress({ current: analyzed, total: targetRepos.length });
-          
-          return true;
-        } catch (error) {
-          console.warn(`Failed to analyze ${repo.full_name}:`, error);
-          
-          // 标记为分析失败
-          const failedRepo = {
-            ...repo,
+            analysis_failed: false,
+          });
+          successCount++;
+        } else {
+          updateRepository({
+            ...result.repo,
             analyzed_at: new Date().toISOString(),
-            analysis_failed: true
-          };
-          
-          updateRepository(failedRepo);
-          analyzed++;
-          setAnalysisProgress({ current: analyzed, total: targetRepos.length });
-          
-          return false;
+            analysis_failed: true,
+          });
+          failedCount++;
         }
       };
 
-      // 分批处理，支持并发
-      for (let i = 0; i < targetRepos.length; i += concurrency) {
-        if (shouldStopRef.current) {
-          console.log('Analysis stopped by user');
-          break;
-        }
+      setAnalysisProgress({ current: 0, total: targetRepos.length });
 
-        const batch = targetRepos.slice(i, i + concurrency);
-        const promises = batch.map((repo) => analyzeRepository(repo));
+      await optimizerRef.current!.analyzeRepositoriesPipelined(
+        targetRepos,
+        githubApi,
+        aiService,
+        categoryNames,
+        (completed, total, currentConcurrency) => {
+          setAnalysisProgress({ current: completed, total });
+          console.log(`AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
+        },
+        handleResult
+      );
 
-        await Promise.all(promises);
-        
-        // 避免API限制，批次间稍作延迟
-        if (i + concurrency < targetRepos.length && !shouldStopRef.current) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
+      const stats = optimizerRef.current!.getStats();
+      console.log('AI Analysis Stats:', stats);
+
       const completionMessage = shouldStopRef.current
         ? (language === 'zh'
-            ? `AI分析已停止！已成功分析了 ${analyzed} 个仓库。`
-            : `AI analysis stopped! Successfully analyzed ${analyzed} repositories.`)
+            ? `AI分析已停止！成功: ${successCount}, 失败: ${failedCount}`
+            : `AI analysis stopped! Success: ${successCount}, Failed: ${failedCount}`)
         : (language === 'zh'
-            ? `AI分析完成！成功分析了 ${analyzed} 个仓库。`
-            : `AI analysis completed! Successfully analyzed ${analyzed} repositories.`);
-      
+            ? `AI分析完成！成功: ${successCount}, 失败: ${failedCount} (平均响应: ${stats.averageResponseTime}ms)`
+            : `AI analysis completed! Success: ${successCount}, Failed: ${failedCount} (avg: ${stats.averageResponseTime}ms)`);
+
       alert(completionMessage);
     } catch (error) {
       console.error('AI analysis failed:', error);
@@ -410,6 +395,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       alert(errorMessage);
     } finally {
       // 清理状态
+      optimizerRef.current = null;
       isAnalyzingRef.current = false;
       shouldStopRef.current = false;
       setLoading(false);
@@ -420,19 +406,34 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const handlePauseResume = () => {
     if (!isAnalyzingRef.current) return;
-    setIsPaused(!isPaused);
-    console.log(isPaused ? 'Analysis resumed' : 'Analysis paused');
+    const newPausedState = !isPaused;
+    setIsPaused(newPausedState);
+
+    // 控制优化器的暂停/恢复
+    if (optimizerRef.current) {
+      if (newPausedState) {
+        optimizerRef.current.pause();
+        console.log('Analysis paused');
+      } else {
+        optimizerRef.current.resume();
+        console.log('Analysis resumed');
+      }
+    }
   };
 
   const handleStop = () => {
     if (!isAnalyzingRef.current) return;
-    
+
     const confirmMessage = language === 'zh'
       ? '确定要停止 AI 分析吗？已分析的结果将会保存。'
       : 'Are you sure you want to stop AI analysis? Analyzed results will be saved.';
-    
+
     if (confirm(confirmMessage)) {
       shouldStopRef.current = true;
+      // 中止优化器
+      if (optimizerRef.current) {
+        optimizerRef.current.abort();
+      }
       setIsPaused(false);
       console.log('Stop requested by user');
     }
@@ -565,76 +566,86 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           isAnalyzingRef.current = true;
           setAnalysisProgress({ current: 0, total: repos.length });
 
+          // 创建优化器实例并保存到 ref
+          optimizerRef.current = new AIAnalysisOptimizer({
+            initialConcurrency: activeConfig.concurrency || 3,
+            maxConcurrency: 10,
+            minConcurrency: 1,
+            targetResponseTime: 5000,
+            batchDelayMs: 100,
+            maxRetries: 3,
+            retryDelayBaseMs: 1000,
+            enableAdaptiveConcurrency: true,
+          });
+
           try {
             const githubApi = new GitHubApiService(githubToken);
             const aiService = new AIService(activeConfig, language);
             const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
 
             let successCount = 0;
-            const concurrency = activeConfig.concurrency || 1;
+            let failedCount = 0;
 
-            for (let i = 0; i < repos.length; i += concurrency) {
-              // Update progress before processing batch
-              setAnalysisProgress({ current: i, total: repos.length });
-              // 检查是否需要停止
-              if (shouldStopRef.current) {
-                console.log('AI analysis stopped by user');
-                break;
+            const handleResult = (result: AnalysisResult) => {
+              if (result.success) {
+                const resolvedCategory = resolveCategoryAssignment(
+                  result.repo,
+                  result.tags || [],
+                  allCategories
+                );
+
+                const wasCategoryLocked = !!result.repo.category_locked;
+                const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
+
+                updateRepository({
+                  ...result.repo,
+                  ai_summary: result.summary,
+                  ai_tags: result.tags,
+                  ai_platforms: result.platforms,
+                  custom_category: resolvedCategory,
+                  category_locked: shouldKeepLocked || wasCategoryLocked,
+                  analyzed_at: new Date().toISOString(),
+                  analysis_failed: false,
+                });
+                successCount++;
+              } else {
+                updateRepository({
+                  ...result.repo,
+                  analyzed_at: new Date().toISOString(),
+                  analysis_failed: true,
+                });
+                failedCount++;
               }
+            };
 
-              const batch = repos.slice(i, i + concurrency);
-              const promises = batch.map(async (repo) => {
-                // 检查是否需要停止
-                if (shouldStopRef.current) {
-                  return;
-                }
+            setAnalysisProgress({ current: 0, total: repos.length });
 
-                try {
-                  const [owner, name] = repo.full_name.split('/');
-                  const readmeContent = await githubApi.getRepositoryReadme(owner, name);
-                  const analysis = await aiService.analyzeRepository(repo, readmeContent, categoryNames);
-                  const resolvedCategory = resolveCategoryAssignment(repo, analysis.tags, allCategories);
+            await optimizerRef.current!.analyzeRepositoriesPipelined(
+              repos,
+              githubApi,
+              aiService,
+              categoryNames,
+              (completed, total, currentConcurrency) => {
+                setAnalysisProgress({ current: completed, total });
+                console.log(`Bulk AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
+              },
+              handleResult
+            );
 
-                  updateRepository({
-                    ...repo,
-                    ai_summary: analysis.summary,
-                    ai_tags: analysis.tags,
-                    ai_platforms: analysis.platforms,
-                    custom_category: resolvedCategory,
-                    analyzed_at: new Date().toISOString(),
-                    analysis_failed: false
-                  });
-                  successCount++;
-                  // Increment progress per repo completion
-                  const newCurrent = Math.min(analysisProgress.current + 1, analysisProgress.total);
-                  setAnalysisProgress({ current: newCurrent, total: analysisProgress.total });
-                } catch (error) {
-                  console.error(`Failed to analyze ${repo.full_name}:`, error);
-                  updateRepository({
-                    ...repo,
-                    analyzed_at: new Date().toISOString(),
-                    analysis_failed: true
-                  });
-                }
-              });
-
-              await Promise.all(promises);
-
-              if (i + concurrency < repos.length) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-            }
+            const stats = optimizerRef.current!.getStats();
+            console.log('Bulk AI Analysis Stats:', stats);
 
             await forceSyncToBackend();
             alert(language === 'zh'
-              ? `成功分析 ${successCount} 个仓库`
-              : `Successfully analyzed ${successCount} repositories`
+              ? `成功分析 ${successCount} 个仓库，失败 ${failedCount} 个 (平均响应: ${stats.averageResponseTime}ms)`
+              : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`
             );
           } catch (error) {
             console.error('Bulk AI analysis failed:', error);
             alert(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed');
           } finally {
             // 确保状态重置
+            optimizerRef.current = null;
             isAnalyzingRef.current = false;
             shouldStopRef.current = false;
             setLoading(false);
@@ -715,7 +726,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         }
 
         case 'lock-category': {
-          const reposWithoutCategory = repos.filter(repo => !repo.custom_category);
+          const allCategoriesForLock = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+          const reposWithoutCategory = repos.filter(repo => !repo.custom_category || repo.custom_category === '');
           if (reposWithoutCategory.length > 0) {
             const confirmMessage = language === 'zh'
               ? `${reposWithoutCategory.length} 个仓库没有设置分类，锁定操作将同时设置当前推断的分类。是否继续？`
@@ -723,40 +735,37 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             if (!confirm(confirmMessage)) return;
           }
 
-          const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
           let successCount = 0;
+          let skippedCount = 0;
           const failedRepos: string[] = [];
 
           for (const repo of repos) {
             try {
-              // 如果没有自定义分类，先推断一个
-              let categoryToSet = repo.custom_category;
-              if (!categoryToSet) {
-                // 根据AI标签或其他信息推断分类
-                for (const category of allCategories) {
-                  if (category.id === 'all') continue;
-                  if (repo.ai_tags && repo.ai_tags.length > 0) {
-                    const hasMatch = repo.ai_tags.some(tag =>
-                      category.keywords.some(keyword =>
-                        tag.toLowerCase().includes(keyword.toLowerCase()) ||
-                        keyword.toLowerCase().includes(tag.toLowerCase())
-                      )
-                    );
-                    if (hasMatch) {
-                      categoryToSet = category.name;
-                      break;
-                    }
-                  }
+              if (repo.custom_category && repo.custom_category !== '') {
+                updateRepository({
+                  ...repo,
+                  category_locked: true,
+                  last_edited: new Date().toISOString()
+                });
+                successCount++;
+              } else {
+                const aiCat = getAICategory(repo, allCategoriesForLock);
+                const defaultCat = getDefaultCategory(repo, allCategoriesForLock);
+                const inferredCategory = aiCat || defaultCat;
+
+                if (inferredCategory) {
+                  const customCategoryValue = computeCustomCategory(inferredCategory, aiCat, defaultCat);
+                  updateRepository({
+                    ...repo,
+                    custom_category: customCategoryValue,
+                    category_locked: true,
+                    last_edited: new Date().toISOString()
+                  });
+                  successCount++;
+                } else {
+                  skippedCount++;
                 }
               }
-
-              updateRepository({
-                ...repo,
-                custom_category: categoryToSet || repo.custom_category,
-                category_locked: true,
-                last_edited: new Date().toISOString()
-              });
-              successCount++;
             } catch (error) {
               console.error(`Failed to lock category for ${repo.full_name}:`, error);
               failedRepos.push(repo.full_name);
@@ -764,15 +773,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
 
           await forceSyncToBackend();
+          const skipMsg = skippedCount > 0
+            ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个无法推断分类的仓库` : `\n\nSkipped ${skippedCount} repositories with no inferable category`)
+            : '';
           if (failedRepos.length > 0) {
             alert(language === 'zh'
-              ? `成功锁定 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+              ? `成功锁定 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}${skipMsg}`
+              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}${skipMsg}`
             );
           } else {
             alert(language === 'zh'
-              ? `成功锁定 ${successCount} 个仓库的分类`
-              : `Successfully locked categories for ${successCount} repositories`
+              ? `成功锁定 ${successCount} 个仓库的分类${skipMsg}`
+              : `Successfully locked categories for ${successCount} repositories${skipMsg}`
             );
           }
           break;
@@ -832,9 +844,20 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     for (const repo of selectedRepos) {
       try {
+        // 获取所有分类用于计算AI和默认分类
+        const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+        const aiCat = getAICategory(repo, allCategoriesList);
+        const defaultCat = getDefaultCategory(repo, allCategoriesList);
+
+        // 使用通用函数计算应该保存的自定义分类值
+        // 如果设置的分类与AI/默认一致，则清除自定义标记
+        const customCategoryValue = computeCustomCategory(categoryName, aiCat, defaultCat);
+
         updateRepository({
           ...repo,
-          custom_category: categoryName
+          custom_category: customCategoryValue,
+          category_locked: customCategoryValue !== undefined && customCategoryValue !== '',
+          last_edited: new Date().toISOString()
         });
       } catch (error) {
         console.error(`Failed to categorize ${repo.full_name}:`, error);
@@ -1108,9 +1131,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           onDeselectAll={handleDeselectAll}
           onBulkAction={handleBulkAction}
           onClose={() => {
-            // 直接关闭工具栏，不触发卡片退出动画
-            setShowBulkToolbar(false);
-            setSelectedRepoIds(new Set());
+            setIsExitingSelection(true);
+            setTimeout(() => {
+              setShowBulkToolbar(false);
+              setSelectedRepoIds(new Set());
+              requestAnimationFrame(() => {
+                setIsExitingSelection(false);
+              });
+            }, 250);
           }}
         />
       )}
