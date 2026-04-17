@@ -45,17 +45,18 @@ export interface ReleaseAsset {
 export interface Release {
   id: number;
   tag_name: string;
-  name: string;
-  body: string;
+  name: string | null;
+  body: string | null;
   published_at: string;
   html_url: string;
   assets: ReleaseAsset[];
+  zipball_url?: string;
+  tarball_url?: string;
   repository: {
     id: number;
     full_name: string;
     name: string;
   };
-  // Read status
   is_read?: boolean;
 }
 
@@ -109,6 +110,9 @@ export interface SearchFilters {
   maxStars?: number;
   isAnalyzed?: boolean; // 新增：是否已AI分析
   isSubscribed?: boolean; // 新增：是否订阅Release
+  isEdited?: boolean; // 新增：是否已编辑
+  isCategoryLocked?: boolean; // 新增：分类是否已锁定
+  analysisFailed?: boolean; // 新增：分析是否失败
 }
 
 export interface Category {
@@ -124,6 +128,8 @@ export interface AssetFilter {
   id: string;
   name: string;
   keywords: string[];
+  isPreset?: boolean;
+  icon?: string;
 }
 
 export interface AppState {
@@ -158,6 +164,8 @@ export interface AppState {
   // Categories
   customCategories: Category[]; // 新增：自定义分类
   hiddenDefaultCategoryIds: string[];
+  categoryOrder: string[]; // 新增：分类排序顺序
+  collapsedSidebarCategoryCount: number; // 新增：折叠状态下显示的分类个数
   
   // Asset Filters
   assetFilters: AssetFilter[]; // 新增：资源过滤器
@@ -167,6 +175,7 @@ export interface AppState {
   currentView: 'repositories' | 'releases' | 'settings';
   selectedCategory: string;
   language: 'zh' | 'en';
+  isSidebarCollapsed: boolean;
   
   // Update
   updateNotification: UpdateNotification | null;
@@ -176,6 +185,13 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+
+  // Release Timeline View
+  releaseViewMode: 'timeline' | 'repository';
+  releaseSelectedFilters: string[];
+  releaseSearchQuery: string;
+  releaseExpandedRepositories: Set<number>;
+  releaseIsRefreshing: boolean;
 }
 
 export interface UpdateNotification {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
+import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
 
@@ -55,6 +56,8 @@ interface AppActions {
   setReleases: (releases: Release[]) => void;
   addReleases: (releases: Release[]) => void;
   toggleReleaseSubscription: (repoId: number) => void;
+  batchUnsubscribeReleases: (repoIds: number[]) => void;
+  removeReleasesByRepoId: (repoId: number) => void;
   markReleaseAsRead: (releaseId: number) => void;
   markAllReleasesAsRead: () => void;
   
@@ -64,7 +67,10 @@ interface AppActions {
   deleteCustomCategory: (id: string) => void;
   hideDefaultCategory: (id: string) => void;
   showDefaultCategory: (id: string) => void;
-  
+  setCategoryOrder: (order: string[]) => void;
+  reorderCategories: (oldIndex: number, newIndex: number) => void;
+  setCollapsedSidebarCategoryCount: (count: number) => void;
+
   // Asset Filter actions
   addAssetFilter: (filter: AssetFilter) => void;
   updateAssetFilter: (id: string, updates: Partial<AssetFilter>) => void;
@@ -75,6 +81,7 @@ interface AppActions {
   setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
@@ -85,6 +92,16 @@ interface AppActions {
 
   // Backend actions
   setBackendApiSecret: (secret: string | null) => void;
+
+  // Release Timeline View actions
+  setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
+  setReleaseSelectedFilters: (filters: string[]) => void;
+  toggleReleaseSelectedFilter: (filterId: string) => void;
+  clearReleaseSelectedFilters: () => void;
+  setReleaseSearchQuery: (query: string) => void;
+  toggleReleaseExpandedRepository: (repoId: number) => void;
+  setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
+  setReleaseIsRefreshing: (refreshing: boolean) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -96,6 +113,9 @@ const initialSearchFilters: SearchFilters = {
   sortOrder: 'desc',
   isAnalyzed: undefined,
   isSubscribed: undefined,
+  isEdited: undefined,
+  isCategoryLocked: undefined,
+  analysisFailed: undefined,
 };
 
 type PersistedAppState = Partial<
@@ -114,16 +134,23 @@ type PersistedAppState = Partial<
     | 'releases'
     | 'customCategories'
     | 'hiddenDefaultCategoryIds'
+    | 'categoryOrder'
+    | 'collapsedSidebarCategoryCount'
     | 'assetFilters'
     | 'theme'
     | 'currentView'
     | 'selectedCategory'
     | 'language'
     | 'searchFilters'
+    | 'isSidebarCollapsed'
+    | 'releaseViewMode'
+    | 'releaseSelectedFilters'
+    | 'releaseSearchQuery'
   >
 > & {
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
+  releaseExpandedRepositories?: unknown;
 };
 
 const normalizeNumberSet = (value: unknown): Set<number> => {
@@ -147,9 +174,6 @@ const normalizePersistedState = (
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
-  const savedSortBy = safePersisted.searchFilters?.sortBy || 'stars';
-  const savedSortOrder = safePersisted.searchFilters?.sortOrder || 'desc';
-
   return {
     ...currentState,
     ...safePersisted,
@@ -158,17 +182,29 @@ const normalizePersistedState = (
     searchResults: repositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
+    releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     searchFilters: {
       ...initialSearchFilters,
-      sortBy: savedSortBy,
-      sortOrder: savedSortOrder,
+      ...safePersisted.searchFilters,
+      sortBy: safePersisted.searchFilters?.sortBy || 'stars',
+      sortOrder: safePersisted.searchFilters?.sortOrder || 'desc',
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
-    hiddenDefaultCategoryIds: Array.isArray((safePersisted as any).hiddenDefaultCategoryIds) ? (safePersisted as any).hiddenDefaultCategoryIds.filter((id: unknown): id is string => typeof id === 'string') : [],
-    assetFilters: Array.isArray(safePersisted.assetFilters) ? safePersisted.assetFilters : [],
+    hiddenDefaultCategoryIds: (() => {
+      const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
+      return Array.isArray(persistedIds)
+        ? persistedIds.filter((id): id is string => typeof id === 'string')
+        : [];
+    })(),
+    categoryOrder: Array.isArray(safePersisted.categoryOrder) ? safePersisted.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') : [],
+    collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
+    assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
+    releaseViewMode: safePersisted.releaseViewMode || 'timeline',
+    releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
+    releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
   };
 };
 
@@ -259,9 +295,25 @@ const defaultCategories: Category[] = [
   }
 ];
 
+// 预设筛选器图标映射
+const PRESET_FILTER_ICONS: Record<string, string> = {
+  'preset-windows': 'Monitor',
+  'preset-macos': 'Apple',
+  'preset-linux': 'Terminal',
+  'preset-android': 'Smartphone',
+  'preset-source': 'Package',
+};
+
+// 默认预设筛选器
+const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
+  ...pf,
+  isPreset: true,
+  icon: PRESET_FILTER_ICONS[pf.id] || 'Package',
+}));
+
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -281,7 +333,9 @@ export const useAppStore = create<AppState & AppActions>()(
       readReleases: new Set<number>(),
       customCategories: [],
       hiddenDefaultCategoryIds: [],
-      assetFilters: [],
+      categoryOrder: [],
+      collapsedSidebarCategoryCount: 20,
+      assetFilters: defaultPresetFilters,
       theme: 'light',
       currentView: 'repositories',
       selectedCategory: 'all',
@@ -289,6 +343,12 @@ export const useAppStore = create<AppState & AppActions>()(
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
+      isSidebarCollapsed: false,
+      releaseViewMode: 'timeline',
+      releaseSelectedFilters: [],
+      releaseSearchQuery: '',
+      releaseExpandedRepositories: new Set<number>(),
+      releaseIsRefreshing: false,
 
       // Auth actions
       setUser: (user) => {
@@ -375,9 +435,21 @@ export const useAppStore = create<AppState & AppActions>()(
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       // Search actions
-      setSearchFilters: (filters) => set((state) => ({
-        searchFilters: { ...state.searchFilters, ...filters }
-      })),
+      setSearchFilters: (filters) => set((state) => {
+        const newFilters = { ...state.searchFilters, ...filters };
+        
+        // 处理互斥筛选器：isAnalyzed 和 analysisFailed 不能同时设置
+        if (filters.isAnalyzed !== undefined && filters.isAnalyzed !== null) {
+          // 如果设置了 isAnalyzed，清除 analysisFailed
+          newFilters.analysisFailed = undefined;
+        }
+        if (filters.analysisFailed !== undefined && filters.analysisFailed !== null) {
+          // 如果设置了 analysisFailed，清除 isAnalyzed
+          newFilters.isAnalyzed = undefined;
+        }
+        
+        return { searchFilters: newFilters };
+      }),
       setSearchResults: (searchResults) => set({ searchResults }),
 
       // Release actions
@@ -398,6 +470,27 @@ export const useAppStore = create<AppState & AppActions>()(
         }
         
         return { releaseSubscriptions: newSubscriptions };
+      }),
+      batchUnsubscribeReleases: (repoIds) => set((state) => {
+        const newSubscriptions = new Set(state.releaseSubscriptions);
+        repoIds.forEach(repoId => {
+          newSubscriptions.delete(repoId);
+        });
+        return { releaseSubscriptions: newSubscriptions };
+      }),
+      removeReleasesByRepoId: (repoId) => set((state) => {
+        const filteredReleases = state.releases.filter(release => release.repository.id !== repoId);
+        const remainingReleaseIds = new Set(filteredReleases.map(r => r.id));
+        const nextReadReleases = new Set(
+          Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))
+        );
+        const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
+        nextExpandedRepos.delete(repoId);
+        return {
+          releases: filteredReleases,
+          readReleases: nextReadReleases,
+          releaseExpandedRepositories: nextExpandedRepos,
+        };
       }),
       markReleaseAsRead: (releaseId) => set((state) => {
         const newReadReleases = new Set(state.readReleases);
@@ -476,6 +569,16 @@ export const useAppStore = create<AppState & AppActions>()(
       showDefaultCategory: (id) => set((state) => ({
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds.filter(categoryId => categoryId !== id)
       })),
+      setCategoryOrder: (order) => set({ categoryOrder: order }),
+      reorderCategories: (oldIndex, newIndex) => set((state) => {
+        const allCategories = getAllCategories(state.customCategories, state.language, state.hiddenDefaultCategoryIds);
+        const orderedCategories = sortCategoriesByOrder(allCategories, state.categoryOrder);
+        const newOrder = orderedCategories.map(c => c.id);
+        const [movedId] = newOrder.splice(oldIndex, 1);
+        newOrder.splice(newIndex, 0, movedId);
+        return { categoryOrder: newOrder };
+      }),
+      setCollapsedSidebarCategoryCount: (count) => set({ collapsedSidebarCategoryCount: count }),
 
       // Asset Filter actions
       addAssetFilter: (filter) => set((state) => ({
@@ -495,6 +598,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setCurrentView: (currentView) => set({ currentView }),
       setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),
+      setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
@@ -504,10 +608,32 @@ export const useAppStore = create<AppState & AppActions>()(
         writeSessionBackendSecret(backendApiSecret);
         set({ backendApiSecret });
       },
+
+      // Release Timeline View actions
+      setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
+      setReleaseSelectedFilters: (releaseSelectedFilters) => set({ releaseSelectedFilters }),
+      toggleReleaseSelectedFilter: (filterId) => set((state) => ({
+        releaseSelectedFilters: state.releaseSelectedFilters.includes(filterId)
+          ? state.releaseSelectedFilters.filter(id => id !== filterId)
+          : [...state.releaseSelectedFilters, filterId]
+      })),
+      clearReleaseSelectedFilters: () => set({ releaseSelectedFilters: [] }),
+      setReleaseSearchQuery: (releaseSearchQuery) => set({ releaseSearchQuery }),
+      toggleReleaseExpandedRepository: (repoId) => set((state) => {
+        const newSet = new Set(state.releaseExpandedRepositories);
+        if (newSet.has(repoId)) {
+          newSet.delete(repoId);
+        } else {
+          newSet.add(repoId);
+        }
+        return { releaseExpandedRepositories: newSet };
+      }),
+      setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
+      setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
     }),
     {
       name: 'github-stars-manager',
-      version: 1,
+      version: 3,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -536,6 +662,8 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化自定义分类
         customCategories: state.customCategories,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+        categoryOrder: state.categoryOrder,
+        collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
 
         // 持久化资源过滤器
         assetFilters: state.assetFilters,
@@ -545,6 +673,7 @@ export const useAppStore = create<AppState & AppActions>()(
         currentView: state.currentView,
         selectedCategory: state.selectedCategory,
         language: state.language,
+        isSidebarCollapsed: state.isSidebarCollapsed,
 
         // backendApiSecret: 保留在内存中，不持久化（安全考虑）
 
@@ -553,8 +682,47 @@ export const useAppStore = create<AppState & AppActions>()(
           sortBy: state.searchFilters.sortBy,
           sortOrder: state.searchFilters.sortOrder,
         },
+
+        // 持久化Release页面视图设置
+        releaseViewMode: state.releaseViewMode,
+        releaseSelectedFilters: state.releaseSelectedFilters,
+        releaseSearchQuery: state.releaseSearchQuery,
+        releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
       }),
-      migrate: (persistedState) => persistedState as PersistedAppState,
+      migrate: (persistedState) => {
+        // 版本升级适配处理
+        const state = persistedState as PersistedAppState | undefined;
+
+        // 从旧版本升级时，确保 categoryOrder 字段存在
+        if (state && !Array.isArray(state.categoryOrder)) {
+          console.log('Migrating from old version: initializing categoryOrder');
+          state.categoryOrder = [];
+        }
+
+        // 从旧版本升级时，确保 collapsedSidebarCategoryCount 字段存在
+        if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
+          console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
+          state.collapsedSidebarCategoryCount = 20;
+        }
+
+        // 迁移仓库数据中的旧标记
+        if (state && Array.isArray(state.repositories)) {
+          let migratedCount = 0;
+          state.repositories = state.repositories.map((repo: Repository) => {
+            // 将旧的 '__EMPTY__' 标记转换为空字符串（表示用户明确清空）
+            if (repo.custom_description === '__EMPTY__') {
+              migratedCount++;
+              return { ...repo, custom_description: '' };
+            }
+            return repo;
+          });
+          if (migratedCount > 0) {
+            console.log(`Migrated ${migratedCount} repositories: converted '__EMPTY__' to empty string`);
+          }
+        }
+
+        return state as PersistedAppState;
+      },
       merge: (persistedState, currentState) => {
         const normalized = normalizePersistedState(
           persistedState as PersistedAppState | undefined,
@@ -579,6 +747,34 @@ export const useAppStore = create<AppState & AppActions>()(
   )
 );
 
+// Helper function to sort categories by order
+export const sortCategoriesByOrder = (
+  categories: Category[],
+  categoryOrder: string[]
+): Category[] => {
+  if (!categoryOrder || categoryOrder.length === 0) {
+    return categories;
+  }
+
+  const orderMap = new Map(categoryOrder.map((id, index) => [id, index]));
+
+  return [...categories].sort((a, b) => {
+    const orderA = orderMap.get(a.id);
+    const orderB = orderMap.get(b.id);
+
+    // 如果两个都有顺序，按顺序排序
+    if (orderA !== undefined && orderB !== undefined) {
+      return orderA - orderB;
+    }
+    // 如果只有a有顺序，a排在前面
+    if (orderA !== undefined) return -1;
+    // 如果只有b有顺序，b排在前面
+    if (orderB !== undefined) return 1;
+    // 都没有顺序，保持原顺序
+    return 0;
+  });
+};
+
 // Helper function to get all categories (default + custom)
 export const getAllCategories = (
   customCategories: Category[],
@@ -591,7 +787,7 @@ export const getAllCategories = (
       ...cat,
       name: language === 'en' ? translateCategoryName(cat.name) : cat.name
     }));
-  
+
   return [...translatedDefaults, ...customCategories];
 };
 

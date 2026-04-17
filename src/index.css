@@ -1,13 +1,85 @@
+/* stylelint-disable */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* stylelint-enable */
 
 @layer utilities {
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  /* 隐藏滚动条但保持滚动功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 滚动时显示滚动条，默认隐藏 - macOS 风格 */
+  .scrollbar-auto {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    overflow: auto;
+  }
+
+  .scrollbar-auto::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-auto::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+  }
+
+  .scrollbar-auto::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+  }
+
+  /* 悬停、滚动中、聚焦时显示滚动条 */
+  .scrollbar-auto:hover::-webkit-scrollbar-thumb,
+  .scrollbar-auto.scrolling::-webkit-scrollbar-thumb,
+  .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .dark .scrollbar-auto:hover::-webkit-scrollbar-thumb,
+  .dark .scrollbar-auto.scrolling::-webkit-scrollbar-thumb,
+  .dark .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  /* 滚动条悬停时加粗 */
+  .scrollbar-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid transparent;
+  }
+
+  .dark .scrollbar-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid transparent;
+  }
+
+  /* 滚动时添加 scrolling 类的动画 */
+  .scrollbar-auto.scrolling::-webkit-scrollbar-thumb {
+    transition: background 0.3s ease;
+  }
+
+  /* 触摸优化 */
+  .touch-manipulation {
+    touch-action: manipulation;
   }
 }
 
@@ -25,4 +97,53 @@
 .repository-list-syncing .repository-card * {
   animation: none !important;
   transition: none !important;
+}
+
+/* 防止多选时选中卡片导致页面滚动 */
+.repository-card {
+  scroll-margin: 20px;
+}
+
+/* 多选模式下防止焦点导致的滚动 */
+.repository-card[data-selection-mode="true"] {
+  scroll-margin: 0;
+}
+
+/* 分类侧栏自定义滚动条样式 */
+.category-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.category-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.category-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb:hover,
+.category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.8);
+}
+
+.dark .category-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.dark .category-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+.dark .category-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.8);
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -247,7 +247,16 @@ export const Header: React.FC = () => {
                   </p>
                 </div>
                 <button
-                  onClick={logout}
+                  onClick={() => {
+                    const confirmed = confirm(
+                      language === 'zh'
+                        ? '确定要退出登录吗？\n\n退出后您的 AI 配置、WebDAV 设置、自定义分类等数据仍会保留。如需完全清除所有数据，请前往「设置 → 数据管理」。'
+                        : 'Are you sure you want to logout?\n\nYour AI configs, WebDAV settings, custom categories and other data will be preserved. To completely clear all data, please go to "Settings → Data Management".'
+                    );
+                    if (confirmed) {
+                      logout();
+                    }
+                  }}
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   title={t('退出登录', 'Logout')}
                 >
