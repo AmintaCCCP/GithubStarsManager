@@ -32,12 +32,27 @@ function validateUrl(rawUrl: string): void {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(`Blocked proxy request: unsupported protocol '${parsed.protocol}'`);
   }
-  const hostname = parsed.hostname;
+  const hostname = parsed.hostname.toLowerCase();
+
+  // 检查是否是IP地址
+  const isIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+  if (isIP) {
+    // IP地址直接检查是否在阻止列表中
+    if (BLOCKED_HOSTS.has(hostname)) {
+      throw new Error(`Blocked proxy request: IP '${hostname}' is not allowed`);
+    }
+  }
+
   if (BLOCKED_HOSTS.has(hostname)) {
     throw new Error(`Blocked proxy request: hostname '${hostname}' is not allowed`);
   }
   if (PRIVATE_IP_PATTERNS.some(p => p.test(hostname))) {
     throw new Error(`Blocked proxy request: private IP '${hostname}' is not allowed`);
+  }
+
+  // 阻止URL中的用户名和密码（防止凭证泄露）
+  if (parsed.username || parsed.password) {
+    throw new Error(`Blocked proxy request: URL containing credentials is not allowed`);
   }
 }
 

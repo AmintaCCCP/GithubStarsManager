@@ -1,6 +1,6 @@
 import type { StateStorage } from 'zustand/middleware';
 
-const DB_NAME = 'github-stars-manager-db';
+export const DB_NAME = 'github-stars-manager-db';
 const STORE_NAME = 'app_state';
 const DB_VERSION = 1;
 

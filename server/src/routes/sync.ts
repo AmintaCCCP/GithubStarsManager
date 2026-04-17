@@ -91,6 +91,12 @@ router.post('/api/sync/import', (req, res) => {
     const data = req.body as Record<string, unknown>;
     const counts: Record<string, number> = {};
 
+    // 验证必要的数据结构
+    if (!data || typeof data !== 'object') {
+      res.status(400).json({ error: 'Invalid data format', code: 'INVALID_DATA_FORMAT' });
+      return;
+    }
+
     const importAll = db.transaction(() => {
       // Repositories
       const repos = data.repositories as Record<string, unknown>[] | undefined;
@@ -106,6 +112,10 @@ router.post('/api/sync/import', (req, res) => {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
+          // 验证必需的字段
+          if (!r.id || typeof r.id !== 'number') {
+            throw new Error(`Invalid repository data: missing or invalid id`);
+          }
           repoStmt.run(
             r.id, r.name, r.full_name, r.description ?? null,
             r.html_url, r.stargazers_count ?? 0, r.language ?? null,

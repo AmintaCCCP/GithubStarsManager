@@ -179,7 +179,7 @@ class BackendAdapter {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configId, body })
-    });
+    }, 120000);
     if (!res.ok) await this.throwTranslatedError(res, 'AI proxy error');
     return res.json();
   }

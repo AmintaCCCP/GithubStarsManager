@@ -20,6 +20,8 @@ function transformRelease(row: Record<string, unknown>) {
     draft: !!row.draft,
     is_read: !!row.is_read,
     assets: parseJsonColumn(row.assets),
+    zipball_url: row.zipball_url ?? undefined,
+    tarball_url: row.tarball_url ?? undefined,
     repository: {
       id: row.repo_id,
       full_name: row.repo_full_name,
@@ -86,8 +88,8 @@ router.put('/api/releases', (req, res) => {
     }
 
     for (const release of releases) {
-      if (!release.id) {
-        res.status(400).json({ error: 'Each release must have an id', code: 'RELEASE_ID_REQUIRED' });
+      if (!release.id || typeof release.id !== 'number' || release.id <= 0) {
+        res.status(400).json({ error: 'Each release must have a valid positive integer id', code: 'RELEASE_ID_REQUIRED' });
         return;
       }
     }
@@ -96,8 +98,9 @@ router.put('/api/releases', (req, res) => {
       INSERT OR REPLACE INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
-        repo_id, repo_full_name, repo_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        repo_id, repo_full_name, repo_name,
+        zipball_url, tarball_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const upsert = db.transaction(() => {
@@ -117,7 +120,9 @@ router.put('/api/releases', (req, res) => {
           JSON.stringify(release.assets ?? []),
           repository?.id ?? release.repo_id ?? null,
           repository?.full_name ?? release.repo_full_name ?? null,
-          repository?.name ?? release.repo_name ?? null
+          repository?.name ?? release.repo_name ?? null,
+          release.zipball_url ?? null,
+          release.tarball_url ?? null
         );
         count++;
       }

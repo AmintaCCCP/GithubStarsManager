@@ -114,6 +114,9 @@ export class UpdateService {
   }
 
   static openDownloadUrl(url: string): void {
-    window.open(url, '_blank');
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (newWindow) {
+      newWindow.opener = null;
+    }
   }
 }

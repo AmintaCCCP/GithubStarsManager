@@ -90,6 +90,35 @@ router.put('/api/repositories', (req, res) => {
       return;
     }
 
+    // 验证每个仓库的ID
+    for (const repo of repositories) {
+      if (!repo.id || typeof repo.id !== 'number' || repo.id <= 0) {
+        res.status(400).json({ error: 'Each repository must have a valid positive integer id', code: 'INVALID_REPOSITORY_ID' });
+        return;
+      }
+      if (!repo.full_name || typeof repo.full_name !== 'string') {
+        res.status(400).json({ error: 'Each repository must have a valid full_name', code: 'INVALID_REPOSITORY_FULL_NAME' });
+        return;
+      }
+      if (!repo.name || typeof repo.name !== 'string') {
+        res.status(400).json({ error: 'Each repository must have a valid name', code: 'INVALID_REPOSITORY_NAME' });
+        return;
+      }
+      const owner = repo.owner as Record<string, unknown> | undefined;
+      if (!owner || typeof owner.login !== 'string' || typeof owner.avatar_url !== 'string') {
+        res.status(400).json({ error: 'Each repository must have a valid owner with login and avatar_url', code: 'INVALID_REPOSITORY_OWNER' });
+        return;
+      }
+      if (!repo.html_url || typeof repo.html_url !== 'string') {
+        res.status(400).json({ error: 'Each repository must have a valid html_url', code: 'INVALID_REPOSITORY_HTML_URL' });
+        return;
+      }
+      if (typeof repo.stargazers_count !== 'number' || repo.stargazers_count < 0) {
+        res.status(400).json({ error: 'Each repository must have a valid non-negative stargazers_count', code: 'INVALID_STARGAZERS_COUNT' });
+        return;
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,

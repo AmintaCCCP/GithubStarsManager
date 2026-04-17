@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Github, Key, ArrowRight, AlertCircle } from 'lucide-react';
+import { Github, Key, ArrowRight, AlertCircle, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -7,7 +7,7 @@ export const LoginScreen: React.FC = () => {
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, repositories, lastSync, language } = useAppStore();
+  const { setUser, setGitHubToken, repositories, lastSync, language, setLanguage, theme, setTheme } = useAppStore();
 
   const handleConnect = async () => {
     if (!token.trim()) {
@@ -64,45 +64,77 @@ export const LoginScreen: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className={`min-h-screen ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-gradient-to-br from-gray-900 to-gray-800'} flex items-center justify-center p-4 transition-colors duration-300`}>
+      {/* Theme and Language Toggle */}
+      <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
+        {/* Language Toggle */}
+        <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <button
+            onClick={() => setLanguage('zh')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'zh' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          >
+            中文
+          </button>
+          <button
+            onClick={() => setLanguage('en')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'en' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          >
+            EN
+          </button>
+        </div>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          className="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title={t('切换主题', 'Toggle theme')}
+        >
+          {theme === 'light' ? (
+            <Moon className="w-5 h-5 text-gray-700" />
+          ) : (
+            <Sun className="w-5 h-5 text-gray-300" />
+          )}
+        </button>
+      </div>
+
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center w-16 h-16 bg-white rounded-2xl mx-auto mb-4 shadow-lg ring-1 ring-blue-100 overflow-hidden">
+          <div className="flex items-center justify-center w-16 h-16 bg-white dark:bg-gray-800 rounded-2xl mx-auto mb-4 shadow-lg ring-1 ring-blue-100 dark:ring-gray-700 overflow-hidden">
             <img
               src="./icon.png"
               alt="GitHub Stars Manager"
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             GitHub Stars Manager
           </h1>
-          <p className="text-gray-600 text-lg">
+          <p className="text-gray-600 dark:text-gray-400 text-lg">
             {t('AI驱动的仓库管理工具', 'AI-powered repository management')}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
           <div className="text-center mb-6">
-            <Github className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <Github className="w-10 h-10 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               {t('连接GitHub', 'Connect with GitHub')}
             </h2>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
               {t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}
             </p>
           </div>
 
           {/* 显示缓存状态 */}
           {repositories.length > 0 && lastSync && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center space-x-2 text-green-700">
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-center space-x-2 text-green-700 dark:text-green-400">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm font-medium">
                   {t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}
                 </span>
               </div>
-              <p className="text-xs text-green-600 mt-1">
+              <p className="text-xs text-green-600 dark:text-green-500 mt-1">
                 {t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}
               </p>
             </div>
@@ -110,7 +142,7 @@ export const LoginScreen: React.FC = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 GitHub Personal Access Token
               </label>
               <div className="relative">
@@ -123,24 +155,24 @@ export const LoginScreen: React.FC = () => {
                     setToken(e.target.value);
                     setError(''); // Clear error when user types
                   }}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:bg-gray-50 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             )}
 
             <button 
               onClick={handleConnect}
               disabled={isLoading || !token.trim()}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
               {isLoading ? (
                 <>
@@ -156,11 +188,11 @@ export const LoginScreen: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2 text-sm">
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <h3 className="font-medium text-gray-900 dark:text-white mb-2 text-sm">
               {t('如何创建GitHub token:', 'How to create a GitHub token:')}
             </h3>
-            <ol className="text-xs text-gray-600 space-y-1">
+            <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
               <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
               <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
               <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong> {t('和', 'and')} <strong>user</strong></li>
@@ -171,7 +203,7 @@ export const LoginScreen: React.FC = () => {
                 href="https://github.com/settings/tokens"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium hover:underline"
               >
                 {t('在GitHub上创建token →', 'Create token on GitHub →')}
               </a>
