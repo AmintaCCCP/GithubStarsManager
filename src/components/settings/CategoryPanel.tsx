@@ -285,10 +285,15 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               <input
                 type="text"
                 value={newCategoryIcon}
-                onChange={(e) => setNewCategoryIcon(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const graphemeCount = Array.from(value).length;
+                  if (graphemeCount <= 2) {
+                    setNewCategoryIcon(value);
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 placeholder="📁"
-                maxLength={2}
               />
             </div>
           </div>
@@ -477,9 +482,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               <input
                 type="text"
                 value={editIcon}
-                onChange={(e) => setEditIcon(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const graphemeCount = Array.from(value).length;
+                  if (graphemeCount <= 2) {
+                    setEditIcon(value);
+                  }
+                }}
                 className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-center text-lg"
-                maxLength={2}
                 placeholder="📁"
               />
               <input

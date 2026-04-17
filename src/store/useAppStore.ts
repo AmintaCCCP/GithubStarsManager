@@ -57,6 +57,7 @@ interface AppActions {
   addReleases: (releases: Release[]) => void;
   toggleReleaseSubscription: (repoId: number) => void;
   batchUnsubscribeReleases: (repoIds: number[]) => void;
+  removeReleasesByRepoId: (repoId: number) => void;
   markReleaseAsRead: (releaseId: number) => void;
   markAllReleasesAsRead: () => void;
   
@@ -100,6 +101,7 @@ interface AppActions {
   setReleaseSearchQuery: (query: string) => void;
   toggleReleaseExpandedRepository: (repoId: number) => void;
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
+  setReleaseIsRefreshing: (refreshing: boolean) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -346,6 +348,7 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseSelectedFilters: [],
       releaseSearchQuery: '',
       releaseExpandedRepositories: new Set<number>(),
+      releaseIsRefreshing: false,
 
       // Auth actions
       setUser: (user) => {
@@ -474,6 +477,20 @@ export const useAppStore = create<AppState & AppActions>()(
           newSubscriptions.delete(repoId);
         });
         return { releaseSubscriptions: newSubscriptions };
+      }),
+      removeReleasesByRepoId: (repoId) => set((state) => {
+        const filteredReleases = state.releases.filter(release => release.repository.id !== repoId);
+        const remainingReleaseIds = new Set(filteredReleases.map(r => r.id));
+        const nextReadReleases = new Set(
+          Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))
+        );
+        const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
+        nextExpandedRepos.delete(repoId);
+        return {
+          releases: filteredReleases,
+          readReleases: nextReadReleases,
+          releaseExpandedRepositories: nextExpandedRepos,
+        };
       }),
       markReleaseAsRead: (releaseId) => set((state) => {
         const newReadReleases = new Set(state.readReleases);
@@ -612,6 +629,7 @@ export const useAppStore = create<AppState & AppActions>()(
         return { releaseExpandedRepositories: newSet };
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
+      setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
     }),
     {
       name: 'github-stars-manager',

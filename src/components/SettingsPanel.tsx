@@ -150,12 +150,12 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             }}
             onClick={() => onTabChange(tab.id)}
             role="tab"
-            id={`mobile-tab-${tab.id}`}
+            id={`settings-tab-${tab.id}`}
             aria-selected={activeTab === tab.id}
-            aria-controls={`tabpanel-${tab.id}`}
+            aria-controls={`settings-tabpanel-${tab.id}`}
             className={`
               flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
-              transition-all duration-200 ease-out snap-center
+              transition-all duration-150 ease-out snap-center
               min-h-[36px] touch-manipulation
               ${activeTab === tab.id
                 ? 'text-blue-600 dark:text-blue-400'
@@ -174,7 +174,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       
       {/* 底部活动指示器 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-200 ease-out will-change-transform"
         style={{
           transform: `translateX(${indicatorStyle.translateX}px)`,
           width: indicatorStyle.width,
@@ -230,8 +230,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       tabResetTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
-      }, 200);
-    }, 150);
+      }, 120);
+    }, 100);
   }, [activeTab, isTransitioning]);
 
   // 清理定时器
@@ -309,11 +309,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     return (
       <div
         role="tabpanel"
-        id={`tabpanel-${displayTab}`}
-        aria-labelledby={`mobile-tab-${displayTab}`}
+        id={`settings-tabpanel-${displayTab}`}
+        aria-labelledby={`settings-tab-${displayTab}`}
         className={`
-          transition-all duration-150 ease-out
-          ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}
+          transition-all duration-100 ease-out
+          ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}
         `}
       >
         {content}
@@ -342,7 +342,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
             <button
               onClick={handleClose}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-150"
               aria-label={t('关闭设置', 'Close settings')}
             >
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -358,9 +358,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
                     role="tab"
-                    id={`desktop-tab-${tab.id}`}
+                    id={`settings-tab-${tab.id}`}
                     aria-selected={activeTab === tab.id}
-                    aria-controls={`desktop-tabpanel-${tab.id}`}
+                    aria-controls={`settings-tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
@@ -415,10 +415,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   role="tab"
-                  id={`desktop-tab-${tab.id}`}
+                  id={`settings-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
-                  aria-controls={`desktop-tabpanel-${tab.id}`}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-left ${
+                  aria-controls={`settings-tabpanel-${tab.id}`}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'

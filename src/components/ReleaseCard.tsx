@@ -1,5 +1,5 @@
 import React, { memo, useCallback } from 'react';
-import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2 } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -9,6 +9,7 @@ interface DownloadLink {
   url: string;
   size: number;
   downloadCount: number;
+  isSourceCode?: boolean;
 }
 
 interface ReleaseCardProps {
@@ -55,7 +56,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-xl border transition-all duration-300 ease-in-out ${
+      onClick={onMarkAsRead}
+      className={`bg-white dark:bg-gray-800 rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isAnyExpanded
           ? 'border-blue-300 dark:border-blue-700 shadow-lg ring-1 ring-blue-100 dark:ring-blue-900'
           : 'border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600'
@@ -201,12 +203,18 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border-b border-gray-200 dark:border-gray-600 last:border-b-0"
+                    className={`flex items-center justify-between px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border-b border-gray-200 dark:border-gray-600 last:border-b-0 ${
+                      link.isSourceCode ? 'bg-green-50/50 dark:bg-green-900/20' : ''
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                      <Download className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="text-xs truncate text-gray-700 dark:text-gray-300">
+                      {link.isSourceCode ? (
+                        <Code2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      )}
+                      <span className={`text-xs truncate ${link.isSourceCode ? 'text-green-700 dark:text-green-300 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
                         {link.name}
                       </span>
                     </div>
@@ -242,7 +250,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 {(release.body || '').length > truncatedBody.length && (
                   <div className="mt-3 flex items-center justify-center space-x-2">
                     <button
-                      onClick={onToggleFullContent}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFullContent(e);
+                      }}
                       className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-xs font-medium min-w-[120px]"
                     >
                       <BookOpen className="w-3 h-3" />

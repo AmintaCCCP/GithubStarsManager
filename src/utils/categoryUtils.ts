@@ -80,6 +80,38 @@ export const computeCustomCategory = (
   return categoryName;
 };
 
+export const matchesCategory = (repo: Repository, category: Category): boolean => {
+  if (category.id === 'all') return true;
+
+  if (repo.custom_category !== undefined) {
+    if (repo.custom_category === '') {
+      return false;
+    }
+    return repo.custom_category === category.name;
+  }
+
+  if (repo.ai_tags && repo.ai_tags.length > 0) {
+    return repo.ai_tags.some(tag =>
+      category.keywords.some(keyword =>
+        tag.toLowerCase().includes(keyword.toLowerCase()) ||
+        keyword.toLowerCase().includes(tag.toLowerCase())
+      )
+    );
+  }
+
+  const repoText = [
+    repo.name,
+    repo.description || '',
+    repo.language || '',
+    ...(repo.topics || []),
+    repo.ai_summary || ''
+  ].join(' ').toLowerCase();
+
+  return category.keywords.some(keyword =>
+    repoText.includes(keyword.toLowerCase())
+  );
+};
+
 export const resolveCategoryAssignment = (
   repository: Repository,
   aiTags: string[] | undefined,

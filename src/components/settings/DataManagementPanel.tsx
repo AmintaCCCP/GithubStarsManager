@@ -257,6 +257,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         lastBackup: null,
 
         // 分类设置
+        customCategories: [],
         hiddenDefaultCategoryIds: [],
         categoryOrder: [],
         collapsedSidebarCategoryCount: 20,
@@ -278,14 +279,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           isSubscribed: undefined,
         },
       });
-
-      // 清除所有分类相关数据（在状态重置之后，使用 getState 获取最新值）
-      const latestCategories = useAppStore.getState().customCategories;
-      for (const cat of latestCategories) {
-        if (cat && cat.id) {
-          deleteCustomCategory(cat.id);
-        }
-      }
 
       addLog(t('删除所有数据', 'Delete all data'), true);
       showSuccess(t('所有数据已删除，应用将重新加载', 'All data deleted, app will reload'));

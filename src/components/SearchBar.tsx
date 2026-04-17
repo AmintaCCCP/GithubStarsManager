@@ -589,7 +589,7 @@ export const SearchBar: React.FC = () => {
 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       handleAISearch();
     }
   };

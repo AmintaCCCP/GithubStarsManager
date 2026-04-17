@@ -166,6 +166,18 @@ export async function syncFromBackend(): Promise<void> {
           }
         }
       }
+      if (Array.isArray(settings.categoryOrder)) {
+        useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') });
+      }
+      if (Array.isArray(settings.customCategories)) {
+        useAppStore.setState({ customCategories: settings.customCategories });
+      }
+      if (Array.isArray(settings.assetFilters)) {
+        useAppStore.setState({ assetFilters: settings.assetFilters });
+      }
+      if (typeof settings.collapsedSidebarCategoryCount === 'number' && settings.collapsedSidebarCategoryCount >= 1) {
+        useAppStore.setState({ collapsedSidebarCategoryCount: settings.collapsedSidebarCategoryCount });
+      }
       _lastHash.settings = hashes.settings;
     }
 
@@ -213,6 +225,10 @@ export async function syncToBackend(): Promise<void> {
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+        categoryOrder: state.categoryOrder,
+        customCategories: state.customCategories,
+        assetFilters: state.assetFilters,
+        collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       }),
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;
@@ -236,6 +252,10 @@ export async function syncToBackend(): Promise<void> {
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+        categoryOrder: state.categoryOrder,
+        customCategories: state.customCategories,
+        assetFilters: state.assetFilters,
+        collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       });
     }
   } catch (err) {
@@ -293,7 +313,12 @@ export function startAutoSync(): () => void {
       state.aiConfigs !== prevState.aiConfigs ||
       state.webdavConfigs !== prevState.webdavConfigs ||
       state.activeAIConfig !== prevState.activeAIConfig ||
-      state.activeWebDAVConfig !== prevState.activeWebDAVConfig;
+      state.activeWebDAVConfig !== prevState.activeWebDAVConfig ||
+      state.hiddenDefaultCategoryIds !== prevState.hiddenDefaultCategoryIds ||
+      state.categoryOrder !== prevState.categoryOrder ||
+      state.customCategories !== prevState.customCategories ||
+      state.assetFilters !== prevState.assetFilters ||
+      state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount;
 
     if (!changed) return;
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -20,21 +20,23 @@ export const ReleaseTimeline: React.FC = () => {
     assetFilters,
     addReleases,
     markReleaseAsRead,
-    toggleReleaseSubscription,
+    batchUnsubscribeReleases,
+    removeReleasesByRepoId,
     updateRepository,
     // Release Timeline View State from global store
     releaseViewMode,
     releaseSelectedFilters,
     releaseSearchQuery,
     releaseExpandedRepositories,
+    releaseIsRefreshing,
     setReleaseViewMode,
     toggleReleaseSelectedFilter,
     clearReleaseSelectedFilters,
     setReleaseSearchQuery,
     toggleReleaseExpandedRepository,
+    setReleaseIsRefreshing,
   } = useAppStore();
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -124,7 +126,7 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const getDownloadLinks = useCallback((release: Release) => {
-    const links: Array<{ name: string; url: string; size: number; downloadCount: number }> = [];
+    const links: Array<{ name: string; url: string; size: number; downloadCount: number; isSourceCode?: boolean }> = [];
     
     if (release.assets && release.assets.length > 0) {
       release.assets.forEach(asset => {
@@ -134,6 +136,26 @@ export const ReleaseTimeline: React.FC = () => {
           size: asset.size,
           downloadCount: asset.download_count
         });
+      });
+    }
+
+    if (release.zipball_url) {
+      links.push({
+        name: `Source code (${release.tag_name}.zip)`,
+        url: release.zipball_url,
+        size: 0,
+        downloadCount: 0,
+        isSourceCode: true
+      });
+    }
+
+    if (release.tarball_url) {
+      links.push({
+        name: `Source code (${release.tag_name}.tar.gz)`,
+        url: release.tarball_url,
+        size: 0,
+        downloadCount: 0,
+        isSourceCode: true
       });
     }
 
@@ -246,6 +268,14 @@ export const ReleaseTimeline: React.FC = () => {
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
   const paginatedRepositoryGroups = repositoryGroups.slice(startIndex, startIndex + itemsPerPage);
 
+  // 同步 currentPage 状态，确保始终在有效范围内
+  useEffect(() => {
+    const maxPage = Math.max(totalPages, 1);
+    if (currentPage < 1 || currentPage > maxPage) {
+      setCurrentPage(Math.min(Math.max(currentPage, 1), maxPage));
+    }
+  }, [totalPages, currentPage]);
+
 
 
   // Filter handlers - 使用全局状态
@@ -265,7 +295,7 @@ export const ReleaseTimeline: React.FC = () => {
       return;
     }
 
-    setIsRefreshing(true);
+    setReleaseIsRefreshing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
       const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
@@ -275,41 +305,36 @@ export const ReleaseTimeline: React.FC = () => {
         return;
       }
 
-      let newReleasesCount = 0;
       const allNewReleases: Release[] = [];
 
-      // 获取最新的release时间戳
       const latestReleaseTime = releases.length > 0 
-        ? Math.max(...releases.map(r => new Date(r.published_at).getTime()))
+        ? releases.reduce((max, r) => Math.max(max, new Date(r.published_at).getTime()), 0)
         : 0;
       const sinceTimestamp = latestReleaseTime > 0 ? new Date(latestReleaseTime).toISOString() : undefined;
 
       for (const repo of subscribedRepos) {
         const [owner, name] = repo.full_name.split('/');
         
-        // 检查这个仓库是否是新订阅的（没有任何release记录）
         const hasExistingReleases = releases.some(r => r.repository.id === repo.id);
         
         let repoReleases: Release[];
         if (!hasExistingReleases) {
-          // 新订阅的仓库，获取全部releases
           repoReleases = await githubApi.getRepositoryReleases(owner, name, 1, 10);
         } else {
-          // 已有记录的仓库，增量更新
           repoReleases = await githubApi.getIncrementalRepositoryReleases(owner, name, sinceTimestamp, 10);
         }
         
-        // 设置repository信息
         repoReleases.forEach(release => {
           release.repository.id = repo.id;
         });
         
         allNewReleases.push(...repoReleases);
-        newReleasesCount += repoReleases.length;
         
-        // Rate limiting protection
         await new Promise(resolve => setTimeout(resolve, 200));
       }
+
+      const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
+      const actuallyNewCount = allNewReleases.filter(r => !existingIds.has(r.id)).length;
 
       if (allNewReleases.length > 0) {
         addReleases(allNewReleases);
@@ -319,8 +344,8 @@ export const ReleaseTimeline: React.FC = () => {
       setLastRefreshTime(now);
 
       const message = language === 'zh'
-        ? `刷新完成！发现 ${newReleasesCount} 个新Release。`
-        : `Refresh completed! Found ${newReleasesCount} new releases.`;
+        ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
+        : `Refresh completed! Found ${actuallyNewCount} new releases.`;
       
       alert(message);
     } catch (error) {
@@ -330,7 +355,7 @@ export const ReleaseTimeline: React.FC = () => {
         : 'Release refresh failed. Please check your network connection.';
       alert(errorMessage);
     } finally {
-      setIsRefreshing(false);
+      setReleaseIsRefreshing(false);
     }
   };
 
@@ -342,12 +367,13 @@ export const ReleaseTimeline: React.FC = () => {
     const delta = 2;
     const range = [];
     const rangeWithDots = [];
+    const activePage = clampedPage;
 
-    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+    for (let i = Math.max(2, activePage - delta); i <= Math.min(totalPages - 1, activePage + delta); i++) {
       range.push(i);
     }
 
-    if (currentPage - delta > 2) {
+    if (activePage - delta > 2) {
       rangeWithDots.push(1, '...');
     } else {
       rangeWithDots.push(1);
@@ -355,7 +381,7 @@ export const ReleaseTimeline: React.FC = () => {
 
     rangeWithDots.push(...range);
 
-    if (currentPage + delta < totalPages - 1) {
+    if (activePage + delta < totalPages - 1) {
       rangeWithDots.push('...', totalPages);
     } else if (totalPages > 1) {
       rangeWithDots.push(totalPages);
@@ -451,16 +477,25 @@ export const ReleaseTimeline: React.FC = () => {
       return;
     }
 
+    const removedReleases = releases.filter(r => r.repository.id === repoId);
+    const removedReadIds = new Set(removedReleases.map(r => r.id));
+
     const updatedRepo = { ...repo, subscribed_to_releases: false };
     updateRepository(updatedRepo);
-    toggleReleaseSubscription(repo.id);
+    batchUnsubscribeReleases([repo.id]);
+    removeReleasesByRepoId(repo.id);
 
     try {
       await forceSyncToBackend();
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
       updateRepository({ ...repo, subscribed_to_releases: true });
-      toggleReleaseSubscription(repo.id);
+      const state = useAppStore.getState();
+      useAppStore.setState({
+        releaseSubscriptions: new Set([...state.releaseSubscriptions, repo.id]),
+        releases: [...state.releases, ...removedReleases],
+        readReleases: new Set([...state.readReleases, ...removedReadIds]),
+      });
       alert(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'));
       return;
     }
@@ -489,11 +524,11 @@ export const ReleaseTimeline: React.FC = () => {
           <div className="mb-6">
             <button
               onClick={handleRefresh}
-              disabled={isRefreshing}
+              disabled={releaseIsRefreshing}
               className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
             >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
+              <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+              <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
             </button>
             {lastRefreshTime && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -558,11 +593,11 @@ export const ReleaseTimeline: React.FC = () => {
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
-              disabled={isRefreshing}
+              disabled={releaseIsRefreshing}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+              <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+              <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
             </button>
           </div>
         </div>
@@ -716,14 +751,14 @@ export const ReleaseTimeline: React.FC = () => {
               <div className="flex items-center space-x-1 overflow-x-auto pb-1">
                 <button
                   onClick={() => handlePageChange(1)}
-                  disabled={currentPage === 1}
+                  disabled={clampedPage === 1}
                   className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsLeft className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(clampedPage - 1)}
+                  disabled={clampedPage === 1}
                   className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -735,7 +770,7 @@ export const ReleaseTimeline: React.FC = () => {
                     onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
                     disabled={typeof page !== 'number'}
                     className={`px-3 py-2 rounded-lg text-sm ${
-                      page === currentPage
+                      page === clampedPage
                         ? 'bg-blue-600 text-white'
                         : typeof page === 'number'
                         ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -747,15 +782,15 @@ export const ReleaseTimeline: React.FC = () => {
                 ))}
                 
                 <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(clampedPage + 1)}
+                  disabled={clampedPage === totalPages}
                   className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handlePageChange(totalPages)}
-                  disabled={currentPage === totalPages}
+                  disabled={clampedPage === totalPages}
                   className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsRight className="w-4 h-4" />
@@ -919,14 +954,14 @@ export const ReleaseTimeline: React.FC = () => {
           <div className="flex items-center space-x-1">
             <button
               onClick={() => handlePageChange(1)}
-              disabled={currentPage === 1}
+              disabled={clampedPage === 1}
               className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              onClick={() => handlePageChange(clampedPage - 1)}
+              disabled={clampedPage === 1}
               className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -938,7 +973,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
                 disabled={typeof page !== 'number'}
                 className={`px-3 py-2 rounded-lg text-sm ${
-                  page === currentPage
+                  page === clampedPage
                     ? 'bg-blue-600 text-white'
                     : typeof page === 'number'
                     ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -950,15 +985,15 @@ export const ReleaseTimeline: React.FC = () => {
             ))}
             
             <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(clampedPage + 1)}
+              disabled={clampedPage === totalPages}
               className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => handlePageChange(totalPages)}
-              disabled={currentPage === totalPages}
+              disabled={clampedPage === totalPages}
               className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />

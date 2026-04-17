@@ -7,11 +7,9 @@
 @layer utilities {
   .line-clamp-3 {
     display: -webkit-box;
-    display: box;
     -webkit-line-clamp: 3;
     line-clamp: 3;
     -webkit-box-orient: vertical;
-    box-orient: vertical;
     overflow: hidden;
   }
 
@@ -29,7 +27,7 @@
   .scrollbar-auto {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
-    overflow: overlay;
+    overflow: auto;
   }
 
   .scrollbar-auto::-webkit-scrollbar {

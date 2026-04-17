@@ -50,6 +50,8 @@ export interface Release {
   published_at: string;
   html_url: string;
   assets: ReleaseAsset[];
+  zipball_url?: string;
+  tarball_url?: string;
   repository: {
     id: number;
     full_name: string;
@@ -189,6 +191,7 @@ export interface AppState {
   releaseSelectedFilters: string[];
   releaseSearchQuery: string;
   releaseExpandedRepositories: Set<number>;
+  releaseIsRefreshing: boolean;
 }
 
 export interface UpdateNotification {

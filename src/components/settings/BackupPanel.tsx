@@ -55,11 +55,11 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         hiddenDefaultCategoryIds,
         aiConfigs: aiConfigs.map(config => ({
           ...config,
-          apiKey: '***'
+          apiKey: config.apiKey ? '***' : ''
         })),
         webdavConfigs: webdavConfigs.map(config => ({
           ...config,
-          password: '***'
+          password: config.password ? '***' : ''
         })),
         exportedAt: new Date().toISOString(),
         version: '1.0'
@@ -168,19 +168,17 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
         try {
           if (Array.isArray(backupData.aiConfigs)) {
-            const currentMap = new Map(aiConfigs.map((c: AIConfig) => [c.id, c]));
+            const latestAIConfigs = useAppStore.getState().aiConfigs;
+            const currentMap = new Map(latestAIConfigs.map((c: AIConfig) => [c.id, c]));
             const backupIdSet = new Set((backupData.aiConfigs as AIConfig[]).map(cfg => cfg.id).filter(Boolean));
-            // Remove local entries not in backup
             for (const [id] of currentMap) {
               if (!backupIdSet.has(id)) {
                 deleteAIConfig(id);
               }
             }
-            // Add or update entries from backup
             for (const cfg of backupData.aiConfigs as AIConfig[]) {
               if (!cfg || !cfg.id) continue;
               const existing = currentMap.get(cfg.id);
-              const isMasked = cfg.apiKey === '***';
               if (existing) {
                 updateAIConfig(cfg.id, {
                   name: cfg.name,
@@ -191,13 +189,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                   useCustomPrompt: cfg.useCustomPrompt,
                   concurrency: cfg.concurrency,
                   reasoningEffort: cfg.reasoningEffort,
-                  apiKey: isMasked ? existing.apiKey : cfg.apiKey,
+                  apiKey: cfg.apiKey || existing.apiKey,
                   isActive: existing.isActive,
                 });
               } else {
                 addAIConfig({
                   ...cfg,
-                  apiKey: isMasked ? '' : cfg.apiKey,
+                  apiKey: cfg.apiKey || '',
                   isActive: cfg.isActive,
                 });
               }
@@ -209,32 +207,30 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
         try {
           if (Array.isArray(backupData.webdavConfigs)) {
-            const currentMap = new Map(webdavConfigs.map((c: WebDAVConfig) => [c.id, c]));
+            const latestWebDAVConfigs = useAppStore.getState().webdavConfigs;
+            const currentMap = new Map(latestWebDAVConfigs.map((c: WebDAVConfig) => [c.id, c]));
             const backupIdSet = new Set((backupData.webdavConfigs as WebDAVConfig[]).map(cfg => cfg.id).filter(Boolean));
-            // Remove local entries not in backup
             for (const [id] of currentMap) {
               if (!backupIdSet.has(id)) {
                 deleteWebDAVConfig(id);
               }
             }
-            // Add or update entries from backup
             for (const cfg of backupData.webdavConfigs as WebDAVConfig[]) {
               if (!cfg || !cfg.id) continue;
               const existing = currentMap.get(cfg.id);
-              const isMasked = cfg.password === '***';
               if (existing) {
                 updateWebDAVConfig(cfg.id, {
                   name: cfg.name,
                   url: cfg.url,
                   username: cfg.username,
                   path: cfg.path,
-                  password: isMasked ? existing.password : cfg.password,
+                  password: cfg.password || existing.password,
                   isActive: existing.isActive,
                 });
               } else {
                 addWebDAVConfig({
                   ...cfg,
-                  password: isMasked ? '' : cfg.password,
+                  password: cfg.password || '',
                   isActive: false,
                 });
               }
@@ -353,8 +349,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('自定义分类', 'Custom categories')}</li>
-          <li>• {t('AI 服务配置（密钥已脱敏）', 'AI service configurations (keys masked)')}</li>
-          <li>• {t('WebDAV 配置（密码已脱敏）', 'WebDAV configurations (passwords masked)')}</li>
+          <li>• {t('AI 服务配置', 'AI service configurations')}</li>
+          <li>• {t('WebDAV 配置', 'WebDAV configurations')}</li>
         </ul>
       </div>
     </div>

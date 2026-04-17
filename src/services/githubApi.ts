@@ -135,8 +135,10 @@ export class GitHubApiService {
         published_at: release.published_at,
         html_url: release.html_url,
         assets: release.assets || [],
+        zipball_url: release.zipball_url,
+        tarball_url: release.tarball_url,
         repository: {
-          id: 0, // Will be set by caller
+          id: 0,
           full_name: `${owner}/${repo}`,
           name: repo,
         },
@@ -191,8 +193,10 @@ export class GitHubApiService {
         published_at: release.published_at,
         html_url: release.html_url,
         assets: release.assets || [],
+        zipball_url: release.zipball_url,
+        tarball_url: release.tarball_url,
         repository: {
-          id: 0, // Will be set by caller
+          id: 0,
           full_name: `${owner}/${repo}`,
           name: repo,
         },

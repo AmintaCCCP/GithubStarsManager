@@ -59,9 +59,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
   const [isExitingSelection, setIsExitingSelection] = useState(false);
 
-  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+  const allCategories = useMemo(
+    () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds),
+    [customCategories, language, hiddenDefaultCategoryIds]
+  );
 
-  // 使用 useMemo 缓存分类过滤结果
   const filteredRepositories = useMemo(() => {
     if (selectedCategory === 'all') return repositories;
     
@@ -1113,6 +1115,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             onSelect={handleSelectRepo}
             selectionMode={showBulkToolbar}
             isExitingSelection={isExitingSelection}
+            allCategories={allCategories}
           />
         ))}
       </div>

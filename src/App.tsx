@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -12,6 +12,41 @@ import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import type { AppState } from './types';
+
+const RepositoriesView = React.memo(({ 
+  repositories, 
+  searchResults, 
+  selectedCategory, 
+  onCategorySelect 
+}: { 
+  repositories: AppState['repositories'];
+  searchResults: AppState['searchResults'];
+  selectedCategory: string;
+  onCategorySelect: (category: string) => void;
+}) => (
+  <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+    <CategorySidebar 
+      repositories={repositories}
+      selectedCategory={selectedCategory}
+      onCategorySelect={onCategorySelect}
+    />
+    <div className="flex-1 space-y-6">
+      <SearchBar />
+      <RepositoryList 
+        repositories={searchResults.length > 0 ? searchResults : repositories}
+        selectedCategory={selectedCategory}
+      />
+    </div>
+  </div>
+));
+RepositoriesView.displayName = 'RepositoriesView';
+
+const ReleasesView = React.memo(() => <ReleaseTimeline />);
+ReleasesView.displayName = 'ReleasesView';
+
+const SettingsView = React.memo(() => <SettingsPanel />);
+SettingsView.displayName = 'SettingsView';
 
 function App() {
   const { 
@@ -24,10 +59,8 @@ function App() {
     setSelectedCategory,
   } = useAppStore();
 
-  // 自动检查更新
   useAutoUpdateCheck();
 
-  // Apply theme to document
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -36,7 +69,6 @@ function App() {
     }
   }, [theme]);
 
-  // Initialize backend adapter and auto-sync
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
@@ -65,46 +97,40 @@ function App() {
     };
   }, []);
 
-  // Show login screen if not authenticated
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
+  const handleCategorySelect = useCallback((category: string) => {
+    setSelectedCategory(category);
+  }, [setSelectedCategory]);
 
-  // Main application interface
-  const renderCurrentView = () => {
+  const currentViewContent = useMemo(() => {
     switch (currentView) {
       case 'repositories':
         return (
-          <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-            <CategorySidebar 
-              repositories={repositories}
-              selectedCategory={selectedCategory}
-              onCategorySelect={setSelectedCategory}
-            />
-            <div className="flex-1 space-y-6">
-              <SearchBar />
-              <RepositoryList 
-                repositories={searchResults.length > 0 ? searchResults : repositories}
-                selectedCategory={selectedCategory}
-              />
-            </div>
-          </div>
+          <RepositoriesView 
+            repositories={repositories}
+            searchResults={searchResults}
+            selectedCategory={selectedCategory}
+            onCategorySelect={handleCategorySelect}
+          />
         );
       case 'releases':
-        return <ReleaseTimeline />;
+        return <ReleasesView />;
       case 'settings':
-        return <SettingsPanel />;
+        return <SettingsView />;
       default:
         return null;
     }
-  };
+  }, [currentView, repositories, searchResults, selectedCategory, handleCategorySelect]);
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <UpdateNotificationBanner />
       <Header />
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {renderCurrentView()}
+        {currentViewContent}
       </main>
       <BackToTop />
     </div>

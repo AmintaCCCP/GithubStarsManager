@@ -173,7 +173,7 @@ export class WebDAVService {
         throw fetchError;
       }
     } catch (error: unknown) {
-      this.handleNetworkError(error, '连接测试');
+      return this.handleNetworkError(error, '连接测试');
     }
   }
 
@@ -259,7 +259,7 @@ export class WebDAVService {
           err.message.includes('WebDAV URL必须')) {
         throw error;
       }
-      this.handleNetworkError(error, '上传');
+      return this.handleNetworkError(error, '上传');
     }
   }
 
@@ -349,7 +349,7 @@ export class WebDAVService {
       if (err.message.includes('HTTP 404')) {
         return null;
       }
-      this.handleNetworkError(error, '下载');
+      return this.handleNetworkError(error, '下载');
     }
   }
 
@@ -481,7 +481,7 @@ export class WebDAVService {
           err.message.includes('列出文件超时')) {
         throw error;
       }
-      this.handleNetworkError(error, '列出文件');
+      return this.handleNetworkError(error, '列出文件');
     }
   }
 

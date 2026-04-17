@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare } from 'lucide-react';
-import { Repository } from '../types';
-import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { Repository, Category } from '../types';
+import { useAppStore } from '../store/useAppStore';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
@@ -10,6 +10,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
+import { shallow } from 'zustand/shallow';
 
 // Selection-aware button component to centralize selectionMode disable logic
 interface SelectionAwareButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -59,17 +60,18 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
 interface RepositoryCardProps {
   repository: Repository;
   showAISummary?: boolean;
-  searchQuery?: string; // 新增：用于高亮搜索关键词
+  searchQuery?: string;
   isSelected?: boolean;
   onSelect?: (id: number) => void;
-  selectionMode?: boolean; // 新增：是否处于选择模式
-  isExitingSelection?: boolean; // 新增：是否正在退出多选模式
+  selectionMode?: boolean;
+  isExitingSelection?: boolean;
+  allCategories: Category[];
 }
 
-// 缓存高亮搜索结果，避免重复计算
+const MAX_CACHE_SIZE = 500;
+
 const highlightCache = new Map<string, React.ReactNode>();
 
-// 转义正则特殊字符
 const escapeRegExp = (string: string): string => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
@@ -81,21 +83,40 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   isSelected = false,
   onSelect,
   selectionMode = false,
-  isExitingSelection = false
+  isExitingSelection = false,
+  allCategories
 }) => {
-  // 使用选择器模式订阅 store，减少不必要的重渲染
-  const releaseSubscriptions = useAppStore(state => state.releaseSubscriptions);
-  const toggleReleaseSubscription = useAppStore(state => state.toggleReleaseSubscription);
-  const githubToken = useAppStore(state => state.githubToken);
+  const repoId = repository.id;
+  
+  const {
+    isSubscribed,
+    toggleReleaseSubscription,
+    githubToken,
+    activeAIConfig,
+    isLoading,
+    setLoading,
+    language,
+    updateRepository,
+    deleteRepository
+  } = useAppStore(
+    useCallback(
+      (state) => ({
+        isSubscribed: state.releaseSubscriptions.has(repoId),
+        toggleReleaseSubscription: state.toggleReleaseSubscription,
+        githubToken: state.githubToken,
+        activeAIConfig: state.activeAIConfig,
+        isLoading: state.isLoading,
+        setLoading: state.setLoading,
+        language: state.language,
+        updateRepository: state.updateRepository,
+        deleteRepository: state.deleteRepository
+      }),
+      [repoId]
+    ),
+    shallow
+  );
+
   const aiConfigs = useAppStore(state => state.aiConfigs);
-  const activeAIConfig = useAppStore(state => state.activeAIConfig);
-  const isLoading = useAppStore(state => state.isLoading);
-  const setLoading = useAppStore(state => state.setLoading);
-  const language = useAppStore(state => state.language);
-  const customCategories = useAppStore(state => state.customCategories);
-  const hiddenDefaultCategoryIds = useAppStore(state => state.hiddenDefaultCategoryIds);
-  const updateRepository = useAppStore(state => state.updateRepository);
-  const deleteRepository = useAppStore(state => state.deleteRepository);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
@@ -106,9 +127,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
-  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
-
-  const isSubscribed = releaseSubscriptions.has(repository.id);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -136,8 +154,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return part;
     });
 
-    // 限制缓存大小
-    if (highlightCache.size > 1000) {
+    if (highlightCache.size > MAX_CACHE_SIZE) {
       const firstKey = highlightCache.keys().next().value;
       if (firstKey) highlightCache.delete(firstKey);
     }
@@ -995,6 +1012,16 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
 // 使用 React.memo 优化，避免不必要的重渲染
 export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, nextProps) => {
+  const allCategoriesEqual = 
+    prevProps.allCategories.length === nextProps.allCategories.length &&
+    prevProps.allCategories.every((cat, i) => {
+      const nextCat = nextProps.allCategories[i];
+      return nextCat && 
+             cat.id === nextCat.id && 
+             cat.name === nextCat.name && 
+             JSON.stringify(cat.keywords) === JSON.stringify(nextCat.keywords);
+    });
+
   return (
     prevProps.repository.id === nextProps.repository.id &&
     prevProps.repository.analyzed_at === nextProps.repository.analyzed_at &&
@@ -1015,6 +1042,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.searchQuery === nextProps.searchQuery &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.selectionMode === nextProps.selectionMode &&
-    prevProps.isExitingSelection === nextProps.isExitingSelection
+    prevProps.isExitingSelection === nextProps.isExitingSelection &&
+    allCategoriesEqual
   );
 });

@@ -63,4 +63,6 @@ if (typeof window !== 'undefined' && !window.CustomEvent) {
   } as typeof window.CustomEvent;
 }
 
-console.log('[polyfills] Polyfills loaded');
+if (import.meta.env.DEV) {
+  console.log('[polyfills] Polyfills loaded');
+}

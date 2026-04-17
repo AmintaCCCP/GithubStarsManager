@@ -11,7 +11,7 @@ import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
 import { CategoryEditModal } from './CategoryEditModal';
 import { forceSyncToBackend } from '../services/autoSync';
-import { getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
+import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 
 interface CategorySidebarProps {
   repositories: Repository[];
@@ -165,39 +165,21 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   const repositoryMap = useMemo(() => new Map(repositories.map(repo => [String(repo.id), repo])), [repositories]);
 
-  const getCategoryCount = (category: Category) => {
-    if (category.id === 'all') return repositories.length;
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    counts.set('all', repositories.length);
+    
+    for (const category of allCategories) {
+      if (category.id === 'all') continue;
+      const count = repositories.filter(repo => matchesCategory(repo, category)).length;
+      counts.set(category.id, count);
+    }
+    return counts;
+  }, [repositories, allCategories]);
 
-    return repositories.filter(repo => {
-      if (repo.custom_category !== undefined) {
-        if (repo.custom_category === '') {
-          return false;
-        }
-        return repo.custom_category === category.name;
-      }
-
-      if (repo.ai_tags && repo.ai_tags.length > 0) {
-        return repo.ai_tags.some(tag =>
-          category.keywords.some(keyword =>
-            tag.toLowerCase().includes(keyword.toLowerCase()) ||
-            keyword.toLowerCase().includes(tag.toLowerCase())
-          )
-        );
-      }
-
-      const repoText = [
-        repo.name,
-        repo.description || '',
-        repo.language || '',
-        ...(repo.topics || []),
-        repo.ai_summary || ''
-      ].join(' ').toLowerCase();
-
-      return category.keywords.some(keyword =>
-        repoText.includes(keyword.toLowerCase())
-      );
-    }).length;
-  };
+  const getCategoryCount = useCallback((category: Category) => {
+    return categoryCounts.get(category.id) ?? 0;
+  }, [categoryCounts]);
 
   const handleAddCategory = () => {
     setIsCreatingCategory(true);
