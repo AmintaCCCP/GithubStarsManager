@@ -192,4 +192,25 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.3.0</downloadUrl>
   </version>
+  <version>
+    <number>0.4.0</number>
+    <releaseDate>2026-04-18</releaseDate>
+    <changelog>
+      <item>Tabbed Settings Interface: Settings are now organized into dedicated panels (General, AI, WebDAV, Backup, Backend, Category, Data Management) with mobile-friendly tab navigation.</item>
+      <item>Repository Multi-Select and Bulk Actions: Select multiple repositories at once with a bulk actions toolbar, bulk categorization modal, and pipelined AI-summary bulk processing.</item>
+      <item>README Modal: View repository READMEs with an improved Markdown renderer featuring safer link and image handling.</item>
+      <item>Back-to-Top Button: Quick navigation for long lists.</item>
+      <item>WebDAV Backup/Restore: Backup your data to WebDAV and restore when needed.</item>
+      <item>Backend Sync Controls: Sync your data across devices with backend integration.</item>
+      <item>AI Config Management: Configure and manage AI service settings.</item>
+      <item>Preset Asset Filters: Quick filter presets for release assets.</item>
+      <item>Category Management and Ordering: Organize categories with drag-and-drop reordering.</item>
+      <item>Settings Refactor: Settings split into focused subpanels for better organization.</item>
+      <item>New UI utilities and animations (scrollbars, touch helpers, slide/shake/bounce effects).</item>
+      <item>README decoding now preserves UTF-8 encoding.</item>
+      <item>More robust Markdown and link handling.</item>
+      <item>Special thanks to @SummerRay160 for their tremendous contributions to this release!</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.4.0</downloadUrl>
+  </version>
 </versions>
