@@ -175,4 +175,29 @@ router.post('/api/releases/mark-all-read', (_req, res) => {
   }
 });
 
+// DELETE /api/releases/:id
+router.delete('/api/releases/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id) || id <= 0) {
+      res.status(400).json({ error: 'Valid release id required', code: 'INVALID_RELEASE_ID' });
+      return;
+    }
+
+    const result = db.prepare('DELETE FROM releases WHERE id = ?').run(id);
+
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
+      return;
+    }
+
+    res.json({ deleted: true, id });
+  } catch (err) {
+    console.error('DELETE /api/releases/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete release', code: 'DELETE_RELEASE_FAILED' });
+  }
+});
+
 export default router;

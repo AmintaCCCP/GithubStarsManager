@@ -241,4 +241,45 @@ router.patch('/api/repositories/:id', (req, res) => {
   }
 });
 
+// DELETE /api/repositories/:id
+router.delete('/api/repositories/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id) || id <= 0) {
+      res.status(400).json({ error: 'Valid repository id required', code: 'INVALID_REPOSITORY_ID' });
+      return;
+    }
+
+    const deleteReleases = db.prepare('DELETE FROM releases WHERE repo_id = ?');
+    const deleteRepo = db.prepare('DELETE FROM repositories WHERE id = ?');
+
+    const deleteAll = db.transaction(() => {
+      const releaseResult = deleteReleases.run(id);
+      const repoResult = deleteRepo.run(id);
+      
+      if (repoResult.changes === 0) {
+        throw new Error('Repository not found or already deleted');
+      }
+      
+      return {
+        releasesDeleted: releaseResult.changes,
+        repoDeleted: repoResult.changes
+      };
+    });
+
+    const result = deleteAll();
+
+    res.json({ 
+      deleted: true, 
+      id,
+      releasesDeleted: result.releasesDeleted
+    });
+  } catch (err) {
+    console.error('DELETE /api/repositories/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete repository', code: 'DELETE_REPOSITORY_FAILED' });
+  }
+});
+
 export default router;
