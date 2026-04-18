@@ -93,6 +93,12 @@
   -webkit-app-region: no-drag;
 }
 
+@media (max-width: 1023px) {
+  .hd-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
 .repository-list-syncing .repository-card,
 .repository-list-syncing .repository-card * {
   animation: none !important;
