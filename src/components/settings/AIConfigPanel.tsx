@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
@@ -34,7 +34,15 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [testingForm, setTestingForm] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
+  const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
 
   const [form, setForm] = useState<AIFormState>({
     name: '',
@@ -63,6 +71,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setShowForm(false);
     setEditingId(null);
     setShowCustomPrompt(false);
+    setShowDefaultPrompt(false);
   };
 
   const handleSave = () => {
@@ -144,7 +153,45 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     }
   };
 
-  const getDefaultPrompt = () => {
+  const handleTestForm = async () => {
+    if (!form.baseUrl || !form.apiKey || !form.model) {
+      alert(t('请先填写API端点、API密钥和模型名称', 'Please fill in API Endpoint, API Key and Model Name first'));
+      return;
+    }
+
+    setTestingForm(true);
+    try {
+      const tempConfig: AIConfig = {
+        id: 'temp-test',
+        name: form.name || 'Test',
+        apiType: form.apiType,
+        baseUrl: form.baseUrl.replace(/\/$/, ''),
+        apiKey: form.apiKey,
+        model: form.model,
+        isActive: false,
+        customPrompt: form.customPrompt || undefined,
+        useCustomPrompt: form.useCustomPrompt,
+        concurrency: form.concurrency,
+        reasoningEffort: form.reasoningEffort || undefined,
+      };
+
+      const aiService = new AIService(tempConfig, language);
+      const isConnected = await aiService.testConnection();
+      
+      if (isConnected) {
+        alert(t('AI服务连接成功！', 'AI service connection successful!'));
+      } else {
+        alert(t('AI服务连接失败，请检查配置。', 'AI service connection failed. Please check configuration.'));
+      }
+    } catch (error) {
+      console.error('AI test failed:', error);
+      alert(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'));
+    } finally {
+      setTestingForm(false);
+    }
+  };
+
+  const defaultPrompt = useMemo(() => {
     if (language === 'zh') {
       return `请分析这个GitHub仓库并提供：
 
@@ -186,7 +233,66 @@ Repository information:
 
 Focus on practicality and accurate categorization to help users quickly understand the repository's purpose and supported platforms.`;
     }
-  };
+  }, [language]);
+
+  const isCustomPromptModified = useMemo(() => {
+    return form.customPrompt.trim() !== '' && form.customPrompt !== defaultPrompt;
+  }, [form.customPrompt, defaultPrompt]);
+
+  const isCustomPromptSameAsDefault = useMemo(() => {
+    return form.customPrompt === defaultPrompt;
+  }, [form.customPrompt, defaultPrompt]);
+
+  const handleUseCustomPromptChange = useCallback((checked: boolean) => {
+    setForm(prev => {
+      const newCustomPrompt = checked && prev.customPrompt.trim() === '' 
+        ? defaultPrompt 
+        : prev.customPrompt;
+      return { 
+        ...prev, 
+        useCustomPrompt: checked,
+        customPrompt: newCustomPrompt
+      };
+    });
+    
+    if (checked) {
+      setShowCustomPrompt(true);
+      setShowDefaultPrompt(false);
+      if (form.customPrompt.trim() === '') {
+        showNotification('info', t('已自动填充默认提示词，您可以进行修改', 'Default prompt auto-filled, you can modify it'));
+      }
+    } else {
+      setShowCustomPrompt(false);
+    }
+  }, [defaultPrompt, form.customPrompt, showNotification, t]);
+
+  const handleToggleDefaultPrompt = useCallback(() => {
+    if (showCustomPrompt) {
+      showNotification('info', t('请先关闭自定义提示词编辑区域', 'Please close the custom prompt editor first'));
+      return;
+    }
+    setShowDefaultPrompt(prev => !prev);
+  }, [showCustomPrompt, showNotification, t]);
+
+  const handleRestoreDefaultPrompt = useCallback(() => {
+    if (isCustomPromptSameAsDefault) {
+      showNotification('info', t('当前提示词已是默认值', 'Current prompt is already the default'));
+      return;
+    }
+    
+    if (isCustomPromptModified) {
+      const confirmed = window.confirm(
+        t(
+          '确定要恢复默认提示词吗？这将覆盖您当前的修改。',
+          'Are you sure you want to restore the default prompt? This will overwrite your current changes.'
+        )
+      );
+      if (!confirmed) return;
+    }
+    
+    setForm(prev => ({ ...prev, customPrompt: defaultPrompt }));
+    showNotification('success', t('已恢复默认提示词', 'Default prompt restored'));
+  }, [defaultPrompt, isCustomPromptModified, isCustomPromptSameAsDefault, showNotification, t]);
 
   return (
     <div className="space-y-6">
@@ -337,25 +443,52 @@ Focus on practicality and accurate categorization to help users quickly understa
           </div>
 
           <div className="mb-4">
+            {notification && (
+              <div 
+                className={`mb-3 p-3 rounded-lg flex items-center space-x-2 ${
+                  notification.type === 'success' 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                    : notification.type === 'error'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                }`}
+              >
+                {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
+                <span className="text-sm">{notification.message}</span>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.useCustomPrompt}
-                  onChange={(e) => {
-                    setForm(prev => ({ ...prev, useCustomPrompt: e.target.checked }));
-                    setShowCustomPrompt(e.target.checked);
-                  }}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {t('使用自定义提示词', 'Use Custom Prompt')}
-                </span>
-              </label>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.useCustomPrompt}
+                    onChange={(e) => handleUseCustomPromptChange(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('使用自定义提示词', 'Use Custom Prompt')}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleToggleDefaultPrompt}
+                  disabled={showCustomPrompt}
+                  className={`flex items-center space-x-1 text-sm ${
+                    showCustomPrompt 
+                      ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                      : 'text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {showDefaultPrompt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <span>{showDefaultPrompt ? t('隐藏默认提示词', 'Hide Default Prompt') : t('查看默认提示词', 'View Default Prompt')}</span>
+                </button>
+              </div>
               {form.useCustomPrompt && (
                 <button
                   type="button"
-                  onClick={() => setForm(prev => ({ ...prev, customPrompt: getDefaultPrompt() }))}
+                  onClick={handleRestoreDefaultPrompt}
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
@@ -363,14 +496,45 @@ Focus on practicality and accurate categorization to help users quickly understa
               )}
             </div>
             
+            {showDefaultPrompt && !showCustomPrompt && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  {t('默认提示词（只读）', 'Default Prompt (Read-only)')}
+                </label>
+                <pre className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                  {defaultPrompt}
+                </pre>
+              </div>
+            )}
+            
             {showCustomPrompt && (
-              <textarea
-                value={form.customPrompt}
-                onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
-                rows={10}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
-                placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
-              />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t('自定义提示词', 'Custom Prompt')}
+                    {isCustomPromptModified && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                        ({t('已修改', 'Modified')})
+                      </span>
+                    )}
+                    {isCustomPromptSameAsDefault && (
+                      <span className="ml-2 text-green-600 dark:text-green-400">
+                        ({t('默认值', 'Default')})
+                      </span>
+                    )}
+                  </label>
+                  <span className="text-xs text-gray-400">
+                    {form.customPrompt.length} {t('字符', 'characters')}
+                  </span>
+                </div>
+                <textarea
+                  value={form.customPrompt}
+                  onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
+                  rows={10}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
+                />
+              </div>
             )}
           </div>
 
@@ -381,6 +545,18 @@ Focus on practicality and accurate categorization to help users quickly understa
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
+            </button>
+            <button
+              onClick={handleTestForm}
+              disabled={testingForm}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {testingForm ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <TestTube className="w-4 h-4" />
+              )}
+              <span>{t('测试连接', 'Test Connection')}</span>
             </button>
             <button
               onClick={resetForm}

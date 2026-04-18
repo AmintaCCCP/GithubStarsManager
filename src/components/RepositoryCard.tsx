@@ -724,9 +724,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           </p>
         </div>
         
-        {/* 拖拽按钮 - 右上角 */}
+        {/* 拖拽按钮 - 右上角 - 手机和平板端隐藏 */}
         {!selectionMode && (
-          <div className="relative flex-shrink-0 opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="hidden lg:block relative flex-shrink-0 opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
             <div
               ref={dragHandleRef}
               draggable

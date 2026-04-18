@@ -57,11 +57,24 @@ export class AIService {
       const base = new URL(baseUrlWithSlash);
       const basePath = base.pathname.replace(/\/$/, '');
 
+      // 检测 baseUrl 是否已经以任何版本号结尾（v1, v2, v3, v1beta, v1alpha 等）
+      // 这样可以兼容火山引擎（/v3）、OpenAI（/v1）、Gemini（/v1beta）等不同版本号
+      const anyVersionPattern = /\/v\d+(?:beta|alpha)?$/;
+      const hasVersionInBase = anyVersionPattern.test(basePath);
+
+      if (hasVersionInBase) {
+        // baseUrl 已包含版本号，只补全端点路径（去掉版本号部分）
+        const endpointPath = pathWithVersion.includes('/')
+          ? pathWithVersion.split('/').slice(1).join('/')
+          : pathWithVersion;
+        return new URL(endpointPath, baseUrlWithSlash).toString();
+      }
+
       // 兼容用户把 baseUrl 写成 .../v1 或 .../v1beta 的情况，避免拼成 /v1/v1/...
       if (versionPrefix) {
         const versionRe = new RegExp(`/${versionPrefix}$`);
         if (versionRe.test(basePath) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
-          const rest = pathWithVersion.slice(versionPrefix.length + 1); // remove "v1/"
+          const rest = pathWithVersion.slice(versionPrefix.length + 1);
           return new URL(rest, baseUrlWithSlash).toString();
         }
       }
