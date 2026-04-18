@@ -204,7 +204,7 @@ class BackendAdapter {
     const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ repositories: repos })
+      body: JSON.stringify({ repositories: repos, isFullSync: true })
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Sync repositories error');
   }

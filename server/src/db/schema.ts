@@ -61,8 +61,11 @@ export function initializeSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      description TEXT,
       icon TEXT NOT NULL DEFAULT '📁',
       keywords TEXT,
+      color TEXT,
+      sort_order INTEGER DEFAULT 0,
       is_custom INTEGER DEFAULT 1
     );
 
@@ -93,7 +96,10 @@ export function initializeSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS asset_filters (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      keywords TEXT
+      description TEXT,
+      keywords TEXT,
+      platform TEXT,
+      sort_order INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -106,4 +112,10 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'repositories', 'category_locked', 'INTEGER DEFAULT 0');
   addColumnIfMissing(db, 'releases', 'zipball_url', 'TEXT');
   addColumnIfMissing(db, 'releases', 'tarball_url', 'TEXT');
+  addColumnIfMissing(db, 'categories', 'description', 'TEXT');
+  addColumnIfMissing(db, 'categories', 'color', 'TEXT');
+  addColumnIfMissing(db, 'categories', 'sort_order', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'asset_filters', 'description', 'TEXT');
+  addColumnIfMissing(db, 'asset_filters', 'platform', 'TEXT');
+  addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
 }
