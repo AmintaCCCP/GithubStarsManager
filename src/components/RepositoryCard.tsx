@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { resolveCategoryAssignment } from '../utils/categoryUtils';
+import { resolveCategoryAssignment, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { backend } from '../services/backendAdapter';
@@ -417,9 +417,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
       ));
 
-    // 分类：有自定义分类标记（包括明确清空）
-    const isCategoryEdited = repository.custom_category !== undefined &&
-      (repository.custom_category === '' || repository.custom_category.trim() !== '');
+    // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+    const aiCat = getAICategory(repository, allCategories);
+    const defaultCat = getDefaultCategory(repository, allCategories);
+    const customCat = repository.custom_category;
+    const isCategoryEdited = customCat !== undefined &&
+      (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
 
     // 任意一个为true则显示已自定义（注意：分类锁定不算自定义）
     const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
+import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 
 
 export const SearchBar: React.FC = () => {
@@ -16,6 +17,9 @@ export const SearchBar: React.FC = () => {
     language,
     setSearchFilters,
     setSearchResults,
+    customCategories,
+    hiddenDefaultCategoryIds,
+    defaultCategoryOverrides,
   } = useAppStore();
   
   const [showFilters, setShowFilters] = useState(false);
@@ -28,6 +32,7 @@ export const SearchBar: React.FC = () => {
   
   // 统计各种状态的数量
   const statusStats = useMemo(() => {
+    const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     const stats = {
       analyzed: 0,      // 已AI分析（成功）
       notAnalyzed: 0,   // 未AI分析
@@ -77,9 +82,12 @@ export const SearchBar: React.FC = () => {
           JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
         ));
 
-      // 分类：有自定义分类标记（包括明确清空）
-      const isCategoryEdited = repo.custom_category !== undefined &&
-        (repo.custom_category === '' || repo.custom_category.trim() !== '');
+      // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+      const aiCat = getAICategory(repo, allCategories);
+      const defaultCat = getDefaultCategory(repo, allCategories);
+      const customCat = repo.custom_category;
+      const isCategoryEdited = customCat !== undefined &&
+        (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
 
       // 任意一个为true则视为已编辑（注意：分类锁定不算编辑）
       const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
@@ -99,7 +107,7 @@ export const SearchBar: React.FC = () => {
     });
     
     return stats;
-  }, [repositories, releaseSubscriptions]);
+  }, [repositories, releaseSubscriptions, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
@@ -234,6 +242,7 @@ export const SearchBar: React.FC = () => {
   };
 
   const applyFilters = (repos: typeof repositories) => {
+    const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     let filtered = repos;
 
     // Language filter
@@ -297,8 +306,12 @@ export const SearchBar: React.FC = () => {
             JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
           ));
 
-        const isCategoryEdited = repo.custom_category !== undefined &&
-          (repo.custom_category === '' || repo.custom_category.trim() !== '');
+        // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+        const aiCat = getAICategory(repo, allCategories);
+        const defaultCat = getDefaultCategory(repo, allCategories);
+        const customCat = repo.custom_category;
+        const isCategoryEdited = customCat !== undefined &&
+          (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
 
         const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
         return searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized;
@@ -404,8 +417,12 @@ export const SearchBar: React.FC = () => {
               JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
               JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
             ));
-          const isCategoryEdited = repo.custom_category !== undefined &&
-            (repo.custom_category === '' || repo.custom_category.trim() !== '');
+          // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+          const aiCat = getAICategory(repo, allCategories);
+          const defaultCat = getDefaultCategory(repo, allCategories);
+          const customCat = repo.custom_category;
+          const isCategoryEdited = customCat !== undefined &&
+            (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
           const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
           tempFiltered = tempFiltered && (searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized);
         }

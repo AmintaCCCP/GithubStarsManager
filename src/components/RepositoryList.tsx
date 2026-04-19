@@ -729,21 +729,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         }
 
         case 'lock-category': {
-          const allCategoriesForLock = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
-          const reposWithoutCategory = repos.filter(repo => !repo.custom_category || repo.custom_category === '');
-          if (reposWithoutCategory.length > 0) {
-            const confirmMessage = language === 'zh'
-              ? `${reposWithoutCategory.length} 个仓库没有设置分类，锁定操作将同时设置当前推断的分类。是否继续？`
-              : `${reposWithoutCategory.length} repositories don't have a category. Locking will also set the inferred category. Continue?`;
-            if (!confirm(confirmMessage)) return;
-          }
-
           let successCount = 0;
           let skippedCount = 0;
           const failedRepos: string[] = [];
 
           for (const repo of repos) {
             try {
+              // 只有有自定义分类的仓库才能锁定，锁定不改变自定义状态
               if (repo.custom_category && repo.custom_category !== '') {
                 updateRepository({
                   ...repo,
@@ -752,22 +744,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 });
                 successCount++;
               } else {
-                const aiCat = getAICategory(repo, allCategoriesForLock);
-                const defaultCat = getDefaultCategory(repo, allCategoriesForLock);
-                const inferredCategory = aiCat || defaultCat;
-
-                if (inferredCategory) {
-                  const customCategoryValue = computeCustomCategory(inferredCategory, aiCat, defaultCat);
-                  updateRepository({
-                    ...repo,
-                    custom_category: customCategoryValue ?? inferredCategory,
-                    category_locked: true,
-                    last_edited: new Date().toISOString()
-                  });
-                  successCount++;
-                } else {
-                  skippedCount++;
-                }
+                skippedCount++;
               }
             } catch (error) {
               console.error(`Failed to lock category for ${repo.full_name}:`, error);
@@ -777,7 +754,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           await forceSyncToBackend();
           const skipMsg = skippedCount > 0
-            ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个无法推断分类的仓库` : `\n\nSkipped ${skippedCount} repositories with no inferable category`)
+            ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个没有自定义分类的仓库` : `\n\nSkipped ${skippedCount} repositories without custom category`)
             : '';
           if (failedRepos.length > 0) {
             alert(language === 'zh'
