@@ -636,7 +636,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => {
                     if (confirm(t('确定要删除这个AI配置吗？', 'Are you sure you want to delete this AI configuration?'))) {
-                      deleteAIConfig(config.id);
+                      if (config.id) deleteAIConfig(config.id);
                     }
                   }}
                   className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
