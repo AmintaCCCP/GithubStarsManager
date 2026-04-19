@@ -27,6 +27,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const {
     customCategories,
     hiddenDefaultCategoryIds,
+    defaultCategoryOverrides,
     categoryOrder,
     collapsedSidebarCategoryCount,
     deleteCustomCategory,
@@ -159,9 +160,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   }, [toggleSidebar, isMobile]);
 
   const allCategories = useMemo(() => {
-    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     return sortCategoriesByOrder(categories, categoryOrder);
-  }, [customCategories, language, hiddenDefaultCategoryIds, categoryOrder]);
+  }, [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryOrder]);
 
   const repositoryMap = useMemo(() => new Map(repositories.map(repo => [String(repo.id), repo])), [repositories]);
 
@@ -270,7 +271,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     const originalRepo = { ...repository };
 
     // 获取所有分类用于计算AI和默认分类
-    const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     const aiCat = getAICategory(repository, allCategoriesList);
     const defaultCat = getDefaultCategory(repository, allCategoriesList);
 

@@ -176,6 +176,8 @@ export const Header: React.FC = () => {
           <nav ref={navRef} className={`hidden lg:flex items-center space-x-1 hd-btns lg:hd-btns ${isTextWrapped ? 'flex-wrap' : ''}`}>
             <button
               onClick={() => setCurrentView('repositories')}
+              aria-label={isTextWrapped ? t('仓库', 'Repositories') : undefined}
+              title={isTextWrapped ? t('仓库', 'Repositories') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'repositories'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -196,6 +198,8 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('releases')}
+              aria-label={isTextWrapped ? t('发布', 'Releases') : undefined}
+              title={isTextWrapped ? t('发布', 'Releases') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'releases'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -207,6 +211,8 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('settings')}
+              aria-label={isTextWrapped ? t('设置', 'Settings') : undefined}
+              title={isTextWrapped ? t('设置', 'Settings') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'settings'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'

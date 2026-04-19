@@ -17,11 +17,11 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
   repositories,
   onCategorize
 }) => {
-  const { customCategories, hiddenDefaultCategoryIds, language } = useAppStore();
+  const { customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+  const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
 
   useEffect(() => {
     if (isOpen) {

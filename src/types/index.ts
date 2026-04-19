@@ -164,6 +164,7 @@ export interface AppState {
   // Categories
   customCategories: Category[]; // 新增：自定义分类
   hiddenDefaultCategoryIds: string[];
+  defaultCategoryOverrides: Record<string, Partial<Category>>;
   categoryOrder: string[]; // 新增：分类排序顺序
   collapsedSidebarCategoryCount: number; // 新增：折叠状态下显示的分类个数
   

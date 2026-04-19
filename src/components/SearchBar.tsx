@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
+import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 
 
 export const SearchBar: React.FC = () => {
@@ -16,6 +17,9 @@ export const SearchBar: React.FC = () => {
     language,
     setSearchFilters,
     setSearchResults,
+    customCategories,
+    hiddenDefaultCategoryIds,
+    defaultCategoryOverrides,
   } = useAppStore();
   
   const [showFilters, setShowFilters] = useState(false);
@@ -26,7 +30,11 @@ export const SearchBar: React.FC = () => {
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   
-  // 统计各种状态的数量
+  const allCategories = useMemo(() => 
+    getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
+    [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]
+  );
+  
   const statusStats = useMemo(() => {
     const stats = {
       analyzed: 0,      // 已AI分析（成功）
@@ -77,9 +85,12 @@ export const SearchBar: React.FC = () => {
           JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
         ));
 
-      // 分类：有自定义分类标记（包括明确清空）
-      const isCategoryEdited = repo.custom_category !== undefined &&
-        (repo.custom_category === '' || repo.custom_category.trim() !== '');
+      // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+      const aiCat = getAICategory(repo, allCategories);
+      const defaultCat = getDefaultCategory(repo, allCategories);
+      const customCat = repo.custom_category;
+      const isCategoryEdited = customCat !== undefined &&
+        (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
 
       // 任意一个为true则视为已编辑（注意：分类锁定不算编辑）
       const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
@@ -99,7 +110,7 @@ export const SearchBar: React.FC = () => {
     });
     
     return stats;
-  }, [repositories, releaseSubscriptions]);
+  }, [repositories, releaseSubscriptions, allCategories]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
@@ -147,13 +158,13 @@ export const SearchBar: React.FC = () => {
         performBasicFilter();
       } else {
         const textResults = performBasicTextSearch(repositories, searchFilters.query);
-        const finalFiltered = applyFilters(textResults);
+        const finalFiltered = applyFilters(textResults, allCategories);
         setSearchResults(finalFiltered);
       }
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -167,7 +178,7 @@ export const SearchBar: React.FC = () => {
       // Reset to show all repositories when search is empty
       performBasicFilter();
     }
-  }, [searchQuery, isRealTimeSearch, repositories]);
+  }, [searchQuery, isRealTimeSearch, repositories, allCategories]);
 
   // Handle composition events for better IME support (Chinese input)
   const handleCompositionStart = () => {
@@ -199,7 +210,7 @@ export const SearchBar: React.FC = () => {
     });
 
     // Apply other filters
-    const finalFiltered = applyFilters(filtered);
+    const finalFiltered = applyFilters(filtered, allCategories);
     setSearchResults(finalFiltered);
     
     const endTime = performance.now();
@@ -207,7 +218,7 @@ export const SearchBar: React.FC = () => {
   };
 
   const performBasicFilter = () => {
-    const filtered = applyFilters(repositories);
+    const filtered = applyFilters(repositories, allCategories);
     setSearchResults(filtered);
   };
 
@@ -233,7 +244,7 @@ export const SearchBar: React.FC = () => {
     });
   };
 
-  const applyFilters = (repos: typeof repositories) => {
+  const applyFilters = (repos: typeof repositories, categories: typeof allCategories) => {
     let filtered = repos;
 
     // Language filter
@@ -297,8 +308,12 @@ export const SearchBar: React.FC = () => {
             JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
           ));
 
-        const isCategoryEdited = repo.custom_category !== undefined &&
-          (repo.custom_category === '' || repo.custom_category.trim() !== '');
+        // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+        const aiCat = getAICategory(repo, allCategories);
+        const defaultCat = getDefaultCategory(repo, allCategories);
+        const customCat = repo.custom_category;
+        const isCategoryEdited = customCat !== undefined &&
+          (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
 
         const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
         return searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized;
@@ -404,8 +419,12 @@ export const SearchBar: React.FC = () => {
               JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
               JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
             ));
-          const isCategoryEdited = repo.custom_category !== undefined &&
-            (repo.custom_category === '' || repo.custom_category.trim() !== '');
+          // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
+          const aiCat = getAICategory(repo, allCategories);
+          const defaultCat = getDefaultCategory(repo, allCategories);
+          const customCat = repo.custom_category;
+          const isCategoryEdited = customCat !== undefined &&
+            (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
           const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
           tempFiltered = tempFiltered && (searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized);
         }
@@ -495,7 +514,7 @@ export const SearchBar: React.FC = () => {
       }
       
       // Apply other filters and update results
-      const finalFiltered = applyFilters(filtered);
+      const finalFiltered = applyFilters(filtered, allCategories);
       console.log('🎯 Final filtered results:', finalFiltered.length);
       console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
       setSearchResults(finalFiltered);
@@ -570,7 +589,7 @@ export const SearchBar: React.FC = () => {
     setShowSearchHistory(false);
 
     const textResults = performBasicTextSearch(repositories, historyQuery);
-    const finalFiltered = applyFilters(textResults);
+    const finalFiltered = applyFilters(textResults, allCategories);
     setSearchResults(finalFiltered);
   };
 
@@ -800,7 +819,9 @@ export const SearchBar: React.FC = () => {
             onClick={handleAISearch}
             disabled={isSearching}
             className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
-            title={t('不是真正地调用大模型\n使用本地智能排序算法', 'Not actually calling LLM, uses local intelligent ranking algorithm')}
+            title={activeAIConfig 
+              ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
+              : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
           >
             <Bot className="w-4 h-4" />
             <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
@@ -810,10 +831,15 @@ export const SearchBar: React.FC = () => {
             <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <p className="font-medium mb-1">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="text-gray-300">
-                {t(
-                  '此功能使用本地算法进行智能排序，并非调用GPT等大模型API。它会根据仓库名称、描述、标签等多维度进行匹配和排序。',
-                  'This feature uses local algorithms for intelligent ranking, not calling GPT or other LLM APIs. It matches and ranks based on repository name, description, tags, and other dimensions.'
-                )}
+                {activeAIConfig
+                  ? t(
+                      '已配置AI服务时，将调用AI进行语义搜索和智能重排序。未配置时使用本地算法根据仓库名称、描述、标签等多维度进行匹配和排序。',
+                      'When AI service is configured, it will be called for semantic search and intelligent reranking. Otherwise, local algorithms are used to match and rank based on repository name, description, tags, and other dimensions.'
+                    )
+                  : t(
+                      '此功能使用本地算法进行智能排序。配置AI服务后可启用语义搜索功能，获得更精准的搜索结果。',
+                      'This feature uses local algorithms for intelligent ranking. Configure an AI service to enable semantic search for more accurate results.'
+                    )}
               </p>
               <div className="absolute bottom-full right-2 w-2 h-2 bg-gray-800 transform rotate-45"></div>
             </div>

@@ -54,7 +54,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   onClose,
   repository
 }) => {
-  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds } = useAppStore();
+  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore();
 
   const [formData, setFormData] = useState({
     description: '',
@@ -90,7 +90,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
 
 
-  const allCategories = useMemo(() => getAllCategories(customCategories, language, hiddenDefaultCategoryIds), [customCategories, language, hiddenDefaultCategoryIds]);
+  const allCategories = useMemo(() => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides), [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]);
 
   // 获取仓库当前所属的分类
   const getCurrentCategory = useCallback((repo: Repository) => {
@@ -348,18 +348,18 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
     /**
      * 分类字段处理逻辑
-     * 目标：确保保存后 RepositoryCard 的显示逻辑能正确显示用户期望的分类
-     *
+     * 
      * 核心逻辑：
-     * - 当用户显式锁定分类时，即使分类名与AI/默认推断一致，也保存为自定义分类
-     * - 当用户未锁定分类时，如果分类与AI/默认一致，清除自定义标记让系统自动推断
+     * - 自定义状态显示：只看是否与AI/默认一致（在 RepositoryCard 中判断）
+     * - 分类锁定：独立设置，锁定时需要保存分类值
      */
     const aiCat = getAICategory(repository, allCategories);
     const defaultCat = getDefaultCategory(repository, allCategories);
     const currentCat = formData.category;
 
+    // 锁定是独立设置
     if (formData.categoryLocked && currentCat) {
-      // 用户显式锁定分类：始终保存为自定义分类，保留锁定状态
+      // 用户锁定分类：保存分类值以便锁定生效
       updatedRepo.custom_category = currentCat;
       updatedRepo.category_locked = true;
     } else {

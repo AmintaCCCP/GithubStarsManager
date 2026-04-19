@@ -244,24 +244,25 @@ router.patch('/api/repositories/:id', (req, res) => {
 // DELETE /api/repositories/:id
 router.delete('/api/repositories/:id', (req, res) => {
   try {
-    const db = getDb();
-    const id = parseInt(req.params.id);
+    const idStr = req.params.id;
+    if (!/^\d+$/.test(idStr)) {
+      res.status(400).json({ error: 'Valid repository id required', code: 'INVALID_REPOSITORY_ID' });
+      return;
+    }
+    const id = parseInt(idStr, 10);
 
     if (isNaN(id) || id <= 0) {
       res.status(400).json({ error: 'Valid repository id required', code: 'INVALID_REPOSITORY_ID' });
       return;
     }
 
+    const db = getDb();
     const deleteReleases = db.prepare('DELETE FROM releases WHERE repo_id = ?');
     const deleteRepo = db.prepare('DELETE FROM repositories WHERE id = ?');
 
     const deleteAll = db.transaction(() => {
       const releaseResult = deleteReleases.run(id);
       const repoResult = deleteRepo.run(id);
-      
-      if (repoResult.changes === 0) {
-        throw new Error('Repository not found or already deleted');
-      }
       
       return {
         releasesDeleted: releaseResult.changes,
@@ -270,6 +271,11 @@ router.delete('/api/repositories/:id', (req, res) => {
     });
 
     const result = deleteAll();
+
+    if (result.repoDeleted === 0) {
+      res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
+      return;
+    }
 
     res.json({ 
       deleted: true, 
