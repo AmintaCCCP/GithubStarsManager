@@ -1,4 +1,4 @@
-import { Repository, Release, GitHubUser } from '../types';
+import { Repository, Release, GitHubUser, SubscriptionRepo, SubscriptionDev } from '../types';
 
 interface GitHubStarredItem {
   starred_at?: string;
@@ -14,6 +14,28 @@ interface GitHubRateLimitResponse {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+
+interface GitHubSearchRepoResponse {
+  items: (Repository & { forks_count?: number })[];
+}
+
+interface GitHubSearchUserResponse {
+  items: Array<{
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  }>;
+}
+
+interface GitHubUserDetail {
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+}
 
 export class GitHubApiService {
   private token: string;
@@ -229,6 +251,100 @@ export class GitHubApiService {
       remaining: response.rate.remaining,
       reset: response.rate.reset,
     };
+  }
+
+  async searchMostStars(perPage = 10): Promise<SubscriptionRepo[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=stars:>1000&sort=stars&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'most-stars' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
+  async searchMostForks(perPage = 10): Promise<SubscriptionRepo[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=forks:>1000&sort=forks&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'most-forks' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
+  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
+    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
+    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'trending' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
+  async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
+    const usersData = await this.makeRequest<GitHubSearchUserResponse>(
+      `/search/users?q=followers:>1000&sort=followers&order=desc&per_page=${perPage}`
+    );
+
+    const devs: SubscriptionDev[] = [];
+    for (let i = 0; i < (usersData.items || []).length; i++) {
+      const searchUser = usersData.items[i];
+
+      // The search API only returns basic fields; fetch the full profile for name/bio/followers/public_repos
+      let userDetail: GitHubUserDetail = {
+        login: searchUser.login,
+        avatar_url: searchUser.avatar_url,
+        html_url: searchUser.html_url,
+        name: null,
+        bio: null,
+        public_repos: 0,
+        followers: 0,
+      };
+      try {
+        userDetail = await this.makeRequest<GitHubUserDetail>(`/users/${searchUser.login}`);
+      } catch {
+      }
+
+      let topRepo: SubscriptionRepo | null = null;
+      try {
+        const reposData = await this.makeRequest<Repository[]>(
+          `/users/${searchUser.login}/repos?sort=stars&per_page=1`
+        );
+        if (reposData && reposData.length > 0) {
+          topRepo = {
+            ...reposData[0],
+            rank: 1,
+            channel: 'most-dev' as const,
+          };
+        }
+      } catch {
+      }
+      devs.push({
+        rank: i + 1,
+        login: userDetail.login,
+        avatar_url: userDetail.avatar_url,
+        html_url: userDetail.html_url,
+        name: userDetail.name,
+        bio: userDetail.bio,
+        public_repos: userDetail.public_repos,
+        followers: userDetail.followers,
+        topRepo,
+      });
+      if (i < (usersData.items || []).length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+    }
+    return devs;
   }
 }
 
