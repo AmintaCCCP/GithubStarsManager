@@ -7,27 +7,32 @@ interface CategoryPanelProps {
 }
 
 export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
-  const {
-    customCategories,
-    hiddenDefaultCategoryIds,
-    categoryOrder,
-    collapsedSidebarCategoryCount,
-    language,
-    addCustomCategory,
-    deleteCustomCategory,
-    updateCustomCategory,
-    hideDefaultCategory,
-    showDefaultCategory,
-    setCategoryOrder,
-    setCollapsedSidebarCategoryCount,
-  } = useAppStore();
+  const customCategories = useAppStore(state => state.customCategories);
+  const hiddenDefaultCategoryIds = useAppStore(state => state.hiddenDefaultCategoryIds);
+  const defaultCategoryOverrides = useAppStore(state => state.defaultCategoryOverrides);
+  const categoryOrder = useAppStore(state => state.categoryOrder);
+  const collapsedSidebarCategoryCount = useAppStore(state => state.collapsedSidebarCategoryCount);
+  const language = useAppStore(state => state.language);
+  const addCustomCategory = useAppStore(state => state.addCustomCategory);
+  const deleteCustomCategory = useAppStore(state => state.deleteCustomCategory);
+  const updateCustomCategory = useAppStore(state => state.updateCustomCategory);
+  const updateDefaultCategory = useAppStore(state => state.updateDefaultCategory);
+  const resetDefaultCategory = useAppStore(state => state.resetDefaultCategory);
+  const resetDefaultCategoryNameIcon = useAppStore(state => state.resetDefaultCategoryNameIcon);
+  const resetDefaultCategoryKeywords = useAppStore(state => state.resetDefaultCategoryKeywords);
+  const hideDefaultCategory = useAppStore(state => state.hideDefaultCategory);
+  const showDefaultCategory = useAppStore(state => state.showDefaultCategory);
+  const setCategoryOrder = useAppStore(state => state.setCategoryOrder);
+  const setCollapsedSidebarCategoryCount = useAppStore(state => state.setCollapsedSidebarCategoryCount);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryIcon, setNewCategoryIcon] = useState('📁');
+  const [newCategoryKeywords, setNewCategoryKeywords] = useState('');
   const [editName, setEditName] = useState('');
   const [editIcon, setEditIcon] = useState('');
+  const [editKeywords, setEditKeywords] = useState('');
   const [isReordering, setIsReordering] = useState(false);
 
   // 拖拽排序状态
@@ -35,16 +40,30 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const dragItemIndex = useRef<number | null>(null);
 
-  const allDefaultCategories = getAllCategories([], language, []);
+  const allDefaultCategories = getAllCategories([], language, [], defaultCategoryOverrides);
+  const originalDefaultCategories = getAllCategories([], language, [], {});
   const hiddenDefaultCategories = allDefaultCategories.filter(category =>
     hiddenDefaultCategoryIds.includes(category.id)
   );
 
-  // 获取所有可见分类（用于排序）
+  const isDefaultCategoryModified = (categoryId: string): boolean => {
+    return categoryId in defaultCategoryOverrides;
+  };
+
+  const hasNameIconModified = (categoryId: string): boolean => {
+    const override = defaultCategoryOverrides[categoryId];
+    return !!(override && (override.name !== undefined || override.icon !== undefined));
+  };
+
+  const hasKeywordsModified = (categoryId: string): boolean => {
+    const override = defaultCategoryOverrides[categoryId];
+    return !!(override && override.keywords !== undefined);
+  };
+
   const allVisibleCategories = useMemo(() => {
-    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+    const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     return sortCategoriesByOrder(categories, categoryOrder);
-  }, [customCategories, language, hiddenDefaultCategoryIds, categoryOrder]);
+  }, [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryOrder]);
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) {
@@ -57,19 +76,21 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       name: newCategoryName.trim(),
       icon: newCategoryIcon,
       isCustom: true,
-      keywords: [],
+      keywords: newCategoryKeywords.split(',').map(k => k.trim()).filter(k => k),
     };
 
     addCustomCategory(newCategory);
     setNewCategoryName('');
     setNewCategoryIcon('📁');
+    setNewCategoryKeywords('');
     setShowAddForm(false);
   };
 
-  const handleStartEdit = (category: { id: string; name: string; icon: string }) => {
+  const handleStartEdit = (category: { id: string; name: string; icon: string; keywords?: string[] }) => {
     setEditingId(category.id);
     setEditName(category.name);
     setEditIcon(category.icon);
+    setEditKeywords(category.keywords?.join(', ') || '');
   };
 
   const handleSaveEdit = () => {
@@ -79,13 +100,24 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     }
 
     if (editingId) {
-      updateCustomCategory(editingId, {
-        name: editName.trim(),
-        icon: editIcon,
-      });
+      const isDefault = allDefaultCategories.some(c => c.id === editingId);
+      if (isDefault) {
+        updateDefaultCategory(editingId, {
+          name: editName.trim(),
+          icon: editIcon,
+          keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
+        });
+      } else {
+        updateCustomCategory(editingId, {
+          name: editName.trim(),
+          icon: editIcon,
+          keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
+        });
+      }
       setEditingId(null);
       setEditName('');
       setEditIcon('');
+      setEditKeywords('');
     }
   };
 
@@ -93,6 +125,15 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     setEditingId(null);
     setEditName('');
     setEditIcon('');
+    setEditKeywords('');
+  };
+
+  const handleResetDefault = (categoryId: string, originalCategory: { name: string; icon: string; keywords?: string[] } | undefined) => {
+    resetDefaultCategory(categoryId);
+    setEditingId(null);
+    setEditName('');
+    setEditIcon('');
+    setEditKeywords('');
   };
 
   const handleDeleteCategory = (categoryId: string) => {
@@ -297,10 +338,26 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               />
             </div>
           </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('关键词', 'Keywords')}
+            </label>
+            <input
+              type="text"
+              value={newCategoryKeywords}
+              onChange={(e) => setNewCategoryKeywords(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
+            </p>
+          </div>
           <div className="flex space-x-3">
             <button
               onClick={handleAddCategory}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              disabled={!newCategoryName.trim()}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400 cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -310,6 +367,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 setShowAddForm(false);
                 setNewCategoryName('');
                 setNewCategoryIcon('📁');
+                setNewCategoryKeywords('');
               }}
               className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
             >
@@ -367,155 +425,253 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             </p>
           ) : (
             <div className="space-y-1">
-              {allVisibleCategories.map((category, index) => (
+              {allVisibleCategories.map((category, index) => {
+                const isEditing = editingId === category.id;
+                const isDefault = !category.isCustom;
+                const isModified = isDefaultCategoryModified(category.id);
+                const originalCategory = originalDefaultCategories.find(c => c.id === category.id);
+                
+                const hasChanges = isEditing && (
+                  editName !== category.name ||
+                  editIcon !== category.icon ||
+                  editKeywords !== (category.keywords?.join(', ') || '')
+                );
+                
+                return (
                 <div
                   key={category.id}
-                  draggable={isReordering}
+                  draggable={isReordering && !isEditing}
                   onDragStart={(e) => handleDragStart(e, index, category.id)}
                   onDragEnd={handleDragEnd}
                   onDragOver={(e) => handleDragOver(e, category.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                  className={`flex flex-col p-3 rounded-lg border transition-all ${
                     category.isCustom
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
                       : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
-                  } ${draggingId === category.id ? 'opacity-50' : ''} ${
+                  } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-blue-500' : ''} ${
+                    draggingId === category.id ? 'opacity-50' : ''
+                  } ${
                     dragOverId === category.id && draggingId !== category.id
                       ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
                       : ''
-                  } ${isReordering ? 'cursor-move' : ''}`}
+                  } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >
-                  <div className="flex items-center space-x-3">
-                    {isReordering && (
-                      <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                    )}
-                    <span className="text-xl">{category.icon}</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {category.name}
-                    </span>
-                    {category.isCustom && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                        {t('自定义', 'Custom')}
-                      </span>
-                    )}
-                  </div>
-
-                  {isReordering ? (
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => handleMoveToTop(index)}
-                        disabled={index === 0}
-                        className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title={t('置顶', 'Move to top')}
-                      >
-                        <ArrowUpToLine className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMoveCategory(index, 'up')}
-                        disabled={index === 0}
-                        className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title={t('上移', 'Move up')}
-                      >
-                        <ArrowUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMoveCategory(index, 'down')}
-                        disabled={index === allVisibleCategories.length - 1}
-                        className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title={t('下移', 'Move down')}
-                      >
-                        <ArrowDown className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMoveToBottom(index)}
-                        disabled={index === allVisibleCategories.length - 1}
-                        className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title={t('置底', 'Move to bottom')}
-                      >
-                        <ArrowDownToLine className="w-4 h-4" />
-                      </button>
-                    </div>
+                  {isEditing ? (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {t('编辑分类', 'Edit Category')}
+                        </span>
+                        {isDefault && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                            {t('默认分类', 'Default Category')}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {isDefault && isModified && originalCategory && (
+                        <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/30 rounded border border-yellow-200 dark:border-yellow-800">
+                          <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                            {t(
+                              `已修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
+                              `Modified. Original: ${originalCategory.icon} ${originalCategory.name}`
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={editIcon}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const graphemeCount = Array.from(value).length;
+                              if (graphemeCount <= 2) {
+                                setEditIcon(value);
+                              }
+                            }}
+                            className="w-14 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-center text-lg text-gray-900 dark:text-white"
+                            placeholder="📁"
+                          />
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                            placeholder={t('分类名称', 'Category name')}
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={editKeywords}
+                            onChange={(e) => setEditKeywords(e.target.value)}
+                            className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                            placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
+                          />
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={!hasChanges}
+                            className={`p-1.5 rounded ${hasChanges ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800' : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'}`}
+                            title={t('保存', 'Save')}
+                          >
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            title={t('取消', 'Cancel')}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {isDefault && isModified && (
+                          <div className="flex items-center space-x-2 pt-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{t('还原:', 'Reset:')}</span>
+                            {hasNameIconModified(category.id) && (
+                              <button
+                                onClick={() => {
+                                  resetDefaultCategoryNameIcon(category.id);
+                                  if (originalCategory) {
+                                    setEditName(originalCategory.name);
+                                    setEditIcon(originalCategory.icon);
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                              >
+                                {t('名字/图标', 'Name/Icon')}
+                              </button>
+                            )}
+                            {hasKeywordsModified(category.id) && (
+                              <button
+                                onClick={() => {
+                                  resetDefaultCategoryKeywords(category.id);
+                                  if (originalCategory) {
+                                    setEditKeywords(originalCategory.keywords?.join(', ') || '');
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                              >
+                                {t('关键词', 'Keywords')}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleResetDefault(category.id, originalCategory)}
+                              className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
+                            >
+                              {t('全部', 'All')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <div className="flex items-center space-x-1">
-                      {category.isCustom ? (
-                        <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        {isReordering && (
+                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        )}
+                        <span className="text-xl w-6 text-center inline-block">{category.icon}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {category.name}
+                        </span>
+                        {category.isCustom && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                            {t('自定义', 'Custom')}
+                          </span>
+                        )}
+                        {!category.isCustom && isModified && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                            {t('已修改', 'Modified')}
+                          </span>
+                        )}
+                      </div>
+
+                      {isReordering ? (
+                        <div className="flex items-center space-x-1">
                           <button
-                            onClick={() => handleStartEdit(category)}
-                            className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
-                            title={t('编辑', 'Edit')}
+                            onClick={() => handleMoveToTop(index)}
+                            disabled={index === 0}
+                            className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title={t('置顶', 'Move to top')}
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <ArrowUpToLine className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteCategory(category.id)}
-                            className="p-1.5 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
-                            title={t('删除', 'Delete')}
+                            onClick={() => handleMoveCategory(index, 'up')}
+                            disabled={index === 0}
+                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title={t('上移', 'Move up')}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <ArrowUp className="w-4 h-4" />
                           </button>
-                        </>
+                          <button
+                            onClick={() => handleMoveCategory(index, 'down')}
+                            disabled={index === allVisibleCategories.length - 1}
+                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title={t('下移', 'Move down')}
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleMoveToBottom(index)}
+                            disabled={index === allVisibleCategories.length - 1}
+                            className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title={t('置底', 'Move to bottom')}
+                          >
+                            <ArrowDownToLine className="w-4 h-4" />
+                          </button>
+                        </div>
                       ) : (
-                        <button
-                          onClick={() => hideDefaultCategory(category.id)}
-                          className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
-                          title={t('隐藏', 'Hide')}
-                        >
-                          <EyeOff className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center space-x-1">
+                          {category.isCustom ? (
+                            <>
+                              <button
+                                onClick={() => handleStartEdit(category)}
+                                className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
+                                title={t('编辑', 'Edit')}
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCategory(category.id)}
+                                className="p-1.5 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
+                                title={t('删除', 'Delete')}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleStartEdit(category)}
+                                className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
+                                title={t('编辑', 'Edit')}
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => hideDefaultCategory(category.id)}
+                                className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                title={t('隐藏', 'Hide')}
+                              >
+                                <EyeOff className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
-
-        {/* 编辑模态框 */}
-        {editingId && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-              {t('编辑分类', 'Edit Category')}
-            </h4>
-            <div className="flex items-center space-x-3">
-              <input
-                type="text"
-                value={editIcon}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const graphemeCount = Array.from(value).length;
-                  if (graphemeCount <= 2) {
-                    setEditIcon(value);
-                  }
-                }}
-                className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-center text-lg"
-                placeholder="📁"
-              />
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                placeholder={t('分类名称', 'Category name')}
-              />
-              <button
-                onClick={handleSaveEdit}
-                className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800"
-                title={t('保存', 'Save')}
-              >
-                <Save className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
-                title={t('取消', 'Cancel')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 隐藏的默认分类 */}
         {hiddenDefaultCategories.length > 0 && (
@@ -535,7 +691,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
-                  <span>{category.icon}</span>
+                  <span className="w-5 text-center inline-block">{category.icon}</span>
                   <span>{category.name}</span>
                 </button>
               ))}
