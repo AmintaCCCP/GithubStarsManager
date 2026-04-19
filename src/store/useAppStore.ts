@@ -817,7 +817,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
