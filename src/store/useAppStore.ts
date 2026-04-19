@@ -64,6 +64,10 @@ interface AppActions {
   // Category actions
   addCustomCategory: (category: Category) => void;
   updateCustomCategory: (id: string, updates: Partial<Category>) => void;
+  updateDefaultCategory: (id: string, updates: Partial<Category>) => void;
+  resetDefaultCategory: (id: string) => void;
+  resetDefaultCategoryNameIcon: (id: string) => void;
+  resetDefaultCategoryKeywords: (id: string) => void;
   deleteCustomCategory: (id: string) => void;
   hideDefaultCategory: (id: string) => void;
   showDefaultCategory: (id: string) => void;
@@ -134,6 +138,7 @@ type PersistedAppState = Partial<
     | 'releases'
     | 'customCategories'
     | 'hiddenDefaultCategoryIds'
+    | 'defaultCategoryOverrides'
     | 'categoryOrder'
     | 'collapsedSidebarCategoryCount'
     | 'assetFilters'
@@ -196,6 +201,12 @@ const normalizePersistedState = (
       return Array.isArray(persistedIds)
         ? persistedIds.filter((id): id is string => typeof id === 'string')
         : [];
+    })(),
+    defaultCategoryOverrides: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).defaultCategoryOverrides;
+      return persisted && typeof persisted === 'object' && !Array.isArray(persisted)
+        ? persisted as Record<string, Partial<Category>>
+        : {};
     })(),
     categoryOrder: Array.isArray(safePersisted.categoryOrder) ? safePersisted.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') : [],
     collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
@@ -333,6 +344,7 @@ export const useAppStore = create<AppState & AppActions>()(
       readReleases: new Set<number>(),
       customCategories: [],
       hiddenDefaultCategoryIds: [],
+      defaultCategoryOverrides: {},
       categoryOrder: [],
       collapsedSidebarCategoryCount: 20,
       assetFilters: defaultPresetFilters,
@@ -532,6 +544,130 @@ export const useAppStore = create<AppState & AppActions>()(
           )
         };
       }),
+      updateDefaultCategory: (id, updates) => set((state) => {
+        const defaultCat = defaultCategories.find(c => c.id === id);
+        if (!defaultCat) return {};
+
+        const originalName = defaultCat.name;
+        const currentOverride = state.defaultCategoryOverrides[id];
+        const currentName = currentOverride?.name || originalName;
+        const newName = updates.name;
+
+        const nextOverrides = {
+          ...state.defaultCategoryOverrides,
+          [id]: { ...state.defaultCategoryOverrides[id], ...updates }
+        };
+
+        if (!newName || newName === currentName) {
+          return { defaultCategoryOverrides: nextOverrides };
+        }
+
+        const nextRepositories = state.repositories.map(repo =>
+          repo.custom_category === currentName
+            ? { ...repo, custom_category: newName, last_edited: new Date().toISOString() }
+            : repo
+        );
+
+        return {
+          defaultCategoryOverrides: nextOverrides,
+          repositories: nextRepositories,
+          searchResults: state.searchResults.map(repo =>
+            repo.custom_category === currentName
+              ? { ...repo, custom_category: newName, last_edited: new Date().toISOString() }
+              : repo
+          )
+        };
+      }),
+      resetDefaultCategory: (id) => set((state) => {
+        const defaultCat = defaultCategories.find(c => c.id === id);
+        if (!defaultCat) return {};
+
+        const override = state.defaultCategoryOverrides[id];
+        if (!override) return {};
+
+        const overriddenName = override.name;
+        const originalName = defaultCat.name;
+
+        const nextOverrides = { ...state.defaultCategoryOverrides };
+        delete nextOverrides[id];
+
+        if (!overriddenName || overriddenName === originalName) {
+          return { defaultCategoryOverrides: nextOverrides };
+        }
+
+        const nextRepositories = state.repositories.map(repo =>
+          repo.custom_category === overriddenName
+            ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
+            : repo
+        );
+
+        return {
+          defaultCategoryOverrides: nextOverrides,
+          repositories: nextRepositories,
+          searchResults: state.searchResults.map(repo =>
+            repo.custom_category === overriddenName
+              ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
+              : repo
+          )
+        };
+      }),
+      resetDefaultCategoryNameIcon: (id) => set((state) => {
+        const defaultCat = defaultCategories.find(c => c.id === id);
+        if (!defaultCat) return {};
+
+        const override = state.defaultCategoryOverrides[id];
+        if (!override) return {};
+
+        const overriddenName = override.name;
+        const originalName = defaultCat.name;
+
+        const nextOverride = { ...override };
+        delete nextOverride.name;
+        delete nextOverride.icon;
+
+        const nextOverrides = { ...state.defaultCategoryOverrides };
+        if (Object.keys(nextOverride).length === 0) {
+          delete nextOverrides[id];
+        } else {
+          nextOverrides[id] = nextOverride;
+        }
+
+        if (!overriddenName || overriddenName === originalName) {
+          return { defaultCategoryOverrides: nextOverrides };
+        }
+
+        const nextRepositories = state.repositories.map(repo =>
+          repo.custom_category === overriddenName
+            ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
+            : repo
+        );
+
+        return {
+          defaultCategoryOverrides: nextOverrides,
+          repositories: nextRepositories,
+          searchResults: state.searchResults.map(repo =>
+            repo.custom_category === overriddenName
+              ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
+              : repo
+          )
+        };
+      }),
+      resetDefaultCategoryKeywords: (id) => set((state) => {
+        const override = state.defaultCategoryOverrides[id];
+        if (!override) return {};
+
+        const nextOverride = { ...override };
+        delete nextOverride.keywords;
+
+        const nextOverrides = { ...state.defaultCategoryOverrides };
+        if (Object.keys(nextOverride).length === 0) {
+          delete nextOverrides[id];
+        } else {
+          nextOverrides[id] = nextOverride;
+        }
+
+        return { defaultCategoryOverrides: nextOverrides };
+      }),
       deleteCustomCategory: (id) => set((state) => {
         const targetCategory = state.customCategories.find(category => category.id === id);
         const nextSelectedCategory = state.selectedCategory === id ? 'all' : state.selectedCategory;
@@ -571,7 +707,7 @@ export const useAppStore = create<AppState & AppActions>()(
       })),
       setCategoryOrder: (order) => set({ categoryOrder: order }),
       reorderCategories: (oldIndex, newIndex) => set((state) => {
-        const allCategories = getAllCategories(state.customCategories, state.language, state.hiddenDefaultCategoryIds);
+        const allCategories = getAllCategories(state.customCategories, state.language, state.hiddenDefaultCategoryIds, state.defaultCategoryOverrides);
         const orderedCategories = sortCategoriesByOrder(allCategories, state.categoryOrder);
         const newOrder = orderedCategories.map(c => c.id);
         const [movedId] = newOrder.splice(oldIndex, 1);
@@ -779,14 +915,20 @@ export const sortCategoriesByOrder = (
 export const getAllCategories = (
   customCategories: Category[],
   language: 'zh' | 'en' = 'zh',
-  hiddenDefaultCategoryIds: string[] = []
+  hiddenDefaultCategoryIds: string[] = [],
+  defaultCategoryOverrides: Record<string, Partial<Category>> = {}
 ): Category[] => {
   const translatedDefaults = defaultCategories
     .filter(cat => !hiddenDefaultCategoryIds.includes(cat.id))
-    .map(cat => ({
-      ...cat,
-      name: language === 'en' ? translateCategoryName(cat.name) : cat.name
-    }));
+    .map(cat => {
+      const override = defaultCategoryOverrides[cat.id];
+      const baseName = language === 'en' ? translateCategoryName(cat.name) : cat.name;
+      return {
+        ...cat,
+        name: baseName,
+        ...(override ? { name: override.name ?? baseName, icon: override.icon ?? cat.icon, keywords: override.keywords ?? cat.keywords } : {})
+      };
+    });
 
   return [...translatedDefaults, ...customCategories];
 };

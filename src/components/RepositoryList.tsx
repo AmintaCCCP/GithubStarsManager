@@ -32,6 +32,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     language,
     customCategories,
     hiddenDefaultCategoryIds,
+    defaultCategoryOverrides,
     analysisProgress,
     setAnalysisProgress,
     searchFilters,
@@ -60,8 +61,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [isExitingSelection, setIsExitingSelection] = useState(false);
 
   const allCategories = useMemo(
-    () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds),
-    [customCategories, language, hiddenDefaultCategoryIds]
+    () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
+    [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]
   );
 
   const filteredRepositories = useMemo(() => {
@@ -728,7 +729,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         }
 
         case 'lock-category': {
-          const allCategoriesForLock = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+          const allCategoriesForLock = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
           const reposWithoutCategory = repos.filter(repo => !repo.custom_category || repo.custom_category === '');
           if (reposWithoutCategory.length > 0) {
             const confirmMessage = language === 'zh'
@@ -847,7 +848,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     for (const repo of selectedRepos) {
       try {
         // 获取所有分类用于计算AI和默认分类
-        const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds);
+        const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
         const aiCat = getAICategory(repo, allCategoriesList);
         const defaultCat = getDefaultCategory(repo, allCategoriesList);
 

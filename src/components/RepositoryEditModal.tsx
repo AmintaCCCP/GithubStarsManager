@@ -54,7 +54,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   onClose,
   repository
 }) => {
-  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds } = useAppStore();
+  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore();
 
   const [formData, setFormData] = useState({
     description: '',
@@ -90,7 +90,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
 
 
-  const allCategories = useMemo(() => getAllCategories(customCategories, language, hiddenDefaultCategoryIds), [customCategories, language, hiddenDefaultCategoryIds]);
+  const allCategories = useMemo(() => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides), [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]);
 
   // 获取仓库当前所属的分类
   const getCurrentCategory = useCallback((repo: Repository) => {

@@ -207,6 +207,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // Clear hidden default categories and reset category-related settings
       useAppStore.setState({ 
         hiddenDefaultCategoryIds: [],
+        defaultCategoryOverrides: {},
         categoryOrder: [],
         collapsedSidebarCategoryCount: 20,
         isSidebarCollapsed: false
