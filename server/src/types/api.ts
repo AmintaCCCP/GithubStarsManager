@@ -12,14 +12,14 @@ export interface RepositoryRow {
   starred_at: string | null;
   owner_login: string;
   owner_avatar_url: string | null;
-  topics: string;
+  topics: string | null;
   ai_summary: string | null;
-  ai_tags: string;
-  ai_platforms: string;
+  ai_tags: string | null;
+  ai_platforms: string | null;
   analyzed_at: string | null;
   analysis_failed: number;
   custom_description: string | null;
-  custom_tags: string;
+  custom_tags: string | null;
   custom_category: string | null;
   category_locked: number;
   last_edited: string | null;

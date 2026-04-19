@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
 import { Category } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 
 // Complete emoji collection for categories
 const availableIcons = [
@@ -792,7 +792,25 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   category,
   isCreating = false
 }) => {
-  const { addCustomCategory, updateCustomCategory, language } = useAppStore();
+  const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore();
+
+  const originalDefaultCategories = getAllCategories([], language, [], {});
+  const isDefaultCategoryModified = category && !category.isCustom && category.id in defaultCategoryOverrides;
+  const originalCategory = category && !category.isCustom ? originalDefaultCategories.find(c => c.id === category.id) : null;
+  
+  const effectiveCategory = React.useMemo(() => {
+    if (!category || isCreating) return null;
+    if (category.isCustom) {
+      return customCategories.find(c => c.id === category.id) || category;
+    }
+    const allCategories = getAllCategories([], language, [], defaultCategoryOverrides);
+    return allCategories.find(c => c.id === category.id) || category;
+  }, [category, isCreating, customCategories, defaultCategoryOverrides, language]);
+  
+  const hasNameIconModified = category && !category.isCustom && defaultCategoryOverrides[category.id] && 
+    (defaultCategoryOverrides[category.id].name !== undefined || defaultCategoryOverrides[category.id].icon !== undefined);
+  const hasKeywordsModified = category && !category.isCustom && defaultCategoryOverrides[category.id] && 
+    defaultCategoryOverrides[category.id].keywords !== undefined;
   
   const [formData, setFormData] = useState({
     name: '',
@@ -824,26 +842,38 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       return;
     }
 
-    const categoryData: Category = {
-      id: category?.id || Date.now().toString(),
-      name: formData.name.trim(),
-      icon: formData.icon,
-      keywords: formData.keywords.split(',').map(k => k.trim()).filter(k => k),
-      isCustom: true
-    };
-
     if (isCreating) {
+      const categoryData: Category = {
+        id: Date.now().toString(),
+        name: formData.name.trim(),
+        icon: formData.icon,
+        keywords: formData.keywords.split(',').map(k => k.trim()).filter(k => k),
+        isCustom: true
+      };
       addCustomCategory(categoryData);
     } else if (category) {
-      updateCustomCategory(category.id, {
-        name: categoryData.name,
-        icon: categoryData.icon,
-        keywords: categoryData.keywords
-      });
+      const updates = {
+        name: formData.name.trim(),
+        icon: formData.icon,
+        keywords: formData.keywords.split(',').map(k => k.trim()).filter(k => k),
+      };
+      if (category.isCustom) {
+        updateCustomCategory(category.id, updates);
+      } else {
+        updateDefaultCategory(category.id, updates);
+      }
     }
 
     onClose();
   };
+
+  const hasChanges = isCreating 
+    ? formData.name.trim().length > 0
+    : effectiveCategory && (
+        formData.name !== effectiveCategory.name ||
+        formData.icon !== effectiveCategory.icon ||
+        formData.keywords !== (effectiveCategory.keywords?.join(', ') || '')
+      );
 
   const handleIconSelect = (iconValue: string) => {
     setFormData(prev => ({ ...prev, icon: iconValue }));
@@ -991,6 +1021,71 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           </p>
         </div>
 
+        {/* Default Category Modified Hint */}
+        {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
+              {t(
+                `此默认分类已被修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
+                `This default category has been modified. Original: ${originalCategory.icon} ${originalCategory.name}`
+              )}
+            </p>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-yellow-600 dark:text-yellow-400">{t('还原:', 'Reset:')}</span>
+              {hasNameIconModified && (
+                <button
+                  onClick={() => {
+                    resetDefaultCategoryNameIcon(category.id);
+                    setFormData(prev => ({
+                      ...prev,
+                      name: originalCategory.name,
+                      icon: originalCategory.icon
+                    }));
+                  }}
+                  className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
+                >
+                  {t('名字/图标', 'Name/Icon')}
+                </button>
+              )}
+              {hasKeywordsModified && (
+                <button
+                  onClick={() => {
+                    resetDefaultCategoryKeywords(category.id);
+                    setFormData(prev => ({
+                      ...prev,
+                      keywords: originalCategory.keywords.join(', ')
+                    }));
+                  }}
+                  className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
+                >
+                  {t('关键词', 'Keywords')}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  resetDefaultCategory(category.id);
+                  setFormData({
+                    name: originalCategory.name,
+                    icon: originalCategory.icon,
+                    keywords: originalCategory.keywords.join(', ')
+                  });
+                }}
+                className="text-xs px-2 py-1 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+              >
+                {t('全部', 'All')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {category && !category.isCustom && !isDefaultCategoryModified && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              {t('编辑默认分类将覆盖原始设置，可随时还原。', 'Editing default category will override original settings. You can reset anytime.')}
+            </p>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex justify-end space-x-3 pt-4">
           <button
@@ -1002,7 +1097,8 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={!hasChanges}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400 cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
