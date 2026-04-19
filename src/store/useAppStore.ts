@@ -598,11 +598,13 @@ export const useAppStore = create<AppState & AppActions>()(
           nextOverrides[id] = mergedOverride;
         }
 
-        if (!newName || newName === currentName) {
+        const currentDisplayedName = currentOverride?.name ?? displayedName;
+        if (!newName || newName === currentName || newName === currentDisplayedName) {
           return { defaultCategoryOverrides: nextOverrides };
         }
 
         const currentNameVariants = getCategoryNameVariants(originalName, currentName);
+        // Avoid self-rewrite when newName already matches the displayed default name.
 
         const nextRepositories = state.repositories.map(repo =>
           currentNameVariants.includes(repo.custom_category || '')
