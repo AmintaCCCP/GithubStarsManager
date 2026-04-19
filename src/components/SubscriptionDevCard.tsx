@@ -134,19 +134,22 @@ export const SubscriptionDevCard: React.FC<SubscriptionDevCardProps> = ({ dev })
                     </div>
                   )}
 
-                  {/* Tags for top repo */}
-                  {((dev.topRepo.ai_tags && dev.topRepo.ai_tags.length > 0) || (dev.topRepo.topics && dev.topRepo.topics.length > 0)) && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {(dev.topRepo.ai_tags || dev.topRepo.topics || []).slice(0, 5).map((tag: string) => (
-                        <span
-                          key={tag}
-                          className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50/50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Tags for top repo - fixed logic */}
+                  {(() => {
+                    const tags = (dev.topRepo.ai_tags?.length ? dev.topRepo.ai_tags : dev.topRepo.topics) || [];
+                    return tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {tags.slice(0, 5).map((tag: string) => (
+                          <span
+                            key={tag}
+                            className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50/50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Platform icons for top repo */}
                   {dev.topRepo.ai_platforms && dev.topRepo.ai_platforms.length > 0 && (

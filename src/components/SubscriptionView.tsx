@@ -66,8 +66,17 @@ export const SubscriptionView: React.FC = React.memo(() => {
         const repos = await githubApi.searchMostForks(10);
         setSubscriptionRepos('most-forks', repos);
       } else if (normalizedId === 'most-dev') {
+    } else if (normalizedId === 'trending') {
+      const repos = await githubApi.searchTrending(10);
+      setSubscriptionRepos('trending', repos);
         const devs = await githubApi.searchDailyDevs(10);
+    } else if (normalizedId === 'trending') {
+      const repos = await githubApi.searchTrending(10);
+      setSubscriptionRepos('trending', repos);
         setSubscriptionDevs(devs);
+    } else if (normalizedId === 'trending') {
+      const repos = await githubApi.searchTrending(10);
+      setSubscriptionRepos('trending', repos);
       }
       setSubscriptionLastRefresh(normalizedId, new Date().toISOString());
     } catch (err) {

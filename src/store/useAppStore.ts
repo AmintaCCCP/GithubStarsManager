@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress } from '../types';
+import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress, SubscriptionChannel, SubscriptionChannelId, SubscriptionRepo, SubscriptionDev } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
@@ -82,7 +82,7 @@ interface AppActions {
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
-  setCurrentView: (view: 'repositories' | 'releases' | 'settings') => void;
+  setCurrentView: (view: 'repositories' | 'releases' | 'settings' | 'subscription') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -106,6 +106,16 @@ interface AppActions {
   toggleReleaseExpandedRepository: (repoId: number) => void;
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   setReleaseIsRefreshing: (refreshing: boolean) => void;
+
+  // Subscription actions
+  setSelectedSubscriptionChannel: (channel: SubscriptionChannelId) => void;
+  setSubscriptionLoading: (channel: SubscriptionChannelId, loading: boolean) => void;
+  setSubscriptionRepos: (channel: SubscriptionChannelId, repos: SubscriptionRepo[]) => void;
+  setSubscriptionDevs: (devs: SubscriptionDev[]) => void;
+  setSubscriptionLastRefresh: (channel: SubscriptionChannelId, timestamp: string) => void;
+  updateSubscriptionRepo: (repo: SubscriptionRepo) => void;
+  updateSubscriptionDev: (dev: SubscriptionDev) => void;
+  toggleSubscriptionChannel: (channelId: SubscriptionChannelId) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -322,6 +332,41 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
   icon: PRESET_FILTER_ICONS[pf.id] || 'Package',
 }));
 
+const defaultSubscriptionChannels: SubscriptionChannel[] = [
+  {
+    id: 'most-stars',
+    name: '最多 Star',
+    nameEn: 'Most Stars',
+    icon: '⭐',
+    description: 'GitHub 上 Star 数量最多的项目 Top 10',
+    enabled: true,
+  },
+  {
+    id: 'most-forks',
+    name: '最多 Fork',
+    nameEn: 'Most Forks',
+    icon: '🔱',
+    description: 'GitHub 上 Fork 数量最多的项目 Top 10',
+    enabled: true,
+  },
+  {
+    id: 'most-dev',
+    name: '热门开发者',
+    nameEn: 'Top Developers',
+    icon: '👤',
+    description: 'GitHub 上最受关注的开发者 Top 10 及其最热项目',
+    enabled: true,
+  },
+  {
+    id: 'trending',
+    name: '热门趋势',
+    nameEn: 'Trending',
+    icon: '🔥',
+    description: 'GitHub 上近期最受关注的项目 Top 10',
+    enabled: true,
+  },
+];
+
 export const useAppStore = create<AppState & AppActions>()(
   persist(
     (set) => ({
@@ -361,6 +406,14 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseSearchQuery: '',
       releaseExpandedRepositories: new Set<number>(),
       releaseIsRefreshing: false,
+
+    // Subscription
+    subscriptionChannels: defaultSubscriptionChannels,
+    subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
+    subscriptionDevs: [],
+    subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
+    subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
+    selectedSubscriptionChannel: 'most-stars',
 
       // Auth actions
       setUser: (user) => {
@@ -814,6 +867,37 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
+
+    // Subscription actions
+    setSelectedSubscriptionChannel: (selectedSubscriptionChannel) => set({ selectedSubscriptionChannel }),
+    setSubscriptionLoading: (channel, loading) => set((state) => ({
+      subscriptionIsLoading: { ...state.subscriptionIsLoading, [channel]: loading },
+    })),
+    setSubscriptionRepos: (channel, repos) => set((state) => ({
+      subscriptionRepos: { ...state.subscriptionRepos, [channel]: repos },
+    })),
+    setSubscriptionDevs: (devs) => set({ subscriptionDevs: devs }),
+    setSubscriptionLastRefresh: (channel, timestamp) => set((state) => ({
+      subscriptionLastRefresh: { ...state.subscriptionLastRefresh, [channel]: timestamp },
+    })),
+    updateSubscriptionRepo: (repo) => set((state) => {
+      const channel = repo.channel;
+      const channelRepos = state.subscriptionRepos[channel] || [];
+      return {
+        subscriptionRepos: {
+          ...state.subscriptionRepos,
+          [channel]: channelRepos.map(r => r.id === repo.id ? repo : r),
+        },
+      };
+    }),
+    updateSubscriptionDev: (dev) => set((state) => ({
+      subscriptionDevs: state.subscriptionDevs.map(d => d.login === dev.login ? dev : d),
+    })),
+    toggleSubscriptionChannel: (channelId) => set((state) => ({
+      subscriptionChannels: state.subscriptionChannels.map(ch =>
+        ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch
+      ),
+    })),
     }),
     {
       name: 'github-stars-manager',
@@ -873,6 +957,13 @@ export const useAppStore = create<AppState & AppActions>()(
         releaseSelectedFilters: state.releaseSelectedFilters,
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
+
+      // 持久化订阅设置
+      subscriptionChannels: state.subscriptionChannels,
+      selectedSubscriptionChannel: state.selectedSubscriptionChannel,
+      subscriptionRepos: state.subscriptionRepos,
+      subscriptionDevs: state.subscriptionDevs,
+      subscriptionLastRefresh: state.subscriptionLastRefresh,
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
@@ -911,6 +1002,24 @@ export const useAppStore = create<AppState & AppActions>()(
             console.log(`Migrated ${migratedCount} repositories: converted '__EMPTY__' to empty string`);
           }
         }
+
+  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending）
+  if (state && !Array.isArray(state.subscriptionChannels)) {
+    console.log('Migrating: initializing subscription channels');
+    state.subscriptionChannels = defaultSubscriptionChannels;
+  } else if (state && Array.isArray(state.subscriptionChannels)) {
+    state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
+      if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
+        return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+      }
+      return ch;
+    });
+  }
+  if (state && !state.selectedSubscriptionChannel) {
+    state.selectedSubscriptionChannel = 'most-stars';
+  } else if (state && state.selectedSubscriptionChannel === 'daily-dev') {
+    state.selectedSubscriptionChannel = 'most-dev';
+  }
 
         return state as PersistedAppState;
       },

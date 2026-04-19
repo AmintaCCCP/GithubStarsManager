@@ -216,7 +216,7 @@ export interface AnalysisProgress {
   total: number;
 }
 
-export type SubscriptionChannelId = 'most-stars' | 'most-forks' | 'most-dev';
+export type SubscriptionChannelId = 'most-stars' | 'most-forks' | 'most-dev' | 'trending';
 
 export interface SubscriptionChannel {
   id: SubscriptionChannelId;

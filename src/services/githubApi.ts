@@ -277,6 +277,20 @@ export class GitHubApiService {
     }));
   }
 
+  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
+    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
+    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'trending' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
   async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
     const usersData = await this.makeRequest<GitHubSearchUserResponse>(
       `/search/users?q=followers:>1000&sort=followers&order=desc&per_page=${perPage}`
