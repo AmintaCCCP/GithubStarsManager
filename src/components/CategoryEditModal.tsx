@@ -792,11 +792,20 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   category,
   isCreating = false
 }) => {
-  const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language } = useAppStore();
+  const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore();
 
   const originalDefaultCategories = getAllCategories([], language, [], {});
   const isDefaultCategoryModified = category && !category.isCustom && category.id in defaultCategoryOverrides;
   const originalCategory = category && !category.isCustom ? originalDefaultCategories.find(c => c.id === category.id) : null;
+  
+  const effectiveCategory = React.useMemo(() => {
+    if (!category || isCreating) return null;
+    if (category.isCustom) {
+      return customCategories.find(c => c.id === category.id) || category;
+    }
+    const allCategories = getAllCategories([], language, [], defaultCategoryOverrides);
+    return allCategories.find(c => c.id === category.id) || category;
+  }, [category, isCreating, customCategories, defaultCategoryOverrides, language]);
   
   const hasNameIconModified = category && !category.isCustom && defaultCategoryOverrides[category.id] && 
     (defaultCategoryOverrides[category.id].name !== undefined || defaultCategoryOverrides[category.id].icon !== undefined);
@@ -860,10 +869,10 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
   const hasChanges = isCreating 
     ? formData.name.trim().length > 0
-    : category && (
-        formData.name !== category.name ||
-        formData.icon !== category.icon ||
-        formData.keywords !== (category.keywords?.join(', ') || '')
+    : effectiveCategory && (
+        formData.name !== effectiveCategory.name ||
+        formData.icon !== effectiveCategory.icon ||
+        formData.keywords !== (effectiveCategory.keywords?.join(', ') || '')
       );
 
   const handleIconSelect = (iconValue: string) => {

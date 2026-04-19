@@ -800,7 +800,9 @@ export const SearchBar: React.FC = () => {
             onClick={handleAISearch}
             disabled={isSearching}
             className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
-            title={t('不是真正地调用大模型\n使用本地智能排序算法', 'Not actually calling LLM, uses local intelligent ranking algorithm')}
+            title={activeAIConfig 
+              ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
+              : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
           >
             <Bot className="w-4 h-4" />
             <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
@@ -810,10 +812,15 @@ export const SearchBar: React.FC = () => {
             <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <p className="font-medium mb-1">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="text-gray-300">
-                {t(
-                  '此功能使用本地算法进行智能排序，并非调用GPT等大模型API。它会根据仓库名称、描述、标签等多维度进行匹配和排序。',
-                  'This feature uses local algorithms for intelligent ranking, not calling GPT or other LLM APIs. It matches and ranks based on repository name, description, tags, and other dimensions.'
-                )}
+                {activeAIConfig
+                  ? t(
+                      '已配置AI服务时，将调用AI进行语义搜索和智能重排序。未配置时使用本地算法根据仓库名称、描述、标签等多维度进行匹配和排序。',
+                      'When AI service is configured, it will be called for semantic search and intelligent reranking. Otherwise, local algorithms are used to match and rank based on repository name, description, tags, and other dimensions.'
+                    )
+                  : t(
+                      '此功能使用本地算法进行智能排序。配置AI服务后可启用语义搜索功能，获得更精准的搜索结果。',
+                      'This feature uses local algorithms for intelligent ranking. Configure an AI service to enable semantic search for more accurate results.'
+                    )}
               </p>
               <div className="absolute bottom-full right-2 w-2 h-2 bg-gray-800 transform rotate-45"></div>
             </div>

@@ -760,7 +760,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   const customCategoryValue = computeCustomCategory(inferredCategory, aiCat, defaultCat);
                   updateRepository({
                     ...repo,
-                    custom_category: customCategoryValue,
+                    custom_category: customCategoryValue ?? inferredCategory,
                     category_locked: true,
                     last_edited: new Date().toISOString()
                   });

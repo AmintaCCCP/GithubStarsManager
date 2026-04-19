@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
@@ -38,10 +38,22 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
 
   const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+    }
     setNotification({ type, message });
-    setTimeout(() => setNotification(null), 3000);
+    notificationTimerRef.current = setTimeout(() => setNotification(null), 3000);
   }, []);
 
   const [form, setForm] = useState<AIFormState>({
@@ -162,7 +174,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setTestingForm(true);
     try {
       const tempConfig: AIConfig = {
-        id: 'temp-test',
+        id: '' as string,
         name: form.name || 'Test',
         apiType: form.apiType,
         baseUrl: form.baseUrl.replace(/\/$/, ''),
@@ -636,7 +648,11 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => {
                     if (confirm(t('确定要删除这个AI配置吗？', 'Are you sure you want to delete this AI configuration?'))) {
-                      if (config.id) deleteAIConfig(config.id);
+                      if (config.id) {
+                        deleteAIConfig(config.id);
+                      } else {
+                        alert(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'));
+                      }
                     }
                   }}
                   className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"

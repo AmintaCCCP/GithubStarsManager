@@ -549,21 +549,62 @@ export const useAppStore = create<AppState & AppActions>()(
         if (!defaultCat) return {};
 
         const originalName = defaultCat.name;
+        const originalIcon = defaultCat.icon;
+        const originalKeywords = defaultCat.keywords || [];
         const currentOverride = state.defaultCategoryOverrides[id];
         const currentName = currentOverride?.name || originalName;
         const newName = updates.name;
 
-        const nextOverrides = {
-          ...state.defaultCategoryOverrides,
-          [id]: { ...state.defaultCategoryOverrides[id], ...updates }
-        };
+        const filteredUpdates: { name?: string; icon?: string; keywords?: string[] } = {};
+        
+        if (updates.name !== undefined && updates.name !== '' && updates.name !== originalName) {
+          filteredUpdates.name = updates.name;
+        }
+        if (updates.icon !== undefined && updates.icon !== originalIcon) {
+          filteredUpdates.icon = updates.icon;
+        }
+        if (updates.keywords !== undefined) {
+          const sortedOriginal = [...originalKeywords].sort().join(',');
+          const sortedNew = [...updates.keywords].sort().join(',');
+          if (sortedNew !== sortedOriginal) {
+            filteredUpdates.keywords = updates.keywords;
+          }
+        }
+
+        const existingOverride = state.defaultCategoryOverrides[id] || {};
+        const mergedOverride = { ...existingOverride, ...filteredUpdates };
+        
+        for (const key of ['name', 'icon', 'keywords'] as const) {
+          if (key in mergedOverride) {
+            if (key === 'keywords') {
+              const sortedOriginal = [...originalKeywords].sort().join(',');
+              const sortedMerged = [...(mergedOverride.keywords || [])].sort().join(',');
+              if (sortedMerged === sortedOriginal) {
+                delete mergedOverride.keywords;
+              }
+            } else if (key === 'name' && (mergedOverride.name === originalName || mergedOverride.name === '')) {
+              delete mergedOverride.name;
+            } else if (key === 'icon' && mergedOverride.icon === originalIcon) {
+              delete mergedOverride.icon;
+            }
+          }
+        }
+
+        const nextOverrides = { ...state.defaultCategoryOverrides };
+        if (Object.keys(mergedOverride).length === 0) {
+          delete nextOverrides[id];
+        } else {
+          nextOverrides[id] = mergedOverride;
+        }
 
         if (!newName || newName === currentName) {
           return { defaultCategoryOverrides: nextOverrides };
         }
 
+        const currentNameVariants = getCategoryNameVariants(originalName, currentName);
+
         const nextRepositories = state.repositories.map(repo =>
-          repo.custom_category === currentName
+          currentNameVariants.includes(repo.custom_category || '')
             ? { ...repo, custom_category: newName, last_edited: new Date().toISOString() }
             : repo
         );
@@ -572,7 +613,7 @@ export const useAppStore = create<AppState & AppActions>()(
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
-            repo.custom_category === currentName
+            currentNameVariants.includes(repo.custom_category || '')
               ? { ...repo, custom_category: newName, last_edited: new Date().toISOString() }
               : repo
           )
@@ -595,8 +636,10 @@ export const useAppStore = create<AppState & AppActions>()(
           return { defaultCategoryOverrides: nextOverrides };
         }
 
+        const overriddenNameVariants = getCategoryNameVariants(originalName, overriddenName);
+
         const nextRepositories = state.repositories.map(repo =>
-          repo.custom_category === overriddenName
+          overriddenNameVariants.includes(repo.custom_category || '')
             ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
             : repo
         );
@@ -605,7 +648,7 @@ export const useAppStore = create<AppState & AppActions>()(
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
-            repo.custom_category === overriddenName
+            overriddenNameVariants.includes(repo.custom_category || '')
               ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
               : repo
           )
@@ -636,8 +679,10 @@ export const useAppStore = create<AppState & AppActions>()(
           return { defaultCategoryOverrides: nextOverrides };
         }
 
+        const overriddenNameVariants = getCategoryNameVariants(originalName, overriddenName);
+
         const nextRepositories = state.repositories.map(repo =>
-          repo.custom_category === overriddenName
+          overriddenNameVariants.includes(repo.custom_category || '')
             ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
             : repo
         );
@@ -646,7 +691,7 @@ export const useAppStore = create<AppState & AppActions>()(
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
-            repo.custom_category === overriddenName
+            overriddenNameVariants.includes(repo.custom_category || '')
               ? { ...repo, custom_category: originalName, last_edited: new Date().toISOString() }
               : repo
           )
@@ -769,7 +814,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -800,6 +845,7 @@ export const useAppStore = create<AppState & AppActions>()(
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
         categoryOrder: state.categoryOrder,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
+        defaultCategoryOverrides: state.defaultCategoryOverrides,
 
         // 持久化资源过滤器
         assetFilters: state.assetFilters,
@@ -839,6 +885,12 @@ export const useAppStore = create<AppState & AppActions>()(
         if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
           console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
           state.collapsedSidebarCategoryCount = 20;
+        }
+
+        // 从旧版本升级时，确保 defaultCategoryOverrides 字段存在
+        if (state && typeof state.defaultCategoryOverrides !== 'object') {
+          console.log('Migrating from old version: initializing defaultCategoryOverrides');
+          state.defaultCategoryOverrides = {};
         }
 
         // 迁移仓库数据中的旧标记
@@ -953,4 +1005,30 @@ const translateCategoryName = (zhName: string): string => {
   };
   
   return translations[zhName] || zhName;
+};
+
+// Helper function to get all possible name variants for a category (original + translated)
+const getCategoryNameVariants = (originalName: string, overrideName?: string): string[] => {
+  const variants = new Set<string>();
+  
+  // Add original name
+  variants.add(originalName);
+  
+  // Add translated name
+  const translated = translateCategoryName(originalName);
+  if (translated !== originalName) {
+    variants.add(translated);
+  }
+  
+  // Add override name if provided and different
+  if (overrideName && overrideName !== originalName) {
+    variants.add(overrideName);
+    // Also add translated version of override if it matches a known pattern
+    const overrideTranslated = translateCategoryName(overrideName);
+    if (overrideTranslated !== overrideName) {
+      variants.add(overrideTranslated);
+    }
+  }
+  
+  return Array.from(variants);
 };

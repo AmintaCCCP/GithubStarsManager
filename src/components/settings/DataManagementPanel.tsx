@@ -50,6 +50,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     aiConfigs,
     webdavConfigs,
     customCategories,
+    defaultCategoryOverrides,
+    hiddenDefaultCategoryIds,
     setRepositories,
     setReleases,
     deleteCustomCategory,
@@ -262,6 +264,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         hiddenDefaultCategoryIds: [],
         categoryOrder: [],
         collapsedSidebarCategoryCount: 20,
+        defaultCategoryOverrides: {},
 
         // 资源过滤器
         assetFilters: [],
@@ -440,7 +443,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     {
       key: 'categorySettings',
       label: t('自定义分类', 'Custom Categories'),
-      count: customCategories.length,
+      count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
       color: 'text-orange-600 dark:text-orange-400',
       bgColor: 'bg-orange-50 dark:bg-orange-900/20',
