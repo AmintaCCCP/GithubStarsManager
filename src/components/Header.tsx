@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Menu, X } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Menu, X, TrendingUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -206,6 +206,17 @@ export const Header: React.FC = () => {
               {!isTextWrapped && t('发布', 'Releases')}
             </button>
             <button
+              onClick={() => setCurrentView('subscription')}
+              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
+                currentView === 'subscription'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              <TrendingUp className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
+              {!isTextWrapped && t('订阅', 'Subscribe')}
+            </button>
+            <button
               onClick={() => setCurrentView('settings')}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'settings'
@@ -241,6 +252,17 @@ export const Header: React.FC = () => {
               title={t('发布', 'Releases')}
             >
               <Calendar className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setCurrentView('subscription')}
+              className={`p-2.5 rounded-lg transition-colors ${
+                currentView === 'subscription'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              title={t('订阅', 'Subscribe')}
+            >
+              <TrendingUp className="w-5 h-5" />
             </button>
             <button
               onClick={() => setCurrentView('settings')}
@@ -294,6 +316,22 @@ export const Header: React.FC = () => {
                   <div className="flex items-center">
                     <Calendar className="w-5 h-5 mr-3" />
                     {t('发布', 'Releases')}
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('subscription');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
+                    currentView === 'subscription'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-3" />
+                    {t('订阅', 'Subscribe')}
                   </div>
                 </button>
                 <button
