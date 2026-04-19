@@ -549,6 +549,7 @@ export const useAppStore = create<AppState & AppActions>()(
         if (!defaultCat) return {};
 
         const originalName = defaultCat.name;
+        const displayedName = state.language === 'en' ? translateCategoryName(originalName) : originalName;
         const originalIcon = defaultCat.icon;
         const originalKeywords = defaultCat.keywords || [];
         const currentOverride = state.defaultCategoryOverrides[id];
@@ -557,7 +558,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         const filteredUpdates: { name?: string; icon?: string; keywords?: string[] } = {};
         
-        if (updates.name !== undefined && updates.name !== '' && updates.name !== originalName) {
+        if (updates.name !== undefined && updates.name !== '' && updates.name !== originalName && updates.name !== displayedName) {
           filteredUpdates.name = updates.name;
         }
         if (updates.icon !== undefined && updates.icon !== originalIcon) {
@@ -582,7 +583,7 @@ export const useAppStore = create<AppState & AppActions>()(
               if (sortedMerged === sortedOriginal) {
                 delete mergedOverride.keywords;
               }
-            } else if (key === 'name' && (mergedOverride.name === originalName || mergedOverride.name === '')) {
+            } else if (key === 'name' && (mergedOverride.name === originalName || mergedOverride.name === displayedName || mergedOverride.name === '')) {
               delete mergedOverride.name;
             } else if (key === 'icon' && mergedOverride.icon === originalIcon) {
               delete mergedOverride.icon;

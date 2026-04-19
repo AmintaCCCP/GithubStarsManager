@@ -438,7 +438,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       isExplicitlyCleared,
       isCustomized
     };
-  }, [repository.custom_description, repository.description, repository.ai_summary, repository.analysis_failed, repository.analyzed_at, repository.custom_tags, repository.ai_tags, repository.topics, repository.custom_category, repository.category_locked, showAISummary, language]);
+  }, [repository.custom_description, repository.description, repository.ai_summary, repository.analysis_failed, repository.analyzed_at, repository.custom_tags, repository.ai_tags, repository.topics, repository.custom_category, repository.category_locked, showAISummary, language, allCategories]);
 
   // 使用 useMemo 缓存标签计算
   // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics

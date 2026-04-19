@@ -30,9 +30,12 @@ export const SearchBar: React.FC = () => {
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   
-  // 统计各种状态的数量
+  const allCategories = useMemo(() => 
+    getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
+    [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]
+  );
+  
   const statusStats = useMemo(() => {
-    const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
     const stats = {
       analyzed: 0,      // 已AI分析（成功）
       notAnalyzed: 0,   // 未AI分析
@@ -107,7 +110,7 @@ export const SearchBar: React.FC = () => {
     });
     
     return stats;
-  }, [repositories, releaseSubscriptions, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]);
+  }, [repositories, releaseSubscriptions, allCategories]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
@@ -155,13 +158,13 @@ export const SearchBar: React.FC = () => {
         performBasicFilter();
       } else {
         const textResults = performBasicTextSearch(repositories, searchFilters.query);
-        const finalFiltered = applyFilters(textResults);
+        const finalFiltered = applyFilters(textResults, allCategories);
         setSearchResults(finalFiltered);
       }
     };
 
     performSearch();
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -175,7 +178,7 @@ export const SearchBar: React.FC = () => {
       // Reset to show all repositories when search is empty
       performBasicFilter();
     }
-  }, [searchQuery, isRealTimeSearch, repositories]);
+  }, [searchQuery, isRealTimeSearch, repositories, allCategories]);
 
   // Handle composition events for better IME support (Chinese input)
   const handleCompositionStart = () => {
@@ -207,7 +210,7 @@ export const SearchBar: React.FC = () => {
     });
 
     // Apply other filters
-    const finalFiltered = applyFilters(filtered);
+    const finalFiltered = applyFilters(filtered, allCategories);
     setSearchResults(finalFiltered);
     
     const endTime = performance.now();
@@ -215,7 +218,7 @@ export const SearchBar: React.FC = () => {
   };
 
   const performBasicFilter = () => {
-    const filtered = applyFilters(repositories);
+    const filtered = applyFilters(repositories, allCategories);
     setSearchResults(filtered);
   };
 
@@ -241,8 +244,7 @@ export const SearchBar: React.FC = () => {
     });
   };
 
-  const applyFilters = (repos: typeof repositories) => {
-    const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
+  const applyFilters = (repos: typeof repositories, categories: typeof allCategories) => {
     let filtered = repos;
 
     // Language filter
@@ -512,7 +514,7 @@ export const SearchBar: React.FC = () => {
       }
       
       // Apply other filters and update results
-      const finalFiltered = applyFilters(filtered);
+      const finalFiltered = applyFilters(filtered, allCategories);
       console.log('🎯 Final filtered results:', finalFiltered.length);
       console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
       setSearchResults(finalFiltered);
@@ -587,7 +589,7 @@ export const SearchBar: React.FC = () => {
     setShowSearchHistory(false);
 
     const textResults = performBasicTextSearch(repositories, historyQuery);
-    const finalFiltered = applyFilters(textResults);
+    const finalFiltered = applyFilters(textResults, allCategories);
     setSearchResults(finalFiltered);
   };
 
