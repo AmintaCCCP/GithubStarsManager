@@ -173,7 +173,7 @@ export interface AppState {
   
   // UI
   theme: 'light' | 'dark';
-  currentView: 'repositories' | 'releases' | 'settings';
+  currentView: 'repositories' | 'releases' | 'settings' | 'subscription';
   selectedCategory: string;
   language: 'zh' | 'en';
   isSidebarCollapsed: boolean;
@@ -193,6 +193,14 @@ export interface AppState {
   releaseSearchQuery: string;
   releaseExpandedRepositories: Set<number>;
   releaseIsRefreshing: boolean;
+
+  // Subscription
+  subscriptionChannels: SubscriptionChannel[];
+  subscriptionRepos: Record<SubscriptionChannelId, SubscriptionRepo[]>;
+  subscriptionDevs: SubscriptionDev[];
+  subscriptionLastRefresh: Record<SubscriptionChannelId, string | null>;
+  subscriptionIsLoading: Record<SubscriptionChannelId, boolean>;
+  selectedSubscriptionChannel: SubscriptionChannelId;
 }
 
 export interface UpdateNotification {
@@ -206,4 +214,34 @@ export interface UpdateNotification {
 export interface AnalysisProgress {
   current: number;
   total: number;
+}
+
+export type SubscriptionChannelId = 'most-stars' | 'most-forks' | 'most-dev' | 'trending';
+
+export interface SubscriptionChannel {
+  id: SubscriptionChannelId;
+  name: string;
+  nameEn: string;
+  icon: string;
+  description: string;
+  enabled: boolean;
+}
+
+export interface SubscriptionRepo extends Repository {
+  rank: number;
+  channel: SubscriptionChannelId;
+  forks?: number;
+  forks_count?: number;
+}
+
+export interface SubscriptionDev {
+  rank: number;
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  topRepo: SubscriptionRepo | null;
 }

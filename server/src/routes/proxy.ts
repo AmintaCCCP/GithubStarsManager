@@ -216,4 +216,82 @@ router.post('/api/proxy/webdav', async (req, res) => {
   }
 });
 
+// POST /api/proxy/github/search/repositories
+router.post('/api/proxy/github/search/repositories', async (req, res) => {
+  try {
+    const db = getDb();
+    const githubPath = 'search/repositories';
+    const { query_params } = req.body as { query_params?: Record<string, string> };
+
+    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    if (!tokenRow?.value) {
+      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      return;
+    }
+
+    let token: string;
+    try {
+      token = decrypt(tokenRow.value, config.encryptionKey);
+    } catch {
+      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      return;
+    }
+
+    const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
+    const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'GithubStarsManager-Backend',
+    };
+
+    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers });
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    console.error('GitHub search repositories proxy error:', err);
+    res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
+  }
+});
+
+// POST /api/proxy/github/search/users
+router.post('/api/proxy/github/search/users', async (req, res) => {
+  try {
+    const db = getDb();
+    const githubPath = 'search/users';
+    const { query_params } = req.body as { query_params?: Record<string, string> };
+
+    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    if (!tokenRow?.value) {
+      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      return;
+    }
+
+    let token: string;
+    try {
+      token = decrypt(tokenRow.value, config.encryptionKey);
+    } catch {
+      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      return;
+    }
+
+    const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
+    const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'GithubStarsManager-Backend',
+    };
+
+    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers });
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    console.error('GitHub search users proxy error:', err);
+    res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
+  }
+});
+
 export default router;
