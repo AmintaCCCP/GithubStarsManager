@@ -285,6 +285,50 @@ const normalizePersistedState = (
       }
       return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
     })(),
+    // 确保 subscription 相关状态包含 trending 键
+    subscriptionRepos: {
+      'most-stars': [],
+      'most-forks': [],
+      'most-dev': [],
+      'trending': [],
+      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
+    },
+    subscriptionLastRefresh: {
+      'most-stars': null,
+      'most-forks': null,
+      'most-dev': null,
+      'trending': null,
+      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
+    },
+    subscriptionIsLoading: {
+      'most-stars': false,
+      'most-forks': false,
+      'most-dev': false,
+      'trending': false,
+      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
+    },
+    // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
+    subscriptionChannels: (() => {
+      const persisted = safePersisted.subscriptionChannels;
+      const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
+      if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
+      // 合并：使用 persisted 的频道，但补全缺失的字段（nameEn、trending 等）
+      return persisted.map((ch: SubscriptionChannel) => {
+        const defaultCh = defaultChannelsMap.get(ch.id);
+        if (defaultCh) {
+          return {
+            ...ch,
+            name: defaultCh.name, // 始终使用中文名称（默认定义）
+            nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
+            icon: ch.icon || defaultCh.icon,
+            description: ch.description || defaultCh.description,
+          };
+        }
+        return ch;
+      }).concat(
+        defaultSubscriptionChannels.filter(dch => !persisted.some((ch: SubscriptionChannel) => ch.id === dch.id))
+      );
+    })(),
   };
 };
 
@@ -1121,6 +1165,42 @@ export const useAppStore = create<AppState & AppActions>()(
 
   if (state && !state.selectedDiscoveryChannel) {
     state.selectedDiscoveryChannel = 'trending';
+  }
+  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
+  const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
+  if (state && !Array.isArray(state.subscriptionChannels)) {
+    console.log('Migrating: initializing subscription channels');
+    state.subscriptionChannels = defaultSubscriptionChannels;
+  } else if (state && Array.isArray(state.subscriptionChannels)) {
+    state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
+      const defaultCh = defaultChannelsMap.get(ch.id as string);
+      if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
+        return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+      }
+      if (defaultCh) {
+        return {
+          ...ch,
+          name: defaultCh.name, // 始终使用中文名称
+          nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
+          icon: ch.icon || defaultCh.icon,
+          description: ch.description || defaultCh.description,
+        };
+      }
+      return ch;
+    });
+    // 确保 trending 频道存在（如果缺失则添加）
+    const hasTrending = state.subscriptionChannels.some((ch: Record<string, unknown>) => ch.id === 'trending');
+    if (!hasTrending) {
+      console.log('Migrating: adding trending channel');
+      state.subscriptionChannels.push({
+        id: 'trending',
+        name: '热门趋势',
+        nameEn: 'Trending',
+        icon: '🔥',
+        description: 'GitHub 上近期最受关注的项目 Top 10',
+        enabled: true,
+      });
+    }
   }
   if (state && !state.discoveryPlatform) {
     state.discoveryPlatform = 'All';
