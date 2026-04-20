@@ -514,11 +514,13 @@ export class GitHubApiService {
       platform,
     }));
 
+    const MAX_SEARCH_RESULTS = 1000;
+    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
     return {
       repos,
-      hasMore: repos.length === perPage,
+      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
       nextPageIndex: page + 1,
-      totalCount: data.total_count,
+      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
     };
   }
 
@@ -546,11 +548,13 @@ export class GitHubApiService {
       platform,
     }));
 
+    const MAX_SEARCH_RESULTS = 1000;
+    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
     return {
       repos,
-      hasMore: repos.length === perPage,
+      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
       nextPageIndex: page + 1,
-      totalCount: data.total_count,
+      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
     };
   }
 
@@ -579,11 +583,13 @@ export class GitHubApiService {
       platform,
     }));
 
+    const MAX_SEARCH_RESULTS = 1000;
+    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
     return {
       repos,
-      hasMore: repos.length === perPage,
+      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
       nextPageIndex: page + 1,
-      totalCount: data.total_count,
+      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
     };
   }
 
@@ -611,11 +617,13 @@ export class GitHubApiService {
       platform,
     }));
 
+    const MAX_SEARCH_RESULTS = 1000;
+    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
     return {
       repos,
-      hasMore: repos.length === perPage,
+      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
       nextPageIndex: page + 1,
-      totalCount: data.total_count,
+      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
     };
   }
 
@@ -671,11 +679,13 @@ export class GitHubApiService {
       platform,
     }));
 
+    const MAX_SEARCH_RESULTS = 1000;
+    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
     return {
       repos,
-      hasMore: repos.length === perPage,
+      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
       nextPageIndex: page + 1,
-      totalCount: data.total_count,
+      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
     };
   }
 
