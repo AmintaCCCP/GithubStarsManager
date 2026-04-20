@@ -273,13 +273,10 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
-    discoveryRepos: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        return persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-      }
-      return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-    })(),
+    discoveryRepos: {
+      trending: [], 'hot-release': [], 'most-popular': [], topic: [], search: [],
+      ...((safePersisted as Record<string, unknown>).discoveryRepos as Record<DiscoveryChannelId, DiscoveryRepo[]> || {}),
+    },
     discoveryLastRefresh: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {

@@ -855,9 +855,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
           if (result.success && result.repo) {
             const updatedRepo: DiscoveryRepo = {
               ...result.repo,
-              rank: 0,
-              channel: selectedDiscoveryChannel,
-              platform: discoveryPlatform,
               ai_summary: result.summary,
               ai_tags: result.tags,
               ai_platforms: result.platforms,
@@ -868,9 +865,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
           } else if (!result.success && result.repo) {
             const failedRepo: DiscoveryRepo = {
               ...result.repo,
-              rank: 0,
-              channel: selectedDiscoveryChannel,
-              platform: discoveryPlatform,
               analyzed_at: new Date().toISOString(),
               analysis_failed: true,
             };
