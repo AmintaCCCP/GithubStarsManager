@@ -226,6 +226,28 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
+    // 确保 subscription 相关状态包含 trending 键
+    subscriptionRepos: {
+      'most-stars': [],
+      'most-forks': [],
+      'most-dev': [],
+      'trending': [],
+      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
+    },
+    subscriptionLastRefresh: {
+      'most-stars': null,
+      'most-forks': null,
+      'most-dev': null,
+      'trending': null,
+      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
+    },
+    subscriptionIsLoading: {
+      'most-stars': false,
+      'most-forks': false,
+      'most-dev': false,
+      'trending': false,
+      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
+    },
   };
 };
 
@@ -1014,6 +1036,19 @@ export const useAppStore = create<AppState & AppActions>()(
       }
       return ch;
     });
+    // 确保 trending 频道存在（如果缺失则添加）
+    const hasTrending = state.subscriptionChannels.some((ch: Record<string, unknown>) => ch.id === 'trending');
+    if (!hasTrending) {
+      console.log('Migrating: adding trending channel');
+      state.subscriptionChannels.push({
+        id: 'trending',
+        name: '热门趋势',
+        nameEn: 'Trending',
+        icon: '🔥',
+        description: 'GitHub 上近期最受关注的项目 Top 10',
+        enabled: true,
+      });
+    }
   }
   if (state && !state.selectedSubscriptionChannel) {
     state.selectedSubscriptionChannel = 'most-stars';
