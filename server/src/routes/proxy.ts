@@ -1,3 +1,4 @@
+import { parseStringPromise } from 'xml2js';
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { decrypt } from '../services/crypto.js';
@@ -255,38 +256,38 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
   }
 });
 
+
 // POST /api/proxy/github/trending
 router.post('/api/proxy/github/trending', async (req, res) => {
   try {
-    const { since = 'daily', language } = req.body as { since?: string; language?: string };
+    const { since = 'daily', language = 'all' } = req.body as { since?: string; language?: string };
     
-    // 构建请求 URL
-    let url = 'https://github.com/trending';
-    if (language) {
-      url += `/${encodeURIComponent(language)}`;
-    }
-    url += `?since=${since}`;
+    // 使用 GitHubTrendingRSS 服务
+    const langPath = language.toLowerCase().replace(/ /g, '-');
+    const url = `https://mshibanami.github.io/GitHubTrendingRSS/${since}/${langPath}.xml`;
     
-    const headers: Record<string, string> = {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    };
+    const result = await proxyRequest({ url, method: 'GET' });
     
-    const result = await proxyRequest({ url, method: 'GET', headers });
-    
-    // 解析 HTML 提取 trending 数据
     if (result.status === 200 && typeof result.data === 'string') {
-      const repos = parseTrendingHtml(result.data);
+      const repos = await parseTrendingRss(result.data, since);
       res.json(repos);
     } else {
-      res.status(result.status).json(result.data);
+      // 如果 RSS 失败，尝试回退到之前的网页爬取
+      const webUrl = `https://github.com/trending/${language === 'all' ? '' : language}?since=${since}`;
+      const webResult = await proxyRequest({ url: webUrl, method: 'GET' });
+      if (webResult.status === 200 && typeof webResult.data === 'string') {
+        const repos = parseTrendingHtml(webResult.data);
+        res.json(repos);
+      } else {
+        res.status(result.status).json(result.data);
+      }
     }
   } catch (err) {
     console.error('GitHub trending proxy error:', err);
     res.status(500).json({ error: 'GitHub trending proxy failed', code: 'GITHUB_TRENDING_PROXY_FAILED' });
   }
 });
+
 
 // 解析 GitHub Trending HTML 页面
 function parseTrendingHtml(html: string): Array<{
