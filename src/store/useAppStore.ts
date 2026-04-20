@@ -1008,9 +1008,20 @@ export const useAppStore = create<AppState & AppActions>()(
     console.log('Migrating: initializing subscription channels');
     state.subscriptionChannels = defaultSubscriptionChannels;
   } else if (state && Array.isArray(state.subscriptionChannels)) {
+    // 检查是否缺少 trending 频道
+    const hasTrending = state.subscriptionChannels.some((ch: Record<string, unknown>) => ch.id === 'trending');
+    if (!hasTrending) {
+      console.log('Migrating: adding trending channel');
+      state.subscriptionChannels = [...state.subscriptionChannels, defaultSubscriptionChannels[3]];
+    }
+    // 更新频道名称和图标
     state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
       if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
         return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+      }
+      if (ch.id === 'trending') {
+        // 确保 trending 频道有正确的名称
+        return { ...ch, name: '热门趋势', nameEn: 'Trending', icon: '🔥' };
       }
       return ch;
     });
