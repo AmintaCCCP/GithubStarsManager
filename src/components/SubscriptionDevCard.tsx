@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ExternalLink, Bot, Star, Users, BookOpen } from 'lucide-react';
+import { ExternalLink, Bot, Star, Users, BookOpen, Monitor, Smartphone, Globe, Terminal, Package } from 'lucide-react';
 import type { SubscriptionDev } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -26,12 +26,20 @@ export const SubscriptionDevCard: React.FC<SubscriptionDevCardProps> = ({ dev })
   }, [dev.rank]);
 
   const platformIconMap = useMemo(() => ({
-    mac: '🍎', macos: '🍎', ios: '🍎', windows: '🪟', win: '🪟',
-    linux: '🐧', android: '📱', web: '🌐', cli: '⌨️', docker: '🐳',
+    mac: <Monitor className="w-3 h-3" />, 
+    macos: <Monitor className="w-3 h-3" />, 
+    ios: <Smartphone className="w-3 h-3" />, 
+    windows: <Monitor className="w-3 h-3" />, 
+    win: <Monitor className="w-3 h-3" />,
+    linux: <Monitor className="w-3 h-3" />, 
+    android: <Smartphone className="w-3 h-3" />, 
+    web: <Globe className="w-3 h-3" />, 
+    cli: <Terminal className="w-3 h-3" />, 
+    docker: <Package className="w-3 h-3" />,
   }), []);
 
-  const getPlatformEmoji = (platform: string) => {
-    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || '💻';
+  const getPlatformIcon = (platform: string) => {
+    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
   };
 
   return (
@@ -153,12 +161,17 @@ export const SubscriptionDevCard: React.FC<SubscriptionDevCardProps> = ({ dev })
 
                   {/* Platform icons for top repo */}
                   {dev.topRepo.ai_platforms && dev.topRepo.ai_platforms.length > 0 && (
-                    <div className="flex items-center gap-1 mb-2">
-                      {dev.topRepo.ai_platforms.slice(0, 5).map((platform: string) => (
-                        <span key={platform} className="text-xs" title={platform}>
-                          {getPlatformEmoji(platform)}
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        平台:
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {dev.topRepo.ai_platforms.slice(0, 5).map((platform: string) => (
+                          <span key={platform} className="text-gray-500 dark:text-gray-400" title={platform}>
+                            {getPlatformIcon(platform)}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
 
