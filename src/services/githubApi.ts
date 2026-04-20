@@ -651,7 +651,7 @@ export class GitHubApiService {
     const platformQuery = this.buildPlatformQuery(platform);
     const languageQuery = this.buildLanguageQuery(language);
     const { sort, order } = this.buildSortParams(sortBy, sortOrder);
-    
+
     let searchQuery = `${query} archived:false`;
     if (platformQuery) {
       searchQuery += ` ${platformQuery}`;
@@ -660,9 +660,12 @@ export class GitHubApiService {
       searchQuery += ` ${languageQuery}`;
     }
 
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(searchQuery)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
-    );
+    let url = `/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&page=${page}`;
+    if (sort) {
+      url += `&sort=${sort}&order=${order}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(url);
 
     const repos = (data.items || []).map((repo, index) => ({
       ...repo,
