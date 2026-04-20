@@ -36,6 +36,7 @@ export const SubscriptionView: React.FC = React.memo(() => {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
+  const [trendingTimeRange, setTrendingTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
@@ -66,17 +67,11 @@ export const SubscriptionView: React.FC = React.memo(() => {
         const repos = await githubApi.searchMostForks(10);
         setSubscriptionRepos('most-forks', repos);
       } else if (normalizedId === 'most-dev') {
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
         const devs = await githubApi.searchDailyDevs(10);
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
         setSubscriptionDevs(devs);
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
+      } else if (normalizedId === 'trending') {
+        const repos = await githubApi.searchTrending(10, trendingTimeRange);
+        setSubscriptionRepos('trending', repos);
       }
       setSubscriptionLastRefresh(normalizedId, new Date().toISOString());
     } catch (err) {
@@ -85,7 +80,7 @@ export const SubscriptionView: React.FC = React.memo(() => {
     } finally {
       setSubscriptionLoading(normalizedId, false);
     }
-  }, [githubToken, t, setSubscriptionLoading, setSubscriptionRepos, setSubscriptionDevs, setSubscriptionLastRefresh]);
+  }, [githubToken, t, setSubscriptionLoading, setSubscriptionRepos, setSubscriptionDevs, setSubscriptionLastRefresh, trendingTimeRange]);
 
   const refreshAll = useCallback(async () => {
     const enabledChannels = subscriptionChannels.filter(ch => ch.enabled);
@@ -276,6 +271,23 @@ export const SubscriptionView: React.FC = React.memo(() => {
               </span>
             )}
           </div>
+          {/* Trending 时间筛选 */}
+          {normalizedChannel === 'trending' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400">{t('时间:', 'Time:')}</span>
+                <select
+                  value={trendingTimeRange}
+                  onChange={(e) => setTrendingTimeRange(e.target.value as 'daily' | 'weekly' | 'monthly')}
+                  className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <option value="daily">{t('今日', 'Today')}</option>
+                  <option value="weekly">{t('本周', 'Week')}</option>
+                  <option value="monthly">{t('本月', 'Month')}</option>
+                </select>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             {isAnalyzingThisChannel && (
               <div className="flex items-center gap-2 mr-2">
