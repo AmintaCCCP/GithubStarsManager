@@ -1081,6 +1081,15 @@ export const useAppStore = create<AppState & AppActions>()(
           currentState as AppState & AppActions
         );
 
+        // Debug: 打印 subscriptionChannels 状态
+        console.log('Merge debug:', {
+          'currentState.subscriptionChannels.length': currentState.subscriptionChannels?.length,
+          'currentState.subscriptionChannels': currentState.subscriptionChannels?.map(c => c.id),
+          'normalized.subscriptionChannels.length': normalized.subscriptionChannels?.length,
+          'normalized.subscriptionChannels': normalized.subscriptionChannels?.map(c => c.id),
+          'safePersisted.subscriptionChannels': (persistedState as PersistedAppState | undefined)?.subscriptionChannels?.map(c => c.id),
+        });
+
         console.log('Store rehydrated:', {
           isAuthenticated: normalized.isAuthenticated,
           repositoriesCount: normalized.repositories?.length || 0,
