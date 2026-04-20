@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Star, GitFork, User, Flame } from 'lucide-react';
 import type { SubscriptionChannel, SubscriptionChannelId } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -38,9 +38,31 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
     return date.toLocaleDateString();
   };
 
-  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => 
-    ch.id === 'daily-dev' ? { ...ch, id: 'most-dev' as const, name: 'Most DEV', nameEn: 'Most DEV', icon: '👤' } : ch
-  );
+  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => {
+    // 将Emoji图标替换为Lucide React图标
+    let icon: React.ReactNode;
+    switch (ch.id) {
+      case 'most-stars':
+        icon = <Star className="w-4 h-4" />;
+        break;
+      case 'most-forks':
+        icon = <GitFork className="w-4 h-4" />;
+        break;
+      case 'most-dev':
+      case 'daily-dev':
+        icon = <User className="w-4 h-4" />;
+        break;
+      case 'trending':
+        icon = <Flame className="w-4 h-4" />;
+        break;
+      default:
+        icon = <Star className="w-4 h-4" />;
+    }
+    
+    return ch.id === 'daily-dev' 
+      ? { ...ch, id: 'most-dev' as const, name: 'Most DEV', nameEn: 'Most DEV', icon } 
+      : { ...ch, icon };
+  });
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 
   return (
@@ -77,7 +99,7 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
-                  <span className="text-base flex-shrink-0">{channel.icon}</span>
+                  <span className="w-4 h-4 flex-shrink-0">{channel.icon}</span>
                   <div className="min-w-0">
                     <span className="text-sm font-medium truncate block">
                       {language === 'zh' ? channel.name : channel.nameEn}
