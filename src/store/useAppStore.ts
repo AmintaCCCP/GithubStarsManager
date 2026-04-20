@@ -19,7 +19,9 @@ import {
   ProgrammingLanguage,
   SortBy,
   SortOrder,
-  TopicCategory
+  TopicCategory,
+  SubscriptionChannel,
+  defaultSubscriptionChannels
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -199,6 +201,10 @@ type PersistedAppState = Partial<
     | 'discoveryLanguage'
     | 'discoverySortBy'
     | 'discoverySortOrder'
+    | 'subscriptionRepos'
+    | 'subscriptionLastRefresh'
+    | 'subscriptionIsLoading'
+    | 'subscriptionChannels'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -309,24 +315,25 @@ const normalizePersistedState = (
     },
     // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
     subscriptionChannels: (() => {
-      const persisted = safePersisted.subscriptionChannels;
+      const persisted = (safePersisted as Record<string, unknown>).subscriptionChannels;
       const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
       if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
       // 合并：使用 persisted 的频道，但补全缺失的字段（nameEn、trending 等）
-      return persisted.map((ch: SubscriptionChannel) => {
-        const defaultCh = defaultChannelsMap.get(ch.id);
+      return persisted.map((ch: unknown) => {
+        const chRecord = ch as Record<string, unknown>;
+        const defaultCh = defaultChannelsMap.get(chRecord.id as string);
         if (defaultCh) {
           return {
-            ...ch,
+            ...(chRecord as Partial<SubscriptionChannel>),
             name: defaultCh.name, // 始终使用中文名称（默认定义）
-            nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
-            icon: ch.icon || defaultCh.icon,
-            description: ch.description || defaultCh.description,
-          };
+            nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
+            icon: (chRecord.icon as string) || defaultCh.icon,
+            description: (chRecord.description as string) || defaultCh.description,
+          } as unknown as SubscriptionChannel;
         }
-        return ch;
+        return chRecord as unknown as SubscriptionChannel;
       }).concat(
-        defaultSubscriptionChannels.filter(dch => !persisted.some((ch: SubscriptionChannel) => ch.id === dch.id))
+        defaultSubscriptionChannels.filter(dch => !persisted.some((ch: unknown) => (ch as Record<string, unknown>).id === dch.id))
       );
     })(),
   };
@@ -537,6 +544,12 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
       discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
       discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+
+      // Subscription
+      subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
+      subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
+      subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
+      subscriptionChannels: defaultSubscriptionChannels,
 
       // Auth actions
       setUser: (user) => {
@@ -1172,24 +1185,25 @@ export const useAppStore = create<AppState & AppActions>()(
     console.log('Migrating: initializing subscription channels');
     state.subscriptionChannels = defaultSubscriptionChannels;
   } else if (state && Array.isArray(state.subscriptionChannels)) {
-    state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
-      const defaultCh = defaultChannelsMap.get(ch.id as string);
-      if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
-        return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+    state.subscriptionChannels = state.subscriptionChannels.map((ch: unknown) => {
+      const chRecord = ch as Record<string, unknown>;
+      const defaultCh = defaultChannelsMap.get(chRecord.id as string);
+      if (chRecord.id === 'daily-dev' || chRecord.id === 'most-dev') {
+        return { ...chRecord, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' } as unknown as SubscriptionChannel;
       }
       if (defaultCh) {
         return {
-          ...ch,
+          ...(chRecord as Partial<SubscriptionChannel>),
           name: defaultCh.name, // 始终使用中文名称
-          nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
-          icon: ch.icon || defaultCh.icon,
-          description: ch.description || defaultCh.description,
-        };
+          nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
+          icon: (chRecord.icon as string) || defaultCh.icon,
+          description: (chRecord.description as string) || defaultCh.description,
+        } as unknown as SubscriptionChannel;
       }
-      return ch;
+      return chRecord as unknown as SubscriptionChannel;
     });
     // 确保 trending 频道存在（如果缺失则添加）
-    const hasTrending = state.subscriptionChannels.some((ch: Record<string, unknown>) => ch.id === 'trending');
+    const hasTrending = state.subscriptionChannels.some((ch: SubscriptionChannel) => ch.id === 'trending');
     if (!hasTrending) {
       console.log('Migrating: adding trending channel');
       state.subscriptionChannels.push({
@@ -1199,7 +1213,7 @@ export const useAppStore = create<AppState & AppActions>()(
         icon: '🔥',
         description: 'GitHub 上近期最受关注的项目 Top 10',
         enabled: true,
-      });
+      } as SubscriptionChannel);
     }
   }
   if (state && !state.discoveryPlatform) {
