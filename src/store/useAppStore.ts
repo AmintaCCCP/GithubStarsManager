@@ -259,8 +259,8 @@ const normalizePersistedState = (
         if (defaultCh) {
           return {
             ...ch,
-            name: ch.name || defaultCh.name,
-            nameEn: ch.nameEn || defaultCh.nameEn,
+            name: defaultCh.name, // 始终使用中文名称（默认定义）
+            nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
             icon: ch.icon || defaultCh.icon,
             description: ch.description || defaultCh.description,
           };
@@ -1061,8 +1061,8 @@ export const useAppStore = create<AppState & AppActions>()(
       if (defaultCh) {
         return {
           ...ch,
-          name: ch.name || defaultCh.name,
-          nameEn: ch.nameEn || defaultCh.nameEn,
+          name: defaultCh.name, // 始终使用中文名称
+          nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
           icon: ch.icon || defaultCh.icon,
           description: ch.description || defaultCh.description,
         };

@@ -277,27 +277,70 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly', language?: string): Promise<SubscriptionRepo[]> {
-    // timeRange: 获取指定时间段内创建的项目
-    const daysMap = { daily: 1, weekly: 7, monthly: 30 };
-    const days = daysMap[timeRange];
-    const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly', _language?: string): Promise<SubscriptionRepo[]> {
+    // 使用 GitHubTrendingRSS API
+    const rssUrl = `https://mshibanami.github.io/GitHubTrendingRSS/${timeRange}/all.xml`;
 
-    // 构建查询：创建时间 + 语言（可选）
-    let query = `created:>${sinceDate}+stars:>50`;
-    if (language && language !== 'all') {
-      query += `+language:${language}`;
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`RSS fetch failed: ${response.status}`);
+      }
+
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const repos: SubscriptionRepo[] = [];
+      items.forEach((item, index) => {
+        if (index >= perPage) return;
+
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        const description = item.querySelector('description')?.textContent || '';
+        const author = item.querySelector('author')?.textContent || '';
+
+        // 解析 link 获取 owner/repo 格式
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+        const owner = match?.[1] || '';
+        const repoName = match?.[2] || title;
+
+        // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
+        const starsMatch = description.match(/⭐\s*([\d,]+)/);
+        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+
+        repos.push({
+          id: index + 1,
+          name: repoName,
+          full_name: `${owner}/${repoName}`,
+          description: description.slice(0, 200),
+          html_url: link,
+          stargazers_count: stars,
+          forks_count: forks,
+          language: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pushed_at: new Date().toISOString(),
+          owner: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+          topics: [],
+          rank: index + 1,
+          channel: 'trending',
+          forks_count: forks,
+        });
+      });
+
+      return repos;
+    } catch (error) {
+      console.error('Failed to fetch trending from RSS:', error);
+      // Fallback to empty array
+      return [];
     }
-
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${query}&sort=stars&order=desc&per_page=${perPage}`
-    );
-    return (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: index + 1,
-      channel: 'trending' as const,
-      forks_count: repo.forks_count,
-    }));
   }
 
   async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
