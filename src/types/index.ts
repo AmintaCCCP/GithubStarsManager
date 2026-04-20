@@ -232,6 +232,7 @@ export interface SubscriptionRepo extends Repository {
   channel: SubscriptionChannelId;
   forks?: number;
   forks_count?: number;
+  stars_today?: number;  // Trending 特有字段：今日新增 star 数
 }
 
 export interface SubscriptionDev {

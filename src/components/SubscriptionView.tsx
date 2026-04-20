@@ -59,25 +59,7 @@ export const SubscriptionView: React.FC = React.memo(() => {
     setSubscriptionLoading(normalizedId, true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      if (normalizedId === 'most-stars') {
-        const repos = await githubApi.searchMostStars(10);
-        setSubscriptionRepos('most-stars', repos);
-      } else if (normalizedId === 'most-forks') {
-        const repos = await githubApi.searchMostForks(10);
-        setSubscriptionRepos('most-forks', repos);
-      } else if (normalizedId === 'most-dev') {
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
-        const devs = await githubApi.searchDailyDevs(10);
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
-        setSubscriptionDevs(devs);
-    } else if (normalizedId === 'trending') {
-      const repos = await githubApi.searchTrending(10);
-      setSubscriptionRepos('trending', repos);
-      }
+      if (normalizedId === 'most-stars') { const repos = await githubApi.searchMostStars(10); setSubscriptionRepos('most-stars', repos); } else if (normalizedId === 'most-forks') { const repos = await githubApi.searchMostForks(10); setSubscriptionRepos('most-forks', repos); } else if (normalizedId === 'most-dev') { const devs = await githubApi.searchDailyDevs(10); setSubscriptionDevs(devs); } else if (normalizedId === 'trending') { const repos = await githubApi.searchTrending(25); setSubscriptionRepos('trending', repos); }
       setSubscriptionLastRefresh(normalizedId, new Date().toISOString());
     } catch (err) {
       console.error(`Failed to refresh subscription channel ${channelId}:`, err);

@@ -277,18 +277,49 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
-    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
-    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
-    );
-    return (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: index + 1,
-      channel: 'trending' as const,
-      forks_count: repo.forks_count,
-    }));
+  async searchTrending(perPage = 25, since: 'daily' | 'weekly' | 'monthly' = 'daily'): Promise<SubscriptionRepo[]> {
+    // 调用后端 API 获取真正的 GitHub Trending 数据
+    try {
+      const response = await fetch('/api/proxy/github/trending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ since, per_page: perPage }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`GitHub trending API error: ${response.status}`);
+      }
+      
+      const trendingRepos = await response.json();
+      
+      return (trendingRepos || []).slice(0, perPage).map((repo: {
+        name: string;
+        owner: string;
+        full_name: string;
+        html_url: string;
+        description: string;
+        language: string | null;
+        stars: number;
+        forks: number;
+        stars_today: number;
+      }, index: number) => ({
+        id: repo.full_name,
+        name: repo.name,
+        full_name: repo.full_name,
+        owner: { login: repo.owner },
+        html_url: repo.html_url,
+        description: repo.description || '',
+        language: repo.language,
+        stargazers_count: repo.stars,
+        forks_count: repo.forks,
+        stars_today: repo.stars_today,
+        rank: index + 1,
+        channel: 'trending' as const,
+      }));
+    } catch (error) {
+      console.error('Failed to fetch trending repos:', error);
+      return [];
+    }
   }
 
   async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {

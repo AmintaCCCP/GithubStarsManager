@@ -255,6 +255,125 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
   }
 });
 
+// POST /api/proxy/github/trending
+router.post('/api/proxy/github/trending', async (req, res) => {
+  try {
+    const { since = 'daily', language } = req.body as { since?: string; language?: string };
+    
+    // 构建请求 URL
+    let url = 'https://github.com/trending';
+    if (language) {
+      url += `/${encodeURIComponent(language)}`;
+    }
+    url += `?since=${since}`;
+    
+    const headers: Record<string, string> = {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+    
+    const result = await proxyRequest({ url, method: 'GET', headers });
+    
+    // 解析 HTML 提取 trending 数据
+    if (result.status === 200 && typeof result.data === 'string') {
+      const repos = parseTrendingHtml(result.data);
+      res.json(repos);
+    } else {
+      res.status(result.status).json(result.data);
+    }
+  } catch (err) {
+    console.error('GitHub trending proxy error:', err);
+    res.status(500).json({ error: 'GitHub trending proxy failed', code: 'GITHUB_TRENDING_PROXY_FAILED' });
+  }
+});
+
+// 解析 GitHub Trending HTML 页面
+function parseTrendingHtml(html: string): Array<{
+  name: string;
+  owner: string;
+  full_name: string;
+  html_url: string;
+  description: string;
+  language: string | null;
+  language_color: string | null;
+  stars: number;
+  forks: number;
+  stars_today: number;
+  since: string;
+}> {
+  const repos: Array<{
+    name: string;
+    owner: string;
+    full_name: string;
+    html_url: string;
+    description: string;
+    language: string | null;
+    language_color: string | null;
+    stars: number;
+    forks: number;
+    stars_today: number;
+    since: string;
+  }> = [];
+  
+  // 简单的正则匹配解析 (生产环境应该用 cheerio 等库)
+  const articleRegex = /<article[^>]*class="[^"]*Box-row[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
+  let match;
+  
+  while ((match = articleRegex.exec(html)) !== null) {
+    const article = match[1];
+    
+    // 提取 repo 名称和链接
+    const repoLinkMatch = article.match(/<h2[^>]*>[\s\S]*?<a[^>]*href="\/([^"/]+)\/([^"/]+)"[^>]*>/i);
+    if (!repoLinkMatch) continue;
+    
+    const owner = repoLinkMatch[1].trim();
+    const name = repoLinkMatch[2].trim();
+    const full_name = `${owner}/${name}`;
+    const html_url = `https://github.com/${owner}/${name}`;
+    
+    // 提取描述
+    const descMatch = article.match(/<p[^>]*class="[^"]*col-9[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+    const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+    
+    // 提取语言
+    const langMatch = article.match(/<span[^>]*itemprop="programmingLanguage"[^>]*>([^<]+)<\/span>/i);
+    const language = langMatch ? langMatch[1].trim() : null;
+    
+    // 提取语言颜色
+    const colorMatch = article.match(/<span[^>]*class="[^"]*repo-language-color[^"]*"[^>]*style="background-color:\s*([^;"]+)/i);
+    const language_color = colorMatch ? colorMatch[1].trim() : null;
+    
+    // 提取 star 数
+    const starsMatch = article.match(/<a[^>]*href="[^"]*\/stargazers"[^>]*>[\s\S]*?<\/svg>\s*([\d,]+)/i);
+    const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, ''), 10) : 0;
+    
+    // 提取 fork 数
+    const forksMatch = article.match(/<a[^>]*href="[^"]*\/forks"[^>]*>[\s\S]*?<\/svg>\s*([\d,]+)/i);
+    const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, ''), 10) : 0;
+    
+    // 提取今日新增 star
+    const starsTodayMatch = article.match(/([\d,]+)\s*stars\s*today/i);
+    const stars_today = starsTodayMatch ? parseInt(starsTodayMatch[1].replace(/,/g, ''), 10) : 0;
+    
+    repos.push({
+      name,
+      owner,
+      full_name,
+      html_url,
+      description,
+      language,
+      language_color,
+      stars,
+      forks,
+      stars_today,
+      since: 'daily',
+    });
+  }
+  
+  return repos;
+}
+
 // POST /api/proxy/github/search/users
 router.post('/api/proxy/github/search/users', async (req, res) => {
   try {

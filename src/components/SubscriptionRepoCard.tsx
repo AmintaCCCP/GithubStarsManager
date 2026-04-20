@@ -147,7 +147,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               <span>{formatNumber(repo.forks_count ?? repo.forks ?? 0)}</span>
             </div>
           </div>
-        </div>
+ {repo.stars_today !== undefined && repo.stars_today > 0 && (
+ <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+ <span className="text-xs font-medium">+{formatNumber(repo.stars_today)}</span>
+ <span className="text-xs">{t('今日', 'today')}</span>
+ </div>
+ )}
+ </div>
       </div>
     </div>
   );
