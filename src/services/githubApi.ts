@@ -271,6 +271,184 @@ export class GitHubApiService {
     }
   }
 
+  async searchMostStars(perPage = 10): Promise<SubscriptionRepo[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=stars:>1000&sort=stars&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'most-stars' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
+  async searchMostForks(perPage = 10): Promise<SubscriptionRepo[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=forks:>1000&sort=forks&order=desc&per_page=${perPage}`
+    );
+    return (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: index + 1,
+      channel: 'most-forks' as const,
+      forks_count: repo.forks_count,
+    }));
+  }
+
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly'): Promise<SubscriptionRepo[]> {
+    // 使用 GitHubTrendingRSS API
+    const rssUrl = `https://mshibanami.github.io/GitHubTrendingRSS/${timeRange}/all.xml`;
+
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`RSS fetch failed: ${response.status}`);
+      }
+
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const repos: SubscriptionRepo[] = [];
+      for (let i = 0; i < Math.min(items.length, perPage); i++) {
+        const item = items[i];
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        // description 可能包含 HTML，需要解码
+        const descriptionEl = item.querySelector('description');
+        let description = descriptionEl?.textContent || '';
+        // 解码 HTML 实体
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        description = tempDiv.textContent || tempDiv.innerText || description;
+        // 清理多余空白
+        description = description.replace(/\s+/g, ' ').trim();
+
+        // 解析 link 获取 owner/repo 格式
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
+        const owner = match?.[1] || '';
+        const repoName = match?.[2] || title;
+
+        // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
+        const starsMatch = description.match(/⭐\s*([\d,]+)/);
+        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        let stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        let forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+
+        repos.push({
+          id: i + 1,
+          name: repoName,
+          full_name: `${owner}/${repoName}`,
+          description: description.slice(0, 200),
+          html_url: link,
+          stargazers_count: stars,
+          forks_count: forks,
+          language: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pushed_at: new Date().toISOString(),
+          owner: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+          topics: [],
+          rank: i + 1,
+          channel: 'trending',
+          forks_count: forks,
+        });
+      }
+
+      // 如果 stars 或 forks 为 0，从 GitHub API 获取
+      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0);
+      if (reposNeedUpdate.length > 0) {
+        await Promise.all(reposNeedUpdate.map(async (r) => {
+          try {
+            const [owner, repo] = r.full_name.split('/');
+            if (!owner || !repo) return;
+            const data = await this.makeRequest<{
+              stargazers_count: number;
+              forks_count: number;
+              language: string | null;
+              description: string | null;
+            }>(`/repos/${owner}/${repo}`);
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.forks_count = data.forks_count ?? r.forks_count;
+            r.language = data.language;
+            if (data.description && !r.description) {
+              r.description = data.description;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+          }
+          // 避免 GitHub API 限流
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }));
+      }
+
+      return repos;
+    } catch (error) {
+      console.error('Failed to fetch trending from RSS:', error);
+      return [];
+    }
+  }
+
+  async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
+    const usersData = await this.makeRequest<GitHubSearchUserResponse>(
+      `/search/users?q=followers:>1000&sort=followers&order=desc&per_page=${perPage}`
+    );
+
+    const devs: SubscriptionDev[] = [];
+    for (let i = 0; i < (usersData.items || []).length; i++) {
+      const searchUser = usersData.items[i];
+
+      // The search API only returns basic fields; fetch the full profile for name/bio/followers/public_repos
+      let userDetail: GitHubUserDetail = {
+        login: searchUser.login,
+        avatar_url: searchUser.avatar_url,
+        html_url: searchUser.html_url,
+        name: null,
+        bio: null,
+        public_repos: 0,
+        followers: 0,
+      };
+      try {
+        userDetail = await this.makeRequest<GitHubUserDetail>(`/users/${searchUser.login}`);
+      } catch {
+      }
+
+      let topRepo: SubscriptionRepo | null = null;
+      try {
+        const reposData = await this.makeRequest<Repository[]>(
+          `/users/${searchUser.login}/repos?sort=stars&per_page=1`
+        );
+        if (reposData && reposData.length > 0) {
+          topRepo = {
+            ...reposData[0],
+            rank: 1,
+            channel: 'most-dev' as const,
+          };
+        }
+      } catch {
+      }
+      devs.push({
+        rank: i + 1,
+        login: userDetail.login,
+        avatar_url: userDetail.avatar_url,
+        html_url: userDetail.html_url,
+        name: userDetail.name,
+        bio: userDetail.bio,
+        public_repos: userDetail.public_repos,
+        followers: userDetail.followers,
+        topRepo,
+      });
+      if (i < (usersData.items || []).length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+    }
+    return devs;
+  }
+
   private buildLanguageQuery(language: ProgrammingLanguage): string {
     if (language === 'All') return '';
     const languageMap: Record<ProgrammingLanguage, string> = {
