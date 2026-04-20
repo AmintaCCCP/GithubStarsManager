@@ -210,6 +210,12 @@ export interface AppState {
   discoveryNextPage: Record<DiscoveryChannelId, number>;
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
+
+  // Subscription
+  subscriptionRepos: Record<string, SubscriptionRepo[]>;
+  subscriptionLastRefresh: Record<string, string | null>;
+  subscriptionIsLoading: Record<string, boolean>;
+  subscriptionChannels: SubscriptionChannel[];
 }
 
 export interface UpdateNotification {
@@ -288,3 +294,85 @@ export interface TopicInfo {
   nameEn: string;
   keywords: string;
 }
+
+// Subscription related types
+export interface SubscriptionRepo extends Repository {
+  rank: number;
+  channel: 'most-stars' | 'most-forks' | 'most-dev' | 'trending';
+}
+
+export interface SubscriptionDev {
+  rank: number;
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  topRepo: SubscriptionRepo | null;
+}
+
+// GitHub API response types
+export interface GitHubSearchUserResponse {
+  items: Array<{
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  }>;
+}
+
+export interface GitHubUserDetail {
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+}
+
+// Subscription channel types
+export interface SubscriptionChannel {
+  id: string;
+  name: string;
+  nameEn: string;
+  icon: string;
+  description: string;
+  enabled: boolean;
+}
+
+export const defaultSubscriptionChannels: SubscriptionChannel[] = [
+  {
+    id: 'most-stars',
+    name: '最多星标',
+    nameEn: 'Most Stars',
+    icon: '⭐',
+    description: 'GitHub 上星标数最多的项目 Top 10',
+    enabled: true,
+  },
+  {
+    id: 'most-forks',
+    name: '最多复刻',
+    nameEn: 'Most Forks',
+    icon: '🍴',
+    description: 'GitHub 上复刻数最多的项目 Top 10',
+    enabled: true,
+  },
+  {
+    id: 'most-dev',
+    name: '热门开发者',
+    nameEn: 'Top Developers',
+    icon: '👤',
+    description: 'GitHub 上最受关注的开发者 Top 10',
+    enabled: true,
+  },
+  {
+    id: 'trending',
+    name: '热门趋势',
+    nameEn: 'Trending',
+    icon: '🔥',
+    description: 'GitHub 上近期最受关注的项目 Top 10',
+    enabled: true,
+  },
+];

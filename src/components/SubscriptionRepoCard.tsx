@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Bookmark, BookmarkCheck, Sparkles, BookOpen } from 'lucide-react';
-import type { DiscoveryRepo, Category } from '../types';
+import type { DiscoveryRepo } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';

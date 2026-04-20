@@ -8,7 +8,11 @@ import {
   SortOrder, 
   PaginatedDiscoveryRepositories,
   DiscoveryChannelId,
-  TopicCategory
+  TopicCategory,
+  SubscriptionRepo,
+  SubscriptionDev,
+  GitHubSearchUserResponse,
+  GitHubUserDetail
 } from '../types';
 
 interface GitHubStarredItem {
@@ -279,7 +283,6 @@ export class GitHubApiService {
       ...repo,
       rank: index + 1,
       channel: 'most-stars' as const,
-      forks_count: repo.forks_count,
     }));
   }
 
@@ -347,6 +350,7 @@ export class GitHubApiService {
           html_url: link,
           stargazers_count: stars,
           forks_count: forks,
+          forks: forks,
           language: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -355,7 +359,6 @@ export class GitHubApiService {
           topics: [],
           rank: i + 1,
           channel: 'trending',
-          forks_count: forks,
         });
       }
 
