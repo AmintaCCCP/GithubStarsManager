@@ -277,18 +277,102 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
-    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
-    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
-    );
-    return (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: index + 1,
-      channel: 'trending' as const,
-      forks_count: repo.forks_count,
-    }));
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly'): Promise<SubscriptionRepo[]> {
+    // 使用 GitHubTrendingRSS API
+    const rssUrl = `https://mshibanami.github.io/GitHubTrendingRSS/${timeRange}/all.xml`;
+
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`RSS fetch failed: ${response.status}`);
+      }
+
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const repos: SubscriptionRepo[] = [];
+      for (let i = 0; i < Math.min(items.length, perPage); i++) {
+        const item = items[i];
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        // description 可能包含 HTML，需要解码
+        const descriptionEl = item.querySelector('description');
+        let description = descriptionEl?.textContent || '';
+        // 解码 HTML 实体
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        description = tempDiv.textContent || tempDiv.innerText || description;
+        // 清理多余空白
+        description = description.replace(/\s+/g, ' ').trim();
+
+        // 解析 link 获取 owner/repo 格式
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
+        const owner = match?.[1] || '';
+        const repoName = match?.[2] || title;
+
+        // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
+        const starsMatch = description.match(/⭐\s*([\d,]+)/);
+        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        let stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        let forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+
+        repos.push({
+          id: i + 1,
+          name: repoName,
+          full_name: `${owner}/${repoName}`,
+          description: description.slice(0, 200),
+          html_url: link,
+          stargazers_count: stars,
+          forks_count: forks,
+          language: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pushed_at: new Date().toISOString(),
+          owner: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+          topics: [],
+          rank: i + 1,
+          channel: 'trending',
+          forks_count: forks,
+        });
+      }
+
+      // 如果 stars 或 forks 为 0，从 GitHub API 获取
+      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0);
+      if (reposNeedUpdate.length > 0) {
+        await Promise.all(reposNeedUpdate.map(async (r) => {
+          try {
+            const [owner, repo] = r.full_name.split('/');
+            if (!owner || !repo) return;
+            const data = await this.makeRequest<{
+              stargazers_count: number;
+              forks_count: number;
+              language: string | null;
+              description: string | null;
+            }>(`/repos/${owner}/${repo}`);
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.forks_count = data.forks_count ?? r.forks_count;
+            r.language = data.language;
+            if (data.description && !r.description) {
+              r.description = data.description;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+          }
+          // 避免 GitHub API 限流
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }));
+      }
+
+      return repos;
+    } catch (error) {
+      console.error('Failed to fetch trending from RSS:', error);
+      return [];
+    }
   }
 
   async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
