@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
 import type { DiscoveryRepo } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
@@ -35,6 +35,14 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 取消Star确认对话框状态
   const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
   const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
   
   // 检查仓库是否已在本地存在（已被Star）
   const isStarredComputed = useMemo(() => {
@@ -205,10 +213,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
     if (isAnalyzing) return;
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsAnalyzing(true);
 
     try {
-      // 使用 store 中的工具函数合并分类，避免重复定义合并逻辑
       const allCategories = getAllCategories(customCategories, language);
 
       const result = await analyzeRepository({
@@ -217,7 +228,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         aiConfig: activeConfig,
         language,
         categories: allCategories,
+        signal: controller.signal,
       });
+
+      if (controller.signal.aborted) return;
 
       const updatedRepo: DiscoveryRepo = {
         ...repo,
@@ -233,17 +247,21 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         onAnalyze(updatedRepo);
       }
     } catch (error) {
-      console.error('AI analysis error:', error);
-      const failedResult = createFailedAnalysisResult();
-      const failedRepo: DiscoveryRepo = {
-        ...repo,
-        analyzed_at: failedResult.analyzed_at,
-        analysis_failed: failedResult.analysis_failed,
-      };
-      updateDiscoveryRepo(failedRepo);
-      alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+      if (!controller.signal.aborted) {
+        console.error('AI analysis error:', error);
+        const failedResult = createFailedAnalysisResult();
+        const failedRepo: DiscoveryRepo = {
+          ...repo,
+          analyzed_at: failedResult.analyzed_at,
+          analysis_failed: failedResult.analysis_failed,
+        };
+        updateDiscoveryRepo(failedRepo);
+        alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+      }
     } finally {
-      setIsAnalyzing(false);
+      if (!controller.signal.aborted) {
+        setIsAnalyzing(false);
+      }
     }
   }, [githubToken, aiConfigs, activeAIConfig, language, repo, isAnalyzing, customCategories, updateDiscoveryRepo, onAnalyze, t]);
 
