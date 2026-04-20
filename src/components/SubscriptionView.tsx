@@ -36,6 +36,8 @@ export const SubscriptionView: React.FC = React.memo(() => {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
+  const [trendingTimeRange, setTrendingTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [trendingLanguage, setTrendingLanguage] = useState<string>('');
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
@@ -69,7 +71,7 @@ export const SubscriptionView: React.FC = React.memo(() => {
         const devs = await githubApi.searchDailyDevs(10);
         setSubscriptionDevs(devs);
       } else if (normalizedId === 'trending') {
-        const repos = await githubApi.searchTrending(10);
+        const repos = await githubApi.searchTrending(10, trendingTimeRange, trendingLanguage || undefined);
         setSubscriptionRepos('trending', repos);
       }
       setSubscriptionLastRefresh(normalizedId, new Date().toISOString());
@@ -79,7 +81,7 @@ export const SubscriptionView: React.FC = React.memo(() => {
     } finally {
       setSubscriptionLoading(normalizedId, false);
     }
-  }, [githubToken, t, setSubscriptionLoading, setSubscriptionRepos, setSubscriptionDevs, setSubscriptionLastRefresh]);
+  }, [githubToken, t, setSubscriptionLoading, setSubscriptionRepos, setSubscriptionDevs, setSubscriptionLastRefresh, trendingTimeRange, trendingLanguage]);
 
   const refreshAll = useCallback(async () => {
     const enabledChannels = subscriptionChannels.filter(ch => ch.enabled);
@@ -270,6 +272,35 @@ export const SubscriptionView: React.FC = React.memo(() => {
               </span>
             )}
           </div>
+          {/* Trending 筛选器 */}
+          {normalizedChannel === 'trending' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 时间范围筛选 */}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400">{t('时间:', 'Time:')}</span>
+                <select
+                  value={trendingTimeRange}
+                  onChange={(e) => setTrendingTimeRange(e.target.value as 'daily' | 'weekly' | 'monthly')}
+                  className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <option value="daily">{t('今日', 'Today')}</option>
+                  <option value="weekly">{t('本周', 'Week')}</option>
+                  <option value="monthly">{t('本月', 'Month')}</option>
+                </select>
+              </div>
+              {/* 语言筛选 */}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400">{t('语言:', 'Lang:')}</span>
+                <input
+                  type="text"
+                  value={trendingLanguage}
+                  onChange={(e) => setTrendingLanguage(e.target.value)}
+                  placeholder={t('如 python', 'e.g. python')}
+                  className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 w-20 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                />
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             {isAnalyzingThisChannel && (
               <div className="flex items-center gap-2 mr-2">

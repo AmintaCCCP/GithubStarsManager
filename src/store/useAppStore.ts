@@ -248,22 +248,27 @@ const normalizePersistedState = (
       'trending': false,
       ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
     },
-    // 确保 subscriptionChannels 包含 trending（合并默认频道）
+    // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
     subscriptionChannels: (() => {
       const persisted = safePersisted.subscriptionChannels;
+      const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
       if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
-      // 检查是否已有 trending
-      const hasTrending = persisted.some((ch: SubscriptionChannel) => ch.id === 'trending');
-      if (hasTrending) return persisted;
-      // 添加 trending 频道
-      return [...persisted, {
-        id: 'trending',
-        name: '热门趋势',
-        nameEn: 'Trending',
-        icon: '🔥',
-        description: 'GitHub 上近期最受关注的项目 Top 10',
-        enabled: true,
-      }];
+      // 合并：使用 persisted 的频道，但补全缺失的字段（nameEn、trending 等）
+      return persisted.map((ch: SubscriptionChannel) => {
+        const defaultCh = defaultChannelsMap.get(ch.id);
+        if (defaultCh) {
+          return {
+            ...ch,
+            name: ch.name || defaultCh.name,
+            nameEn: ch.nameEn || defaultCh.nameEn,
+            icon: ch.icon || defaultCh.icon,
+            description: ch.description || defaultCh.description,
+          };
+        }
+        return ch;
+      }).concat(
+        defaultSubscriptionChannels.filter(dch => !persisted.some((ch: SubscriptionChannel) => ch.id === dch.id))
+      );
     })(),
   };
 };
@@ -1042,14 +1047,25 @@ export const useAppStore = create<AppState & AppActions>()(
           }
         }
 
-  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending）
+  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
+  const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
   if (state && !Array.isArray(state.subscriptionChannels)) {
     console.log('Migrating: initializing subscription channels');
     state.subscriptionChannels = defaultSubscriptionChannels;
   } else if (state && Array.isArray(state.subscriptionChannels)) {
     state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
+      const defaultCh = defaultChannelsMap.get(ch.id as string);
       if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
         return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+      }
+      if (defaultCh) {
+        return {
+          ...ch,
+          name: ch.name || defaultCh.name,
+          nameEn: ch.nameEn || defaultCh.nameEn,
+          icon: ch.icon || defaultCh.icon,
+          description: ch.description || defaultCh.description,
+        };
       }
       return ch;
     });
@@ -1080,15 +1096,6 @@ export const useAppStore = create<AppState & AppActions>()(
           persistedState as PersistedAppState | undefined,
           currentState as AppState & AppActions
         );
-
-        // Debug: 打印 subscriptionChannels 状态
-        console.log('Merge debug:', {
-          'currentState.subscriptionChannels.length': currentState.subscriptionChannels?.length,
-          'currentState.subscriptionChannels': currentState.subscriptionChannels?.map(c => c.id),
-          'normalized.subscriptionChannels.length': normalized.subscriptionChannels?.length,
-          'normalized.subscriptionChannels': normalized.subscriptionChannels?.map(c => c.id),
-          'safePersisted.subscriptionChannels': (persistedState as PersistedAppState | undefined)?.subscriptionChannels?.map(c => c.id),
-        });
 
         console.log('Store rehydrated:', {
           isAuthenticated: normalized.isAuthenticated,

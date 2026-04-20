@@ -277,12 +277,20 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
-    // 获取过去 30 天内创建且 Star 较多的项目（模拟 Trending 效果）
-    // GitHub Search API 不支持"近期获得星标数"过滤，故用创建时间+星标数近似 trending
-    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly', language?: string): Promise<SubscriptionRepo[]> {
+    // timeRange: 获取指定时间段内创建的项目
+    const daysMap = { daily: 1, weekly: 7, monthly: 30 };
+    const days = daysMap[timeRange];
+    const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // 构建查询：创建时间 + 语言（可选）
+    let query = `created:>${sinceDate}+stars:>50`;
+    if (language && language !== 'all') {
+      query += `+language:${language}`;
+    }
+
     const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=created:>${lastMonth}+stars:>100&sort=stars&order=desc&per_page=${perPage}`
+      `/search/repositories?q=${query}&sort=stars&order=desc&per_page=${perPage}`
     );
     return (data.items || []).map((repo, index) => ({
       ...repo,
