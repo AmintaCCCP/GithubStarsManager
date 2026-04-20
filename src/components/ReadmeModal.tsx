@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
@@ -225,7 +225,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           aria-modal="true"
           aria-labelledby="readme-modal-title"
           tabIndex={-1}
-          className="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-xl shadow-xl transform transition-all max-h-[90vh] flex flex-col"
+          className="relative w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl transform transition-all max-h-[90vh] flex flex-col"
+          style={{ maxWidth: '1130px' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -326,7 +327,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             <div 
               ref={contentRef}
               onScroll={handleScroll}
-              className={`flex-1 overflow-y-auto p-6 ${currentFontSize}`}
+              className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text`}
             >
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
