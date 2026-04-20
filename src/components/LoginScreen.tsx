@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Github, Key, ArrowRight, AlertCircle, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
+import { safeReadText } from '../utils/clipboardUtils';
 
 export const LoginScreen: React.FC = () => {
   const [token, setToken] = useState('');
@@ -48,15 +49,13 @@ export const LoginScreen: React.FC = () => {
 
     // 兼容桌面端首次登录场景下 Ctrl/Cmd + V 无法触发默认粘贴的问题
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && !isLoading) {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          setToken(text.trim());
-          setError('');
-        }
-      } catch (error) {
-        // 忽略读取剪贴板失败，让浏览器/系统默认行为继续兜底
-        console.warn('Clipboard read failed:', error);
+      const result = await safeReadText();
+      if (result.success && result.text) {
+        setToken(result.text.trim());
+        setError('');
+      } else {
+        // 读取剪贴板失败，让浏览器/系统默认行为继续兜底
+        console.warn('Clipboard read failed:', result.error);
       }
     }
   };

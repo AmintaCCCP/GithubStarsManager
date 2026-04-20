@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare } from 'lucide-react';
+import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare, Loader2 } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { resolveCategoryAssignment, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
-import { GitHubApiService } from '../services/githubApi';
-import { AIService } from '../services/aiService';
-import { backend } from '../services/backendAdapter';
+import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
+import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
+import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
@@ -93,8 +92,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     toggleReleaseSubscription,
     githubToken,
     activeAIConfig,
-    isLoading,
-    setLoading,
+    analyzingRepositoryIds,
+    setAnalyzingRepository,
     language,
     updateRepository,
     deleteRepository
@@ -105,8 +104,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         toggleReleaseSubscription: state.toggleReleaseSubscription,
         githubToken: state.githubToken,
         activeAIConfig: state.activeAIConfig,
-        isLoading: state.isLoading,
-        setLoading: state.setLoading,
+        analyzingRepositoryIds: state.analyzingRepositoryIds,
+        setAnalyzingRepository: state.setAnalyzingRepository,
         language: state.language,
         updateRepository: state.updateRepository,
         deleteRepository: state.deleteRepository
@@ -115,6 +114,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     ),
     shallow
   );
+
+  const isAnalyzing = analyzingRepositoryIds.has(repoId);
+
+  // 组件卸载时清理分析状态
+  useEffect(() => {
+    return () => {
+      setAnalyzingRepository(repoId, false);
+    };
+  }, [repoId, setAnalyzingRepository]);
 
   const aiConfigs = useAppStore(state => state.aiConfigs);
 
@@ -268,7 +276,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return;
     }
 
-    // 如果已经分析过，询问用户是否要重新分析
     if (repository.analyzed_at) {
       const confirmMessage = language === 'zh'
         ? `此仓库已于 ${new Date(repository.analyzed_at).toLocaleString()} 进行过AI分析。\n\n是否要重新分析？这将覆盖现有的分析结果。`
@@ -279,36 +286,25 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       }
     }
 
-    setLoading(true);
+    setAnalyzingRepository(repoId, true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
-      const aiService = new AIService(activeConfig, language);
-
-      // 获取README内容
-      const [owner, name] = repository.full_name.split('/');
-      const readmeContent = backend.isAvailable
-        ? await backend.getRepositoryReadme(owner, name)
-        : await githubApi.getRepositoryReadme(owner, name);
-
-      // 获取可用分类名称列表
-      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
-
-      // AI分析
-      const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames);
-      const resolvedCategory = resolveCategoryAssignment(repository, analysis.tags, allCategories);
-
-      const wasCategoryLocked = !!repository.category_locked;
-      const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
+      const result = await analyzeRepository({
+        repository,
+        githubToken,
+        aiConfig: activeConfig,
+        language,
+        categories: allCategories,
+      });
 
       const updatedRepo = {
         ...repository,
-        ai_summary: analysis.summary,
-        ai_tags: analysis.tags,
-        ai_platforms: analysis.platforms,
-        custom_category: resolvedCategory,
-        category_locked: shouldKeepLocked || wasCategoryLocked,
-        analyzed_at: new Date().toISOString(),
-        analysis_failed: false
+        ai_summary: result.summary,
+        ai_tags: result.tags,
+        ai_platforms: result.platforms,
+        custom_category: result.custom_category,
+        category_locked: result.category_locked,
+        analyzed_at: result.analyzed_at,
+        analysis_failed: result.analysis_failed
       };
 
       updateRepository(updatedRepo);
@@ -321,18 +317,18 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     } catch (error) {
       console.error('AI analysis failed:', error);
       
-      // 标记为分析失败
+      const failedResult = createFailedAnalysisResult();
       const failedRepo = {
         ...repository,
-        analyzed_at: new Date().toISOString(),
-        analysis_failed: true
+        analyzed_at: failedResult.analyzed_at,
+        analysis_failed: failedResult.analysis_failed
       };
       
       updateRepository(failedRepo);
       
       alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
     } finally {
-      setLoading(false);
+      setAnalyzingRepository(repoId, false);
     }
   };
 
@@ -773,7 +769,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div className="flex items-center space-x-2">
           <SelectionAwareButton
             onClick={handleAIAnalyze}
-            disabled={isLoading}
+            disabled={isAnalyzing}
             selectionMode={selectionMode}
             className={`${
               repository.analysis_failed
@@ -784,7 +780,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             }`}
             title={aiButtonTitle}
           >
-            <Bot className="w-4 h-4" />
+            {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
           </SelectionAwareButton>
           <SelectionAwareButton
             onClick={() => toggleReleaseSubscription(repository.id)}
