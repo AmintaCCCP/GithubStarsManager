@@ -5,6 +5,11 @@ export interface VersionInfo {
   downloadUrl: string;
 }
 
+import { PROJECT_REPO_URL } from '../constants/project';
+
+const REPO_OWNER = PROJECT_REPO_URL.split('/').slice(-2).join('/');
+const VERSION_INFO_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/main/versions/version-info.xml`;
+
 export interface UpdateCheckResult {
   hasUpdate: boolean;
   currentVersion: string;
@@ -12,7 +17,7 @@ export interface UpdateCheckResult {
 }
 
 export class UpdateService {
-  private static readonly REPO_URL = 'https://raw.githubusercontent.com/AmintaCCCP/GithubStarsManager/main/versions/version-info.xml';
+  private static readonly REPO_URL = VERSION_INFO_URL;
 
   private static getCurrentVersion(): string {
     // 在实际应用中，这个版本号应该在构建时注入

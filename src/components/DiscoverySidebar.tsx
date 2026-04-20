@@ -1,7 +1,14 @@
 import React from 'react';
-import { RefreshCw, Star, Rocket, Tag, Search, TrendingUp } from 'lucide-react';
-import type { DiscoveryChannel, DiscoveryChannelId } from '../types';
-import { Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'lucide-react';
+import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
+
+const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
+  trending: <TrendingUp className="w-4 h-4" />,
+  rocket: <Rocket className="w-4 h-4" />,
+  star: <Crown className="w-4 h-4" />,
+  tag: <Tag className="w-4 h-4" />,
+  search: <Search className="w-4 h-4" />,
+};
 
 interface DiscoverySidebarProps {
   channels: DiscoveryChannel[];
@@ -39,30 +46,10 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
     return date.toLocaleDateString();
   };
 
-  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => {
-    let icon: React.ReactNode;
-    switch (ch.id) {
-      case 'trending':
-        icon = <TrendingUp className="w-4 h-4" />;
-        break;
-      case 'hot-release':
-        icon = <Rocket className="w-4 h-4" />;
-        break;
-      case 'most-popular':
-        icon = <Star className="w-4 h-4" />;
-        break;
-      case 'topic':
-        icon = <Tag className="w-4 h-4" />;
-        break;
-      case 'search':
-        icon = <Search className="w-4 h-4" />;
-        break;
-      default:
-        icon = <Star className="w-4 h-4" />;
-    }
-    
-    return { ...ch, icon };
-  });
+  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => ({
+    ...ch,
+    icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
+  }));
   
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 

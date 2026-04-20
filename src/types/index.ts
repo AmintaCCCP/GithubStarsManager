@@ -256,11 +256,13 @@ export type SortOrder = 'Descending' | 'Ascending';
 
 export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search';
 
+export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'search';
+
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;
   name: string;
   nameEn: string;
-  icon: string;
+  icon: DiscoveryChannelIcon;
   description: string;
   enabled: boolean;
 }

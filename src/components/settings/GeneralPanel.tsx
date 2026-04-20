@@ -3,6 +3,7 @@ import { Globe, Package, Mail, ExternalLink, Github, Twitter } from 'lucide-reac
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { version } from '../../../package.json';
+import { PROJECT_REPO_URL } from '../../constants/project';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -118,7 +119,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           
           <button
             onClick={() => {
-              const newWindow = window.open('https://github.com/AmintaCCCP/GithubStarsManager', '_blank', 'noopener,noreferrer');
+              const newWindow = window.open(PROJECT_REPO_URL, '_blank', 'noopener,noreferrer');
               if (newWindow) {
                 newWindow.opener = null;
               }

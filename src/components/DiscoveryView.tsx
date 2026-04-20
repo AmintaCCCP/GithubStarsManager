@@ -8,6 +8,7 @@ import {
   Rocket, 
   Tag, 
   Search,
+  Crown,
   Filter,
   ChevronDown,
   ChevronLeft,
@@ -16,7 +17,8 @@ import {
   Apple,
   Terminal,
   Smartphone,
-  Globe
+  Globe,
+  X
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -25,8 +27,10 @@ import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
+import { ScrollToBottom } from './ScrollToBottom';
 import type { 
   DiscoveryChannelId, 
+  DiscoveryChannelIcon,
   DiscoveryRepo, 
   DiscoveryPlatform, 
   ProgrammingLanguage,
@@ -34,6 +38,14 @@ import type {
   SortOrder,
   TopicCategory 
 } from '../types';
+
+const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
+  trending: <TrendingUp className="w-4 h-4" />,
+  rocket: <Rocket className="w-4 h-4" />,
+  star: <Crown className="w-4 h-4" />,
+  tag: <Tag className="w-4 h-4" />,
+  search: <Search className="w-4 h-4" />,
+};
 
 interface MobileTabNavProps {
   channels: { id: DiscoveryChannelId; name: string; nameEn: string; icon: React.ReactNode }[];
@@ -216,7 +228,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
       >
         <Filter className="w-4 h-4" />
-        <span className="hidden sm:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
+        <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -396,6 +408,117 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
   );
 };
 
+interface CompactPaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  language: 'zh' | 'en';
+  totalCount: number;
+}
+
+const CompactPagination: React.FC<CompactPaginationProps> = ({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  language,
+  totalCount 
+}) => {
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const [inputPage, setInputPage] = useState<string>(currentPage.toString());
+  const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setInputPage(currentPage.toString());
+    }
+  }, [currentPage, isEditing]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '' || /^\d*$/.test(value)) {
+      setInputPage(value);
+    }
+  };
+
+  const handleInputSubmit = () => {
+    const pageNum = parseInt(inputPage, 10);
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+      onPageChange(pageNum);
+    } else {
+      setInputPage(currentPage.toString());
+    }
+    setIsEditing(false);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleInputSubmit();
+    } else if (e.key === 'Escape') {
+      setInputPage(currentPage.toString());
+      setIsEditing(false);
+    }
+  };
+
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title={t('上一页', 'Previous')}
+      >
+        <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+      </button>
+      
+      <span className="hidden xl:inline text-xs text-gray-500 dark:text-gray-400">
+        {t('共', 'Total')} {totalCount}
+      </span>
+      
+      <div className="flex items-center gap-1">
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputPage}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            onBlur={handleInputSubmit}
+            className="w-10 px-1.5 py-0.5 text-xs text-center border border-blue-500 rounded focus:outline-none dark:bg-gray-700 dark:text-white"
+          />
+        ) : (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="w-10 px-1.5 py-0.5 text-xs text-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:border-blue-500 transition-colors dark:text-white"
+            title={t('点击跳转', 'Click to jump')}
+          >
+            {currentPage}
+          </button>
+        )}
+        <span className="text-xs text-gray-500 dark:text-gray-400">/ {totalPages}</span>
+      </div>
+      
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title={t('下一页', 'Next')}
+      >
+        <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+      </button>
+    </div>
+  );
+};
+
 export const DiscoveryView: React.FC = React.memo(() => {
   const {
     githubToken,
@@ -439,6 +562,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
+  const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
   
   // 当前页码状态（从1开始）
@@ -464,10 +588,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 从 store 获取当前频道的总数量
   const currentTotalCount = discoveryTotalCount?.[selectedDiscoveryChannel] ?? 0;
 
-  // 计算总页数（基于 API 返回的总数量，而不是已加载的数据长度）
   const totalPages = useMemo(() => {
-    return Math.ceil(currentTotalCount / ITEMS_PER_PAGE);
-  }, [currentTotalCount]);
+    if (currentTotalCount > 0) {
+      return Math.ceil(currentTotalCount / ITEMS_PER_PAGE);
+    }
+    if (allRepos.length > 0) {
+      return Math.ceil(allRepos.length / ITEMS_PER_PAGE);
+    }
+    return 0;
+  }, [currentTotalCount, allRepos.length]);
 
   // 获取当前页显示的仓库
   const currentPageRepos = useMemo(() => {
@@ -658,6 +787,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
 
     setIsAnalyzing(true);
+    setAnalysisState({ paused: false, aborted: false });
     const allCategories = useAppStore
       .getState()
       .customCategories.map(c => c.name);
@@ -735,16 +865,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [githubToken, aiConfigs, activeAIConfig, language, currentPageRepos, t, updateDiscoveryRepo, setAnalysisProgress]);
 
-  const handlePauseAnalysis = useCallback(() => {
-    analysisOptimizer?.pause();
-  }, [analysisOptimizer]);
 
-  const handleResumeAnalysis = useCallback(() => {
-    analysisOptimizer?.resume();
-  }, [analysisOptimizer]);
 
   const handleAbortAnalysis = useCallback(() => {
     analysisOptimizer?.abort();
+    setAnalysisState(prev => ({ ...prev, aborted: true }));
   }, [analysisOptimizer]);
 
   const isAnalyzingThisChannel = isAnalyzing && (
@@ -778,29 +903,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const mobileChannels = useMemo(() => {
     return discoveryChannels
       .filter(ch => ch.enabled)
-      .map(ch => {
-        let icon: React.ReactNode;
-        switch (ch.id) {
-          case 'trending':
-            icon = <TrendingUp className="w-4 h-4" />;
-            break;
-          case 'hot-release':
-            icon = <Rocket className="w-4 h-4" />;
-            break;
-          case 'most-popular':
-            icon = <Star className="w-4 h-4" />;
-            break;
-          case 'topic':
-            icon = <Tag className="w-4 h-4" />;
-            break;
-          case 'search':
-            icon = <Search className="w-4 h-4" />;
-            break;
-          default:
-            icon = <Star className="w-4 h-4" />;
-        }
-        return { ...ch, icon };
-      });
+      .map(ch => ({
+        ...ch,
+        icon: discoveryChannelIconMap[ch.icon] || <Star className="w-4 h-4" />,
+      }));
   }, [discoveryChannels]);
 
   return (
@@ -848,108 +954,123 @@ export const DiscoveryView: React.FC = React.memo(() => {
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
-            <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-blue-500" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon}{' '}
-                  {language === 'zh'
-                    ? discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.name
-                    : discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
-                </h2>
-                {/* Sort Algorithm Tooltip */}
-                <SortAlgorithmTooltip 
-                  channelId={selectedDiscoveryChannel} 
-                  language={language} 
-                />
-                {currentLastRefresh && (
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
-                  </span>
-                )}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-3.5 sm:p-4 mb-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20">
+              {/* 第一行：标题和刷新按钮 */}
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight flex items-center gap-2">
+                      {discoveryChannelIconMap[discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending']}
+                      {language === 'zh'
+                        ? discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.name
+                        : discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
+                    </h2>
+                    {currentLastRefresh && (
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block">
+                        {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="relative group/refresh shrink-0">
+                  <button
+                    onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
+                    disabled={currentIsLoading || isAnalyzing}
+                    className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={t('刷新', 'Refresh')}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  {selectedDiscoveryChannel === 'hot-release' && (
+                    <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
+                      <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                        {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
+                      </div>
+                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45" />
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              
+              {/* 第二行：筛选和操作按钮 */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'topic' && (
                   <select
                     value={discoverySelectedTopic || ''}
                     onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
-                    <option value="">{t('选择主题', 'Select Topic')}</option>
+                    <option value="">{t('主题', 'Topic')}</option>
                     <option value="ai">{t('人工智能', 'AI')}</option>
-                    <option value="ml">{t('机器学习', 'Machine Learning')}</option>
-                    <option value="database">{t('数据库', 'Database')}</option>
-                    <option value="web">{t('Web开发', 'Web Development')}</option>
-                    <option value="mobile">{t('移动开发', 'Mobile Development')}</option>
+                    <option value="ml">{t('机器学习', 'ML')}</option>
+                    <option value="database">{t('数据库', 'DB')}</option>
+                    <option value="web">{t('Web开发', 'Web')}</option>
+                    <option value="mobile">{t('移动开发', 'Mobile')}</option>
                     <option value="devtools">{t('开发工具', 'DevTools')}</option>
                     <option value="security">{t('安全', 'Security')}</option>
                     <option value="game">{t('游戏', 'Game')}</option>
                   </select>
                 )}
-                <PlatformFilter 
-                  platform={discoveryPlatform} 
-                  onPlatformChange={setDiscoveryPlatform} 
-                  language={language}
-                />
-                {isAnalyzingThisChannel && (
-                  <div className="flex items-center gap-2 mr-2">
-                    <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{
-                          width: analysisProgress.total > 0
-                            ? `${(analysisProgress.current / analysisProgress.total) * 100}%`
-                            : '0%',
-                        }}
-                      />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <PlatformFilter 
+                    platform={discoveryPlatform} 
+                    onPlatformChange={setDiscoveryPlatform} 
+                    language={language}
+                  />
+                  <SortAlgorithmTooltip 
+                    channelId={selectedDiscoveryChannel} 
+                    language={language} 
+                  />
+                  {isAnalyzingThisChannel ? (
+                    <div className="flex items-center gap-1">
+                      <div className="relative">
+                        <div className="px-2 py-1.5 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 flex items-center gap-1.5 overflow-hidden">
+                          <div 
+                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-purple-300/70 via-purple-400/70 to-purple-300/70 dark:from-purple-700/70 dark:via-purple-600/70 dark:to-purple-700/70 transition-all duration-400 ease-out"
+                            style={{
+                              width: analysisProgress.total > 0
+                                ? `${Math.min((analysisProgress.current / analysisProgress.total) * 100, 100)}%`
+                                : '0%',
+                            }}
+                          />
+                          <div className="relative flex items-center gap-1.5 z-10">
+                            <Bot className="w-4 h-4" />
+                            <span className="text-xs font-medium">
+                              {analysisProgress.current}/{analysisProgress.total}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleAbortAnalysis}
+                        className="p-1.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                        title={t('停止', 'Stop')}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {analysisProgress.current}/{analysisProgress.total}
-                    </span>
-                    {analysisOptimizer && !analysisOptimizer.isPaused() && (
-                      <button
-                        onClick={handlePauseAnalysis}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title={t('暂停', 'Pause')}
-                      >
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      </button>
-                    )}
-                    {analysisOptimizer && analysisOptimizer.isPaused() && (
-                      <button
-                        onClick={handleResumeAnalysis}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title={t('继续', 'Resume')}
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-                    )}
+                  ) : (
                     <button
-                      onClick={handleAbortAnalysis}
-                      className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
-                      title={t('停止', 'Stop')}
+                      onClick={handleAnalyzePage}
+                      disabled={isAnalyzing || currentIsLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={t('AI分析当前页', 'Analyze current page with AI')}
                     >
-                      ✕
+                      <Bot className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('AI分析', 'AI Analyze')}</span>
                     </button>
-                  </div>
-                )}
-                <button
-                  onClick={handleAnalyzePage}
-                  disabled={isAnalyzing || currentIsLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={t('AI分析当前页', 'Analyze current page with AI')}
-                >
-                  <Bot className="w-4 h-4" />
-                  {t('AI分析本页', 'AI Analyze Page')}
-                </button>
-                <button
-                  onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
-                  disabled={currentIsLoading || isAnalyzing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
-                  {t('刷新', 'Refresh')}
-                </button>
+                  )}
+                  <CompactPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    language={language}
+                    totalCount={currentTotalCount || allRepos.length}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -961,30 +1082,34 @@ export const DiscoveryView: React.FC = React.memo(() => {
             className="flex-1 overflow-y-auto space-y-4 pr-2"
           >
             {selectedDiscoveryChannel === 'search' && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder={t('搜索仓库...', 'Search repositories...')}
-                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20">
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      type="text"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      placeholder={t('搜索仓库...', 'Search repositories...')}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/80 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    />
+                  </div>
                   <button
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
-                    className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium"
                   >
                     <Search className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
                   </button>
                 </div>
                 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2.5">
                   <select
                     value={discoveryLanguage}
                     onChange={(e) => setDiscoveryLanguage(e.target.value as ProgrammingLanguage)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="All">{t('所有语言', 'All Languages')}</option>
                     <option value="JavaScript">JavaScript</option>
@@ -1006,7 +1131,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySortBy}
                     onChange={(e) => setDiscoverySortBy(e.target.value as SortBy)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="BestMatch">{t('最佳匹配', 'Best Match')}</option>
                     <option value="MostStars">{t('最多Star', 'Most Stars')}</option>
@@ -1016,7 +1141,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySortOrder}
                     onChange={(e) => setDiscoverySortOrder(e.target.value as SortOrder)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="Descending">{t('降序', 'Descending')}</option>
                     <option value="Ascending">{t('升序', 'Ascending')}</option>
@@ -1025,7 +1150,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoveryPlatform}
                     onChange={(e) => setDiscoveryPlatform(e.target.value as DiscoveryPlatform)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="All">{t('所有平台', 'All Platforms')}</option>
                     <option value="iOS">iOS</option>
@@ -1039,20 +1164,45 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {currentIsLoading && allRepos.length === 0 && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-                <span className="text-gray-500 dark:text-gray-400">
-                  {t('加载中...', 'Loading...')}
-                </span>
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+                    <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-ping opacity-75" />
+                </div>
+                <div className="text-center space-y-1.5">
+                  <p className="text-gray-700 dark:text-gray-300 font-medium text-sm">
+                    {t('正在获取数据...', 'Fetching data...')}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {t('GitHub API 响应中', 'Waiting for GitHub API response')}
+                  </p>
+                </div>
               </div>
             )}
 
             {!currentIsLoading && allRepos.length === 0 && (
-              <div className="text-center py-12">
-                <TrendingUp className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500 dark:text-gray-400 mb-2">
-                  {t('暂无数据，点击刷新按钮获取排行', 'No data yet. Click refresh to fetch rankings.')}
-                </p>
+              <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <TrendingUp className="w-9 h-9 text-gray-300 dark:text-gray-600" />
+                </div>
+                <div className="space-y-2 max-w-xs">
+                  <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
+                    {t('暂无数据', 'No data yet')}
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+                    {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
+                  disabled={currentIsLoading}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {t('立即刷新', 'Refresh Now')}
+                </button>
               </div>
             )}
 
@@ -1064,15 +1214,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {/* Page Info */}
             {allRepos.length > 0 && (
-              <div className="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-600 dark:text-gray-400">
-                <span>
-                  {t('共', 'Total')} {allRepos.length} {t('个项目', 'items')}，
-                  {t('第', 'Page')} {currentPage}/{totalPages} {t('页', 'pages')}
-                </span>
-                {currentHasMore && (
-                  <span className="text-blue-500">
-                    {t('还有更多数据可加载', 'More data available')}
+              <div className="flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-gray-100 dark:border-gray-700/50 text-sm">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>
+                    {t('共', 'Total')} <strong className="text-gray-900 dark:text-white">{currentTotalCount || allRepos.length}</strong> {t('个项目', 'items')}
+                    {totalPages > 1 && (
+                      <> · {t('第', 'Page')} <strong>{currentPage}/{totalPages}</strong> {t('页', 'pages')}</>
+                    )}
                   </span>
+                </div>
+                {currentHasMore && (
+                  <div className="flex items-center gap-1.5 text-blue-500 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    {t('还有更多', 'More available')}
+                  </div>
                 )}
               </div>
             )}
@@ -1087,24 +1243,30 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {/* Load More Button */}
             {currentHasMore && (
-              <div className="flex justify-center py-2">
+              <div className="flex justify-center py-4">
                 <button
                   onClick={() => refreshChannel(selectedDiscoveryChannel, currentNextPage, true)}
                   disabled={currentIsLoading}
-                  className="px-6 py-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group px-8 py-3 rounded-xl bg-gray-100/80 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2.5 text-sm font-medium shadow-sm"
                 >
                   {currentIsLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       {t('加载中...', 'Loading...')}
                     </>
                   ) : (
-                    t('加载更多数据', 'Load More Data')
+                    <>
+                      <ChevronDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
+                      {t('加载更多数据', 'Load More Data')}
+                    </>
                   )}
                 </button>
               </div>
             )}
           </div>
+
+          {/* 滚动到底部按钮 */}
+          <ScrollToBottom scrollContainerRef={scrollContainerRef} />
         </div>
       </div>
     </div>
