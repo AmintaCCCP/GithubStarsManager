@@ -172,8 +172,8 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation - Desktop (≥1024px): Icon + Text + Badge */}
-          <nav ref={navRef} className={`hidden lg:flex items-center space-x-1 hd-btns lg:hd-btns ${isTextWrapped ? 'flex-wrap' : ''}`}>
+          {/* Navigation - Desktop (≥1300px): Icon + Text + Badge */}
+          <nav ref={navRef} className={`hidden xl:flex items-center space-x-1 hd-btns xl:hd-btns ${isTextWrapped ? 'flex-wrap' : ''}`}>
             <button
               onClick={() => setCurrentView('repositories')}
               aria-label={isTextWrapped ? t('仓库', 'Repositories') : undefined}
@@ -235,8 +235,8 @@ export const Header: React.FC = () => {
             </button>
           </nav>
 
-          {/* Navigation - Tablet (768px-1023px): Icon only */}
-          <nav className="hidden md:flex lg:hidden items-center space-x-1 hd-btns lg:hd-btns">
+          {/* Navigation - Tablet (768px-1299px): Icon only */}
+          <nav className="hidden md:flex xl:hidden items-center space-x-1 hd-btns md:hd-btns">
             <button
               onClick={() => setCurrentView('repositories')}
               className={`p-2.5 rounded-lg transition-colors ${
