@@ -248,6 +248,23 @@ const normalizePersistedState = (
       'trending': false,
       ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
     },
+    // 确保 subscriptionChannels 包含 trending（合并默认频道）
+    subscriptionChannels: (() => {
+      const persisted = safePersisted.subscriptionChannels;
+      if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
+      // 检查是否已有 trending
+      const hasTrending = persisted.some((ch: SubscriptionChannel) => ch.id === 'trending');
+      if (hasTrending) return persisted;
+      // 添加 trending 频道
+      return [...persisted, {
+        id: 'trending',
+        name: '热门趋势',
+        nameEn: 'Trending',
+        icon: '🔥',
+        description: 'GitHub 上近期最受关注的项目 Top 10',
+        enabled: true,
+      }];
+    })(),
   };
 };
 

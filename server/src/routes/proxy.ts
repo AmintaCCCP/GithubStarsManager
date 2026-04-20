@@ -294,41 +294,4 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
   }
 });
 
-// GET /api/proxy/github/trending - Proxy for GitHub Trending API
-// Uses third-party GitHubTrendingRSS JSON API when available
-router.get('/api/proxy/github/trending', async (req, res) => {
-  try {
-    const { language, since } = req.query as { language?: string; since?: string };
-
-    // Try GitHubTrendingRSS JSON API first
-    const trendingBaseUrl = 'https://github-trending-api.wtf被她压住了.depsilon.net';
-    const params = new URLSearchParams();
-    if (language && language !== 'all') params.set('language', language);
-    if (since) params.set('since', since);
-
-    const targetUrl = `${trendingBaseUrl}/repositories${params.toString() ? '?' + params.toString() : ''}`;
-
-    const result = await proxyRequest({
-      url: targetUrl,
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'GithubStarsManager-Backend',
-      },
-      timeout: 10000,
-    });
-
-    if (result.status === 200 && Array.isArray(result.data)) {
-      res.status(200).json({ repositories: result.data });
-      return;
-    }
-
-    // Fallback: Return empty result if API is unavailable
-    res.status(200).json({ repositories: [], error: 'Trending API unavailable' });
-  } catch (err) {
-    console.error('GitHub trending proxy error:', err);
-    res.status(200).json({ repositories: [], error: 'Trending proxy failed' });
-  }
-});
-
 export default router;
