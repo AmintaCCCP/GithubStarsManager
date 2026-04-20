@@ -278,10 +278,11 @@ export class GitHubApiService {
   }
 
   async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
-    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
-    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
+    // 获取过去 30 天内创建且 Star 较多的项目（模拟 Trending 效果）
+    // GitHub Search API 不支持"近期获得星标数"过滤，故用创建时间+星标数近似 trending
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
+      `/search/repositories?q=created:>${lastMonth}+stars:>100&sort=stars&order=desc&per_page=${perPage}`
     );
     return (data.items || []).map((repo, index) => ({
       ...repo,
