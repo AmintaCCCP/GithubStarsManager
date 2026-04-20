@@ -189,11 +189,25 @@ const normalizePersistedState = (
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
+  // 确保订阅频道列表包含所有默认频道（包括 trending）
+  let subscriptionChannels = Array.isArray(safePersisted.subscriptionChannels)
+    ? [...safePersisted.subscriptionChannels]
+    : [...defaultSubscriptionChannels];
+  
+  const existingIds = new Set(subscriptionChannels.map((ch: SubscriptionChannel) => ch.id));
+  for (const defaultCh of defaultSubscriptionChannels) {
+    if (!existingIds.has(defaultCh.id)) {
+      subscriptionChannels = [...subscriptionChannels, defaultCh];
+    }
+  }
+
   return {
+    subscriptionChannels,
     ...currentState,
     ...safePersisted,
     repositories,
     releases,
+    subscriptionChannels,
     searchResults: repositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
@@ -441,6 +455,7 @@ export const useAppStore = create<AppState & AppActions>()(
       updateRepository: (repo) => set((state) => {
         const updatedRepositories = state.repositories.map(r => r.id === repo.id ? repo : r);
         return {
+    subscriptionChannels,
           repositories: updatedRepositories,
           searchResults: state.searchResults.map(r => r.id === repo.id ? repo : r)
         };
@@ -458,6 +473,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           repositories: state.repositories.filter(r => r.id !== repoId),
           searchResults: state.searchResults.filter(r => r.id !== repoId),
           releases: filteredReleases,
@@ -514,6 +530,7 @@ export const useAppStore = create<AppState & AppActions>()(
         }
         
         return { searchFilters: newFilters };
+    subscriptionChannels,
       }),
       setSearchResults: (searchResults) => set({ searchResults }),
 
@@ -523,6 +540,7 @@ export const useAppStore = create<AppState & AppActions>()(
         const existingIds = new Set(state.releases.map(r => r.id));
         const uniqueReleases = newReleases.filter(r => !existingIds.has(r.id));
         return { releases: [...state.releases, ...uniqueReleases] };
+    subscriptionChannels,
       }),
       toggleReleaseSubscription: (repoId) => set((state) => {
         const newSubscriptions = new Set(state.releaseSubscriptions);
@@ -535,6 +553,7 @@ export const useAppStore = create<AppState & AppActions>()(
         }
         
         return { releaseSubscriptions: newSubscriptions };
+    subscriptionChannels,
       }),
       batchUnsubscribeReleases: (repoIds) => set((state) => {
         const newSubscriptions = new Set(state.releaseSubscriptions);
@@ -542,6 +561,7 @@ export const useAppStore = create<AppState & AppActions>()(
           newSubscriptions.delete(repoId);
         });
         return { releaseSubscriptions: newSubscriptions };
+    subscriptionChannels,
       }),
       removeReleasesByRepoId: (repoId) => set((state) => {
         const filteredReleases = state.releases.filter(release => release.repository.id !== repoId);
@@ -552,6 +572,7 @@ export const useAppStore = create<AppState & AppActions>()(
         const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
         nextExpandedRepos.delete(repoId);
         return {
+    subscriptionChannels,
           releases: filteredReleases,
           readReleases: nextReadReleases,
           releaseExpandedRepositories: nextExpandedRepos,
@@ -561,10 +582,12 @@ export const useAppStore = create<AppState & AppActions>()(
         const newReadReleases = new Set(state.readReleases);
         newReadReleases.add(releaseId);
         return { readReleases: newReadReleases };
+    subscriptionChannels,
       }),
       markAllReleasesAsRead: () => set((state) => {
         const allReleaseIds = new Set(state.releases.map(r => r.id));
         return { readReleases: allReleaseIds };
+    subscriptionChannels,
       }),
 
       // Category actions
@@ -579,6 +602,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         if (!targetCategory || !updates.name || updates.name === targetCategory.name) {
           return { customCategories: nextCategories };
+    subscriptionChannels,
         }
 
         const nextRepositories = state.repositories.map(repo =>
@@ -588,6 +612,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           customCategories: nextCategories,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
@@ -600,6 +625,7 @@ export const useAppStore = create<AppState & AppActions>()(
       updateDefaultCategory: (id, updates) => set((state) => {
         const defaultCat = defaultCategories.find(c => c.id === id);
         if (!defaultCat) return {};
+    subscriptionChannels,
 
         const originalName = defaultCat.name;
         const displayedName = state.language === 'en' ? translateCategoryName(originalName) : originalName;
@@ -654,6 +680,7 @@ export const useAppStore = create<AppState & AppActions>()(
         const currentDisplayedName = currentOverride?.name ?? displayedName;
         if (!newName || newName === currentName || newName === currentDisplayedName) {
           return { defaultCategoryOverrides: nextOverrides };
+    subscriptionChannels,
         }
 
         const currentNameVariants = getCategoryNameVariants(originalName, currentName);
@@ -666,6 +693,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
@@ -678,9 +706,11 @@ export const useAppStore = create<AppState & AppActions>()(
       resetDefaultCategory: (id) => set((state) => {
         const defaultCat = defaultCategories.find(c => c.id === id);
         if (!defaultCat) return {};
+    subscriptionChannels,
 
         const override = state.defaultCategoryOverrides[id];
         if (!override) return {};
+    subscriptionChannels,
 
         const overriddenName = override.name;
         const originalName = defaultCat.name;
@@ -690,6 +720,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         if (!overriddenName || overriddenName === originalName) {
           return { defaultCategoryOverrides: nextOverrides };
+    subscriptionChannels,
         }
 
         const overriddenNameVariants = getCategoryNameVariants(originalName, overriddenName);
@@ -701,6 +732,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
@@ -713,9 +745,11 @@ export const useAppStore = create<AppState & AppActions>()(
       resetDefaultCategoryNameIcon: (id) => set((state) => {
         const defaultCat = defaultCategories.find(c => c.id === id);
         if (!defaultCat) return {};
+    subscriptionChannels,
 
         const override = state.defaultCategoryOverrides[id];
         if (!override) return {};
+    subscriptionChannels,
 
         const overriddenName = override.name;
         const originalName = defaultCat.name;
@@ -733,6 +767,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         if (!overriddenName || overriddenName === originalName) {
           return { defaultCategoryOverrides: nextOverrides };
+    subscriptionChannels,
         }
 
         const overriddenNameVariants = getCategoryNameVariants(originalName, overriddenName);
@@ -744,6 +779,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           defaultCategoryOverrides: nextOverrides,
           repositories: nextRepositories,
           searchResults: state.searchResults.map(repo =>
@@ -756,6 +792,7 @@ export const useAppStore = create<AppState & AppActions>()(
       resetDefaultCategoryKeywords: (id) => set((state) => {
         const override = state.defaultCategoryOverrides[id];
         if (!override) return {};
+    subscriptionChannels,
 
         const nextOverride = { ...override };
         delete nextOverride.keywords;
@@ -768,6 +805,7 @@ export const useAppStore = create<AppState & AppActions>()(
         }
 
         return { defaultCategoryOverrides: nextOverrides };
+    subscriptionChannels,
       }),
       deleteCustomCategory: (id) => set((state) => {
         const targetCategory = state.customCategories.find(category => category.id === id);
@@ -775,6 +813,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         if (!targetCategory) {
           return {
+    subscriptionChannels,
             customCategories: state.customCategories.filter(category => category.id !== id),
             selectedCategory: nextSelectedCategory
           };
@@ -787,6 +826,7 @@ export const useAppStore = create<AppState & AppActions>()(
         );
 
         return {
+    subscriptionChannels,
           customCategories: state.customCategories.filter(category => category.id !== id),
           repositories: clearedRepositories,
           searchResults: state.searchResults.map(repo =>
@@ -814,6 +854,7 @@ export const useAppStore = create<AppState & AppActions>()(
         const [movedId] = newOrder.splice(oldIndex, 1);
         newOrder.splice(newIndex, 0, movedId);
         return { categoryOrder: newOrder };
+    subscriptionChannels,
       }),
       setCollapsedSidebarCategoryCount: (count) => set({ collapsedSidebarCategoryCount: count }),
 
@@ -864,6 +905,7 @@ export const useAppStore = create<AppState & AppActions>()(
           newSet.add(repoId);
         }
         return { releaseExpandedRepositories: newSet };
+    subscriptionChannels,
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
@@ -884,6 +926,7 @@ export const useAppStore = create<AppState & AppActions>()(
       const channel = repo.channel;
       const channelRepos = state.subscriptionRepos[channel] || [];
       return {
+    subscriptionChannels,
         subscriptionRepos: {
           ...state.subscriptionRepos,
           [channel]: channelRepos.map(r => r.id === repo.id ? repo : r),
@@ -995,6 +1038,7 @@ export const useAppStore = create<AppState & AppActions>()(
             if (repo.custom_description === '__EMPTY__') {
               migratedCount++;
               return { ...repo, custom_description: '' };
+    subscriptionChannels,
             }
             return repo;
           });
@@ -1018,10 +1062,12 @@ export const useAppStore = create<AppState & AppActions>()(
     state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
       if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
         return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+    subscriptionChannels,
       }
       if (ch.id === 'trending') {
         // 确保 trending 频道有正确的名称
         return { ...ch, name: '热门趋势', nameEn: 'Trending', icon: '🔥' };
+    subscriptionChannels,
       }
       return ch;
     });
@@ -1050,6 +1096,7 @@ export const useAppStore = create<AppState & AppActions>()(
         });
 
         return {
+    subscriptionChannels,
           ...currentState,
           ...normalized,
         };
@@ -1099,6 +1146,7 @@ export const getAllCategories = (
       const override = defaultCategoryOverrides[cat.id];
       const baseName = language === 'en' ? translateCategoryName(cat.name) : cat.name;
       return {
+    subscriptionChannels,
         ...cat,
         name: baseName,
         ...(override ? { name: override.name ?? baseName, icon: override.icon ?? cat.icon, keywords: override.keywords ?? cat.keywords } : {})
