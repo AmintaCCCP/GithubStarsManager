@@ -1,6 +1,26 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress, SubscriptionChannel, SubscriptionChannelId, SubscriptionRepo, SubscriptionDev } from '../types';
+import { 
+  AppState, 
+  Repository, 
+  Release, 
+  AIConfig, 
+  WebDAVConfig, 
+  SearchFilters, 
+  GitHubUser, 
+  Category, 
+  AssetFilter, 
+  UpdateNotification, 
+  AnalysisProgress, 
+  DiscoveryChannel, 
+  DiscoveryChannelId, 
+  DiscoveryRepo,
+  DiscoveryPlatform,
+  ProgrammingLanguage,
+  SortBy,
+  SortOrder,
+  TopicCategory
+} from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
@@ -32,6 +52,7 @@ interface AppActions {
   setLoading: (loading: boolean) => void;
   setLastSync: (timestamp: string) => void;
   deleteRepository: (repoId: number) => void;
+  setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
   
   // AI actions
   addAIConfig: (config: AIConfig) => void;
@@ -107,15 +128,24 @@ interface AppActions {
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   setReleaseIsRefreshing: (refreshing: boolean) => void;
 
-  // Subscription actions
-  setSelectedSubscriptionChannel: (channel: SubscriptionChannelId) => void;
-  setSubscriptionLoading: (channel: SubscriptionChannelId, loading: boolean) => void;
-  setSubscriptionRepos: (channel: SubscriptionChannelId, repos: SubscriptionRepo[]) => void;
-  setSubscriptionDevs: (devs: SubscriptionDev[]) => void;
-  setSubscriptionLastRefresh: (channel: SubscriptionChannelId, timestamp: string) => void;
-  updateSubscriptionRepo: (repo: SubscriptionRepo) => void;
-  updateSubscriptionDev: (dev: SubscriptionDev) => void;
-  toggleSubscriptionChannel: (channelId: SubscriptionChannelId) => void;
+  // Discovery actions
+  setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
+  setDiscoveryLoading: (channel: DiscoveryChannelId, loading: boolean) => void;
+  setDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[], append?: boolean) => void;
+  setDiscoveryLastRefresh: (channel: DiscoveryChannelId, timestamp: string) => void;
+  updateDiscoveryRepo: (repo: DiscoveryRepo) => void;
+  toggleDiscoveryChannel: (channelId: DiscoveryChannelId) => void;
+  setDiscoveryPlatform: (platform: DiscoveryPlatform) => void;
+  setDiscoveryLanguage: (language: ProgrammingLanguage) => void;
+  setDiscoverySortBy: (sortBy: SortBy) => void;
+  setDiscoverySortOrder: (sortOrder: SortOrder) => void;
+  setDiscoverySearchQuery: (query: string) => void;
+  setDiscoverySelectedTopic: (topic: TopicCategory | null) => void;
+  setDiscoveryHasMore: (channel: DiscoveryChannelId, hasMore: boolean) => void;
+  setDiscoveryNextPage: (channel: DiscoveryChannelId, page: number) => void;
+  setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
+  setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
+  appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -161,6 +191,14 @@ type PersistedAppState = Partial<
     | 'releaseViewMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
+    | 'discoveryRepos'
+    | 'discoveryLastRefresh'
+    | 'discoveryTotalCount'
+    | 'selectedDiscoveryChannel'
+    | 'discoveryPlatform'
+    | 'discoveryLanguage'
+    | 'discoverySortBy'
+    | 'discoverySortOrder'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -226,6 +264,27 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
+    discoveryRepos: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
+      }
+      return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
+    })(),
+    discoveryLastRefresh: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return persisted as Record<string, string | null>;
+      }
+      return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
+    })(),
+    discoveryTotalCount: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return persisted as Record<string, number>;
+      }
+      return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
+    })(),
   };
 };
 
@@ -316,6 +375,9 @@ const defaultCategories: Category[] = [
   }
 ];
 
+// 导出默认分类供其他模块使用
+export { defaultCategories };
+
 // 预设筛选器图标映射
 const PRESET_FILTER_ICONS: Record<string, string> = {
   'preset-windows': 'Monitor',
@@ -332,37 +394,45 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
   icon: PRESET_FILTER_ICONS[pf.id] || 'Package',
 }));
 
-const defaultSubscriptionChannels: SubscriptionChannel[] = [
-  {
-    id: 'most-stars',
-    name: '最多 Star',
-    nameEn: 'Most Stars',
-    icon: '⭐',
-    description: 'GitHub 上 Star 数量最多的项目 Top 10',
-    enabled: true,
-  },
-  {
-    id: 'most-forks',
-    name: '最多 Fork',
-    nameEn: 'Most Forks',
-    icon: '🔱',
-    description: 'GitHub 上 Fork 数量最多的项目 Top 10',
-    enabled: true,
-  },
-  {
-    id: 'most-dev',
-    name: '热门开发者',
-    nameEn: 'Top Developers',
-    icon: '👤',
-    description: 'GitHub 上最受关注的开发者 Top 10 及其最热项目',
-    enabled: true,
-  },
+const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '热门趋势',
+    name: '热门仓库',
     nameEn: 'Trending',
     icon: '🔥',
-    description: 'GitHub 上近期最受关注的项目 Top 10',
+    description: '最近30天内星标数超过50的热门仓库',
+    enabled: true,
+  },
+  {
+    id: 'hot-release',
+    name: '热门发布',
+    nameEn: 'Hot Release',
+    icon: '🚀',
+    description: '最近14天内活跃更新的仓库',
+    enabled: true,
+  },
+  {
+    id: 'most-popular',
+    name: '最受欢迎',
+    nameEn: 'Most Popular',
+    icon: '⭐',
+    description: '星标数超过1000的稳定热门仓库',
+    enabled: true,
+  },
+  {
+    id: 'topic',
+    name: '主题探索',
+    nameEn: 'Topic',
+    icon: '🏷️',
+    description: '按主题分类浏览仓库',
+    enabled: true,
+  },
+  {
+    id: 'search',
+    name: '搜索发现',
+    nameEn: 'Search',
+    icon: '🔍',
+    description: '自定义搜索发现新项目',
     enabled: true,
   },
 ];
@@ -377,6 +447,7 @@ export const useAppStore = create<AppState & AppActions>()(
       repositories: [],
       isLoading: false,
       lastSync: null,
+      analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
       webdavConfigs: [],
@@ -407,13 +478,21 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseExpandedRepositories: new Set<number>(),
       releaseIsRefreshing: false,
 
-    // Subscription
-    subscriptionChannels: defaultSubscriptionChannels,
-    subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
-    subscriptionDevs: [],
-    subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
-    subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
-    selectedSubscriptionChannel: 'most-stars',
+      discoveryChannels: defaultDiscoveryChannels,
+      discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
+      discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
+      discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      selectedDiscoveryChannel: 'trending',
+      discoveryPlatform: 'All',
+      discoveryLanguage: 'All',
+      discoverySortBy: 'BestMatch',
+      discoverySortOrder: 'Descending',
+      discoverySearchQuery: '',
+      discoverySelectedTopic: null,
+      discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
+      discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+      discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
 
       // Auth actions
       setUser: (user) => {
@@ -432,6 +511,7 @@ export const useAppStore = create<AppState & AppActions>()(
         releases: [],
         releaseSubscriptions: new Set(),
         readReleases: new Set(),
+        analyzingRepositoryIds: new Set(),
         searchResults: [],
         lastSync: null,
       }),
@@ -464,6 +544,15 @@ export const useAppStore = create<AppState & AppActions>()(
           releaseSubscriptions: nextReleaseSubscriptions,
           readReleases: nextReadReleases,
         };
+      }),
+      setAnalyzingRepository: (repoId, isAnalyzing) => set((state) => {
+        const nextAnalyzingIds = new Set(state.analyzingRepositoryIds);
+        if (isAnalyzing) {
+          nextAnalyzingIds.add(repoId);
+        } else {
+          nextAnalyzingIds.delete(repoId);
+        }
+        return { analyzingRepositoryIds: nextAnalyzingIds };
       }),
 
       // AI actions
@@ -868,35 +957,58 @@ export const useAppStore = create<AppState & AppActions>()(
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
 
-    // Subscription actions
-    setSelectedSubscriptionChannel: (selectedSubscriptionChannel) => set({ selectedSubscriptionChannel }),
-    setSubscriptionLoading: (channel, loading) => set((state) => ({
-      subscriptionIsLoading: { ...state.subscriptionIsLoading, [channel]: loading },
+    // Discovery actions
+    setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set({ selectedDiscoveryChannel }),
+    setDiscoveryLoading: (channel, loading) => set((state) => ({
+      discoveryIsLoading: { ...state.discoveryIsLoading, [channel]: loading },
     })),
-    setSubscriptionRepos: (channel, repos) => set((state) => ({
-      subscriptionRepos: { ...state.subscriptionRepos, [channel]: repos },
+    setDiscoveryRepos: (channel, repos, append = false) => set((state) => ({
+      discoveryRepos: { 
+        ...state.discoveryRepos, 
+        [channel]: append ? [...(state.discoveryRepos[channel] || []), ...repos] : repos 
+      },
     })),
-    setSubscriptionDevs: (devs) => set({ subscriptionDevs: devs }),
-    setSubscriptionLastRefresh: (channel, timestamp) => set((state) => ({
-      subscriptionLastRefresh: { ...state.subscriptionLastRefresh, [channel]: timestamp },
+    setDiscoveryLastRefresh: (channel, timestamp) => set((state) => ({
+      discoveryLastRefresh: { ...state.discoveryLastRefresh, [channel]: timestamp },
     })),
-    updateSubscriptionRepo: (repo) => set((state) => {
+    updateDiscoveryRepo: (repo) => set((state) => {
       const channel = repo.channel;
-      const channelRepos = state.subscriptionRepos[channel] || [];
+      const channelRepos = state.discoveryRepos[channel] || [];
       return {
-        subscriptionRepos: {
-          ...state.subscriptionRepos,
+        discoveryRepos: {
+          ...state.discoveryRepos,
           [channel]: channelRepos.map(r => r.id === repo.id ? repo : r),
         },
       };
     }),
-    updateSubscriptionDev: (dev) => set((state) => ({
-      subscriptionDevs: state.subscriptionDevs.map(d => d.login === dev.login ? dev : d),
-    })),
-    toggleSubscriptionChannel: (channelId) => set((state) => ({
-      subscriptionChannels: state.subscriptionChannels.map(ch =>
+    toggleDiscoveryChannel: (channelId) => set((state) => ({
+      discoveryChannels: state.discoveryChannels.map(ch =>
         ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch
       ),
+    })),
+    setDiscoveryPlatform: (discoveryPlatform) => set({ discoveryPlatform }),
+    setDiscoveryLanguage: (discoveryLanguage) => set({ discoveryLanguage }),
+    setDiscoverySortBy: (discoverySortBy) => set({ discoverySortBy }),
+    setDiscoverySortOrder: (discoverySortOrder) => set({ discoverySortOrder }),
+    setDiscoverySearchQuery: (discoverySearchQuery) => set({ discoverySearchQuery }),
+    setDiscoverySelectedTopic: (discoverySelectedTopic) => set({ discoverySelectedTopic }),
+    setDiscoveryHasMore: (channel, hasMore) => set((state) => ({
+      discoveryHasMore: { ...state.discoveryHasMore, [channel]: hasMore },
+    })),
+    setDiscoveryNextPage: (channel, page) => set((state) => ({
+      discoveryNextPage: { ...state.discoveryNextPage, [channel]: page },
+    })),
+    setDiscoveryTotalCount: (channel, count) => set((state) => ({
+      discoveryTotalCount: { ...state.discoveryTotalCount, [channel]: count },
+    })),
+    setDiscoveryScrollPosition: (channel, position) => set((state) => ({
+      discoveryScrollPositions: { ...state.discoveryScrollPositions, [channel]: position },
+    })),
+    appendDiscoveryRepos: (channel, repos) => set((state) => ({
+      discoveryRepos: { 
+        ...state.discoveryRepos, 
+        [channel]: [...(state.discoveryRepos[channel] || []), ...repos] 
+      },
     })),
     }),
     {
@@ -958,12 +1070,16 @@ export const useAppStore = create<AppState & AppActions>()(
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
 
-      // 持久化订阅设置
-      subscriptionChannels: state.subscriptionChannels,
-      selectedSubscriptionChannel: state.selectedSubscriptionChannel,
-      subscriptionRepos: state.subscriptionRepos,
-      subscriptionDevs: state.subscriptionDevs,
-      subscriptionLastRefresh: state.subscriptionLastRefresh,
+      // 持久化发现设置
+      discoveryChannels: state.discoveryChannels,
+      selectedDiscoveryChannel: state.selectedDiscoveryChannel,
+      discoveryRepos: state.discoveryRepos,
+      discoveryLastRefresh: state.discoveryLastRefresh,
+      discoveryPlatform: state.discoveryPlatform,
+      discoveryLanguage: state.discoveryLanguage,
+      discoverySortBy: state.discoverySortBy,
+      discoverySortOrder: state.discoverySortOrder,
+      discoverySelectedTopic: state.discoverySelectedTopic,
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
@@ -1003,22 +1119,20 @@ export const useAppStore = create<AppState & AppActions>()(
           }
         }
 
-  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending）
-  if (state && !Array.isArray(state.subscriptionChannels)) {
-    console.log('Migrating: initializing subscription channels');
-    state.subscriptionChannels = defaultSubscriptionChannels;
-  } else if (state && Array.isArray(state.subscriptionChannels)) {
-    state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
-      if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
-        return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
-      }
-      return ch;
-    });
+  if (state && !state.selectedDiscoveryChannel) {
+    state.selectedDiscoveryChannel = 'trending';
   }
-  if (state && !state.selectedSubscriptionChannel) {
-    state.selectedSubscriptionChannel = 'most-stars';
-  } else if (state && state.selectedSubscriptionChannel === 'daily-dev') {
-    state.selectedSubscriptionChannel = 'most-dev';
+  if (state && !state.discoveryPlatform) {
+    state.discoveryPlatform = 'All';
+  }
+  if (state && !state.discoveryLanguage) {
+    state.discoveryLanguage = 'All';
+  }
+  if (state && !state.discoverySortBy) {
+    state.discoverySortBy = 'BestMatch';
+  }
+  if (state && !state.discoverySortOrder) {
+    state.discoverySortOrder = 'Descending';
   }
 
         return state as PersistedAppState;

@@ -1,15 +1,32 @@
-import React, { useMemo } from 'react';
-import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package } from 'lucide-react';
-import type { SubscriptionRepo } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Bookmark, BookmarkCheck, Sparkles, BookOpen } from 'lucide-react';
+import type { DiscoveryRepo, Category } from '../types';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
+import { forceSyncToBackend } from '../services/autoSync';
+import { GitHubApiService } from '../services/githubApi';
+import { ReadmeModal } from './ReadmeModal';
 
 interface SubscriptionRepoCardProps {
-  repo: SubscriptionRepo;
+  repo: DiscoveryRepo;
+  onStar?: (repo: DiscoveryRepo) => void;
+  onAnalyze?: (repo: DiscoveryRepo) => void;
 }
 
-export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo }) => {
+export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo, onStar, onAnalyze }) => {
   const language = useAppStore(state => state.language);
+  const githubToken = useAppStore(state => state.githubToken);
+  const aiConfigs = useAppStore(state => state.aiConfigs);
+  const activeAIConfig = useAppStore(state => state.activeAIConfig);
+  const customCategories = useAppStore(state => state.customCategories);
+  const updateDiscoveryRepo = useAppStore(state => state.updateDiscoveryRepo);
+  
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const [isStarring, setIsStarring] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [readmeModalOpen, setReadmeModalOpen] = useState(false);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -53,8 +70,112 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
   };
 
+  // 处理添加Star
+  const handleStar = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!githubToken || isStarring) return;
+
+    setIsStarring(true);
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const [owner, name] = repo.full_name.split('/');
+      await githubApi.starRepository(owner, name);
+      setIsStarred(true);
+      
+      if (onStar) {
+        onStar(repo);
+      }
+      
+      await forceSyncToBackend();
+    } catch (error) {
+      console.error('Failed to star repository:', error);
+      alert(t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.'));
+    } finally {
+      setIsStarring(false);
+    }
+  }, [githubToken, isStarring, repo, onStar, t]);
+
+  // 处理在ZRead打开
+  const handleOpenInZRead = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const zreadUrl = `https://zread.ai/${repo.full_name}`;
+    window.open(zreadUrl, '_blank');
+  }, [repo.full_name]);
+
+  // 处理单个项目AI分析
+  const handleAnalyze = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!githubToken) {
+      alert(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'));
+      return;
+    }
+
+    const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
+    if (!activeConfig) {
+      alert(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'));
+      return;
+    }
+
+    if (isAnalyzing) return;
+
+    setIsAnalyzing(true);
+
+    try {
+      // 使用 store 中的工具函数合并分类，避免重复定义合并逻辑
+      const allCategories = getAllCategories(customCategories, language);
+
+      const result = await analyzeRepository({
+        repository: repo,
+        githubToken,
+        aiConfig: activeConfig,
+        language,
+        categories: allCategories,
+      });
+
+      const updatedRepo: DiscoveryRepo = {
+        ...repo,
+        ai_summary: result.summary,
+        ai_tags: result.tags,
+        ai_platforms: result.platforms,
+        analyzed_at: result.analyzed_at,
+        analysis_failed: result.analysis_failed,
+      };
+      updateDiscoveryRepo(updatedRepo);
+      
+      if (onAnalyze) {
+        onAnalyze(updatedRepo);
+      }
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      const failedResult = createFailedAnalysisResult();
+      const failedRepo: DiscoveryRepo = {
+        ...repo,
+        analyzed_at: failedResult.analyzed_at,
+        analysis_failed: failedResult.analysis_failed,
+      };
+      updateDiscoveryRepo(failedRepo);
+      alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [githubToken, aiConfigs, activeAIConfig, language, repo, isAnalyzing, customCategories, updateDiscoveryRepo, onAnalyze, t]);
+
+  // 判断是否已分析
+  const isAnalyzed = !!repo.analyzed_at && !repo.analysis_failed;
+  const isFailed = !!repo.analysis_failed;
+
+  // 点击卡片打开 README
+  const handleCardClick = useCallback(() => {
+    setReadmeModalOpen(true);
+  }, []);
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow duration-200 hover:border-blue-300 dark:hover:border-blue-600">
+    <>
+    <div 
+      onClick={handleCardClick}
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow duration-200 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer"
+    >
       <div className="flex items-start gap-4">
         {/* Rank badge */}
         <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${rankBadgeClass}`}>
@@ -71,22 +192,80 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 alt={repo.owner.login}
                 className="w-6 h-6 rounded-full flex-shrink-0"
               />
-              <a
-                href={repo.html_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate"
-              >
+              <span className="font-semibold text-gray-900 dark:text-white truncate">
                 {repo.full_name}
-              </a>
+              </span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* AI Analyze button */}
+              <button
+                onClick={handleAnalyze}
+                disabled={!githubToken || isAnalyzing}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isAnalyzed
+                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
+                    : isFailed
+                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
+                    : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+                }`}
+                title={
+                  isAnalyzed 
+                    ? t('重新分析', 'Re-analyze') 
+                    : isFailed 
+                    ? t('重新分析', 'Re-analyze')
+                    : t('AI分析', 'AI Analyze')
+                }
+              >
+                {isAnalyzing ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : isAnalyzed ? (
+                  <Sparkles className="w-4 h-4" />
+                ) : (
+                  <Bot className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* ZRead button */}
+              <button
+                onClick={handleOpenInZRead}
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                title={t('在ZRead打开', 'Open in ZRead')}
+              >
+                <BookOpen className="w-4 h-4" />
+              </button>
+
+              {/* GitHub button */}
               <a
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-shrink-0 text-gray-400 hover:text-blue-500"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title={t('在GitHub打开', 'Open on GitHub')}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-4 h-4" />
               </a>
+
+              {/* Star button */}
+              <button
+                onClick={handleStar}
+                disabled={!githubToken || isStarring || isStarred}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isStarred
+                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400'
+                    : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
+                }`}
+                title={isStarred ? t('已Star', 'Starred') : t('添加Star', 'Add Star')}
+              >
+                {isStarring ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : isStarred ? (
+                  <BookmarkCheck className="w-4 h-4" />
+                ) : (
+                  <Bookmark className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -160,5 +339,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         </div>
       </div>
     </div>
+
+    {/* README Modal */}
+    <ReadmeModal
+      isOpen={readmeModalOpen}
+      onClose={() => setReadmeModalOpen(false)}
+      repository={repo}
+    />
+    </>
   );
 };

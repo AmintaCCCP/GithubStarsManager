@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Trash2,
   AlertTriangle,
@@ -12,9 +12,27 @@ import {
   XCircle,
   Loader2,
   FileWarning,
+  Download,
+  Upload,
+  Sparkles,
+  Filter,
+  Search,
+  Eye,
+  HardDrive,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
+import type { 
+  Repository, 
+  Release, 
+  AIConfig, 
+  WebDAVConfig, 
+  Category, 
+  AssetFilter,
+  DiscoveryRepo,
+  SearchFilters 
+} from '../../types';
 
 interface DataManagementPanelProps {
   t: (zh: string, en: string) => string;
@@ -26,6 +44,10 @@ type DeleteOperation =
   | 'aiConfigs'
   | 'webdavConfigs'
   | 'categorySettings'
+  | 'assetFilters'
+  | 'discoveryData'
+  | 'releaseSubscriptions'
+  | 'searchHistory'
   | 'all';
 
 interface DeleteConfirmation {
@@ -42,6 +64,39 @@ interface OperationLog {
   details?: string;
 }
 
+interface ExportData {
+  version: string;
+  exportDate: string;
+  appVersion: string;
+  data: {
+    repositories?: Repository[];
+    releases?: Release[];
+    aiConfigs?: AIConfig[];
+    webdavConfigs?: WebDAVConfig[];
+    customCategories?: Category[];
+    assetFilters?: AssetFilter[];
+    discoveryRepos?: Record<string, DiscoveryRepo[]>;
+    releaseSubscriptions?: number[];
+    readReleases?: number[];
+    searchFilters?: SearchFilters;
+    hiddenDefaultCategoryIds?: string[];
+    defaultCategoryOverrides?: Record<string, Partial<Category>>;
+    categoryOrder?: string[];
+  };
+}
+
+interface DataCleanupSuggestion {
+  key: string;
+  label: string;
+  labelEn: string;
+  description: string;
+  descriptionEn: string;
+  count: number;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+}
+
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
   const {
     user,
@@ -52,9 +107,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     customCategories,
     defaultCategoryOverrides,
     hiddenDefaultCategoryIds,
+    assetFilters,
+    discoveryRepos,
+    releaseSubscriptions,
+    readReleases,
+    searchFilters,
+    language,
     setRepositories,
     setReleases,
     deleteCustomCategory,
+    setAssetFilters,
   } = useAppStore();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
@@ -66,6 +128,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
   const [showErrorMessage, setShowErrorMessage] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<{
+    data: ExportData | null;
+    isOpen: boolean;
+    fileName: string;
+  }>({ data: null, isOpen: false, fileName: '' });
 
   const addLog = useCallback((operation: string, success: boolean, details?: string) => {
     const newLog: OperationLog = {
@@ -227,6 +296,387 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
   };
 
+  const deleteAssetFilters = async () => {
+    try {
+      setAssetFilters([]);
+      addLog(t('删除资源过滤器数据', 'Delete asset filters'), true);
+      showSuccess(t('资源过滤器数据已删除', 'Asset filters deleted'));
+    } catch (error) {
+      addLog(
+        t('删除资源过滤器数据', 'Delete asset filters'),
+        false,
+        String(error)
+      );
+      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      throw error;
+    }
+  };
+
+  const deleteDiscoveryData = async () => {
+    try {
+      const emptyDiscoveryRepos = {
+        'trending': [],
+        'hot-release': [],
+        'most-popular': [],
+        'topic': [],
+        'search': []
+      } as Record<string, DiscoveryRepo[]>;
+      useAppStore.setState({ 
+        discoveryRepos: emptyDiscoveryRepos,
+        discoveryLastRefresh: {
+          'trending': null,
+          'hot-release': null,
+          'most-popular': null,
+          'topic': null,
+          'search': null
+        }
+      });
+      addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);
+      showSuccess(t('发现页缓存数据已删除', 'Discovery cache data deleted'));
+    } catch (error) {
+      addLog(
+        t('删除发现页缓存数据', 'Delete discovery cache data'),
+        false,
+        String(error)
+      );
+      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      throw error;
+    }
+  };
+
+  const deleteReleaseSubscriptions = async () => {
+    try {
+      useAppStore.setState({ 
+        releaseSubscriptions: new Set<number>(),
+        readReleases: new Set<number>()
+      });
+      addLog(t('删除Release订阅数据', 'Delete release subscriptions'), true);
+      showSuccess(t('Release订阅数据已删除', 'Release subscriptions deleted'));
+    } catch (error) {
+      addLog(
+        t('删除Release订阅数据', 'Delete release subscriptions'),
+        false,
+        String(error)
+      );
+      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      throw error;
+    }
+  };
+
+  const deleteSearchHistory = async () => {
+    try {
+      useAppStore.setState({ 
+        searchFilters: {
+          query: '',
+          tags: [],
+          languages: [],
+          platforms: [],
+          sortBy: 'stars',
+          sortOrder: 'desc',
+          isAnalyzed: undefined,
+          isSubscribed: undefined,
+        }
+      });
+      localStorage.removeItem('github-stars-search-history');
+      localStorage.removeItem('lastSearchTime');
+      addLog(t('删除搜索历史数据', 'Delete search history'), true);
+      showSuccess(t('搜索历史数据已删除', 'Search history deleted'));
+    } catch (error) {
+      addLog(
+        t('删除搜索历史数据', 'Delete search history'),
+        false,
+        String(error)
+      );
+      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      throw error;
+    }
+  };
+
+  const exportData = useCallback(async (selectedTypes: string[]) => {
+    setIsExporting(true);
+    try {
+      const store = useAppStore.getState();
+      const exportDataObj: ExportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        appVersion: '0.4.0',
+        data: {}
+      };
+
+      if (selectedTypes.includes('repositories')) {
+        exportDataObj.data.repositories = store.repositories;
+      }
+      if (selectedTypes.includes('releases')) {
+        exportDataObj.data.releases = store.releases;
+      }
+      if (selectedTypes.includes('aiConfigs')) {
+        exportDataObj.data.aiConfigs = store.aiConfigs;
+      }
+      if (selectedTypes.includes('webdavConfigs')) {
+        exportDataObj.data.webdavConfigs = store.webdavConfigs;
+      }
+      if (selectedTypes.includes('customCategories')) {
+        exportDataObj.data.customCategories = store.customCategories;
+        exportDataObj.data.hiddenDefaultCategoryIds = store.hiddenDefaultCategoryIds;
+        exportDataObj.data.defaultCategoryOverrides = store.defaultCategoryOverrides;
+        exportDataObj.data.categoryOrder = store.categoryOrder;
+      }
+      if (selectedTypes.includes('assetFilters')) {
+        exportDataObj.data.assetFilters = store.assetFilters;
+      }
+      if (selectedTypes.includes('discoveryRepos')) {
+        exportDataObj.data.discoveryRepos = store.discoveryRepos;
+      }
+      if (selectedTypes.includes('releaseSubscriptions')) {
+        exportDataObj.data.releaseSubscriptions = Array.from(store.releaseSubscriptions);
+        exportDataObj.data.readReleases = Array.from(store.readReleases);
+      }
+      if (selectedTypes.includes('searchFilters')) {
+        exportDataObj.data.searchFilters = store.searchFilters;
+      }
+
+      const blob = new Blob([JSON.stringify(exportDataObj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `github-stars-manager-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      addLog(t('导出数据', 'Export data'), true);
+      showSuccess(t('数据导出成功', 'Data exported successfully'));
+    } catch (error) {
+      addLog(t('导出数据', 'Export data'), false, String(error));
+      showError(t('导出失败，请重试', 'Export failed, please try again'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [addLog, showSuccess, showError, t]);
+
+  const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content) as ExportData;
+        
+        if (!data.version || !data.data) {
+          showError(t('无效的备份文件格式', 'Invalid backup file format'));
+          return;
+        }
+
+        setImportPreview({ data, isOpen: true, fileName: file.name });
+      } catch {
+        showError(t('解析文件失败，请确保是有效的JSON文件', 'Failed to parse file, ensure it is a valid JSON file'));
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }, [showError, t]);
+
+  const importData = useCallback(async (selectedTypes: string[], mode: 'merge' | 'replace') => {
+    if (!importPreview.data) return;
+
+    setIsImporting(true);
+    try {
+      const store = useAppStore.getState();
+      const importedData = importPreview.data.data;
+
+      if (mode === 'replace') {
+        if (selectedTypes.includes('repositories') && importedData.repositories) {
+          store.setRepositories(importedData.repositories);
+        }
+        if (selectedTypes.includes('releases') && importedData.releases) {
+          store.setReleases(importedData.releases);
+        }
+        if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
+          store.setAIConfigs(importedData.aiConfigs);
+        }
+        if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
+          store.setWebDAVConfigs(importedData.webdavConfigs);
+        }
+        if (selectedTypes.includes('customCategories')) {
+          if (importedData.customCategories) {
+            useAppStore.setState({ customCategories: importedData.customCategories });
+          }
+          if (importedData.hiddenDefaultCategoryIds) {
+            useAppStore.setState({ hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds });
+          }
+          if (importedData.defaultCategoryOverrides) {
+            useAppStore.setState({ defaultCategoryOverrides: importedData.defaultCategoryOverrides });
+          }
+          if (importedData.categoryOrder) {
+            useAppStore.setState({ categoryOrder: importedData.categoryOrder });
+          }
+        }
+        if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
+          store.setAssetFilters(importedData.assetFilters);
+        }
+        if (selectedTypes.includes('releaseSubscriptions')) {
+          if (importedData.releaseSubscriptions) {
+            useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions) });
+          }
+          if (importedData.readReleases) {
+            useAppStore.setState({ readReleases: new Set(importedData.readReleases) });
+          }
+        }
+        if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
+          useAppStore.setState({ searchFilters: importedData.searchFilters });
+        }
+      } else {
+        if (selectedTypes.includes('repositories') && importedData.repositories) {
+          const existingIds = new Set(store.repositories.map(r => r.id));
+          const newRepos = importedData.repositories.filter(r => !existingIds.has(r.id));
+          store.setRepositories([...store.repositories, ...newRepos]);
+        }
+        if (selectedTypes.includes('releases') && importedData.releases) {
+          const existingIds = new Set(store.releases.map(r => r.id));
+          const newReleases = importedData.releases.filter(r => !existingIds.has(r.id));
+          store.setReleases([...store.releases, ...newReleases]);
+        }
+        if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
+          const existingIds = new Set(store.aiConfigs.map(c => c.id));
+          const newConfigs = importedData.aiConfigs.filter(c => !existingIds.has(c.id));
+          store.setAIConfigs([...store.aiConfigs, ...newConfigs]);
+        }
+        if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
+          const existingIds = new Set(store.webdavConfigs.map(c => c.id));
+          const newConfigs = importedData.webdavConfigs.filter(c => !existingIds.has(c.id));
+          store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
+        }
+        if (selectedTypes.includes('customCategories') && importedData.customCategories) {
+          const existingIds = new Set(store.customCategories.map(c => c.id));
+          const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
+          useAppStore.setState({ 
+            customCategories: [...store.customCategories, ...newCategories] 
+          });
+        }
+        if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
+          const existingIds = new Set(store.assetFilters.map(f => f.id));
+          const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
+          store.setAssetFilters([...store.assetFilters, ...newFilters]);
+        }
+        if (selectedTypes.includes('releaseSubscriptions') && importedData.releaseSubscriptions) {
+          const existingSubs = store.releaseSubscriptions;
+          const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
+          useAppStore.setState({ releaseSubscriptions: newSubs });
+        }
+      }
+
+      addLog(t('导入数据', 'Import data'), true);
+      showSuccess(t('数据导入成功', 'Data imported successfully'));
+      setImportPreview({ data: null, isOpen: false, fileName: '' });
+    } catch (error) {
+      addLog(t('导入数据', 'Import data'), false, String(error));
+      showError(t('导入失败，请重试', 'Import failed, please try again'));
+    } finally {
+      setIsImporting(false);
+    }
+  }, [importPreview, addLog, showSuccess, showError, t]);
+
+  const cleanupSuggestions = useMemo<DataCleanupSuggestion[]>(() => {
+    const suggestions: DataCleanupSuggestion[] = [];
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
+
+    const oldReleases = releases.filter(r => 
+      new Date(r.published_at).getTime() < ninetyDaysAgo
+    );
+    if (oldReleases.length > 0) {
+      suggestions.push({
+        key: 'oldReleases',
+        label: '过期的Release记录',
+        labelEn: 'Outdated Release Records',
+        description: '超过90天未更新的Release记录',
+        descriptionEn: 'Release records not updated in over 90 days',
+        count: oldReleases.length,
+        icon: <Tag className="w-4 h-4" />,
+        color: 'text-amber-600 dark:text-amber-400',
+        bgColor: 'bg-amber-50 dark:bg-amber-900/20'
+      });
+    }
+
+    const totalDiscoveryRepos = Object.values(discoveryRepos || {}).flat().length;
+    if (totalDiscoveryRepos > 100) {
+      suggestions.push({
+        key: 'discoveryCache',
+        label: '发现页缓存数据',
+        labelEn: 'Discovery Page Cache',
+        description: '发现页缓存的仓库数据，可安全清理',
+        descriptionEn: 'Cached repository data from discovery page, safe to clean',
+        count: totalDiscoveryRepos,
+        icon: <Sparkles className="w-4 h-4" />,
+        color: 'text-purple-600 dark:text-purple-400',
+        bgColor: 'bg-purple-50 dark:bg-purple-900/20'
+      });
+    }
+
+    const unanalyzedRepos = repositories.filter(r => !r.analyzed_at).length;
+    if (unanalyzedRepos > 10) {
+      suggestions.push({
+        key: 'unanalyzedRepos',
+        label: '未分析的仓库',
+        labelEn: 'Unanalyzed Repositories',
+        description: '尚未进行AI分析的仓库数量',
+        descriptionEn: 'Repositories that have not been analyzed by AI',
+        count: unanalyzedRepos,
+        icon: <Bot className="w-4 h-4" />,
+        color: 'text-blue-600 dark:text-blue-400',
+        bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+      });
+    }
+
+    const oldReadReleases = readReleases.size;
+    if (oldReadReleases > 50) {
+      suggestions.push({
+        key: 'readReleases',
+        label: '已读Release标记',
+        labelEn: 'Read Release Marks',
+        description: '已读Release的标记记录',
+        descriptionEn: 'Records of read releases',
+        count: oldReadReleases,
+        icon: <Eye className="w-4 h-4" />,
+        color: 'text-green-600 dark:text-green-400',
+        bgColor: 'bg-green-50 dark:bg-green-900/20'
+      });
+    }
+
+    return suggestions;
+  }, [releases, discoveryRepos, repositories, readReleases]);
+
+  const handleCleanup = useCallback(async (key: string) => {
+    try {
+      switch (key) {
+        case 'oldReleases': {
+          const now = Date.now();
+          const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
+          const filteredReleases = releases.filter(r => 
+            new Date(r.published_at).getTime() >= ninetyDaysAgo
+          );
+          setReleases(filteredReleases);
+          break;
+        }
+        case 'discoveryCache':
+          await deleteDiscoveryData();
+          return;
+        case 'readReleases':
+          useAppStore.setState({ readReleases: new Set<number>() });
+          break;
+      }
+      addLog(t('清理数据', 'Cleanup data'), true);
+      showSuccess(t('数据清理成功', 'Data cleanup successful'));
+    } catch (error) {
+      addLog(t('清理数据', 'Cleanup data'), false, String(error));
+      showError(t('清理失败，请重试', 'Cleanup failed, please try again'));
+    }
+  }, [releases, setReleases, deleteDiscoveryData, addLog, showSuccess, showError, t]);
+
   const deleteAllData = async () => {
     try {
       // 先清除存储，确保存储清除成功后再重置状态
@@ -327,6 +777,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         case 'categorySettings':
           await deleteCategorySettings();
           break;
+        case 'assetFilters':
+          await deleteAssetFilters();
+          break;
+        case 'discoveryData':
+          await deleteDiscoveryData();
+          break;
+        case 'releaseSubscriptions':
+          await deleteReleaseSubscriptions();
+          break;
+        case 'searchHistory':
+          await deleteSearchHistory();
+          break;
         case 'all':
           await deleteAllData();
           break;
@@ -378,6 +840,26 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           '这将删除所有自定义分类和分类显示设置。此操作不可恢复。',
           'This will delete all custom categories and category display settings. This action cannot be undone.'
         );
+      case 'assetFilters':
+        return t(
+          '这将删除所有资源过滤器预设数据。此操作不可恢复。',
+          'This will delete all asset filter presets. This action cannot be undone.'
+        );
+      case 'discoveryData':
+        return t(
+          '这将删除发现页缓存的仓库数据。此操作不可恢复。',
+          'This will delete cached repository data from discovery page. This action cannot be undone.'
+        );
+      case 'releaseSubscriptions':
+        return t(
+          '这将删除所有Release订阅和已读标记数据。此操作不可恢复。',
+          'This will delete all release subscriptions and read marks. This action cannot be undone.'
+        );
+      case 'searchHistory':
+        return t(
+          '这将删除搜索历史和搜索过滤器设置。此操作不可恢复。',
+          'This will delete search history and filter settings. This action cannot be undone.'
+        );
       case 'all':
         return t(
           '这将删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。此操作将重置应用程序到初始状态，不可恢复！',
@@ -400,12 +882,24 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         return t('删除WebDAV配置数据', 'Delete WebDAV Configurations');
       case 'categorySettings':
         return t('删除分类显示设置数据', 'Delete Category Display Settings');
+      case 'assetFilters':
+        return t('删除资源过滤器数据', 'Delete Asset Filters');
+      case 'discoveryData':
+        return t('删除发现页缓存数据', 'Delete Discovery Cache');
+      case 'releaseSubscriptions':
+        return t('删除Release订阅数据', 'Delete Release Subscriptions');
+      case 'searchHistory':
+        return t('删除搜索历史数据', 'Delete Search History');
       case 'all':
         return t('删除所有数据', 'Delete All Data');
       default:
         return '';
     }
   };
+
+  const totalDiscoveryReposCount = useMemo(() => {
+    return Object.values(discoveryRepos || {}).flat().length;
+  }, [discoveryRepos]);
 
   const dataStats = [
     {
@@ -447,6 +941,38 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       icon: <FolderTree className="w-5 h-5" />,
       color: 'text-orange-600 dark:text-orange-400',
       bgColor: 'bg-orange-50 dark:bg-orange-900/20',
+    },
+    {
+      key: 'assetFilters',
+      label: t('资源过滤器', 'Asset Filters'),
+      count: assetFilters.length,
+      icon: <Filter className="w-5 h-5" />,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
+    },
+    {
+      key: 'discoveryData',
+      label: t('发现页缓存', 'Discovery Cache'),
+      count: totalDiscoveryReposCount,
+      icon: <Sparkles className="w-5 h-5" />,
+      color: 'text-pink-600 dark:text-pink-400',
+      bgColor: 'bg-pink-50 dark:bg-pink-900/20',
+    },
+    {
+      key: 'releaseSubscriptions',
+      label: t('Release订阅', 'Release Subscriptions'),
+      count: releaseSubscriptions.size,
+      icon: <Eye className="w-5 h-5" />,
+      color: 'text-teal-600 dark:text-teal-400',
+      bgColor: 'bg-teal-50 dark:bg-teal-900/20',
+    },
+    {
+      key: 'searchHistory',
+      label: t('搜索历史', 'Search History'),
+      count: searchFilters.query ? 1 : 0,
+      icon: <Search className="w-5 h-5" />,
+      color: 'text-gray-600 dark:text-gray-400',
+      bgColor: 'bg-gray-50 dark:bg-gray-900/20',
     },
   ];
 
@@ -497,6 +1023,153 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           ))}
         </div>
       </section>
+
+      {/* Data Export/Import */}
+      <section>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+          <HardDrive className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+          {t('数据导出与导入', 'Data Export & Import')}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Export */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white">{t('导出数据', 'Export Data')}</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
+              </div>
+            </div>
+            <div className="space-y-2 mb-4">
+              {[
+                { key: 'repositories', label: t('仓库数据', 'Repositories') },
+                { key: 'releases', label: t('Release数据', 'Releases') },
+                { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
+                { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
+                { key: 'customCategories', label: t('分类设置', 'Categories') },
+                { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
+              ].map((item) => (
+                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="export-checkbox rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                    data-type={item.key}
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const checkboxes = document.querySelectorAll('.export-checkbox:checked');
+                const selectedTypes = Array.from(checkboxes).map((cb) => (cb as HTMLInputElement).dataset.type as string);
+                if (selectedTypes.length === 0) {
+                  showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
+                  return;
+                }
+                exportData(selectedTypes);
+              }}
+              disabled={isExporting}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{t('导出中...', 'Exporting...')}</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>{t('导出选中数据', 'Export Selected')}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Import */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white">{t('导入数据', 'Import Data')}</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
+              </div>
+            </div>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
+              </p>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportFile}
+                className="hidden"
+                id="import-file-input"
+              />
+              <label
+                htmlFor="import-file-input"
+                className="cursor-pointer px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors inline-block"
+              >
+                {t('选择文件', 'Select File')}
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Data Cleanup Suggestions */}
+      {cleanupSuggestions.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <RefreshCw className="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400" />
+            {t('数据清理建议', 'Data Cleanup Suggestions')}
+          </h3>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {t('以下数据可以安全清理以释放存储空间，不会影响核心功能。', 'The following data can be safely cleaned to free up storage without affecting core functionality.')}
+            </p>
+          </div>
+          <div className="space-y-3">
+            {cleanupSuggestions.map((suggestion) => (
+              <div
+                key={suggestion.key}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
+                    {suggestion.icon}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {language === 'zh' ? suggestion.label : suggestion.labelEn}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {suggestion.count} {t('条', 'items')}
+                  </span>
+                  <button
+                    onClick={() => handleCleanup(suggestion.key)}
+                    className="px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-lg transition-colors"
+                  >
+                    {t('清理', 'Clean')}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Selective Data Deletion */}
       <section>
@@ -693,6 +1366,110 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       <Trash2 className="w-4 h-4" />
                       <span>{t('确认删除', 'Confirm Delete')}</span>
                     </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Preview Modal */}
+      {importPreview.isOpen && importPreview.data && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-800">
+              <div className="flex items-center space-x-3">
+                <Upload className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">
+                  {t('导入数据预览', 'Import Data Preview')}
+                </h3>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
+                <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
+                <p><strong>{t('版本:', 'Version:')}</strong> {importPreview.data.appVersion}</p>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('包含的数据:', 'Included Data:')}</p>
+                <div className="space-y-1 text-sm">
+                  {importPreview.data.data.repositories && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
+                    </p>
+                  )}
+                  {importPreview.data.data.releases && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
+                    </p>
+                  )}
+                  {importPreview.data.data.aiConfigs && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
+                    </p>
+                  )}
+                  {importPreview.data.data.webdavConfigs && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
+                    </p>
+                  )}
+                  {importPreview.data.data.customCategories && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
+                    </p>
+                  )}
+                  {importPreview.data.data.assetFilters && (
+                    <p className="text-gray-600 dark:text-gray-400">
+                      • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
+                  disabled={isImporting}
+                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {t('取消', 'Cancel')}
+                </button>
+                <button
+                  onClick={() => {
+                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
+                    importData(types, 'merge');
+                  }}
+                  disabled={isImporting}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{t('导入中...', 'Importing...')}</span>
+                    </>
+                  ) : (
+                    <span>{t('合并导入', 'Merge Import')}</span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
+                    importData(types, 'replace');
+                  }}
+                  disabled={isImporting}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{t('导入中...', 'Importing...')}</span>
+                    </>
+                  ) : (
+                    <span>{t('覆盖导入', 'Replace Import')}</span>
                   )}
                 </button>
               </div>

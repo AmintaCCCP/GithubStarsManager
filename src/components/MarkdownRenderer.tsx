@@ -1,10 +1,12 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import { Copy, Check } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
 
 interface MarkdownRendererProps {
   content: string;
@@ -12,7 +14,75 @@ interface MarkdownRendererProps {
   shouldRender?: boolean;
   enableHtml?: boolean;
   baseUrl?: string;
+  headingIds?: Map<string, string>;
 }
+
+const CodeBlock: React.FC<{ 
+  children: React.ReactNode; 
+  className?: string;
+  language: string;
+}> = ({ children, className, language }) => {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const { language: uiLanguage } = useAppStore();
+  
+  const handleCopy = useCallback(async () => {
+    const codeText = typeof children === 'string'
+      ? children
+      : String(children);
+
+    setCopyError(null);
+
+    const result = await safeWriteText(codeText);
+
+    if (result.success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      console.error('Failed to copy:', result.error);
+      setCopyError(result.error || getClipboardErrorMessage('write', uiLanguage));
+    }
+  }, [children, uiLanguage]);
+  
+  return (
+    <div className="relative group my-3">
+      <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {language && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-700 dark:bg-gray-600 px-2 py-1 rounded">
+            {language}
+          </span>
+        )}
+        <button
+          onClick={handleCopy}
+          className={`p-1.5 rounded transition-colors ${
+            copyError 
+              ? 'bg-red-600 dark:bg-red-500 text-white' 
+              : 'bg-gray-600 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 text-gray-200 dark:text-gray-100'
+          }`}
+          title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
+        >
+          {copyError ? (
+            <span className="text-xs">!</span>
+          ) : copied ? (
+            <Check className="w-4 h-4 text-green-400" />
+          ) : (
+            <Copy className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+      {copyError && (
+        <div className="absolute top-2 right-14 max-w-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-xs px-2 py-1 rounded shadow-lg z-20">
+          {copyError}
+        </div>
+      )}
+      <pre className={`bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto ${className || ''}`}>
+        <code className="text-xs font-mono text-gray-800 dark:text-gray-200">
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
+};
 
 const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string }> = ({ 
   href, 
@@ -103,7 +173,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   className = '', 
   shouldRender = true,
   enableHtml = false,
-  baseUrl
+  baseUrl,
+  headingIds
 }) => {
   if (!shouldRender) {
     return <div className="h-32 flex items-center justify-center text-gray-400">Loading...</div>;
@@ -111,6 +182,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
 
   const remarkPlugins = [remarkGfm, remarkBreaks];
   const rehypePlugins = enableHtml ? [rehypeRaw, rehypeSanitize] : [];
+
+  const getHeadingId = (children: React.ReactNode): string | undefined => {
+    const text = typeof children === 'string' 
+      ? children 
+      : Array.isArray(children) 
+        ? children.join('') 
+        : String(children);
+    return headingIds?.get(text);
+  };
 
   return (
     <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
@@ -120,30 +200,38 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         components={{
           a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} />,
           img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
-          h1: ({ children }) => <h1 className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>,
-          h2: ({ children }) => <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>,
-          h3: ({ children }) => <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>,
+          h1: ({ children }) => {
+            const id = getHeadingId(children);
+            return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>;
+          },
+          h2: ({ children }) => {
+            const id = getHeadingId(children);
+            return <h2 id={id} className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
+          },
+          h3: ({ children }) => {
+            const id = getHeadingId(children);
+            return <h3 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>;
+          },
           p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-2 leading-relaxed">{children}</p>,
           ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,
           code: ({ className, children, ...props }) => {
             const isInline = !className;
+            const match = /language-(\w+)/.exec(className || '');
+            const language = match ? match[1] : '';
+            
             return isInline ? (
               <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
                 {children}
               </code>
             ) : (
-              <code className="text-xs font-mono text-gray-800 dark:text-gray-200" {...props}>
+              <CodeBlock className={className} language={language}>
                 {children}
-              </code>
+              </CodeBlock>
             );
           },
-          pre: ({ children }) => (
-            <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3">
-              {children}
-            </pre>
-          ),
+          pre: ({ children }) => <>{children}</>,
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
               {children}

@@ -5,29 +5,28 @@ export interface Repository {
   description: string | null;
   html_url: string;
   stargazers_count: number;
+  forks_count: number;
+  forks: number;
   language: string | null;
   created_at: string;
   updated_at: string;
   pushed_at: string;
-  starred_at?: string; // 新增：加入星标的时间
+  starred_at?: string;
   owner: {
     login: string;
     avatar_url: string;
   };
   topics: string[];
-  // AI generated fields
   ai_summary?: string;
   ai_tags?: string[];
-  ai_platforms?: string[]; // 新增：支持的平台类型
+  ai_platforms?: string[];
   analyzed_at?: string;
-  analysis_failed?: boolean; // 新增：AI分析是否失败
-  // Release subscription
+  analysis_failed?: boolean;
   subscribed_to_releases?: boolean;
-  // Manual editing fields
   custom_description?: string;
   custom_tags?: string[];
   custom_category?: string;
-  category_locked?: boolean; // 是否锁定分类（锁定后同步不自动改分类）
+  category_locked?: boolean;
   last_edited?: string;
 }
 
@@ -142,6 +141,7 @@ export interface AppState {
   repositories: Repository[];
   isLoading: boolean;
   lastSync: string | null;
+  analyzingRepositoryIds: Set<number>;
   
   // AI
   aiConfigs: AIConfig[];
@@ -194,13 +194,22 @@ export interface AppState {
   releaseExpandedRepositories: Set<number>;
   releaseIsRefreshing: boolean;
 
-  // Subscription
-  subscriptionChannels: SubscriptionChannel[];
-  subscriptionRepos: Record<SubscriptionChannelId, SubscriptionRepo[]>;
-  subscriptionDevs: SubscriptionDev[];
-  subscriptionLastRefresh: Record<SubscriptionChannelId, string | null>;
-  subscriptionIsLoading: Record<SubscriptionChannelId, boolean>;
-  selectedSubscriptionChannel: SubscriptionChannelId;
+  // Discovery
+  discoveryChannels: DiscoveryChannel[];
+  discoveryRepos: Record<DiscoveryChannelId, DiscoveryRepo[]>;
+  discoveryLastRefresh: Record<DiscoveryChannelId, string | null>;
+  discoveryIsLoading: Record<DiscoveryChannelId, boolean>;
+  selectedDiscoveryChannel: DiscoveryChannelId;
+  discoveryPlatform: DiscoveryPlatform;
+  discoveryLanguage: ProgrammingLanguage;
+  discoverySortBy: SortBy;
+  discoverySortOrder: SortOrder;
+  discoverySearchQuery: string;
+  discoverySelectedTopic: TopicCategory | null;
+  discoveryHasMore: Record<DiscoveryChannelId, boolean>;
+  discoveryNextPage: Record<DiscoveryChannelId, number>;
+  discoveryTotalCount: Record<DiscoveryChannelId, number>;
+  discoveryScrollPositions: Record<DiscoveryChannelId, number>;
 }
 
 export interface UpdateNotification {
@@ -216,10 +225,33 @@ export interface AnalysisProgress {
   total: number;
 }
 
-export type SubscriptionChannelId = 'most-stars' | 'most-forks' | 'most-dev' | 'trending';
+export type DiscoveryPlatform = 'All' | 'Android' | 'Macos' | 'Windows' | 'Linux';
 
-export interface SubscriptionChannel {
-  id: SubscriptionChannelId;
+export type ProgrammingLanguage = 
+  | 'All' 
+  | 'Kotlin' 
+  | 'Java' 
+  | 'JavaScript' 
+  | 'TypeScript' 
+  | 'Python' 
+  | 'Swift' 
+  | 'Rust' 
+  | 'Go' 
+  | 'CSharp' 
+  | 'CPlusPlus' 
+  | 'C' 
+  | 'Dart' 
+  | 'Ruby' 
+  | 'PHP';
+
+export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
+
+export type SortOrder = 'Descending' | 'Ascending';
+
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search';
+
+export interface DiscoveryChannel {
+  id: DiscoveryChannelId;
   name: string;
   nameEn: string;
   icon: string;
@@ -227,21 +259,32 @@ export interface SubscriptionChannel {
   enabled: boolean;
 }
 
-export interface SubscriptionRepo extends Repository {
-  rank: number;
-  channel: SubscriptionChannelId;
-  forks?: number;
-  forks_count?: number;
+export interface PaginatedDiscoveryRepositories {
+  repos: DiscoveryRepo[];
+  hasMore: boolean;
+  nextPageIndex: number;
+  totalCount?: number;
 }
 
-export interface SubscriptionDev {
+export interface DiscoveryRepo extends Repository {
   rank: number;
-  login: string;
-  avatar_url: string;
-  html_url: string;
-  name: string | null;
-  bio: string | null;
-  public_repos: number;
-  followers: number;
-  topRepo: SubscriptionRepo | null;
+  channel: DiscoveryChannelId;
+  platform: DiscoveryPlatform;
+}
+
+export type TopicCategory = 
+  | 'ai' 
+  | 'ml' 
+  | 'database' 
+  | 'web' 
+  | 'mobile' 
+  | 'devtools' 
+  | 'security' 
+  | 'game';
+
+export interface TopicInfo {
+  id: TopicCategory;
+  name: string;
+  nameEn: string;
+  keywords: string;
 }
