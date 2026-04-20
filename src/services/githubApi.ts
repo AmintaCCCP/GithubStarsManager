@@ -277,7 +277,7 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly', _language?: string): Promise<SubscriptionRepo[]> {
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly'): Promise<SubscriptionRepo[]> {
     // 使用 GitHubTrendingRSS API
     const rssUrl = `https://mshibanami.github.io/GitHubTrendingRSS/${timeRange}/all.xml`;
 
@@ -296,27 +296,33 @@ export class GitHubApiService {
       const items = xml.querySelectorAll('item');
 
       const repos: SubscriptionRepo[] = [];
-      items.forEach((item, index) => {
-        if (index >= perPage) return;
-
+      for (let i = 0; i < Math.min(items.length, perPage); i++) {
+        const item = items[i];
         const title = item.querySelector('title')?.textContent || '';
         const link = item.querySelector('link')?.textContent || '';
-        const description = item.querySelector('description')?.textContent || '';
-        const author = item.querySelector('author')?.textContent || '';
+        // description 可能包含 HTML，需要解码
+        const descriptionEl = item.querySelector('description');
+        let description = descriptionEl?.textContent || '';
+        // 解码 HTML 实体
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        description = tempDiv.textContent || tempDiv.innerText || description;
+        // 清理多余空白
+        description = description.replace(/\s+/g, ' ').trim();
 
         // 解析 link 获取 owner/repo 格式
-        const match = link.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
         const owner = match?.[1] || '';
         const repoName = match?.[2] || title;
 
         // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
         const starsMatch = description.match(/⭐\s*([\d,]+)/);
         const forksMatch = description.match(/🍴\s*([\d,]+)/);
-        const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
-        const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+        let stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        let forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
 
         repos.push({
-          id: index + 1,
+          id: i + 1,
           name: repoName,
           full_name: `${owner}/${repoName}`,
           description: description.slice(0, 200),
@@ -329,16 +335,42 @@ export class GitHubApiService {
           pushed_at: new Date().toISOString(),
           owner: { login: owner, avatar_url: `https://github.com/${owner}.png` },
           topics: [],
-          rank: index + 1,
+          rank: i + 1,
           channel: 'trending',
           forks_count: forks,
         });
-      });
+      }
+
+      // 如果 stars 或 forks 为 0，从 GitHub API 获取
+      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0);
+      if (reposNeedUpdate.length > 0) {
+        await Promise.all(reposNeedUpdate.map(async (r) => {
+          try {
+            const [owner, repo] = r.full_name.split('/');
+            if (!owner || !repo) return;
+            const data = await this.makeRequest<{
+              stargazers_count: number;
+              forks_count: number;
+              language: string | null;
+              description: string | null;
+            }>(`/repos/${owner}/${repo}`);
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.forks_count = data.forks_count ?? r.forks_count;
+            r.language = data.language;
+            if (data.description && !r.description) {
+              r.description = data.description;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+          }
+          // 避免 GitHub API 限流
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }));
+      }
 
       return repos;
     } catch (error) {
       console.error('Failed to fetch trending from RSS:', error);
-      // Fallback to empty array
       return [];
     }
   }
