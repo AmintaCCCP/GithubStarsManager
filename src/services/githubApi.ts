@@ -520,38 +520,40 @@ export class GitHubApiService {
       ? this.buildLanguageQuery(params.language) 
       : '';
     const minStars = params?.minStars ?? 100;
-    const projectType = params?.projectType ?? 'active';
-    const timeRange = params?.timeRange ?? 'month';
+    const timeRange = params?.timeRange ?? 'monthly-trending';
     const sortBy = params?.sortBy ?? 'Stars';
     const sortOrder = params?.sortOrder ?? 'Desc';
 
-    const timeRangeDays: Record<string, number> = {
-      'today': 1,
-      'week': 7,
-      'month': 30,
-      'quarter': 90,
-      'year': 365,
-    };
-    const daysAgo = timeRangeDays[timeRange] || 30;
-    const sinceDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
-    const since = sinceDate.toISOString().split('T')[0];
-
     let query: string;
-    
-    switch (projectType) {
-      case 'new':
+
+    switch (timeRange) {
+      case 'weekly-hot': {
+        const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        query = `stars:>=${minStars} archived:false pushed:>=${since}`;
+        break;
+      }
+      case 'new-stars': {
+        const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         query = `stars:>=${minStars} archived:false created:>=${since}`;
         break;
+      }
       case 'classic': {
         const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         query = `stars:>=${minStars} archived:false created:<${sixMonthsAgo} pushed:>=${oneYearAgo}`;
         break;
       }
-      case 'active':
-      default:
+      case 'quarterly': {
+        const since = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         query = `stars:>=${minStars} archived:false pushed:>=${since}`;
         break;
+      }
+      case 'monthly-trending':
+      default: {
+        const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        query = `stars:>=${minStars} archived:false pushed:>=${since}`;
+        break;
+      }
     }
 
     if (platformQuery) {

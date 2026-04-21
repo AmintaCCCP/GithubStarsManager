@@ -257,12 +257,9 @@ export type DiscoverySortBy = 'BestMatch' | 'Stars' | 'Forks' | 'Updated' | 'Cre
 
 export type DiscoverySortOrder = 'Desc' | 'Asc';
 
-export type TrendingTimeRange = 'today' | 'week' | 'month' | 'quarter' | 'year';
-
-export type TrendingProjectType = 'new' | 'active' | 'classic';
+export type TrendingTimeRange = 'weekly-hot' | 'monthly-trending' | 'new-stars' | 'classic' | 'quarterly';
 
 export interface TrendingParams {
-  projectType: TrendingProjectType;
   timeRange: TrendingTimeRange;
   language: ProgrammingLanguage;
   minStars: number;

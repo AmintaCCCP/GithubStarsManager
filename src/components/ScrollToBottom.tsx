@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useModalVisibility } from '../hooks/useModalVisibility';
 
 interface ScrollToBottomProps {
   scrollContainerRef: React.RefObject<HTMLElement>;
@@ -10,6 +11,7 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
   scrollContainerRef 
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const isModalOpen = useModalVisibility();
   const language = useAppStore(state => state.language);
   const containerRef = useRef<HTMLElement | null>(null);
 
@@ -70,6 +72,8 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
     };
   }, [checkVisibility]);
 
+  const shouldShow = isVisible && !isModalOpen;
+
   return (
     <button
       type="button"
@@ -87,7 +91,7 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         hover:scale-110
         focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
-        ${isVisible
+        ${shouldShow
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
@@ -96,8 +100,8 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         lg:bottom-24 lg:left-10
       `}
       aria-label={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
-      aria-hidden={!isVisible}
-      tabIndex={isVisible ? 0 : -1}
+      aria-hidden={!shouldShow}
+      tabIndex={shouldShow ? 0 : -1}
       title={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
     >
       <ArrowDown className="w-5 h-5 sm:w-6 sm:h-6" />

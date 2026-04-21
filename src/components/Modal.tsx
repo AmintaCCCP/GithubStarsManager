@@ -28,11 +28,13 @@ export const Modal: React.FC<ModalProps> = ({
       document.addEventListener('keydown', handleEscape);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
+      window.dispatchEvent(new CustomEvent('gsm:modal-open'));
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
+      window.dispatchEvent(new CustomEvent('gsm:modal-close'));
     };
   }, [isOpen, onClose]);
 

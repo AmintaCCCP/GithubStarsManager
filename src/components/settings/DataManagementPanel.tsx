@@ -32,7 +32,19 @@ import type {
   Category, 
   AssetFilter,
   DiscoveryRepo,
-  SearchFilters 
+  SubscriptionRepo,
+  SubscriptionChannel,
+  DiscoveryChannel,
+  DiscoveryChannelId,
+  SearchFilters,
+  TrendingParams,
+  TopicParams,
+  DiscoverySortBy,
+  DiscoverySortOrder,
+  RSSTimeRange,
+  ProgrammingLanguage,
+  DiscoveryPlatform,
+  TopicCategory
 } from '../../types';
 
 interface DataManagementPanelProps {
@@ -81,9 +93,21 @@ interface ExportData {
     discoveryTotalCount?: Record<string, number>;
     discoveryHasMore?: Record<string, boolean>;
     discoveryNextPage?: Record<string, number>;
-    subscriptionRepos?: Record<string, DiscoveryRepo[]>;
+    discoveryCurrentPage?: Record<string, number>;
+    discoveryLastRefresh?: Record<string, string | null>;
+    discoveryScrollPositions?: Record<string, number>;
+    discoveryChannels?: DiscoveryChannel[];
+    selectedDiscoveryChannel?: DiscoveryChannelId;
+    discoveryPlatform?: DiscoveryPlatform;
+    discoveryLanguage?: ProgrammingLanguage;
+    trendingParams?: TrendingParams;
+    topicParams?: TopicParams;
+    searchParams?: { sortBy: DiscoverySortBy; sortOrder: DiscoverySortOrder };
+    discoverySelectedTopic?: TopicCategory | null;
+    rssTimeRange?: RSSTimeRange;
+    subscriptionRepos?: Record<string, SubscriptionRepo[]>;
     subscriptionLastRefresh?: Record<string, string | null>;
-    subscriptionChannels?: Array<{ id: string; name: string; nameEn: string }>;
+    subscriptionChannels?: SubscriptionChannel[];
     releaseSubscriptions?: number[];
     readReleases?: number[];
     searchFilters?: SearchFilters;
@@ -130,7 +154,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     language,
     setRepositories,
     setReleases,
-    setAssetFilters,
   } = useAppStore();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
@@ -348,7 +371,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteAssetFilters = async () => {
     try {
-      setAssetFilters([]);
+      useAppStore.setState({ assetFilters: [] });
       addLog(t('删除资源过滤器数据', 'Delete asset filters'), true);
       showSuccess(t('资源过滤器数据已删除', 'Asset filters deleted'));
     } catch (error) {
@@ -377,6 +400,36 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'topic': null,
           'search': null,
           'rss-trending': null
+        },
+        discoveryTotalCount: {
+          'trending': 0,
+          'topic': 0,
+          'search': 0,
+          'rss-trending': 0
+        },
+        discoveryHasMore: {
+          'trending': true,
+          'topic': true,
+          'search': true,
+          'rss-trending': false
+        },
+        discoveryNextPage: {
+          'trending': 1,
+          'topic': 1,
+          'search': 1,
+          'rss-trending': 1
+        },
+        discoveryCurrentPage: {
+          'trending': 1,
+          'topic': 1,
+          'search': 1,
+          'rss-trending': 1
+        },
+        discoveryScrollPositions: {
+          'trending': 0,
+          'topic': 0,
+          'search': 0,
+          'rss-trending': 0
         }
       });
       addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);
@@ -400,6 +453,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'most-forks': [],
           'most-dev': [],
           'trending': [],
+        },
+        subscriptionLastRefresh: {
+          'most-stars': null,
+          'most-forks': null,
+          'most-dev': null,
+          'trending': null,
         },
       });
       addLog(t('删除订阅页数据', 'Delete subscription data'), true);
@@ -501,6 +560,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.discoveryTotalCount = store.discoveryTotalCount;
         exportDataObj.data.discoveryHasMore = store.discoveryHasMore;
         exportDataObj.data.discoveryNextPage = store.discoveryNextPage;
+        exportDataObj.data.discoveryCurrentPage = store.discoveryCurrentPage;
+        exportDataObj.data.discoveryLastRefresh = store.discoveryLastRefresh;
+        exportDataObj.data.discoveryScrollPositions = store.discoveryScrollPositions;
+        exportDataObj.data.discoveryChannels = store.discoveryChannels;
+        exportDataObj.data.selectedDiscoveryChannel = store.selectedDiscoveryChannel;
+        exportDataObj.data.discoveryPlatform = store.discoveryPlatform;
+        exportDataObj.data.discoveryLanguage = store.discoveryLanguage;
+        exportDataObj.data.trendingParams = store.trendingParams;
+        exportDataObj.data.topicParams = store.topicParams;
+        exportDataObj.data.searchParams = store.searchParams;
+        exportDataObj.data.discoverySelectedTopic = store.discoverySelectedTopic;
+        exportDataObj.data.rssTimeRange = store.rssTimeRange;
       }
       if (selectedTypes.includes('subscriptionRepos')) {
         exportDataObj.data.subscriptionRepos = store.subscriptionRepos;
@@ -628,7 +699,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
-          store.setAssetFilters(importedData.assetFilters);
+          useAppStore.setState({ assetFilters: importedData.assetFilters });
         }
         if (selectedTypes.includes('discoveryRepos')) {
           if (importedData.discoveryRepos) {
@@ -642,6 +713,42 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
           if (importedData.discoveryNextPage) {
             useAppStore.setState({ discoveryNextPage: importedData.discoveryNextPage });
+          }
+          if (importedData.discoveryCurrentPage) {
+            useAppStore.setState({ discoveryCurrentPage: importedData.discoveryCurrentPage });
+          }
+          if (importedData.discoveryLastRefresh) {
+            useAppStore.setState({ discoveryLastRefresh: importedData.discoveryLastRefresh });
+          }
+          if (importedData.discoveryScrollPositions) {
+            useAppStore.setState({ discoveryScrollPositions: importedData.discoveryScrollPositions });
+          }
+          if (importedData.discoveryChannels) {
+            useAppStore.setState({ discoveryChannels: importedData.discoveryChannels });
+          }
+          if (importedData.selectedDiscoveryChannel) {
+            useAppStore.setState({ selectedDiscoveryChannel: importedData.selectedDiscoveryChannel });
+          }
+          if (importedData.discoveryPlatform) {
+            useAppStore.setState({ discoveryPlatform: importedData.discoveryPlatform });
+          }
+          if (importedData.discoveryLanguage) {
+            useAppStore.setState({ discoveryLanguage: importedData.discoveryLanguage });
+          }
+          if (importedData.trendingParams) {
+            useAppStore.setState({ trendingParams: importedData.trendingParams });
+          }
+          if (importedData.topicParams) {
+            useAppStore.setState({ topicParams: importedData.topicParams });
+          }
+          if (importedData.searchParams) {
+            useAppStore.setState({ searchParams: importedData.searchParams });
+          }
+          if (importedData.discoverySelectedTopic !== undefined) {
+            useAppStore.setState({ discoverySelectedTopic: importedData.discoverySelectedTopic });
+          }
+          if (importedData.rssTimeRange) {
+            useAppStore.setState({ rssTimeRange: importedData.rssTimeRange });
           }
         }
         if (selectedTypes.includes('subscriptionRepos')) {
@@ -720,12 +827,65 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
           const existingIds = new Set(store.assetFilters.map(f => f.id));
           const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
-          store.setAssetFilters([...store.assetFilters, ...newFilters]);
+          useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
         }
         if (selectedTypes.includes('releaseSubscriptions') && importedData.releaseSubscriptions) {
           const existingSubs = store.releaseSubscriptions;
           const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
           useAppStore.setState({ releaseSubscriptions: newSubs });
+          if (importedData.readReleases) {
+            const existingRead = store.readReleases;
+            const newRead = new Set([...Array.from(existingRead), ...importedData.readReleases]);
+            useAppStore.setState({ readReleases: newRead });
+          }
+        }
+        if (selectedTypes.includes('discoveryRepos') && importedData.discoveryRepos) {
+          const mergedDiscoveryRepos = { ...store.discoveryRepos };
+          for (const [channel, repos] of Object.entries(importedData.discoveryRepos)) {
+            const channelKey = channel as keyof typeof mergedDiscoveryRepos;
+            const existingIds = new Set((mergedDiscoveryRepos[channelKey] || []).map(r => r.id));
+            const newRepos = repos.filter(r => !existingIds.has(r.id));
+            mergedDiscoveryRepos[channelKey] = [...(mergedDiscoveryRepos[channelKey] || []), ...newRepos];
+          }
+          useAppStore.setState({ discoveryRepos: mergedDiscoveryRepos });
+        }
+        if (selectedTypes.includes('subscriptionRepos') && importedData.subscriptionRepos) {
+          const mergedSubRepos = { ...store.subscriptionRepos };
+          for (const [channel, repos] of Object.entries(importedData.subscriptionRepos)) {
+            const channelKey = channel as keyof typeof mergedSubRepos;
+            const existingIds = new Set((mergedSubRepos[channelKey] || []).map(r => r.id));
+            const newRepos = repos.filter(r => !existingIds.has(r.id));
+            mergedSubRepos[channelKey] = [...(mergedSubRepos[channelKey] || []), ...newRepos];
+          }
+          useAppStore.setState({ subscriptionRepos: mergedSubRepos });
+        }
+        if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
+          useAppStore.setState({ searchFilters: importedData.searchFilters });
+        }
+        if (selectedTypes.includes('uiSettings')) {
+          if (importedData.theme === 'light' || importedData.theme === 'dark') {
+            useAppStore.setState({ theme: importedData.theme });
+          }
+          if (importedData.language) {
+            useAppStore.setState({ language: importedData.language });
+          }
+          if (typeof importedData.isSidebarCollapsed === 'boolean') {
+            useAppStore.setState({ isSidebarCollapsed: importedData.isSidebarCollapsed });
+          }
+          if (importedData.releaseViewMode === 'timeline' || importedData.releaseViewMode === 'repository') {
+            useAppStore.setState({ releaseViewMode: importedData.releaseViewMode });
+          }
+          if (importedData.releaseSelectedFilters) {
+            useAppStore.setState({ releaseSelectedFilters: importedData.releaseSelectedFilters });
+          }
+          if (importedData.releaseSearchQuery !== undefined) {
+            useAppStore.setState({ releaseSearchQuery: importedData.releaseSearchQuery });
+          }
+          if (importedData.releaseExpandedRepositories) {
+            const existingExpanded = store.releaseExpandedRepositories;
+            const mergedExpanded = new Set([...Array.from(existingExpanded), ...importedData.releaseExpandedRepositories]);
+            useAppStore.setState({ releaseExpandedRepositories: mergedExpanded });
+          }
         }
       }
 
@@ -879,6 +1039,64 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
         // 资源过滤器
         assetFilters: [],
+
+        // 发现页数据
+        discoveryRepos: {
+          'trending': [],
+          'topic': [],
+          'search': [],
+          'rss-trending': []
+        },
+        discoveryLastRefresh: {
+          'trending': null,
+          'topic': null,
+          'search': null,
+          'rss-trending': null
+        },
+        discoveryTotalCount: {
+          'trending': 0,
+          'topic': 0,
+          'search': 0,
+          'rss-trending': 0
+        },
+        discoveryHasMore: {
+          'trending': true,
+          'topic': true,
+          'search': true,
+          'rss-trending': false
+        },
+        discoveryNextPage: {
+          'trending': 1,
+          'topic': 1,
+          'search': 1,
+          'rss-trending': 1
+        },
+        discoveryCurrentPage: {
+          'trending': 1,
+          'topic': 1,
+          'search': 1,
+          'rss-trending': 1
+        },
+        discoveryScrollPositions: {
+          'trending': 0,
+          'topic': 0,
+          'search': 0,
+          'rss-trending': 0
+        },
+
+        // 订阅页数据
+        subscriptionRepos: {
+          'most-stars': [],
+          'most-forks': [],
+          'most-dev': [],
+          'trending': [],
+        },
+        subscriptionLastRefresh: {
+          'most-stars': null,
+          'most-forks': null,
+          'most-dev': null,
+          'trending': null,
+        },
 
         // UI 设置
         selectedCategory: 'all',

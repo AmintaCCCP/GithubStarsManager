@@ -276,6 +276,108 @@
   border-color: #4b5563;
 }
 
+/* ========== Markdown Dark Mode Text Color Fix ========== */
+
+.dark .prose {
+  color: #d1d5db;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
+  color: #f3f4f6;
+}
+
+.dark .prose p,
+.dark .prose li,
+.dark .prose dd,
+.dark .prose dt,
+.dark .prose td,
+.dark .prose th,
+.dark .prose span,
+.dark .prose div,
+.dark .prose figcaption,
+.dark .prose label,
+.dark .prose summary,
+.dark .prose details {
+  color: #d1d5db;
+}
+
+.dark .prose strong,
+.dark .prose b {
+  color: #f3f4f6;
+}
+
+.dark .prose em,
+.dark .prose i {
+  color: #d1d5db;
+}
+
+.dark .prose small {
+  color: #9ca3af;
+}
+
+.dark .prose kbd {
+  background-color: #374151;
+  color: #f3f4f6;
+  border-color: #4b5563;
+  box-shadow: 0 1px 0 #1f2937;
+}
+
+.dark .prose mark {
+  background-color: rgba(250, 204, 21, 0.3);
+  color: #fbbf24;
+}
+
+.dark .prose abbr[title] {
+  color: #d1d5db;
+  text-decoration-color: #6b7280;
+}
+
+.dark .prose del,
+.dark .prose s {
+  color: #9ca3af;
+}
+
+.dark .prose sub,
+.dark .prose sup {
+  color: #d1d5db;
+}
+
+.dark .prose details {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.dark .prose summary {
+  color: #e5e7eb;
+}
+
+.dark .prose dl {
+  color: #d1d5db;
+}
+
+.dark .prose [style*="color"] {
+  color: inherit !important;
+}
+
+.dark .prose a[style*="color"] {
+  color: #60a5fa !important;
+}
+
+.dark .prose svg text {
+  fill: #d1d5db;
+}
+
+.dark .prose svg[fill="black"],
+.dark .prose svg[fill="#000"],
+.dark .prose svg[fill="#000000"] {
+  fill: #d1d5db;
+}
+
 /* ========== Terminal / Shell Code Block Enhancement ========== */
 
 /* 终端代码块容器 */

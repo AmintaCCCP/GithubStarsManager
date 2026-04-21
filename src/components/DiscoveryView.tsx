@@ -45,7 +45,6 @@ import type {
   TopicCategory,
   TrendingParams,
   TrendingTimeRange,
-  TrendingProjectType,
   RSSTimeRange
 } from '../types';
 import { ITEMS_PER_PAGE } from '../utils/pagination';
@@ -313,25 +312,18 @@ const TrendingFilter = React.memo<TrendingFilterProps>(({ params, onParamsChange
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const projectTypeOptions = useMemo<{ id: TrendingProjectType; name: string; nameEn: string; icon: React.ReactNode; desc: string; descEn: string }[]>(() => [
-    { id: 'new', name: '新星项目', nameEn: 'New', icon: <Sparkles className="w-3.5 h-3.5" />, desc: '最近创建的新项目', descEn: 'Recently created projects' },
-    { id: 'active', name: '活跃项目', nameEn: 'Active', icon: <TrendingUp className="w-3.5 h-3.5" />, desc: '最近有更新的项目', descEn: 'Recently updated projects' },
+  const timeRangeOptions = useMemo<{ id: TrendingTimeRange; name: string; nameEn: string; icon: React.ReactNode; desc: string; descEn: string }[]>(() => [
+    { id: 'weekly-hot', name: '本周热门', nameEn: 'Weekly Hot', icon: <TrendingUp className="w-3.5 h-3.5" />, desc: '最近7天活跃的项目', descEn: 'Active in last 7 days' },
+    { id: 'monthly-trending', name: '本月趋势', nameEn: 'Monthly Trending', icon: <Star className="w-3.5 h-3.5" />, desc: '最近30天活跃的项目', descEn: 'Active in last 30 days' },
+    { id: 'new-stars', name: '新星项目', nameEn: 'New Stars', icon: <Sparkles className="w-3.5 h-3.5" />, desc: '最近30天创建的项目', descEn: 'Created in last 30 days' },
     { id: 'classic', name: '经典项目', nameEn: 'Classic', icon: <Crown className="w-3.5 h-3.5" />, desc: '经过时间检验的项目', descEn: 'Time-tested projects' },
-  ], []);
-
-  const timeRangeOptions = useMemo<{ id: TrendingTimeRange; name: string; nameEn: string }[]>(() => [
-    { id: 'today', name: '今天', nameEn: 'Today' },
-    { id: 'week', name: '本周', nameEn: 'This Week' },
-    { id: 'month', name: '本月', nameEn: 'This Month' },
-    { id: 'quarter', name: '本季度', nameEn: 'This Quarter' },
-    { id: 'year', name: '今年', nameEn: 'This Year' },
+    { id: 'quarterly', name: '本季度', nameEn: 'Quarterly', icon: <Calendar className="w-3.5 h-3.5" />, desc: '最近90天活跃的项目', descEn: 'Active in last 90 days' },
   ], []);
 
   const sortByOptions = useMemo<{ id: DiscoverySortBy; name: string; nameEn: string; icon: React.ReactNode }[]>(() => [
     { id: 'Stars', name: '最多Star', nameEn: 'Most Stars', icon: <Star className="w-3.5 h-3.5" /> },
     { id: 'Forks', name: '最多Fork', nameEn: 'Most Forks', icon: <GitFork className="w-3.5 h-3.5" /> },
     { id: 'Updated', name: '最近更新', nameEn: 'Recently Updated', icon: <Calendar className="w-3.5 h-3.5" /> },
-    { id: 'Created', name: '最近创建', nameEn: 'Recently Created', icon: <Sparkles className="w-3.5 h-3.5" /> },
   ], []);
 
   const languageOptions = useMemo<{ id: ProgrammingLanguage; name: string }[]>(() => [
@@ -351,9 +343,8 @@ const TrendingFilter = React.memo<TrendingFilterProps>(({ params, onParamsChange
     { id: 'PHP', name: 'PHP' },
   ], [t]);
 
-  const minStarsOptions = useMemo(() => [50, 100, 200, 500, 1000], []);
+  const minStarsOptions = useMemo(() => [100, 500, 1000, 5000, 10000], []);
 
-  const currentProjectType = useMemo(() => projectTypeOptions.find(o => o.id === params.projectType), [projectTypeOptions, params.projectType]);
   const currentTimeRange = useMemo(() => timeRangeOptions.find(o => o.id === params.timeRange), [timeRangeOptions, params.timeRange]);
 
   return (
@@ -372,45 +363,24 @@ const TrendingFilter = React.memo<TrendingFilterProps>(({ params, onParamsChange
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                {t('项目类型', 'Project Type')}
+                {t('时间范围', 'Time Range')}
               </label>
               <div className="space-y-1">
-                {projectTypeOptions.map((option) => (
+                {timeRangeOptions.map((option) => (
                   <button
                     key={option.id}
-                    onClick={() => onParamsChange({ projectType: option.id })}
+                    onClick={() => onParamsChange({ timeRange: option.id })}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                      params.projectType === option.id
+                      params.timeRange === option.id
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
                     {option.icon}
                     <span className="flex-1 text-left">{language === 'zh' ? option.name : option.nameEn}</span>
-                    <span className={`text-[10px] ${params.projectType === option.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                    <span className={`text-[10px] ${params.timeRange === option.id ? 'text-blue-100' : 'text-gray-400'}`}>
                       {language === 'zh' ? option.desc : option.descEn}
                     </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                {t('时间范围', 'Time Range')}
-              </label>
-              <div className="flex gap-1 flex-wrap">
-                {timeRangeOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => onParamsChange({ timeRange: option.id })}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      params.timeRange === option.id
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {language === 'zh' ? option.name : option.nameEn}
                   </button>
                 ))}
               </div>
@@ -474,35 +444,13 @@ const TrendingFilter = React.memo<TrendingFilterProps>(({ params, onParamsChange
                   </button>
                 ))}
               </div>
-              <div className="flex gap-1 mt-2">
-                <button
-                  onClick={() => onParamsChange({ sortOrder: 'Desc' })}
-                  className={`flex-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    params.sortOrder === 'Desc'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {t('降序', 'Descending')}
-                </button>
-                <button
-                  onClick={() => onParamsChange({ sortOrder: 'Asc' })}
-                  className={`flex-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    params.sortOrder === 'Asc'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {t('升序', 'Ascending')}
-                </button>
-              </div>
             </div>
 
             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <Code className="w-3.5 h-3.5" />
                 <span>
-                  {t('当前筛选', 'Current')}: {language === 'zh' ? currentProjectType?.name : currentProjectType?.nameEn} · {language === 'zh' ? currentTimeRange?.name : currentTimeRange?.nameEn} · {params.minStars}+ ⭐
+                  {t('当前筛选', 'Current')}: {language === 'zh' ? currentTimeRange?.name : currentTimeRange?.nameEn} · {params.minStars >= 1000 ? `${params.minStars / 1000}K` : params.minStars}+ ⭐
                 </span>
               </div>
             </div>
@@ -1122,9 +1070,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 获取当前页显示的仓库
   // 服务端分页模式：allRepos 就是当前页的数据，不需要切片
   const currentPageRepos = useMemo(() => {
+    if (selectedDiscoveryChannel === 'rss-trending') {
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      console.log(`[Discovery] RSS client pagination: showing ${startIndex}-${endIndex} of ${allRepos.length} items, page ${currentPage}/${totalPages || '?'}`);
+      return allRepos.slice(startIndex, endIndex);
+    }
     console.log(`[Discovery] Current page repos: ${allRepos.length} items, page ${currentPage}/${totalPages || '?'}`);
     return allRepos;
-  }, [allRepos, currentPage, totalPages]);
+  }, [allRepos, currentPage, totalPages, selectedDiscoveryChannel]);
 
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
@@ -1170,8 +1124,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
           }
           break;
         case 'rss-trending': {
+          const currentRssTimeRange = useAppStore.getState().rssTimeRange;
           const rssService = new RSSTrendingService(githubToken);
-          result = await rssService.fetchRSSTrending(rssTimeRange, (current, total) => {
+          result = await rssService.fetchRSSTrending(currentRssTimeRange, (current, total) => {
             console.log(`[RSS Trending] Progress: ${current}/${total}`);
           });
           break;
@@ -1223,7 +1178,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       setDiscoveryLoading(channelId, false);
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingParams, topicParams, searchParams, rssTimeRange]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingParams, topicParams, searchParams]);
 
   // 切换频道时恢复滚动位置，并自动加载空频道
   useEffect(() => {
@@ -1467,6 +1422,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryScrollPosition(selectedDiscoveryChannel, 0);
     setIsToolbarVisible(true);
 
+    if (selectedDiscoveryChannel === 'rss-trending') {
+      console.log(`[Discovery] RSS client pagination: switching to page ${validPage}, no API call needed`);
+      return;
+    }
+
     console.log(`[Discovery] Triggering refresh for page ${validPage}`);
     refreshChannel(selectedDiscoveryChannel, validPage, false);
   }, [currentPage, currentIsLoading, selectedDiscoveryChannel, setDiscoveryCurrentPage, refreshChannel, setDiscoveryScrollPosition]);
@@ -1566,37 +1526,37 @@ export const DiscoveryView: React.FC = React.memo(() => {
               
               {/* 第二行：筛选和操作按钮 */}
               <div className="flex items-center gap-2 flex-wrap">
-                {selectedDiscoveryChannel === 'topic' && (
-                  <>
-                    <select
-                      value={discoverySelectedTopic || ''}
-                      onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    >
-                      <option value="">{t('主题', 'Topic')}</option>
-                      <option value="ai">{t('人工智能', 'AI')}</option>
-                      <option value="ml">{t('机器学习', 'ML')}</option>
-                      <option value="database">{t('数据库', 'DB')}</option>
-                      <option value="web">{t('Web开发', 'Web')}</option>
-                      <option value="mobile">{t('移动开发', 'Mobile')}</option>
-                      <option value="devtools">{t('开发工具', 'DevTools')}</option>
-                      <option value="security">{t('安全', 'Security')}</option>
-                      <option value="game">{t('游戏', 'Game')}</option>
-                    </select>
-                    <SortSelector
-                      sortBy={topicParams.sortBy}
-                      sortOrder={topicParams.sortOrder}
-                      onSortChange={(params) => {
-                        setTopicParams(params);
-                        if (discoverySelectedTopic) {
-                          refreshChannel('topic', 1, false);
-                        }
-                      }}
-                      language={language}
-                    />
-                  </>
-                )}
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  {selectedDiscoveryChannel === 'topic' && (
+                    <>
+                      <select
+                        value={discoverySelectedTopic || ''}
+                        onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      >
+                        <option value="">{t('主题', 'Topic')}</option>
+                        <option value="ai">{t('人工智能', 'AI')}</option>
+                        <option value="ml">{t('机器学习', 'ML')}</option>
+                        <option value="database">{t('数据库', 'DB')}</option>
+                        <option value="web">{t('Web开发', 'Web')}</option>
+                        <option value="mobile">{t('移动开发', 'Mobile')}</option>
+                        <option value="devtools">{t('开发工具', 'DevTools')}</option>
+                        <option value="security">{t('安全', 'Security')}</option>
+                        <option value="game">{t('游戏', 'Game')}</option>
+                      </select>
+                      <SortSelector
+                        sortBy={topicParams.sortBy}
+                        sortOrder={topicParams.sortOrder}
+                        onSortChange={(params) => {
+                          setTopicParams(params);
+                          if (discoverySelectedTopic) {
+                            refreshChannel('topic', 1, false);
+                          }
+                        }}
+                        language={language}
+                      />
+                    </>
+                  )}
                   <PlatformFilter 
                     platform={discoveryPlatform} 
                     onPlatformChange={setDiscoveryPlatform} 
@@ -1754,6 +1714,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       timeRange={rssTimeRange}
                       onTimeRangeChange={(timeRange) => {
                         setRssTimeRange(timeRange);
+                        setDiscoveryCurrentPage('rss-trending', 1);
                         refreshChannel('rss-trending', 1, false);
                       }}
                       language={language}

@@ -197,6 +197,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       previousFocusRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      window.dispatchEvent(new CustomEvent('gsm:modal-open'));
       setTimeout(() => {
         modalRef.current?.focus();
       }, 0);
@@ -207,6 +208,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       if (document.body.style.overflow === 'hidden') {
         document.body.style.overflow = 'unset';
       }
+      window.dispatchEvent(new CustomEvent('gsm:modal-close'));
       previousFocusRef.current?.focus();
     };
   }, [isOpen, onClose]);

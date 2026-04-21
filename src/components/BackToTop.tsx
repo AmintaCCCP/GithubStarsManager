@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useModalVisibility } from '../hooks/useModalVisibility';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
+  const isModalOpen = useModalVisibility();
   const language = useAppStore(state => state.language);
   const bounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -23,7 +25,6 @@ export const BackToTop: React.FC = () => {
     });
   }, []);
 
-  // 触发跳跃动画
   const triggerBounce = useCallback(() => {
     if (bounceTimeoutRef.current) {
       clearTimeout(bounceTimeoutRef.current);
@@ -42,7 +43,6 @@ export const BackToTop: React.FC = () => {
     };
   }, [toggleVisibility]);
 
-  // 监听全局跳跃动画事件
   useEffect(() => {
     const handleBounceEvent = () => {
       if (isVisible) {
@@ -58,6 +58,8 @@ export const BackToTop: React.FC = () => {
       }
     };
   }, [isVisible, triggerBounce]);
+
+  const shouldShow = isVisible && !isModalOpen;
 
   return (
     <button
@@ -76,7 +78,7 @@ export const BackToTop: React.FC = () => {
         hover:scale-110
         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
-        ${isVisible
+        ${shouldShow
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
@@ -86,8 +88,8 @@ export const BackToTop: React.FC = () => {
         lg:bottom-24 lg:right-10
       `}
       aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}
-      aria-hidden={!isVisible}
-      tabIndex={isVisible ? 0 : -1}
+      aria-hidden={!shouldShow}
+      tabIndex={shouldShow ? 0 : -1}
       title={language === 'zh' ? '回到顶部' : 'Back to top'}
     >
       <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />

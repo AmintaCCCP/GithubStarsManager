@@ -24,6 +24,7 @@ import {
   SubscriptionRepo,
   defaultSubscriptionChannels,
   TrendingParams,
+  TrendingTimeRange,
   TopicParams,
   SearchParams,
   RSSTimeRange
@@ -319,6 +320,22 @@ const normalizePersistedState = (
       }
       return 'daily' as RSSTimeRange;
     })(),
+    trendingParams: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).trendingParams;
+      const validTimeRanges = ['weekly-hot', 'monthly-trending', 'new-stars', 'classic', 'quarterly'];
+      const validSortBy = ['Stars', 'Forks', 'Updated'];
+      const validMinStars = [100, 500, 1000, 5000, 10000];
+      const defaults = { timeRange: 'monthly-trending' as const, language: 'All' as const, minStars: 100, sortBy: 'Stars' as const, sortOrder: 'Desc' as const };
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const tp = persisted as Record<string, unknown>;
+        if (tp.projectType) delete tp.projectType;
+        const timeRange = validTimeRanges.includes(tp.timeRange as string) ? tp.timeRange as TrendingTimeRange : defaults.timeRange;
+        const minStars = validMinStars.includes(tp.minStars as number) ? tp.minStars as number : defaults.minStars;
+        const sortBy = validSortBy.includes(tp.sortBy as string) ? tp.sortBy as DiscoverySortBy : defaults.sortBy;
+        return { timeRange, language: (tp.language as ProgrammingLanguage) || defaults.language, minStars, sortBy, sortOrder: defaults.sortOrder };
+      }
+      return defaults;
+    })(),
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: (() => {
       const defaults = { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] };
@@ -566,7 +583,7 @@ const store = create<AppState & AppActions>()(
       discoveryTotalCount: { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 },
       discoveryScrollPositions: { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 },
       discoveryCurrentPage: { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 },
-      trendingParams: { projectType: 'active', timeRange: 'month', language: 'All', minStars: 100, sortBy: 'Stars', sortOrder: 'Desc' },
+      trendingParams: { timeRange: 'monthly-trending', language: 'All', minStars: 100, sortBy: 'Stars', sortOrder: 'Desc' },
       topicParams: { sortBy: 'Stars', sortOrder: 'Desc' },
       searchParams: { sortBy: 'BestMatch', sortOrder: 'Desc' },
       rssTimeRange: 'daily',
@@ -1222,7 +1239,7 @@ const store = create<AppState & AppActions>()(
       rssTimeRange: state.rssTimeRange,
       }),
       migrate: (persistedState, fromVersion) => {
-        const CURRENT_STORE_VERSION = 7;
+        const CURRENT_STORE_VERSION = 8;
         const state = persistedState as PersistedAppState | undefined;
         
         if (!state) return undefined as unknown as PersistedAppState;
@@ -1315,7 +1332,7 @@ const store = create<AppState & AppActions>()(
             const oldSortOrder = (state as Record<string, unknown>).discoverySortOrder as string | undefined;
             const sortBy: DiscoverySortBy = oldSortBy === 'MostStars' ? 'Stars' : oldSortBy === 'MostForks' ? 'Forks' : 'Stars';
             const sortOrder: DiscoverySortOrder = oldSortOrder === 'Ascending' ? 'Asc' : 'Desc';
-            state.trendingParams = { projectType: 'active', timeRange: 'month', language: 'All', minStars: 100, sortBy, sortOrder };
+            state.trendingParams = { timeRange: 'monthly-trending', language: 'All', minStars: 100, sortBy, sortOrder };
             delete (state as Record<string, unknown>).discoverySortBy;
             delete (state as Record<string, unknown>).discoverySortOrder;
           }
@@ -1350,6 +1367,57 @@ const store = create<AppState & AppActions>()(
           const persistedRSSRange = (state as Record<string, unknown>).rssTimeRange;
           if (!persistedRSSRange || !validRSSTimeRanges.includes(persistedRSSRange as string)) {
             (state as Record<string, unknown>).rssTimeRange = 'daily';
+          }
+        }
+
+        // 版本 7-8: 迁移 trendingParams，删除 projectType，合并为场景化 timeRange
+        if (fromVersion < 8) {
+          const tp = (state as Record<string, unknown>).trendingParams as Record<string, unknown> | undefined;
+          if (tp) {
+            const oldProjectType = tp.projectType as string | undefined;
+            const oldTimeRange = tp.timeRange as string | undefined;
+            delete tp.projectType;
+
+            const validTimeRanges = ['weekly-hot', 'monthly-trending', 'new-stars', 'classic', 'quarterly'];
+            if (validTimeRanges.includes(oldTimeRange as string)) {
+              tp.timeRange = oldTimeRange;
+            } else {
+              const projectTypeToTimeRange: Record<string, string> = {
+                'new': 'new-stars',
+                'active': 'monthly-trending',
+                'classic': 'classic',
+              };
+              const timeRangeMap: Record<string, string> = {
+                'today': 'weekly-hot',
+                'week': 'weekly-hot',
+                'month': 'monthly-trending',
+                'quarter': 'quarterly',
+                'year': 'quarterly',
+              };
+              if (oldProjectType && projectTypeToTimeRange[oldProjectType]) {
+                tp.timeRange = projectTypeToTimeRange[oldProjectType];
+              } else if (oldTimeRange && timeRangeMap[oldTimeRange]) {
+                tp.timeRange = timeRangeMap[oldTimeRange];
+              } else {
+                tp.timeRange = 'monthly-trending';
+              }
+            }
+
+            const validMinStars = [100, 500, 1000, 5000, 10000];
+            if (!validMinStars.includes(tp.minStars as number)) {
+              const oldMinStars = tp.minStars as number;
+              if (oldMinStars <= 100) tp.minStars = 100;
+              else if (oldMinStars <= 500) tp.minStars = 500;
+              else if (oldMinStars <= 1000) tp.minStars = 1000;
+              else if (oldMinStars <= 5000) tp.minStars = 5000;
+              else tp.minStars = 10000;
+            }
+
+            const validSortBy = ['Stars', 'Forks', 'Updated'];
+            if (!validSortBy.includes(tp.sortBy as string)) {
+              tp.sortBy = 'Stars';
+            }
+            tp.sortOrder = 'Desc';
           }
         }
 

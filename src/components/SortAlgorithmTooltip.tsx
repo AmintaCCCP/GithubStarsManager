@@ -122,8 +122,8 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
           title: t('仓库探索', 'Repository Discovery'),
           highlight: t('🔥 发现热门项目，支持多种筛选模式', '🔥 Discover hot projects with multiple filter modes'),
           description: t(
-            '【项目类型】\n• 新星项目：最近创建的新项目\n• 活跃项目：最近有更新的项目\n• 经典项目：经过时间检验的项目\n\n【筛选条件】\n• 时间范围：今天/本周/本月/本季度/今年\n• Star门槛：可自定义（50-1000+）\n• 排序方式：Star数/Fork数/更新时间\n• 编程语言：支持多种语言筛选\n\n【适合场景】\n一站式发现各类热门项目，灵活筛选满足不同需求。',
-            '【Project Type】\n• New: Recently created projects\n• Active: Recently updated projects\n• Classic: Time-tested projects\n\n【Filters】\n• Time range: Today/Week/Month/Quarter/Year\n• Star threshold: Customizable (50-1000+)\n• Sort by: Stars/Forks/Updated\n• Language: Multiple language support\n\n【Best for】\nOne-stop discovery of hot projects with flexible filtering.'
+            '【时间范围】\n• 本周热门：最近7天活跃的项目\n• 本月趋势：最近30天活跃的项目\n• 新星项目：最近30天创建的项目\n• 经典项目：经过时间检验的项目\n• 本季度：最近90天活跃的项目\n\n【筛选条件】\n• Star门槛：100 / 500 / 1K / 5K / 10K\n• 排序方式：Star数/Fork数/更新时间\n• 编程语言：支持多种语言筛选\n\n【适合场景】\n一站式发现各类热门项目，灵活筛选满足不同需求。',
+            '【Time Range】\n• Weekly Hot: Active in last 7 days\n• Monthly Trending: Active in last 30 days\n• New Stars: Created in last 30 days\n• Classic: Time-tested projects\n• Quarterly: Active in last 90 days\n\n【Filters】\n• Star threshold: 100 / 500 / 1K / 5K / 10K\n• Sort by: Stars/Forks/Updated\n• Language: Multiple language support\n\n【Best for】\nOne-stop discovery of hot projects with flexible filtering.'
           ),
         };
       case 'topic':
