@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Info } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import type { DiscoveryChannelId } from '../types';
 
 interface SortAlgorithmTooltipProps {
@@ -7,10 +8,92 @@ interface SortAlgorithmTooltipProps {
   language: 'zh' | 'en';
 }
 
+interface TooltipPosition {
+  top: number;
+  left: number;
+  arrowLeft: number;
+  placement: 'top' | 'bottom';
+}
+
 export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ channelId, language }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState<TooltipPosition | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const calculatePosition = useCallback(() => {
+    if (!containerRef.current || !tooltipRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    const padding = 16; // 屏幕边缘留白
+    const arrowOffset = 12; // 箭头距离边缘的最小距离
+    const gap = 8; // 气泡与按钮的间距
+    
+    // 计算气泡宽度（响应式）
+    const tooltipWidth = Math.min(320, viewportWidth - padding * 2); // max-w-xs = 320px
+    
+    // 水平居中，但确保不溢出
+    let left = containerRect.left + containerRect.width / 2 - tooltipWidth / 2;
+    let arrowLeft = tooltipWidth / 2;
+    
+    // 左边界检测
+    if (left < padding) {
+      arrowLeft = containerRect.left + containerRect.width / 2 - padding;
+      left = padding;
+    }
+    // 右边界检测
+    if (left + tooltipWidth > viewportWidth - padding) {
+      const overflow = left + tooltipWidth - (viewportWidth - padding);
+      left = viewportWidth - padding - tooltipWidth;
+      arrowLeft = tooltipWidth / 2 + overflow;
+    }
+    
+    // 确保箭头不超出气泡边界
+    arrowLeft = Math.max(arrowOffset, Math.min(tooltipWidth - arrowOffset, arrowLeft));
+    
+    // 垂直方向：优先向下，空间不足则向上
+    const spaceBelow = viewportHeight - containerRect.bottom - gap;
+    const spaceAbove = containerRect.top - gap;
+    
+    let top: number;
+    let placement: 'top' | 'bottom';
+    
+    if (spaceBelow >= tooltipRect.height || spaceBelow >= spaceAbove) {
+      // 向下显示
+      top = containerRect.bottom + gap;
+      placement = 'bottom';
+    } else {
+      // 向上显示
+      top = containerRect.top - tooltipRect.height - gap;
+      placement = 'top';
+    }
+    
+    setPosition({ top, left, arrowLeft, placement });
+  }, []);
+
+  useEffect(() => {
+    if (isVisible) {
+      // 使用 requestAnimationFrame 确保 DOM 已更新
+      requestAnimationFrame(() => {
+        calculatePosition();
+      });
+      
+      // 监听窗口变化
+      window.addEventListener('resize', calculatePosition);
+      window.addEventListener('scroll', calculatePosition, true);
+      
+      return () => {
+        window.removeEventListener('resize', calculatePosition);
+        window.removeEventListener('scroll', calculatePosition, true);
+      };
+    }
+  }, [isVisible, calculatePosition]);
 
   const getAlgorithmInfo = (channel: DiscoveryChannelId): { title: string; description: string; highlight: string } => {
     switch (channel) {
@@ -70,39 +153,68 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
 
   const info = getAlgorithmInfo(channelId);
 
+  const handleMouseEnter = () => setIsVisible(true);
+  const handleMouseLeave = () => setIsVisible(false);
+  const handleClick = () => setIsVisible(prev => !prev);
+
   return (
-    <div className="relative inline-flex items-center">
+    <div className="relative inline-flex items-center" ref={containerRef}>
       <button
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-        onClick={() => setIsVisible(!isVisible)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         className="p-1 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+        aria-label={t('排序算法说明', 'Sorting algorithm info')}
+        aria-expanded={isVisible}
       >
         <Info className="w-4 h-4" />
       </button>
 
-      {isVisible && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[9999]" style={{ zIndex: 9999 }}>
-          <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 w-80">
-            {/* Arrow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-[10000]">
-              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-gray-200 dark:border-b-gray-700" />
-              <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-gray-800" />
-            </div>
-
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm">
+      {isVisible && createPortal(
+        <div 
+          ref={tooltipRef}
+          className="fixed z-[9999] w-[calc(100vw-2rem)] max-w-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl"
+          style={{ 
+            top: position?.top ?? 0,
+            left: position?.left ?? 0,
+            opacity: position ? 1 : 0,
+            transition: 'opacity 0.15s ease-out',
+          }}
+          role="tooltip"
+        >
+          {/* Arrow */}
+          {position && (
+            <div 
+              className="absolute w-3 h-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+              style={{
+                left: position.arrowLeft,
+                top: position.placement === 'bottom' ? -6 : 'auto',
+                bottom: position.placement === 'top' ? -6 : 'auto',
+                transform: 'translateX(-50%) rotate(45deg)',
+                borderLeftWidth: position.placement === 'bottom' ? 1 : 0,
+                borderTopWidth: position.placement === 'bottom' ? 0 : 1,
+                borderRightWidth: position.placement === 'bottom' ? 0 : 1,
+                borderBottomWidth: position.placement === 'bottom' ? 1 : 0,
+                borderStyle: 'solid',
+              }}
+            />
+          )}
+          
+          <div className="relative p-3 sm:p-4">
+            <h4 className="font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 text-sm truncate">
               {info.title}
             </h4>
             {info.highlight && (
-              <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
+              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 mb-1.5 sm:mb-2 line-clamp-2">
                 {info.highlight}
               </p>
             )}
-            <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
               {info.description}
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -7,8 +7,6 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { Copy, Check, Download } from 'lucide-react';
 import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.min.css';
-import 'highlight.js/styles/github.min.css';
 import { useAppStore } from '../store/useAppStore';
 import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
 

@@ -21,6 +21,7 @@ import {
   SortOrder,
   TopicCategory,
   SubscriptionChannel,
+  SubscriptionRepo,
   defaultSubscriptionChannels
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
@@ -149,6 +150,7 @@ interface AppActions {
   setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
   setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
+  setDiscoveryCurrentPage: (channel: DiscoveryChannelId, page: number) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -199,6 +201,7 @@ type PersistedAppState = Partial<
     | 'discoveryTotalCount'
     | 'discoveryHasMore'
     | 'discoveryNextPage'
+    | 'discoveryCurrentPage'
     | 'selectedDiscoveryChannel'
     | 'discoveryPlatform'
     | 'discoveryLanguage'
@@ -273,10 +276,11 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
-    discoveryRepos: {
-      trending: [], 'hot-release': [], 'most-popular': [], topic: [], search: [],
-      ...((safePersisted as Record<string, unknown>).discoveryRepos as Record<DiscoveryChannelId, DiscoveryRepo[]> || {}),
-    },
+    discoveryRepos: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos as Record<DiscoveryChannelId, DiscoveryRepo[]>;
+      const defaults: Record<DiscoveryChannelId, DiscoveryRepo[]> = { trending: [], 'hot-release': [], 'most-popular': [], topic: [], search: [] };
+      return { ...defaults, ...persisted };
+    })(),
     discoveryLastRefresh: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
@@ -285,34 +289,44 @@ const normalizePersistedState = (
       return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
     })(),
     discoveryTotalCount: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        return persisted as Record<string, number>;
-      }
-      return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
-    })(),
+        const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
+        if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+          return persisted as Record<string, number>;
+        }
+        return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
+      })(),
+      discoveryCurrentPage: (() => {
+        const persisted = (safePersisted as Record<string, unknown>).discoveryCurrentPage;
+        if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+          return persisted as Record<string, number>;
+        }
+        return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
+      })(),
     // 确保 subscription 相关状态包含 trending 键
-    subscriptionRepos: {
-      'most-stars': [],
-      'most-forks': [],
-      'most-dev': [],
-      'trending': [],
-      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
-    },
-    subscriptionLastRefresh: {
-      'most-stars': null,
-      'most-forks': null,
-      'most-dev': null,
-      'trending': null,
-      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
-    },
-    subscriptionIsLoading: {
-      'most-stars': false,
-      'most-forks': false,
-      'most-dev': false,
-      'trending': false,
-      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
-    },
+    subscriptionRepos: (() => {
+      const defaults = { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] };
+      const persisted = safePersisted.subscriptionRepos;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return { ...defaults, ...persisted } as Record<string, SubscriptionRepo[]>;
+      }
+      return defaults as Record<string, SubscriptionRepo[]>;
+    })(),
+    subscriptionLastRefresh: (() => {
+      const defaults = { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null };
+      const persisted = safePersisted.subscriptionLastRefresh;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return { ...defaults, ...persisted } as Record<string, string | null>;
+      }
+      return defaults as Record<string, string | null>;
+    })(),
+    subscriptionIsLoading: (() => {
+      const defaults = { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false };
+      const persisted = safePersisted.subscriptionIsLoading;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return { ...defaults, ...persisted } as Record<string, boolean>;
+      }
+      return defaults as Record<string, boolean>;
+    })(),
     // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
     subscriptionChannels: (() => {
       const persisted = (safePersisted as Record<string, unknown>).subscriptionChannels;
@@ -488,7 +502,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
   },
 ];
 
-export const useAppStore = create<AppState & AppActions>()(
+const store = create<AppState & AppActions>()(
   persist(
     (set) => ({
       // Initial state
@@ -544,6 +558,7 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
       discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
       discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+      discoveryCurrentPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
 
       // Subscription
       subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
@@ -1103,6 +1118,14 @@ export const useAppStore = create<AppState & AppActions>()(
         [channel]: [...(state.discoveryRepos[channel] || []), ...repos] 
       },
     })),
+    setDiscoveryCurrentPage: (channel, page) => set((state) => {
+      // 边界条件处理：确保页数不小于 1
+      const validPage = Math.max(1, page);
+      console.log(`[Discovery] Set page for ${channel}: ${validPage}`);
+      return {
+        discoveryCurrentPage: { ...state.discoveryCurrentPage, [channel]: validPage },
+      };
+    }),
     }),
     {
       name: 'github-stars-manager',
@@ -1171,6 +1194,7 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryTotalCount: state.discoveryTotalCount,
       discoveryHasMore: state.discoveryHasMore,
       discoveryNextPage: state.discoveryNextPage,
+      discoveryCurrentPage: state.discoveryCurrentPage,
       discoveryPlatform: state.discoveryPlatform,
       discoveryLanguage: state.discoveryLanguage,
       discoverySortBy: state.discoverySortBy,
@@ -1267,6 +1291,10 @@ export const useAppStore = create<AppState & AppActions>()(
   if (state && !state.discoverySortOrder) {
     state.discoverySortOrder = 'Descending';
   }
+  // 初始化 discoveryCurrentPage
+  if (state && !state.discoveryCurrentPage) {
+    state.discoveryCurrentPage = { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
+  }
 
         return state as PersistedAppState;
       },
@@ -1293,6 +1321,10 @@ export const useAppStore = create<AppState & AppActions>()(
     }
   )
 );
+
+export const useAppStore = store;
+
+export const useAppStoreRaw = () => store.getState();
 
 // Helper function to sort categories by order
 export const sortCategoriesByOrder = (

@@ -279,10 +279,6 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <div 
       onClick={handleCardClick}
       className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow duration-200 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer"
-      style={{ userSelect: 'none' }}
-      onCopy={(e) => e.preventDefault()}
-      onCut={(e) => e.preventDefault()}
-      onSelect={(e) => e.preventDefault()}
     >
       <div className="flex items-start gap-4">
         {/* Rank badge */}

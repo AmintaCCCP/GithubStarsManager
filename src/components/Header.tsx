@@ -245,6 +245,7 @@ export const Header: React.FC = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
               title={t('仓库', 'Repositories')}
+              aria-label={t('仓库', 'Repositories')}
             >
               <Search className="w-5 h-5" />
             </button>
@@ -256,6 +257,7 @@ export const Header: React.FC = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
               title={t('发布', 'Releases')}
+              aria-label={t('发布', 'Releases')}
             >
               <Calendar className="w-5 h-5" />
             </button>
@@ -267,6 +269,7 @@ export const Header: React.FC = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
               title={t('趋势', 'Trending')}
+              aria-label={t('趋势', 'Trending')}
             >
               <TrendingUp className="w-5 h-5" />
             </button>
@@ -278,6 +281,7 @@ export const Header: React.FC = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
               title={t('设置', 'Settings')}
+              aria-label={t('设置', 'Settings')}
             >
               <Settings className="w-5 h-5" />
             </button>

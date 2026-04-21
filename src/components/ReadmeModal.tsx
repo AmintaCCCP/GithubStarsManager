@@ -49,16 +49,25 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const extractToc = useCallback((content: string): { items: TocItem[], idMap: Map<string, string> } => {
     const items: TocItem[] = [];
     const idMap = new Map<string, string>();
+    
+    const contentWithoutCodeBlocks = content
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/`[^`]*`/g, '');
+    
     const regex = /^(#{1,3})\s+(.+)$/gm;
     let match;
-    let idCounter = 0;
+    const seenTexts = new Map<string, number>();
     
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(contentWithoutCodeBlocks)) !== null) {
       const level = match[1].length;
       const text = match[2].trim();
-      const id = `heading-${idCounter++}`;
+      
+      const count = seenTexts.get(text) ?? 0;
+      seenTexts.set(text, count + 1);
+      
+      const id = count === 0 ? `heading-${items.length}` : `heading-${items.length}-${count}`;
       items.push({ id, text, level });
-      idMap.set(text, id);
+      idMap.set(`${text}-${count}`, id);
     }
     
     return { items, idMap };
@@ -141,7 +150,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setLoading(false);
       }
     }
-  }, [repository, githubToken, language]);
+  }, [repository, githubToken, language, extractToc]);
 
   useEffect(() => {
     if (isOpen && repository) {

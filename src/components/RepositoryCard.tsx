@@ -118,9 +118,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const isAnalyzing = analyzingRepositoryIds.has(repoId);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       abortControllerRef.current?.abort();
       setAnalyzingRepository(repoId, false);
     };
@@ -303,7 +306,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         signal: controller.signal,
       });
 
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isMountedRef.current) return;
 
       const updatedRepo = {
         ...repository,
@@ -324,22 +327,21 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       alert(successMessage);
     } catch (error) {
-      if (!controller.signal.aborted) {
-        console.error('AI analysis failed:', error);
+      if (controller.signal.aborted || !isMountedRef.current) return;
+      console.error('AI analysis failed:', error);
 
-        const failedResult = createFailedAnalysisResult();
-        const failedRepo = {
-          ...repository,
-          analyzed_at: failedResult.analyzed_at,
-          analysis_failed: failedResult.analysis_failed
-        };
+      const failedResult = createFailedAnalysisResult();
+      const failedRepo = {
+        ...repository,
+        analyzed_at: failedResult.analyzed_at,
+        analysis_failed: failedResult.analysis_failed
+      };
 
-        updateRepository(failedRepo);
+      updateRepository(failedRepo);
 
-        alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
-      }
+      alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
     } finally {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isMountedRef.current) {
         setAnalyzingRepository(repoId, false);
       }
     }

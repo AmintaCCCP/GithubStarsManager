@@ -49,14 +49,15 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   const resolvedCategory = resolveCategoryAssignment(repository as Repository, analysis.tags, categories);
 
   const wasCategoryLocked = !!(repository as Repository).category_locked;
-  const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
+  const hasValidCategory = resolvedCategory !== undefined && resolvedCategory !== '';
+  const shouldKeepLocked = wasCategoryLocked && hasValidCategory;
 
   return {
     summary: analysis.summary,
     tags: analysis.tags,
     platforms: analysis.platforms,
     custom_category: resolvedCategory,
-    category_locked: shouldKeepLocked || wasCategoryLocked,
+    category_locked: shouldKeepLocked,
     analyzed_at: new Date().toISOString(),
     analysis_failed: false,
   };

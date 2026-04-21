@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleReportIssue = () => {
-    window.open(PROJECT_ISSUES_URL, '_blank');
+    window.open(PROJECT_ISSUES_URL, '_blank', 'noopener,noreferrer');
   };
 
   handleToggleDetails = () => {

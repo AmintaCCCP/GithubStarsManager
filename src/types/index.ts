@@ -210,6 +210,7 @@ export interface AppState {
   discoveryNextPage: Record<DiscoveryChannelId, number>;
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
+  discoveryCurrentPage: Record<DiscoveryChannelId, number>;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
