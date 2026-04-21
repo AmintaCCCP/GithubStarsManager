@@ -8,10 +8,12 @@ interface RSSItem {
   pubDate: string;
 }
 
+const RSS_BASE_URL = 'https://mshibanami.github.io/GitHubTrendingRSS';
+
 const RSS_URLS: Record<RSSTimeRange, string> = {
-  daily: '/api/rss/daily/all.xml',
-  weekly: '/api/rss/weekly/all.xml',
-  monthly: '/api/rss/monthly/all.xml',
+  daily: `${RSS_BASE_URL}/daily/all.xml`,
+  weekly: `${RSS_BASE_URL}/weekly/all.xml`,
+  monthly: `${RSS_BASE_URL}/monthly/all.xml`,
 };
 
 const MAX_CONCURRENT_REQUESTS = 8;

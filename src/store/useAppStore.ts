@@ -215,6 +215,7 @@ type PersistedAppState = Partial<
     | 'trendingParams'
     | 'topicParams'
     | 'searchParams'
+    | 'rssTimeRange'
     | 'subscriptionRepos'
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
@@ -310,6 +311,14 @@ const normalizePersistedState = (
         }
         return { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 };
       })(),
+    rssTimeRange: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).rssTimeRange;
+      const validValues = ['daily', 'weekly', 'monthly'];
+      if (typeof persisted === 'string' && validValues.includes(persisted)) {
+        return persisted as RSSTimeRange;
+      }
+      return 'daily' as RSSTimeRange;
+    })(),
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: (() => {
       const defaults = { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] };
@@ -1210,9 +1219,10 @@ const store = create<AppState & AppActions>()(
       topicParams: state.topicParams,
       searchParams: state.searchParams,
       discoverySelectedTopic: state.discoverySelectedTopic,
+      rssTimeRange: state.rssTimeRange,
       }),
       migrate: (persistedState, fromVersion) => {
-        const CURRENT_STORE_VERSION = 6;
+        const CURRENT_STORE_VERSION = 7;
         const state = persistedState as PersistedAppState | undefined;
         
         if (!state) return undefined as unknown as PersistedAppState;
@@ -1331,6 +1341,15 @@ const store = create<AppState & AppActions>()(
             } else {
               state.discoveryChannels = (oldChannels as DiscoveryChannel[]).filter(ch => validChannelIds.has(ch.id));
             }
+          }
+        }
+
+        // 版本 6-7: 初始化 RSS 时间范围
+        if (fromVersion < 7) {
+          const validRSSTimeRanges = ['daily', 'weekly', 'monthly'];
+          const persistedRSSRange = (state as Record<string, unknown>).rssTimeRange;
+          if (!persistedRSSRange || !validRSSTimeRanges.includes(persistedRSSRange as string)) {
+            (state as Record<string, unknown>).rssTimeRange = 'daily';
           }
         }
 

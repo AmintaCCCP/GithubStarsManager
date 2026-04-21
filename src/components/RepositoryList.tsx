@@ -407,24 +407,28 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     }
   };
 
-  const handlePauseResume = () => {
-    if (!isAnalyzingRef.current) return;
-    const newPausedState = !isPaused;
-    setIsPaused(newPausedState);
-
-    // 控制优化器的暂停/恢复
-    if (optimizerRef.current) {
-      if (newPausedState) {
-        optimizerRef.current.pause();
-        console.log('Analysis paused');
-      } else {
-        optimizerRef.current.resume();
-        console.log('Analysis resumed');
-      }
+  const handlePauseResume = useCallback(() => {
+    if (!isAnalyzingRef.current || !optimizerRef.current) return;
+    
+    const optimizer = optimizerRef.current;
+    const currentPausedState = optimizer.isPaused();
+    const newPausedState = !currentPausedState;
+    
+    setIsPaused(prev => {
+      console.log(`[Pause/Resume] State transition: ${prev} → ${newPausedState} (optimizer: ${currentPausedState})`);
+      return newPausedState;
+    });
+    
+    if (newPausedState) {
+      optimizer.pause();
+      console.log('Analysis paused');
+    } else {
+      optimizer.resume();
+      console.log('Analysis resumed');
     }
-  };
+  }, []);
 
-  const handleStop = () => {
+  const handleStop = useCallback(() => {
     if (!isAnalyzingRef.current) return;
 
     const confirmMessage = language === 'zh'
@@ -433,14 +437,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     if (confirm(confirmMessage)) {
       shouldStopRef.current = true;
-      // 中止优化器
       if (optimizerRef.current) {
         optimizerRef.current.abort();
       }
       setIsPaused(false);
       console.log('Stop requested by user');
     }
-  };
+  }, [language]);
 
   // 批量操作处理函数
   // 使用 useCallback 优化事件处理函数
