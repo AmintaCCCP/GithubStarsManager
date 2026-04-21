@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Trash2,
   AlertTriangle,
@@ -127,11 +127,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     subscriptionRepos,
     releaseSubscriptions,
     readReleases,
-    searchFilters,
     language,
     setRepositories,
     setReleases,
-    deleteCustomCategory,
     setAssetFilters,
   } = useAppStore();
 
@@ -151,6 +149,42 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     isOpen: boolean;
     fileName: string;
   }>({ data: null, isOpen: false, fileName: '' });
+
+  const [searchHistoryCount, setSearchHistoryCount] = useState(0);
+
+  useEffect(() => {
+    try {
+      const savedHistory = localStorage.getItem('github-stars-search-history');
+      if (savedHistory) {
+        const history = JSON.parse(savedHistory);
+        if (Array.isArray(history)) {
+          setSearchHistoryCount(history.length);
+        }
+      }
+    } catch {
+      setSearchHistoryCount(0);
+    }
+  }, []);
+
+  const EXPORT_DATA_TYPES = useMemo(() => [
+    { key: 'repositories', label: t('仓库数据', 'Repositories') },
+    { key: 'releases', label: t('Release数据', 'Releases') },
+    { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
+    { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
+    { key: 'customCategories', label: t('分类设置', 'Categories') },
+    { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
+    { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
+    { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
+    { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
+    { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
+    { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
+  ], [t]);
+
+  const [exportSelectedTypes, setExportSelectedTypes] = useState<Set<string>>(
+    () => new Set(EXPORT_DATA_TYPES.map(item => item.key))
+  );
+
+  const [importSelectedTypes, setImportSelectedTypes] = useState<Set<string>>(new Set());
 
   const addLog = useCallback((operation: string, success: boolean, details?: string) => {
     const newLog: OperationLog = {
@@ -328,23 +362,21 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
   };
 
-  const deleteDiscoveryData = async () => {
+  const deleteDiscoveryData = useCallback(async () => {
     try {
       const emptyDiscoveryRepos = {
         'trending': [],
-        'hot-release': [],
-        'most-popular': [],
         'topic': [],
-        'search': []
+        'search': [],
+        'rss-trending': []
       } as Record<string, DiscoveryRepo[]>;
       useAppStore.setState({ 
         discoveryRepos: emptyDiscoveryRepos,
         discoveryLastRefresh: {
           'trending': null,
-          'hot-release': null,
-          'most-popular': null,
           'topic': null,
-          'search': null
+          'search': null,
+          'rss-trending': null
         }
       });
       addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);
@@ -358,7 +390,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       showError(t('删除失败，请重试', 'Delete failed, please try again'));
       throw error;
     }
-  };
+  }, [addLog, showSuccess, showError, t]);
 
   const deleteSubscriptionData = async () => {
     try {
@@ -418,6 +450,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       });
       localStorage.removeItem('github-stars-search-history');
       localStorage.removeItem('lastSearchTime');
+      setSearchHistoryCount(0);
       addLog(t('删除搜索历史数据', 'Delete search history'), true);
       showSuccess(t('搜索历史数据已删除', 'Search history deleted'));
     } catch (error) {
@@ -511,6 +544,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
   }, [addLog, showSuccess, showError, t]);
 
+  const getImportPreviewItems = useCallback((): Array<{ key: string; label: string; count: number }> => {
+    if (!importPreview.data) return [];
+    const d = importPreview.data.data;
+    const items: Array<{ key: string; label: string; count: number }> = [];
+    if (d.repositories?.length) items.push({ key: 'repositories', label: t('仓库数据', 'Repositories'), count: d.repositories.length });
+    if (d.releases?.length) items.push({ key: 'releases', label: t('Release数据', 'Releases'), count: d.releases.length });
+    if (d.aiConfigs?.length) items.push({ key: 'aiConfigs', label: t('AI配置', 'AI Configs'), count: d.aiConfigs.length });
+    if (d.webdavConfigs?.length) items.push({ key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs'), count: d.webdavConfigs.length });
+    if (d.customCategories?.length) items.push({ key: 'customCategories', label: t('分类设置', 'Categories'), count: d.customCategories.length });
+    if (d.assetFilters?.length) items.push({ key: 'assetFilters', label: t('资源过滤器', 'Asset Filters'), count: d.assetFilters.length });
+    if (d.discoveryRepos) items.push({ key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data'), count: Object.values(d.discoveryRepos).flat().length });
+    if (d.subscriptionRepos) items.push({ key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data'), count: Object.values(d.subscriptionRepos).flat().length });
+    if (d.releaseSubscriptions?.length) items.push({ key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions'), count: d.releaseSubscriptions.length });
+    if (d.searchFilters) items.push({ key: 'searchFilters', label: t('搜索过滤器', 'Search Filters'), count: 1 });
+    if (d.theme || d.language) items.push({ key: 'uiSettings', label: t('UI设置', 'UI Settings'), count: [d.theme, d.language, d.isSidebarCollapsed, d.releaseViewMode].filter(Boolean).length });
+    return items;
+  }, [importPreview.data, t]);
+
+  const getAvailableImportTypes = useCallback((): string[] => {
+    return getImportPreviewItems().map(item => item.key);
+  }, [getImportPreviewItems]);
+
   const handleImportFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -527,6 +582,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
 
         setImportPreview({ data, isOpen: true, fileName: file.name });
+        const availableTypes = Object.keys(data.data).filter(k => data.data[k as keyof typeof data.data] !== undefined);
+        setImportSelectedTypes(new Set(availableTypes));
       } catch {
         showError(t('解析文件失败，请确保是有效的JSON文件', 'Failed to parse file, ensure it is a valid JSON file'));
       }
@@ -675,6 +732,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       addLog(t('导入数据', 'Import data'), true);
       showSuccess(t('数据导入成功', 'Data imported successfully'));
       setImportPreview({ data: null, isOpen: false, fileName: '' });
+      setImportSelectedTypes(new Set());
     } catch (error) {
       addLog(t('导入数据', 'Import data'), false, String(error));
       showError(t('导入失败，请重试', 'Import failed, please try again'));
@@ -686,7 +744,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const cleanupSuggestions = useMemo<DataCleanupSuggestion[]>(() => {
     const suggestions: DataCleanupSuggestion[] = [];
     const now = Date.now();
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
     const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 
     const oldReleases = releases.filter(r => 
@@ -1095,7 +1152,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     {
       key: 'searchHistory',
       label: t('搜索历史', 'Search History'),
-      count: searchFilters.query ? 1 : 0,
+      count: searchHistoryCount,
       icon: <Search className="w-5 h-5" />,
       color: 'text-gray-600 dark:text-gray-400',
       bgColor: 'bg-gray-50 dark:bg-gray-900/20',
@@ -1126,25 +1183,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <Database className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
           {t('数据概览', 'Data Overview')}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {dataStats.map((stat) => (
             <div
               key={stat.key}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-center"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {stat.count}
-                    </p>
-                  </div>
-                </div>
+              <div className={`inline-flex p-2 rounded-lg ${stat.bgColor} ${stat.color} mb-2`}>
+                {stat.icon}
               </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stat.count}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -1168,26 +1219,38 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <p className="text-sm text-gray-500 dark:text-gray-400">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
+            <div className="flex items-center space-x-3 mb-3">
+              <button
+                onClick={() => setExportSelectedTypes(new Set(EXPORT_DATA_TYPES.map(item => item.key)))}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {t('全选', 'Select All')}
+              </button>
+              <button
+                onClick={() => setExportSelectedTypes(new Set())}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:underline"
+              >
+                {t('取消全选', 'Deselect All')}
+              </button>
+            </div>
             <div className="space-y-2 mb-4">
-              {[
-                { key: 'repositories', label: t('仓库数据', 'Repositories') },
-                { key: 'releases', label: t('Release数据', 'Releases') },
-                { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
-                { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
-                { key: 'customCategories', label: t('分类设置', 'Categories') },
-                { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
-                { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
-                { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
-                { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
-                { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
-                { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+              {EXPORT_DATA_TYPES.map((item) => (
+                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
-                    defaultChecked
-                    className="export-checkbox rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                    data-type={item.key}
+                    checked={exportSelectedTypes.has(item.key)}
+                    onChange={(e) => {
+                      setExportSelectedTypes(prev => {
+                        const next = new Set(prev);
+                        if (e.target.checked) {
+                          next.add(item.key);
+                        } else {
+                          next.delete(item.key);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                   />
                   <span>{item.label}</span>
                 </label>
@@ -1195,13 +1258,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             </div>
             <button
               onClick={() => {
-                const checkboxes = document.querySelectorAll('.export-checkbox:checked');
-                const selectedTypes = Array.from(checkboxes).map((cb) => (cb as HTMLInputElement).dataset.type as string);
-                if (selectedTypes.length === 0) {
+                if (exportSelectedTypes.size === 0) {
                   showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
                   return;
                 }
-                exportData(selectedTypes);
+                exportData(Array.from(exportSelectedTypes));
               }}
               disabled={isExporting}
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
@@ -1376,9 +1437,17 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {t('操作日志', 'Operation Logs')}
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('操作日志', 'Operation Logs')}
+            </h3>
+            <button
+              onClick={() => setOperationLogs([])}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            >
+              {t('清空日志', 'Clear Logs')}
+            </button>
+          </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
@@ -1508,8 +1577,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Import Preview Modal */}
       {importPreview.isOpen && importPreview.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-800">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-800 shrink-0">
               <div className="flex items-center space-x-3">
                 <Upload className="w-6 h-6 text-green-600 dark:text-green-400" />
                 <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">
@@ -1518,7 +1587,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
                 <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
@@ -1526,44 +1595,58 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </div>
 
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('包含的数据:', 'Included Data:')}</p>
-                <div className="space-y-1 text-sm">
-                  {importPreview.data.data.repositories && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
-                    </p>
-                  )}
-                  {importPreview.data.data.releases && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
-                    </p>
-                  )}
-                  {importPreview.data.data.aiConfigs && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
-                    </p>
-                  )}
-                  {importPreview.data.data.webdavConfigs && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
-                    </p>
-                  )}
-                  {importPreview.data.data.customCategories && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
-                    </p>
-                  )}
-                  {importPreview.data.data.assetFilters && (
-                    <p className="text-gray-600 dark:text-gray-400">
-                      • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
-                    </p>
-                  )}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('选择要导入的数据:', 'Select data to import:')}</p>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        const allTypes = getAvailableImportTypes();
+                        setImportSelectedTypes(new Set(allTypes));
+                      }}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {t('全选', 'Select All')}
+                    </button>
+                    <button
+                      onClick={() => setImportSelectedTypes(new Set())}
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:underline"
+                    >
+                      {t('取消全选', 'Deselect All')}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {getImportPreviewItems().map((item) => (
+                    <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={importSelectedTypes.has(item.key)}
+                        onChange={(e) => {
+                          setImportSelectedTypes(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              next.add(item.key);
+                            } else {
+                              next.delete(item.key);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="flex-1">{item.label}</span>
+                      <span className="text-gray-500 dark:text-gray-400">{item.count} {t('条', 'items')}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
               <div className="flex space-x-3 pt-4">
                 <button
-                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
+                  onClick={() => {
+                    setImportPreview({ data: null, isOpen: false, fileName: '' });
+                    setImportSelectedTypes(new Set());
+                  }}
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
                 >
@@ -1571,11 +1654,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </button>
                 <button
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'merge');
+                    if (importSelectedTypes.size === 0) {
+                      showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
+                      return;
+                    }
+                    importData(Array.from(importSelectedTypes), 'merge');
                   }}
-                  disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  disabled={isImporting || importSelectedTypes.size === 0}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>
@@ -1588,11 +1674,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </button>
                 <button
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'replace');
+                    if (importSelectedTypes.size === 0) {
+                      showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
+                      return;
+                    }
+                    importData(Array.from(importSelectedTypes), 'replace');
                   }}
-                  disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  disabled={isImporting || importSelectedTypes.size === 0}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>

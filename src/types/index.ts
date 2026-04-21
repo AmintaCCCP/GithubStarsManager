@@ -202,8 +202,6 @@ export interface AppState {
   selectedDiscoveryChannel: DiscoveryChannelId;
   discoveryPlatform: DiscoveryPlatform;
   discoveryLanguage: ProgrammingLanguage;
-  discoverySortBy: SortBy;
-  discoverySortOrder: SortOrder;
   discoverySearchQuery: string;
   discoverySelectedTopic: TopicCategory | null;
   discoveryHasMore: Record<DiscoveryChannelId, boolean>;
@@ -211,6 +209,10 @@ export interface AppState {
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
   discoveryCurrentPage: Record<DiscoveryChannelId, number>;
+  trendingParams: TrendingParams;
+  topicParams: TopicParams;
+  searchParams: SearchParams;
+  rssTimeRange: RSSTimeRange;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -251,13 +253,38 @@ export type ProgrammingLanguage =
   | 'Ruby' 
   | 'PHP';
 
-export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
+export type DiscoverySortBy = 'BestMatch' | 'Stars' | 'Forks' | 'Updated' | 'Created' | 'HelpWanted';
 
-export type SortOrder = 'Descending' | 'Ascending';
+export type DiscoverySortOrder = 'Desc' | 'Asc';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search';
+export type TrendingTimeRange = 'today' | 'week' | 'month' | 'quarter' | 'year';
 
-export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'search';
+export type TrendingProjectType = 'new' | 'active' | 'classic';
+
+export interface TrendingParams {
+  projectType: TrendingProjectType;
+  timeRange: TrendingTimeRange;
+  language: ProgrammingLanguage;
+  minStars: number;
+  sortBy: DiscoverySortBy;
+  sortOrder: DiscoverySortOrder;
+}
+
+export interface TopicParams {
+  sortBy: DiscoverySortBy;
+  sortOrder: DiscoverySortOrder;
+}
+
+export interface SearchParams {
+  sortBy: DiscoverySortBy;
+  sortOrder: DiscoverySortOrder;
+}
+
+export type DiscoveryChannelId = 'trending' | 'topic' | 'search' | 'rss-trending';
+
+export type DiscoveryChannelIcon = 'trending' | 'tag' | 'search' | 'rss';
+
+export type RSSTimeRange = 'daily' | 'weekly' | 'monthly';
 
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;

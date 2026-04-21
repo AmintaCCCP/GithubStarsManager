@@ -17,12 +17,16 @@ import {
   DiscoveryRepo,
   DiscoveryPlatform,
   ProgrammingLanguage,
-  SortBy,
-  SortOrder,
+  DiscoverySortBy,
+  DiscoverySortOrder,
   TopicCategory,
   SubscriptionChannel,
   SubscriptionRepo,
-  defaultSubscriptionChannels
+  defaultSubscriptionChannels,
+  TrendingParams,
+  TopicParams,
+  SearchParams,
+  RSSTimeRange
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -141,8 +145,6 @@ interface AppActions {
   toggleDiscoveryChannel: (channelId: DiscoveryChannelId) => void;
   setDiscoveryPlatform: (platform: DiscoveryPlatform) => void;
   setDiscoveryLanguage: (language: ProgrammingLanguage) => void;
-  setDiscoverySortBy: (sortBy: SortBy) => void;
-  setDiscoverySortOrder: (sortOrder: SortOrder) => void;
   setDiscoverySearchQuery: (query: string) => void;
   setDiscoverySelectedTopic: (topic: TopicCategory | null) => void;
   setDiscoveryHasMore: (channel: DiscoveryChannelId, hasMore: boolean) => void;
@@ -151,6 +153,10 @@ interface AppActions {
   setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
   setDiscoveryCurrentPage: (channel: DiscoveryChannelId, page: number) => void;
+  setTrendingParams: (params: Partial<TrendingParams>) => void;
+  setTopicParams: (params: Partial<TopicParams>) => void;
+  setSearchParams: (params: Partial<SearchParams>) => void;
+  setRssTimeRange: (timeRange: RSSTimeRange) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -203,10 +209,12 @@ type PersistedAppState = Partial<
     | 'discoveryNextPage'
     | 'discoveryCurrentPage'
     | 'selectedDiscoveryChannel'
+    | 'discoveryChannels'
     | 'discoveryPlatform'
     | 'discoveryLanguage'
-    | 'discoverySortBy'
-    | 'discoverySortOrder'
+    | 'trendingParams'
+    | 'topicParams'
+    | 'searchParams'
     | 'subscriptionRepos'
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
@@ -278,7 +286,7 @@ const normalizePersistedState = (
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
     discoveryRepos: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryRepos as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-      const defaults: Record<DiscoveryChannelId, DiscoveryRepo[]> = { trending: [], 'hot-release': [], 'most-popular': [], topic: [], search: [] };
+      const defaults: Record<DiscoveryChannelId, DiscoveryRepo[]> = { trending: [], topic: [], search: [], 'rss-trending': [] };
       return { ...defaults, ...persisted };
     })(),
     discoveryLastRefresh: (() => {
@@ -286,21 +294,21 @@ const normalizePersistedState = (
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
         return persisted as Record<string, string | null>;
       }
-      return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
+      return { 'trending': null, 'topic': null, 'search': null, 'rss-trending': null };
     })(),
     discoveryTotalCount: (() => {
         const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
         if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
           return persisted as Record<string, number>;
         }
-        return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
+        return { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 };
       })(),
       discoveryCurrentPage: (() => {
         const persisted = (safePersisted as Record<string, unknown>).discoveryCurrentPage;
         if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
           return persisted as Record<string, number>;
         }
-        return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
+        return { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 };
       })(),
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: (() => {
@@ -462,42 +470,34 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
 const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '热门仓库',
-    nameEn: 'Trending',
+    name: '仓库探索',
+    nameEn: 'Repository Discovery',
     icon: 'trending',
-    description: '最近30天内星标数超过50的热门仓库',
-    enabled: true,
-  },
-  {
-    id: 'hot-release',
-    name: '热门发布',
-    nameEn: 'Hot Release',
-    icon: 'rocket',
-    description: '最近14天内活跃更新的仓库',
-    enabled: true,
-  },
-  {
-    id: 'most-popular',
-    name: '最受欢迎',
-    nameEn: 'Most Popular',
-    icon: 'star',
-    description: '星标数超过1000的稳定热门仓库',
+    description: '发现热门项目，支持新项目/活跃项目/经典项目筛选，可自定义时间范围和排序方式',
     enabled: true,
   },
   {
     id: 'topic',
-    name: '主题探索',
-    nameEn: 'Topic',
+    name: '专题浏览',
+    nameEn: 'Topics',
     icon: 'tag',
-    description: '按主题分类浏览仓库',
+    description: '按技术主题分类浏览优质项目',
     enabled: true,
   },
   {
     id: 'search',
-    name: '搜索发现',
+    name: '搜索',
     nameEn: 'Search',
     icon: 'search',
-    description: '自定义搜索发现新项目',
+    description: '自定义关键词搜索发现新项目',
+    enabled: true,
+  },
+  {
+    id: 'rss-trending',
+    name: 'RSS 趋势',
+    nameEn: 'RSS Trending',
+    icon: 'rss',
+    description: '通过 RSS 订阅获取 GitHub Trending 仓库（今日/本周/本月）',
     enabled: true,
   },
 ];
@@ -544,21 +544,23 @@ const store = create<AppState & AppActions>()(
       releaseIsRefreshing: false,
 
       discoveryChannels: defaultDiscoveryChannels,
-      discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
-      discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
-      discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      discoveryRepos: { 'trending': [], 'topic': [], 'search': [], 'rss-trending': [] },
+      discoveryLastRefresh: { 'trending': null, 'topic': null, 'search': null, 'rss-trending': null },
+      discoveryIsLoading: { 'trending': false, 'topic': false, 'search': false, 'rss-trending': false },
       selectedDiscoveryChannel: 'trending',
       discoveryPlatform: 'All',
       discoveryLanguage: 'All',
-      discoverySortBy: 'BestMatch',
-      discoverySortOrder: 'Descending',
       discoverySearchQuery: '',
       discoverySelectedTopic: null,
-      discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
-      discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
-      discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
-      discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
-      discoveryCurrentPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
+      discoveryHasMore: { 'trending': false, 'topic': false, 'search': false, 'rss-trending': false },
+      discoveryNextPage: { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 },
+      discoveryTotalCount: { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 },
+      discoveryScrollPositions: { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 },
+      discoveryCurrentPage: { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 },
+      trendingParams: { projectType: 'active', timeRange: 'month', language: 'All', minStars: 100, sortBy: 'Stars', sortOrder: 'Desc' },
+      topicParams: { sortBy: 'Stars', sortOrder: 'Desc' },
+      searchParams: { sortBy: 'BestMatch', sortOrder: 'Desc' },
+      rssTimeRange: 'daily',
 
       // Subscription
       subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
@@ -1096,8 +1098,6 @@ const store = create<AppState & AppActions>()(
     })),
     setDiscoveryPlatform: (discoveryPlatform) => set({ discoveryPlatform }),
     setDiscoveryLanguage: (discoveryLanguage) => set({ discoveryLanguage }),
-    setDiscoverySortBy: (discoverySortBy) => set({ discoverySortBy }),
-    setDiscoverySortOrder: (discoverySortOrder) => set({ discoverySortOrder }),
     setDiscoverySearchQuery: (discoverySearchQuery) => set({ discoverySearchQuery }),
     setDiscoverySelectedTopic: (discoverySelectedTopic) => set({ discoverySelectedTopic }),
     setDiscoveryHasMore: (channel, hasMore) => set((state) => ({
@@ -1119,17 +1119,26 @@ const store = create<AppState & AppActions>()(
       },
     })),
     setDiscoveryCurrentPage: (channel, page) => set((state) => {
-      // 边界条件处理：确保页数不小于 1
       const validPage = Math.max(1, page);
       console.log(`[Discovery] Set page for ${channel}: ${validPage}`);
       return {
         discoveryCurrentPage: { ...state.discoveryCurrentPage, [channel]: validPage },
       };
     }),
-    }),
-    {
-      name: 'github-stars-manager',
-      version: 5,
+    setTrendingParams: (params) => set((state) => ({
+      trendingParams: { ...state.trendingParams, ...params },
+    })),
+    setTopicParams: (params) => set((state) => ({
+      topicParams: { ...state.topicParams, ...params },
+    })),
+    setSearchParams: (params) => set((state) => ({
+      searchParams: { ...state.searchParams, ...params },
+    })),
+    setRssTimeRange: (timeRange) => set({ rssTimeRange: timeRange }),
+  }),
+  {
+    name: 'github-stars-manager',
+      version: 6,
       storage: createJSONStorage(() => indexedDBStorage),
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -1197,37 +1206,36 @@ const store = create<AppState & AppActions>()(
       discoveryCurrentPage: state.discoveryCurrentPage,
       discoveryPlatform: state.discoveryPlatform,
       discoveryLanguage: state.discoveryLanguage,
-      discoverySortBy: state.discoverySortBy,
-      discoverySortOrder: state.discoverySortOrder,
+      trendingParams: state.trendingParams,
+      topicParams: state.topicParams,
+      searchParams: state.searchParams,
       discoverySelectedTopic: state.discoverySelectedTopic,
       }),
-      migrate: (persistedState) => {
-        // 版本升级适配处理
+      migrate: (persistedState, fromVersion) => {
+        const CURRENT_STORE_VERSION = 6;
         const state = persistedState as PersistedAppState | undefined;
-
-        // 从旧版本升级时，确保 categoryOrder 字段存在
-        if (state && !Array.isArray(state.categoryOrder)) {
-          console.log('Migrating from old version: initializing categoryOrder');
-          state.categoryOrder = [];
+        
+        if (!state) return undefined as unknown as PersistedAppState;
+        
+        console.log(`Store migration: from version ${fromVersion} to ${CURRENT_STORE_VERSION}`);
+        
+        // 版本 0-1: 初始化基础字段
+        if (fromVersion < 1) {
+          if (!Array.isArray(state.categoryOrder)) {
+            state.categoryOrder = [];
+          }
+          if (typeof state.collapsedSidebarCategoryCount !== 'number') {
+            state.collapsedSidebarCategoryCount = 20;
+          }
+          if (typeof state.defaultCategoryOverrides !== 'object') {
+            state.defaultCategoryOverrides = {};
+          }
         }
-
-        // 从旧版本升级时，确保 collapsedSidebarCategoryCount 字段存在
-        if (state && typeof state.collapsedSidebarCategoryCount !== 'number') {
-          console.log('Migrating from old version: initializing collapsedSidebarCategoryCount');
-          state.collapsedSidebarCategoryCount = 20;
-        }
-
-        // 从旧版本升级时，确保 defaultCategoryOverrides 字段存在
-        if (state && typeof state.defaultCategoryOverrides !== 'object') {
-          console.log('Migrating from old version: initializing defaultCategoryOverrides');
-          state.defaultCategoryOverrides = {};
-        }
-
-        // 迁移仓库数据中的旧标记
-        if (state && Array.isArray(state.repositories)) {
+        
+        // 版本 1-2: 迁移仓库数据中的旧标记
+        if (fromVersion < 2 && Array.isArray(state.repositories)) {
           let migratedCount = 0;
           state.repositories = state.repositories.map((repo: Repository) => {
-            // 将旧的 '__EMPTY__' 标记转换为空字符串（表示用户明确清空）
             if (repo.custom_description === '__EMPTY__') {
               migratedCount++;
               return { ...repo, custom_description: '' };
@@ -1238,63 +1246,93 @@ const store = create<AppState & AppActions>()(
             console.log(`Migrated ${migratedCount} repositories: converted '__EMPTY__' to empty string`);
           }
         }
-
-  if (state && !state.selectedDiscoveryChannel) {
-    state.selectedDiscoveryChannel = 'trending';
-  }
-  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
-  const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
-  if (state && !Array.isArray(state.subscriptionChannels)) {
-    console.log('Migrating: initializing subscription channels');
-    state.subscriptionChannels = defaultSubscriptionChannels;
-  } else if (state && Array.isArray(state.subscriptionChannels)) {
-    state.subscriptionChannels = state.subscriptionChannels.map((ch: unknown) => {
-      const chRecord = ch as Record<string, unknown>;
-      const defaultCh = defaultChannelsMap.get(chRecord.id as string);
-      if (chRecord.id === 'daily-dev' || chRecord.id === 'most-dev') {
-        return { ...chRecord, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' } as unknown as SubscriptionChannel;
-      }
-      if (defaultCh) {
-        return {
-          ...(chRecord as Partial<SubscriptionChannel>),
-          name: defaultCh.name, // 始终使用中文名称
-          nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
-          icon: (chRecord.icon as string) || defaultCh.icon,
-          description: (chRecord.description as string) || defaultCh.description,
-        } as unknown as SubscriptionChannel;
-      }
-      return chRecord as unknown as SubscriptionChannel;
-    });
-    // 确保 trending 频道存在（如果缺失则添加）
-    const hasTrending = state.subscriptionChannels.some((ch: SubscriptionChannel) => ch.id === 'trending');
-    if (!hasTrending) {
-      console.log('Migrating: adding trending channel');
-      state.subscriptionChannels.push({
-        id: 'trending',
-        name: '热门趋势',
-        nameEn: 'Trending',
-        icon: 'trending',
-        description: 'GitHub 上近期最受关注的项目 Top 10',
-        enabled: true,
-      } as SubscriptionChannel);
-    }
-  }
-  if (state && !state.discoveryPlatform) {
-    state.discoveryPlatform = 'All';
-  }
-  if (state && !state.discoveryLanguage) {
-    state.discoveryLanguage = 'All';
-  }
-  if (state && !state.discoverySortBy) {
-    state.discoverySortBy = 'BestMatch';
-  }
-  if (state && !state.discoverySortOrder) {
-    state.discoverySortOrder = 'Descending';
-  }
-  // 初始化 discoveryCurrentPage
-  if (state && !state.discoveryCurrentPage) {
-    state.discoveryCurrentPage = { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
-  }
+        
+        // 版本 2-3: 初始化发现频道选择
+        if (fromVersion < 3) {
+          if (!state.selectedDiscoveryChannel) {
+            state.selectedDiscoveryChannel = 'trending';
+          }
+        }
+        
+        // 版本 3-4: 迁移订阅频道
+        if (fromVersion < 4) {
+          const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
+          if (!Array.isArray(state.subscriptionChannels)) {
+            state.subscriptionChannels = defaultSubscriptionChannels;
+          } else {
+            state.subscriptionChannels = state.subscriptionChannels.map((ch: unknown) => {
+              const chRecord = ch as Record<string, unknown>;
+              const defaultCh = defaultChannelsMap.get(chRecord.id as string);
+              if (chRecord.id === 'daily-dev' || chRecord.id === 'most-dev') {
+                return { ...chRecord, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' } as unknown as SubscriptionChannel;
+              }
+              if (defaultCh) {
+                return {
+                  ...(chRecord as Partial<SubscriptionChannel>),
+                  name: defaultCh.name,
+                  nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
+                  icon: (chRecord.icon as string) || defaultCh.icon,
+                  description: (chRecord.description as string) || defaultCh.description,
+                } as unknown as SubscriptionChannel;
+              }
+              return chRecord as unknown as SubscriptionChannel;
+            });
+            const hasTrending = state.subscriptionChannels.some((ch: SubscriptionChannel) => ch.id === 'trending');
+            if (!hasTrending) {
+              state.subscriptionChannels.push({
+                id: 'trending',
+                name: '热门趋势',
+                nameEn: 'Trending',
+                icon: 'trending',
+                description: 'GitHub 上近期最受关注的项目 Top 10',
+                enabled: true,
+              } as SubscriptionChannel);
+            }
+          }
+        }
+        
+        // 版本 4-5: 初始化发现平台和语言
+        if (fromVersion < 5) {
+          if (!state.discoveryPlatform) {
+            state.discoveryPlatform = 'All';
+          }
+          if (!state.discoveryLanguage) {
+            state.discoveryLanguage = 'All';
+          }
+          // 迁移旧的排序参数到新的参数结构
+          if (!state.trendingParams) {
+            const oldSortBy = (state as Record<string, unknown>).discoverySortBy as string | undefined;
+            const oldSortOrder = (state as Record<string, unknown>).discoverySortOrder as string | undefined;
+            const sortBy: DiscoverySortBy = oldSortBy === 'MostStars' ? 'Stars' : oldSortBy === 'MostForks' ? 'Forks' : 'Stars';
+            const sortOrder: DiscoverySortOrder = oldSortOrder === 'Ascending' ? 'Asc' : 'Desc';
+            state.trendingParams = { projectType: 'active', timeRange: 'month', language: 'All', minStars: 100, sortBy, sortOrder };
+            delete (state as Record<string, unknown>).discoverySortBy;
+            delete (state as Record<string, unknown>).discoverySortOrder;
+          }
+          if (!state.topicParams) {
+            state.topicParams = { sortBy: 'Stars', sortOrder: 'Desc' };
+          }
+          if (!state.searchParams) {
+            state.searchParams = { sortBy: 'BestMatch', sortOrder: 'Desc' };
+          }
+          if (!state.discoveryCurrentPage) {
+            state.discoveryCurrentPage = { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 };
+          }
+        }
+        
+        // 版本 5-6: 迁移发现频道
+        if (fromVersion < 6) {
+          const validChannelIds = new Set(defaultDiscoveryChannels.map(ch => ch.id));
+          if (Array.isArray(state.discoveryChannels)) {
+            const oldChannels = state.discoveryChannels as Array<{ id: string }>;
+            const hasOldChannels = oldChannels.some(ch => ch.id === 'hot-release' || ch.id === 'most-popular');
+            if (hasOldChannels) {
+              state.discoveryChannels = defaultDiscoveryChannels;
+            } else {
+              state.discoveryChannels = (oldChannels as DiscoveryChannel[]).filter(ch => validChannelIds.has(ch.id));
+            }
+          }
+        }
 
         return state as PersistedAppState;
       },

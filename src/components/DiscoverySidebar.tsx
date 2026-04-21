@@ -1,13 +1,12 @@
 import React from 'react';
-import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'lucide-react';
+import { RefreshCw, Loader2, TrendingUp, Tag, Search, Rss } from 'lucide-react';
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4" />,
-  rocket: <Rocket className="w-4 h-4" />,
-  star: <Crown className="w-4 h-4" />,
-  tag: <Tag className="w-4 h-4" />,
-  search: <Search className="w-4 h-4" />,
+  trending: <TrendingUp className="w-4 h-4 text-inherit" />,
+  tag: <Tag className="w-4 h-4 text-inherit" />,
+  search: <Search className="w-4 h-4 text-inherit" />,
+  rss: <Rss className="w-4 h-4 text-inherit" />,
 };
 
 interface DiscoverySidebarProps {
@@ -48,17 +47,17 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
 
   const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => ({
     ...ch,
-    icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
+    icon: discoveryChannelIconMap[ch.icon] || <TrendingUp className="w-4 h-4" />,
   }));
   
-  const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
+  const anyLoading = Object.values(isLoading).some(v => v);
 
   return (
     <div className="w-full lg:w-64 shrink-0">
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('发现频道', 'Discovery Channels')}
+            {t('探索频道', 'Explore Channels')}
           </h3>
           <button
             onClick={onRefreshAll}
@@ -73,7 +72,8 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
         <div className="space-y-1">
           {enabledChannels.map((channel) => {
             const isSelected = selectedChannel === channel.id;
-            const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
+            const channelLoading = isLoading[channel.id] ?? false;
+            const channelLastRefresh = lastRefresh[channel.id] ?? null;
 
             return (
               <button
@@ -95,9 +95,9 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                   {channelLoading && (
                     <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
                   )}
-                  {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id]) ? (
+                  {channelLastRefresh ? (
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
+                      {formatLastRefresh(channelLastRefresh)}
                     </span>
                   ) : null}
                 </div>

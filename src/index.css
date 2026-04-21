@@ -627,3 +627,190 @@
     height: auto;
   }
 }
+
+/* ========== Performance Optimization ========== */
+
+/* GPU Acceleration for animations */
+.gpu-accelerate {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Smooth scrolling with GPU acceleration */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Optimized transitions */
+.optimized-transition {
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  will-change: opacity, transform;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimize card rendering */
+.card-optimize {
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Optimize list rendering */
+.list-optimize {
+  contain: layout style;
+  content-visibility: auto;
+}
+
+/* Optimize fixed elements */
+.fixed-optimize {
+  position: fixed;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Optimize sticky elements */
+.sticky-optimize {
+  position: sticky;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Loading skeleton animation */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200px 100%;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Staggered fade in for lists */
+.stagger-fade-in > * {
+  animation: fadeIn 0.2s ease-out forwards;
+  opacity: 0;
+}
+
+.stagger-fade-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-fade-in > *:nth-child(2) { animation-delay: 30ms; }
+.stagger-fade-in > *:nth-child(3) { animation-delay: 60ms; }
+.stagger-fade-in > *:nth-child(4) { animation-delay: 90ms; }
+.stagger-fade-in > *:nth-child(5) { animation-delay: 120ms; }
+.stagger-fade-in > *:nth-child(6) { animation-delay: 150ms; }
+.stagger-fade-in > *:nth-child(7) { animation-delay: 180ms; }
+.stagger-fade-in > *:nth-child(8) { animation-delay: 210ms; }
+.stagger-fade-in > *:nth-child(9) { animation-delay: 240ms; }
+.stagger-fade-in > *:nth-child(10) { animation-delay: 270ms; }
+
+/* Expand fade animation */
+@keyframes expandFade {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+.animate-expand-fade {
+  animation: expandFade 0.2s ease-out forwards;
+  overflow: hidden;
+}
+
+/* Optimize image loading */
+.img-optimize {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Prevent layout shift for images */
+.img-no-shift {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: attr(width) / attr(height);
+}
+
+/* Optimize modal rendering */
+.modal-optimize {
+  contain: layout style paint;
+  will-change: opacity, transform;
+}
+
+/* Optimize dropdown rendering */
+.dropdown-optimize {
+  contain: layout style;
+  will-change: opacity, transform;
+}
+
+/* Debounce hover effects */
+.hover-debounce {
+  transition-delay: 50ms;
+}
+
+/* Instant active state for better perceived performance */
+.instant-active:active {
+  transform: scale(0.98);
+  transition: transform 0ms;
+}
+
+/* Optimize text rendering */
+.text-optimize {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Critical CSS for above-the-fold content */
+.critical-render {
+  contain: none;
+  content-visibility: visible;
+}

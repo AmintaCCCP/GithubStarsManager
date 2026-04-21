@@ -218,7 +218,7 @@ export const Header: React.FC = () => {
               }`}
             >
               <TrendingUp className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && t('趋势', 'Trending')}
+              {!isTextWrapped && t('探索', 'Explore')}
             </button>
             <button
               onClick={() => setCurrentView('settings')}
@@ -268,8 +268,8 @@ export const Header: React.FC = () => {
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
-              title={t('趋势', 'Trending')}
-              aria-label={t('趋势', 'Trending')}
+              title={t('探索', 'Explore')}
+              aria-label={t('探索', 'Explore')}
             >
               <TrendingUp className="w-5 h-5" />
             </button>
@@ -341,7 +341,7 @@ export const Header: React.FC = () => {
                 >
                   <div className="flex items-center">
                     <TrendingUp className="w-5 h-5 mr-3" />
-                    {t('趋势', 'Trending')}
+                    {t('探索', 'Explore')}
                   </div>
                 </button>
                 <button

@@ -4,10 +4,8 @@ import {
   TrendingUp, 
   Bot, 
   Loader2, 
-  Rocket, 
   Tag, 
   Search,
-  Crown,
   Filter,
   ChevronDown,
   ChevronLeft,
@@ -17,12 +15,21 @@ import {
   Terminal,
   Smartphone,
   Globe,
-  X
+  X,
+  Settings2,
+  Calendar,
+  Star,
+  GitFork,
+  Code,
+  Rss,
+  Sparkles,
+  Crown
 } from 'lucide-react';
-import { useAppStore, useAppStoreRaw } from '../store/useAppStore';
+import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { RSSTrendingService } from '../services/rssTrendingService';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
@@ -33,18 +40,21 @@ import type {
   DiscoveryRepo,
   DiscoveryPlatform,
   ProgrammingLanguage,
-  SortBy,
-  SortOrder,
-  TopicCategory
+  DiscoverySortBy,
+  DiscoverySortOrder,
+  TopicCategory,
+  TrendingParams,
+  TrendingTimeRange,
+  TrendingProjectType,
+  RSSTimeRange
 } from '../types';
 import { ITEMS_PER_PAGE } from '../utils/pagination';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4" />,
-  rocket: <Rocket className="w-4 h-4" />,
-  star: <Crown className="w-4 h-4" />,
-  tag: <Tag className="w-4 h-4" />,
-  search: <Search className="w-4 h-4" />,
+  trending: <TrendingUp className="w-4 h-4 text-inherit" />,
+  tag: <Tag className="w-4 h-4 text-inherit" />,
+  search: <Search className="w-4 h-4 text-inherit" />,
+  rss: <Rss className="w-4 h-4 text-inherit" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
@@ -52,16 +62,6 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
     gradient: 'from-blue-500 to-indigo-600',
     shadow: 'shadow-blue-500/25',
     largeIcon: <TrendingUp className="w-9 h-9 text-white" />,
-  },
-  rocket: {
-    gradient: 'from-orange-500 to-red-600',
-    shadow: 'shadow-orange-500/25',
-    largeIcon: <Rocket className="w-9 h-9 text-white" />,
-  },
-  star: {
-    gradient: 'from-amber-400 to-yellow-600',
-    shadow: 'shadow-amber-500/25',
-    largeIcon: <Crown className="w-9 h-9 text-white" />,
   },
   tag: {
     gradient: 'from-emerald-500 to-teal-600',
@@ -72,6 +72,11 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
     gradient: 'from-violet-500 to-purple-600',
     shadow: 'shadow-violet-500/25',
     largeIcon: <Search className="w-9 h-9 text-white" />,
+  },
+  rss: {
+    gradient: 'from-orange-400 to-red-500',
+    shadow: 'shadow-orange-500/25',
+    largeIcon: <Rss className="w-9 h-9 text-white" />,
   },
 };
 
@@ -285,6 +290,319 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
   );
 };
 
+interface TrendingFilterProps {
+  params: TrendingParams;
+  onParamsChange: (params: Partial<TrendingParams>) => void;
+  language: 'zh' | 'en';
+}
+
+const TrendingFilter = React.memo<TrendingFilterProps>(({ params, onParamsChange, language }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const projectTypeOptions = useMemo<{ id: TrendingProjectType; name: string; nameEn: string; icon: React.ReactNode; desc: string; descEn: string }[]>(() => [
+    { id: 'new', name: '新星项目', nameEn: 'New', icon: <Sparkles className="w-3.5 h-3.5" />, desc: '最近创建的新项目', descEn: 'Recently created projects' },
+    { id: 'active', name: '活跃项目', nameEn: 'Active', icon: <TrendingUp className="w-3.5 h-3.5" />, desc: '最近有更新的项目', descEn: 'Recently updated projects' },
+    { id: 'classic', name: '经典项目', nameEn: 'Classic', icon: <Crown className="w-3.5 h-3.5" />, desc: '经过时间检验的项目', descEn: 'Time-tested projects' },
+  ], []);
+
+  const timeRangeOptions = useMemo<{ id: TrendingTimeRange; name: string; nameEn: string }[]>(() => [
+    { id: 'today', name: '今天', nameEn: 'Today' },
+    { id: 'week', name: '本周', nameEn: 'This Week' },
+    { id: 'month', name: '本月', nameEn: 'This Month' },
+    { id: 'quarter', name: '本季度', nameEn: 'This Quarter' },
+    { id: 'year', name: '今年', nameEn: 'This Year' },
+  ], []);
+
+  const sortByOptions = useMemo<{ id: DiscoverySortBy; name: string; nameEn: string; icon: React.ReactNode }[]>(() => [
+    { id: 'Stars', name: '最多Star', nameEn: 'Most Stars', icon: <Star className="w-3.5 h-3.5" /> },
+    { id: 'Forks', name: '最多Fork', nameEn: 'Most Forks', icon: <GitFork className="w-3.5 h-3.5" /> },
+    { id: 'Updated', name: '最近更新', nameEn: 'Recently Updated', icon: <Calendar className="w-3.5 h-3.5" /> },
+    { id: 'Created', name: '最近创建', nameEn: 'Recently Created', icon: <Sparkles className="w-3.5 h-3.5" /> },
+  ], []);
+
+  const languageOptions = useMemo<{ id: ProgrammingLanguage; name: string }[]>(() => [
+    { id: 'All', name: t('所有语言', 'All Languages') },
+    { id: 'JavaScript', name: 'JavaScript' },
+    { id: 'TypeScript', name: 'TypeScript' },
+    { id: 'Python', name: 'Python' },
+    { id: 'Java', name: 'Java' },
+    { id: 'Go', name: 'Go' },
+    { id: 'Rust', name: 'Rust' },
+    { id: 'CSharp', name: 'C#' },
+    { id: 'CPlusPlus', name: 'C++' },
+    { id: 'Swift', name: 'Swift' },
+    { id: 'Kotlin', name: 'Kotlin' },
+    { id: 'Dart', name: 'Dart' },
+    { id: 'Ruby', name: 'Ruby' },
+    { id: 'PHP', name: 'PHP' },
+  ], [t]);
+
+  const minStarsOptions = useMemo(() => [50, 100, 200, 500, 1000], []);
+
+  const currentProjectType = useMemo(() => projectTypeOptions.find(o => o.id === params.projectType), [projectTypeOptions, params.projectType]);
+  const currentTimeRange = useMemo(() => timeRangeOptions.find(o => o.id === params.timeRange), [timeRangeOptions, params.timeRange]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+      >
+        <Settings2 className="w-4 h-4" />
+        <span className="hidden sm:inline">{t('参数设置', 'Settings')}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg p-4 z-50">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('项目类型', 'Project Type')}
+              </label>
+              <div className="space-y-1">
+                {projectTypeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => onParamsChange({ projectType: option.id })}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      params.projectType === option.id
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {option.icon}
+                    <span className="flex-1 text-left">{language === 'zh' ? option.name : option.nameEn}</span>
+                    <span className={`text-[10px] ${params.projectType === option.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                      {language === 'zh' ? option.desc : option.descEn}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('时间范围', 'Time Range')}
+              </label>
+              <div className="flex gap-1 flex-wrap">
+                {timeRangeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => onParamsChange({ timeRange: option.id })}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      params.timeRange === option.id
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {language === 'zh' ? option.name : option.nameEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('编程语言', 'Language')}
+              </label>
+              <select
+                value={params.language}
+                onChange={(e) => onParamsChange({ language: e.target.value as ProgrammingLanguage })}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                {languageOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('最低星标数', 'Min Stars')}
+              </label>
+              <div className="flex gap-1 flex-wrap">
+                {minStarsOptions.map((stars) => (
+                  <button
+                    key={stars}
+                    onClick={() => onParamsChange({ minStars: stars })}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      params.minStars === stars
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {stars >= 1000 ? `${stars / 1000}K` : stars}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('排序方式', 'Sort By')}
+              </label>
+              <div className="flex gap-1">
+                {sortByOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => onParamsChange({ sortBy: option.id })}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      params.sortBy === option.id
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {option.icon}
+                    <span className="hidden sm:inline">{language === 'zh' ? option.name : option.nameEn}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1 mt-2">
+                <button
+                  onClick={() => onParamsChange({ sortOrder: 'Desc' })}
+                  className={`flex-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    params.sortOrder === 'Desc'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {t('降序', 'Descending')}
+                </button>
+                <button
+                  onClick={() => onParamsChange({ sortOrder: 'Asc' })}
+                  className={`flex-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    params.sortOrder === 'Asc'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {t('升序', 'Ascending')}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <Code className="w-3.5 h-3.5" />
+                <span>
+                  {t('当前筛选', 'Current')}: {language === 'zh' ? currentProjectType?.name : currentProjectType?.nameEn} · {language === 'zh' ? currentTimeRange?.name : currentTimeRange?.nameEn} · {params.minStars}+ ⭐
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// RSS Time Range Filter Component
+interface RSSFilterProps {
+  timeRange: RSSTimeRange;
+  onTimeRangeChange: (timeRange: RSSTimeRange) => void;
+  language: 'zh' | 'en';
+}
+
+const RSSFilter = React.memo<RSSFilterProps>(({ timeRange, onTimeRangeChange, language }) => {
+  const timeRangeOptions = useMemo<{ id: RSSTimeRange; name: string; nameEn: string }[]>(() => [
+    { id: 'daily', name: '今日', nameEn: 'Daily' },
+    { id: 'weekly', name: '本周', nameEn: 'Weekly' },
+    { id: 'monthly', name: '本月', nameEn: 'Monthly' },
+  ], []);
+
+  return (
+    <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+      {timeRangeOptions.map((option) => (
+        <button
+          key={option.id}
+          onClick={() => onTimeRangeChange(option.id)}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+            timeRange === option.id
+              ? 'bg-orange-500 text-white shadow-sm'
+              : 'text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-800/30'
+          }`}
+        >
+          {language === 'zh' ? option.name : option.nameEn}
+        </button>
+      ))}
+    </div>
+  );
+});
+
+// Unified Sort Selector Component
+interface SortSelectorProps {
+  sortBy: DiscoverySortBy;
+  sortOrder: DiscoverySortOrder;
+  onSortChange: (params: { sortBy?: DiscoverySortBy; sortOrder?: DiscoverySortOrder }) => void;
+  language: 'zh' | 'en';
+  showBestMatch?: boolean;
+}
+
+const SortSelector = React.memo<SortSelectorProps>(({ sortBy, sortOrder, onSortChange, language, showBestMatch = false }) => {
+  const sortByOptions = useMemo<{ id: DiscoverySortBy; name: string; nameEn: string }[]>(() => {
+    const options = [
+      { id: 'Stars' as DiscoverySortBy, name: '最多Star', nameEn: 'Most Stars' },
+      { id: 'Forks' as DiscoverySortBy, name: '最多Fork', nameEn: 'Most Forks' },
+      { id: 'Updated' as DiscoverySortBy, name: '最近更新', nameEn: 'Recently Updated' },
+      { id: 'Created' as DiscoverySortBy, name: '最近创建', nameEn: 'Recently Created' },
+      { id: 'HelpWanted' as DiscoverySortBy, name: '寻求帮助', nameEn: 'Help Wanted' },
+    ];
+    if (showBestMatch) {
+      options.unshift({ id: 'BestMatch' as DiscoverySortBy, name: '最佳匹配', nameEn: 'Best Match' });
+    }
+    return options;
+  }, [showBestMatch]);
+
+  const sortOrderOptions = useMemo(() => [
+    { id: 'Desc' as DiscoverySortOrder, name: '降序', nameEn: 'Descending' },
+    { id: 'Asc' as DiscoverySortOrder, name: '升序', nameEn: 'Ascending' },
+  ], []);
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={sortBy}
+        onChange={(e) => onSortChange({ sortBy: e.target.value as DiscoverySortBy })}
+        className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+      >
+        {sortByOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {language === 'zh' ? option.name : option.nameEn}
+          </option>
+        ))}
+      </select>
+      <select
+        value={sortOrder}
+        onChange={(e) => onSortChange({ sortOrder: e.target.value as DiscoverySortOrder })}
+        className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+      >
+        {sortOrderOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {language === 'zh' ? option.name : option.nameEn}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+});
+
 // 重构后的 Pagination Component - 完整版本
 interface PaginationProps {
   currentPage: number;
@@ -294,14 +612,14 @@ interface PaginationProps {
   isLoading?: boolean;
 }
 
-const Pagination: React.FC<PaginationProps> = ({ 
+const Pagination = React.memo<PaginationProps>(({ 
   currentPage, 
   totalPages, 
   onPageChange, 
   language,
   isLoading = false 
 }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const [inputPage, setInputPage] = useState<string>(String(currentPage));
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -525,7 +843,7 @@ const Pagination: React.FC<PaginationProps> = ({
       )}
     </div>
   );
-};
+});
 
 // 重构后的 CompactPagination Component
 interface CompactPaginationProps {
@@ -537,7 +855,7 @@ interface CompactPaginationProps {
   isLoading?: boolean;
 }
 
-const CompactPagination: React.FC<CompactPaginationProps> = ({ 
+const CompactPagination = React.memo<CompactPaginationProps>(({ 
   currentPage, 
   totalPages, 
   onPageChange, 
@@ -545,7 +863,7 @@ const CompactPagination: React.FC<CompactPaginationProps> = ({
   totalCount,
   isLoading = false 
 }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const [inputPage, setInputPage] = useState<string>(String(currentPage));
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -709,7 +1027,9 @@ const CompactPagination: React.FC<CompactPaginationProps> = ({
       )}
     </div>
   );
-};
+});
+
+CompactPagination.displayName = 'CompactPagination';
 
 export const DiscoveryView: React.FC = React.memo(() => {
   const {
@@ -733,10 +1053,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryPlatform,
     discoveryLanguage,
     setDiscoveryLanguage,
-    discoverySortBy,
-    setDiscoverySortBy,
-    discoverySortOrder,
-    setDiscoverySortOrder,
     discoverySearchQuery,
     setDiscoverySearchQuery,
     discoverySelectedTopic,
@@ -750,6 +1066,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryCurrentPage,
     setDiscoveryScrollPosition,
     appendDiscoveryRepos,
+    trendingParams,
+    setTrendingParams,
+    topicParams,
+    setTopicParams,
+    searchParams,
+    setSearchParams,
+    rssTimeRange,
+    setRssTimeRange,
   } = useAppStore();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -807,18 +1131,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
   const currentChannelIcon = discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
-  const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
-
-  // 切换频道时重置页码并恢复滚动位置（只依赖 selectedDiscoveryChannel，不订阅 discoveryScrollPositions）
-  useEffect(() => {
-    console.log(`[Discovery] Channel changed to ${selectedDiscoveryChannel}, resetting page to 1`);
-    setDiscoveryCurrentPage(selectedDiscoveryChannel, 1);
-    // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
-    if (scrollContainerRef.current) {
-      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
-      scrollContainerRef.current.scrollTop = savedPosition;
-    }
-  }, [selectedDiscoveryChannel, setDiscoveryCurrentPage]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
     console.log(`[Discovery] Refreshing channel ${channelId}, page: ${page}, append: ${append}`);
@@ -835,19 +1147,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
       switch (channelId) {
         case 'trending':
-          result = await githubApi.getTrendingRepositories(discoveryPlatform, page);
-          break;
-        case 'hot-release':
-          result = await githubApi.getHotReleaseRepositories(discoveryPlatform, page);
-          break;
-        case 'most-popular':
-          result = await githubApi.getMostPopular(discoveryPlatform, page);
+          result = await githubApi.getTrendingRepositories(discoveryPlatform, page, 20, trendingParams);
           break;
         case 'topic':
           if (discoverySelectedTopic) {
-            result = await githubApi.getTopicRepositories(discoverySelectedTopic, discoveryPlatform, page);
+            result = await githubApi.getTopicRepositories(discoverySelectedTopic, discoveryPlatform, page, 20, topicParams);
           } else {
-            result = await githubApi.getTrendingRepositories(discoveryPlatform, page);
+            result = await githubApi.getTrendingRepositories(discoveryPlatform, page, 20, trendingParams);
           }
           break;
         case 'search':
@@ -856,25 +1162,34 @@ export const DiscoveryView: React.FC = React.memo(() => {
               discoverySearchQuery,
               discoveryPlatform,
               discoveryLanguage,
-              discoverySortBy,
-              discoverySortOrder,
+              searchParams,
               page
             );
           } else {
             result = { repos: [], hasMore: false, nextPageIndex: 2, totalCount: 0 };
           }
           break;
+        case 'rss-trending': {
+          const rssService = new RSSTrendingService(githubToken);
+          result = await rssService.fetchRSSTrending(rssTimeRange, (current, total) => {
+            console.log(`[RSS Trending] Progress: ${current}/${total}`);
+          });
+          break;
+        }
         default:
           result = { repos: [], hasMore: false, nextPageIndex: 2, totalCount: 0 };
       }
 
+      if (!result || !Array.isArray(result.repos)) {
+        console.error(`[Discovery] Invalid result from API:`, result);
+        throw new Error('Invalid API response');
+      }
+
       console.log(`[Discovery] Received ${result.repos.length} repos, hasMore: ${result.hasMore}, totalCount: ${result.totalCount}`);
 
-      // 合并AI分析结果（如果仓库之前被分析过）
-      // 使用 getState 获取最新状态，避免闭包问题
-      const currentState = useAppStoreRaw();
-      const currentRepos = currentState.discoveryRepos[channelId] || [];
+      const currentRepos = useAppStore.getState().discoveryRepos[channelId] || [];
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
+        if (!newRepo || !newRepo.id) return null;
         const existingRepo = currentRepos.find(r => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
           return {
@@ -887,17 +1202,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
           };
         }
         return newRepo;
-      });
+      }).filter(Boolean) as DiscoveryRepo[];
 
       if (append) {
         appendDiscoveryRepos(channelId, mergedRepos);
       } else {
         setDiscoveryRepos(channelId, mergedRepos);
       }
-      setDiscoveryHasMore(channelId, result.hasMore);
-      setDiscoveryNextPage(channelId, result.nextPageIndex);
-      // 保存总数量用于计算总页数
-      if (result.totalCount !== undefined) {
+      setDiscoveryHasMore(channelId, result.hasMore ?? false);
+      setDiscoveryNextPage(channelId, result.nextPageIndex ?? 2);
+      if (result.totalCount !== undefined && typeof result.totalCount === 'number') {
         setDiscoveryTotalCount(channelId, result.totalCount);
       }
       setDiscoveryLastRefresh(channelId, new Date().toISOString());
@@ -909,7 +1223,26 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       setDiscoveryLoading(channelId, false);
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingParams, topicParams, searchParams, rssTimeRange]);
+
+  // 切换频道时重置页码、恢复滚动位置，并自动加载空频道
+  useEffect(() => {
+    console.log(`[Discovery] Channel changed to ${selectedDiscoveryChannel}, resetting page to 1`);
+    setDiscoveryCurrentPage(selectedDiscoveryChannel, 1);
+    if (scrollContainerRef.current) {
+      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
+      scrollContainerRef.current.scrollTop = savedPosition;
+    }
+
+    const currentRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel];
+    if ((!currentRepos || currentRepos.length === 0) && githubToken) {
+      const channelLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
+      if (!channelLoading) {
+        console.log(`[Discovery] Auto-loading empty channel: ${selectedDiscoveryChannel}`);
+        refreshChannel(selectedDiscoveryChannel, 1, false);
+      }
+    }
+  }, [selectedDiscoveryChannel, setDiscoveryCurrentPage, githubToken, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -930,6 +1263,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
     return date.toLocaleDateString();
   }, [t]);
+
+  const handleTrendingParamsChange = useCallback((params: Partial<TrendingParams>) => {
+    setTrendingParams(params);
+    refreshChannel('trending', 1, false);
+  }, [setTrendingParams, refreshChannel]);
 
   // 处理滚动事件：保存滚动位置并控制工具栏显示
   const handleScroll = useCallback(() => {
@@ -1156,14 +1494,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
         channels={mobileChannels}
         selectedChannel={selectedDiscoveryChannel}
         onChannelSelect={(channel) => {
-          // 保存当前频道的滚动位置到 ref 和 state
           if (scrollContainerRef.current) {
             const scrollTop = scrollContainerRef.current.scrollTop;
             discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
             setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
           }
           setSelectedDiscoveryChannel(channel);
-          setDiscoveryCurrentPage(channel, 1);
         }}
         language={language}
       />
@@ -1174,14 +1510,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
             channels={discoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
-              // 保存当前频道的滚动位置到 ref 和 state
               if (scrollContainerRef.current) {
                 const scrollTop = scrollContainerRef.current.scrollTop;
                 discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
                 setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
               }
               setSelectedDiscoveryChannel(channel);
-              setDiscoveryCurrentPage(channel, 1);
             }}
             onRefreshAll={refreshAll}
             isLoading={discoveryIsLoading}
@@ -1203,7 +1537,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <div className="flex items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                    {currentChannelIconNode}
+                    {currentChannelStyle.largeIcon}
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">
@@ -1227,35 +1561,40 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
                   </button>
-                  {selectedDiscoveryChannel === 'hot-release' && (
-                    <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
-                      <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                        {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
-                      </div>
-                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45" />
-                    </div>
-                  )}
                 </div>
               </div>
               
               {/* 第二行：筛选和操作按钮 */}
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'topic' && (
-                  <select
-                    value={discoverySelectedTopic || ''}
-                    onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    <option value="">{t('主题', 'Topic')}</option>
-                    <option value="ai">{t('人工智能', 'AI')}</option>
-                    <option value="ml">{t('机器学习', 'ML')}</option>
-                    <option value="database">{t('数据库', 'DB')}</option>
-                    <option value="web">{t('Web开发', 'Web')}</option>
-                    <option value="mobile">{t('移动开发', 'Mobile')}</option>
-                    <option value="devtools">{t('开发工具', 'DevTools')}</option>
-                    <option value="security">{t('安全', 'Security')}</option>
-                    <option value="game">{t('游戏', 'Game')}</option>
-                  </select>
+                  <>
+                    <select
+                      value={discoverySelectedTopic || ''}
+                      onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    >
+                      <option value="">{t('主题', 'Topic')}</option>
+                      <option value="ai">{t('人工智能', 'AI')}</option>
+                      <option value="ml">{t('机器学习', 'ML')}</option>
+                      <option value="database">{t('数据库', 'DB')}</option>
+                      <option value="web">{t('Web开发', 'Web')}</option>
+                      <option value="mobile">{t('移动开发', 'Mobile')}</option>
+                      <option value="devtools">{t('开发工具', 'DevTools')}</option>
+                      <option value="security">{t('安全', 'Security')}</option>
+                      <option value="game">{t('游戏', 'Game')}</option>
+                    </select>
+                    <SortSelector
+                      sortBy={topicParams.sortBy}
+                      sortOrder={topicParams.sortOrder}
+                      onSortChange={(params) => {
+                        setTopicParams(params);
+                        if (discoverySelectedTopic) {
+                          refreshChannel('topic', 1, false);
+                        }
+                      }}
+                      language={language}
+                    />
+                  </>
                 )}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <PlatformFilter 
@@ -1263,6 +1602,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     onPlatformChange={setDiscoveryPlatform} 
                     language={language}
                   />
+                  {selectedDiscoveryChannel === 'trending' && (
+                    <TrendingFilter
+                      params={trendingParams}
+                      onParamsChange={handleTrendingParamsChange}
+                      language={language}
+                    />
+                  )}
                   <SortAlgorithmTooltip 
                     channelId={selectedDiscoveryChannel} 
                     language={language} 
@@ -1372,24 +1718,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <option value="PHP">PHP</option>
                   </select>
                   
-                  <select
-                    value={discoverySortBy}
-                    onChange={(e) => setDiscoverySortBy(e.target.value as SortBy)}
-                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    <option value="BestMatch">{t('最佳匹配', 'Best Match')}</option>
-                    <option value="MostStars">{t('最多Star', 'Most Stars')}</option>
-                    <option value="MostForks">{t('最多Fork', 'Most Forks')}</option>
-                  </select>
-                  
-                  <select
-                    value={discoverySortOrder}
-                    onChange={(e) => setDiscoverySortOrder(e.target.value as SortOrder)}
-                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  >
-                    <option value="Descending">{t('降序', 'Descending')}</option>
-                    <option value="Ascending">{t('升序', 'Ascending')}</option>
-                  </select>
+                  <SortSelector
+                    sortBy={searchParams.sortBy}
+                    sortOrder={searchParams.sortOrder}
+                    onSortChange={(params) => {
+                      setSearchParams(params);
+                      if (discoverySearchQuery.trim()) {
+                        refreshChannel('search', 1, false);
+                      }
+                    }}
+                    language={language}
+                    showBestMatch={true}
+                  />
                   
                   <select
                     value={discoveryPlatform}
@@ -1402,6 +1742,26 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <option value="Windows">Windows</option>
                     <option value="Linux">Linux</option>
                   </select>
+                </div>
+              </div>
+            )}
+
+            {selectedDiscoveryChannel === 'rss-trending' && (
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <RSSFilter
+                      timeRange={rssTimeRange}
+                      onTimeRangeChange={(timeRange) => {
+                        setRssTimeRange(timeRange);
+                        refreshChannel('rss-trending', 1, false);
+                      }}
+                      language={language}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('数据来源: GitHubTrendingRSS', 'Source: GitHubTrendingRSS')}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1435,7 +1795,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     {t('暂无数据', 'No data yet')}
                   </p>
                   <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
-                    {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
+                    {t('点击刷新按钮获取最新数据', 'Click refresh to fetch latest data')}
                   </p>
                 </div>
                 <button

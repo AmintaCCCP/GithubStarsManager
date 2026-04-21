@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
-import type { DiscoveryRepo } from '../types';
+import type { DiscoveryRepo, Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
@@ -14,7 +14,34 @@ interface SubscriptionRepoCardProps {
   onAnalyze?: (repo: DiscoveryRepo) => void;
 }
 
-export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo, onStar, onAnalyze }) => {
+function arePropsEqual(prevProps: SubscriptionRepoCardProps, nextProps: SubscriptionRepoCardProps): boolean {
+  const prevRepo = prevProps.repo;
+  const nextRepo = nextProps.repo;
+  
+  return (
+    prevRepo.id === nextRepo.id &&
+    prevRepo.rank === nextRepo.rank &&
+    prevRepo.analyzed_at === nextRepo.analyzed_at &&
+    prevRepo.analysis_failed === nextRepo.analysis_failed &&
+    prevRepo.ai_summary === nextRepo.ai_summary &&
+    prevRepo.ai_tags === nextRepo.ai_tags &&
+    prevRepo.ai_platforms === nextRepo.ai_platforms &&
+    prevRepo.description === nextRepo.description &&
+    prevRepo.stargazers_count === nextRepo.stargazers_count &&
+    prevRepo.forks_count === nextRepo.forks_count &&
+    prevRepo.forks === nextRepo.forks &&
+    prevRepo.full_name === nextRepo.full_name &&
+    prevRepo.html_url === nextRepo.html_url &&
+    prevRepo.language === nextRepo.language &&
+    prevRepo.topics === nextRepo.topics &&
+    prevRepo.owner?.avatar_url === nextRepo.owner?.avatar_url &&
+    prevRepo.owner?.login === nextRepo.owner?.login &&
+    prevProps.onStar === nextProps.onStar &&
+    prevProps.onAnalyze === nextProps.onAnalyze
+  );
+}
+
+const SubscriptionRepoCardBase: React.FC<SubscriptionRepoCardProps> = ({ repo, onStar, onAnalyze }) => {
   const language = useAppStore(state => state.language);
   const githubToken = useAppStore(state => state.githubToken);
   const aiConfigs = useAppStore(state => state.aiConfigs);
@@ -25,7 +52,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const addRepository = useAppStore(state => state.addRepository);
   const deleteRepository = useAppStore(state => state.deleteRepository);
   
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const [isStarring, setIsStarring] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -156,14 +183,33 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       await githubApi.starRepository(owner, name);
       
       // 将DiscoveryRepo转换为Repository并添加到本地，保留AI分析结果
-      const repositoryToAdd = {
-        ...repo,
-        // 移除Discovery/Subscription特有的字段
-        rank: undefined,
-        channel: undefined,
-        platform: undefined,
-        // 添加Star时间
+      const repositoryToAdd: Repository = {
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        description: repo.description,
+        html_url: repo.html_url,
+        stargazers_count: repo.stargazers_count,
+        forks_count: repo.forks_count,
+        forks: repo.forks,
+        language: repo.language,
+        created_at: repo.created_at,
+        updated_at: repo.updated_at,
+        pushed_at: repo.pushed_at,
+        owner: repo.owner,
+        topics: repo.topics,
+        ai_summary: repo.ai_summary,
+        ai_tags: repo.ai_tags,
+        ai_platforms: repo.ai_platforms,
+        analyzed_at: repo.analyzed_at,
+        analysis_failed: repo.analysis_failed,
         starred_at: new Date().toISOString(),
+        subscribed_to_releases: false,
+        custom_description: undefined,
+        custom_tags: undefined,
+        custom_category: undefined,
+        category_locked: undefined,
+        last_edited: undefined,
       };
       
       addRepository(repositoryToAdd);
@@ -497,3 +543,5 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     </>
   );
 };
+
+export const SubscriptionRepoCard = React.memo(SubscriptionRepoCardBase, arePropsEqual);

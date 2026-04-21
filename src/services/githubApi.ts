@@ -4,15 +4,18 @@ import {
   GitHubUser, 
   DiscoveryPlatform, 
   ProgrammingLanguage, 
-  SortBy, 
-  SortOrder, 
+  DiscoverySortBy, 
+  DiscoverySortOrder, 
   PaginatedDiscoveryRepositories,
   DiscoveryChannelId,
   TopicCategory,
   SubscriptionRepo,
   SubscriptionDev,
   GitHubSearchUserResponse,
-  GitHubUserDetail
+  GitHubUserDetail,
+  TrendingParams,
+  TopicParams,
+  SearchParams
 } from '../types';
 
 interface GitHubStarredItem {
@@ -117,6 +120,16 @@ export class GitHubApiService {
     }
 
     return allRepos;
+  }
+
+  async getRepository(owner: string, repo: string): Promise<Repository | null> {
+    try {
+      const response = await this.makeRequest<Repository>(`/repos/${owner}/${repo}`);
+      return response;
+    } catch (error) {
+      console.warn(`Failed to fetch repository ${owner}/${repo}:`, error);
+      return null;
+    }
   }
 
   async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
@@ -332,15 +345,15 @@ export class GitHubApiService {
         description = description.replace(/\s+/g, ' ').trim();
 
         // 解析 link 获取 owner/repo 格式
-        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
+        const match = link.match(/github\.com\/([^/]+)\/([^/?#]+)/);
         const owner = match?.[1] || '';
         const repoName = match?.[2] || title;
 
         // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
         const starsMatch = description.match(/⭐\s*([\d,]+)/);
         const forksMatch = description.match(/🍴\s*([\d,]+)/);
-        let stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
-        let forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+        const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
 
         repos.push({
           id: i + 1,
@@ -418,6 +431,7 @@ export class GitHubApiService {
       try {
         userDetail = await this.makeRequest<GitHubUserDetail>(`/users/${searchUser.login}`);
       } catch {
+        console.warn(`Failed to fetch user detail for ${searchUser.login}`);
       }
 
       let topRepo: SubscriptionRepo | null = null;
@@ -433,6 +447,7 @@ export class GitHubApiService {
           };
         }
       } catch {
+        console.warn(`Failed to fetch top repo for ${searchUser.login}`);
       }
       devs.push({
         rank: i + 1,
@@ -474,15 +489,18 @@ export class GitHubApiService {
     return `language:${languageMap[language]}`;
   }
 
-  private buildSortParams(sortBy: SortBy, sortOrder: SortOrder): { sort: string; order: string } {
-    const sortMap: Record<SortBy, string> = {
+  private buildDiscoverySortParams(sortBy: DiscoverySortBy, sortOrder: DiscoverySortOrder): { sort: string; order: string } {
+    const sortMap: Record<DiscoverySortBy, string> = {
       'BestMatch': 'best-match',
-      'MostStars': 'stars',
-      'MostForks': 'forks',
+      'Stars': 'stars',
+      'Forks': 'forks',
+      'Updated': 'updated',
+      'Created': 'created',
+      'HelpWanted': 'help-wanted-issues',
     };
-    const orderMap: Record<SortOrder, string> = {
-      'Descending': 'desc',
-      'Ascending': 'asc',
+    const orderMap: Record<DiscoverySortOrder, string> = {
+      'Desc': 'desc',
+      'Asc': 'asc',
     };
     return {
       sort: sortMap[sortBy],
@@ -493,18 +511,60 @@ export class GitHubApiService {
   async getTrendingRepositories(
     platform: DiscoveryPlatform,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    params?: TrendingParams
   ): Promise<PaginatedDiscoveryRepositories> {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const now = new Date();
     const platformQuery = this.buildPlatformQuery(platform);
+    const languageQuery = params?.language && params.language !== 'All' 
+      ? this.buildLanguageQuery(params.language) 
+      : '';
+    const minStars = params?.minStars ?? 100;
+    const projectType = params?.projectType ?? 'active';
+    const timeRange = params?.timeRange ?? 'month';
+    const sortBy = params?.sortBy ?? 'Stars';
+    const sortOrder = params?.sortOrder ?? 'Desc';
+
+    const timeRangeDays: Record<string, number> = {
+      'today': 1,
+      'week': 7,
+      'month': 30,
+      'quarter': 90,
+      'year': 365,
+    };
+    const daysAgo = timeRangeDays[timeRange] || 30;
+    const sinceDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    const since = sinceDate.toISOString().split('T')[0];
+
+    let query: string;
     
-    let query = `stars:>50 archived:false pushed:>=${thirtyDaysAgo}`;
+    switch (projectType) {
+      case 'new':
+        query = `stars:>=${minStars} archived:false created:>=${since}`;
+        break;
+      case 'classic': {
+        const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        query = `stars:>=${minStars} archived:false created:<${sixMonthsAgo} pushed:>=${oneYearAgo}`;
+        break;
+      }
+      case 'active':
+      default:
+        query = `stars:>=${minStars} archived:false pushed:>=${since}`;
+        break;
+    }
+
     if (platformQuery) {
       query += ` ${platformQuery}`;
     }
+    if (languageQuery) {
+      query += ` ${languageQuery}`;
+    }
+
+    const { sort, order } = this.buildDiscoverySortParams(sortBy, sortOrder);
 
     const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
     );
 
     const repos = (data.items || []).map((repo, index) => ({
@@ -524,90 +584,26 @@ export class GitHubApiService {
     };
   }
 
-  async getHotReleaseRepositories(
-    platform: DiscoveryPlatform,
-    page: number = 1,
-    perPage: number = 20
-  ): Promise<PaginatedDiscoveryRepositories> {
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const platformQuery = this.buildPlatformQuery(platform);
-    
-    let query = `stars:>10 archived:false pushed:>=${fourteenDaysAgo}`;
-    if (platformQuery) {
-      query += ` ${platformQuery}`;
-    }
-
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`
-    );
-
-    const repos = (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: (page - 1) * perPage + index + 1,
-      channel: 'hot-release' as DiscoveryChannelId,
-      platform,
-    }));
-
-    const MAX_SEARCH_RESULTS = 1000;
-    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
-    return {
-      repos,
-      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
-      nextPageIndex: page + 1,
-      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
-    };
-  }
-
-  async getMostPopular(
-    platform: DiscoveryPlatform,
-    page: number = 1,
-    perPage: number = 20
-  ): Promise<PaginatedDiscoveryRepositories> {
-    const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const platformQuery = this.buildPlatformQuery(platform);
-    
-    let query = `stars:>1000 archived:false created:<${sixMonthsAgo} pushed:>=${oneYearAgo}`;
-    if (platformQuery) {
-      query += ` ${platformQuery}`;
-    }
-
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
-    );
-
-    const repos = (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: (page - 1) * perPage + index + 1,
-      channel: 'most-popular' as DiscoveryChannelId,
-      platform,
-    }));
-
-    const MAX_SEARCH_RESULTS = 1000;
-    const reachedCap = page * perPage >= MAX_SEARCH_RESULTS;
-    return {
-      repos,
-      hasMore: repos.length === perPage && !reachedCap && page * perPage < data.total_count,
-      nextPageIndex: page + 1,
-      totalCount: Math.min(data.total_count, MAX_SEARCH_RESULTS),
-    };
-  }
-
   async searchByTopic(
     searchKeywords: string,
     platform: DiscoveryPlatform,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    params?: TopicParams
   ): Promise<PaginatedDiscoveryRepositories> {
     const platformQuery = this.buildPlatformQuery(platform);
+    const sortBy = params?.sortBy ?? 'Stars';
+    const sortOrder = params?.sortOrder ?? 'Desc';
     
     let query = `${searchKeywords} in:name,description,topics stars:>10 archived:false`;
     if (platformQuery) {
       query += ` ${platformQuery}`;
     }
 
+    const { sort, order } = this.buildDiscoverySortParams(sortBy, sortOrder);
+
     const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
     );
 
     const repos = (data.items || []).map((repo, index) => ({
@@ -631,7 +627,8 @@ export class GitHubApiService {
     topic: TopicCategory,
     platform: DiscoveryPlatform,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    params?: TopicParams
   ): Promise<PaginatedDiscoveryRepositories> {
     const topicKeywords: Record<TopicCategory, string> = {
       'ai': 'artificial-intelligence machine-learning ai',
@@ -644,21 +641,22 @@ export class GitHubApiService {
       'game': 'game game-engine unity unreal',
     };
 
-    return this.searchByTopic(topicKeywords[topic], platform, page, perPage);
+    return this.searchByTopic(topicKeywords[topic], platform, page, perPage, params);
   }
 
   async searchRepositories(
     query: string,
     platform: DiscoveryPlatform,
     language: ProgrammingLanguage,
-    sortBy: SortBy,
-    sortOrder: SortOrder,
+    params?: SearchParams,
     page: number = 1,
     perPage: number = 20
   ): Promise<PaginatedDiscoveryRepositories> {
     const platformQuery = this.buildPlatformQuery(platform);
     const languageQuery = this.buildLanguageQuery(language);
-    const { sort, order } = this.buildSortParams(sortBy, sortOrder);
+    const sortBy = params?.sortBy ?? 'BestMatch';
+    const sortOrder = params?.sortOrder ?? 'Desc';
+    const { sort, order } = this.buildDiscoverySortParams(sortBy, sortOrder);
 
     let searchQuery = `${query} archived:false`;
     if (platformQuery) {

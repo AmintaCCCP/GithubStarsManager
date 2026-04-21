@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Info } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { DiscoveryChannelId } from '../types';
 
@@ -31,33 +31,27 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
-    const padding = 16; // 屏幕边缘留白
-    const arrowOffset = 12; // 箭头距离边缘的最小距离
-    const gap = 8; // 气泡与按钮的间距
+    const padding = 16;
+    const arrowOffset = 12;
+    const gap = 8;
     
-    // 计算气泡宽度（响应式）
-    const tooltipWidth = Math.min(320, viewportWidth - padding * 2); // max-w-xs = 320px
+    const tooltipWidth = Math.min(380, viewportWidth - padding * 2);
     
-    // 水平居中，但确保不溢出
     let left = containerRect.left + containerRect.width / 2 - tooltipWidth / 2;
     let arrowLeft = tooltipWidth / 2;
     
-    // 左边界检测
     if (left < padding) {
       arrowLeft = containerRect.left + containerRect.width / 2 - padding;
       left = padding;
     }
-    // 右边界检测
     if (left + tooltipWidth > viewportWidth - padding) {
       const overflow = left + tooltipWidth - (viewportWidth - padding);
       left = viewportWidth - padding - tooltipWidth;
       arrowLeft = tooltipWidth / 2 + overflow;
     }
     
-    // 确保箭头不超出气泡边界
     arrowLeft = Math.max(arrowOffset, Math.min(tooltipWidth - arrowOffset, arrowLeft));
     
-    // 垂直方向：优先向下，空间不足则向上
     const spaceBelow = viewportHeight - containerRect.bottom - gap;
     const spaceAbove = containerRect.top - gap;
     
@@ -65,11 +59,9 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
     let placement: 'top' | 'bottom';
     
     if (spaceBelow >= tooltipRect.height || spaceBelow >= spaceAbove) {
-      // 向下显示
       top = containerRect.bottom + gap;
       placement = 'bottom';
     } else {
-      // 向上显示
       top = containerRect.top - tooltipRect.height - gap;
       placement = 'top';
     }
@@ -79,12 +71,10 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
 
   useEffect(() => {
     if (isVisible) {
-      // 使用 requestAnimationFrame 确保 DOM 已更新
       requestAnimationFrame(() => {
         calculatePosition();
       });
       
-      // 监听窗口变化
       window.addEventListener('resize', calculatePosition);
       window.addEventListener('scroll', calculatePosition, true);
       
@@ -95,38 +85,50 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
     }
   }, [isVisible, calculatePosition]);
 
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isVisible) {
+        setIsVisible(false);
+      }
+    };
+    
+    if (isVisible) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isVisible && 
+          tooltipRef.current && 
+          !tooltipRef.current.contains(e.target as Node) &&
+          containerRef.current && 
+          !containerRef.current.contains(e.target as Node)) {
+        setIsVisible(false);
+      }
+    };
+    
+    if (isVisible) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isVisible]);
+
   const getAlgorithmInfo = (channel: DiscoveryChannelId): { title: string; description: string; highlight: string } => {
     switch (channel) {
       case 'trending':
         return {
-          title: t('热门仓库', 'Trending Repositories'),
-          highlight: t('🔥 发现近期热门的新兴项目', '🔥 Discover emerging hot projects'),
+          title: t('仓库探索', 'Repository Discovery'),
+          highlight: t('🔥 发现热门项目，支持多种筛选模式', '🔥 Discover hot projects with multiple filter modes'),
           description: t(
-            '【特点】\n• 时间范围：最近30天有更新\n• Star门槛：50+\n• 排序方式：按Star数降序\n\n【适合场景】\n发现近期活跃且受欢迎的新兴项目，跟踪技术热点趋势。',
-            '【Features】\n• Time range: Updated in last 30 days\n• Star threshold: 50+\n• Sort by: Stars descending\n\n【Best for】\nDiscovering emerging hot projects, tracking tech trends.'
-          ),
-        };
-      case 'hot-release':
-        return {
-          title: t('热门发布', 'Hot Release'),
-          highlight: t('🚀 跟踪项目最新动态', '🚀 Track latest project updates'),
-          description: t(
-            '【特点】\n• 时间范围：最近14天有更新\n• Star门槛：10+\n• 排序方式：按更新时间降序\n\n【适合场景】\n发现最近有更新、活跃开发中的项目，可能是刚发布新版本或有重大改进。',
-            '【Features】\n• Time range: Updated in last 14 days\n• Star threshold: 10+\n• Sort by: Update time descending\n\n【Best for】\nFinding actively developed projects with recent updates or new releases.'
-          ),
-        };
-      case 'most-popular':
-        return {
-          title: t('最受欢迎', 'Most Popular'),
-          highlight: t('⭐ 发现经典成熟项目', '⭐ Discover classic mature projects'),
-          description: t(
-            '【特点】\n• 时间范围：创建超过6个月，1年内有更新\n• Star门槛：1000+\n• 排序方式：按Star数降序\n\n【适合场景】\n发现经过时间考验、广受认可的经典项目，适合寻找成熟稳定的工具和框架。',
-            '【Features】\n• Time range: Created 6+ months ago, updated within 1 year\n• Star threshold: 1000+\n• Sort by: Stars descending\n\n【Best for】\nFinding time-tested, widely recognized classic projects for stable tools and frameworks.'
+            '【项目类型】\n• 新星项目：最近创建的新项目\n• 活跃项目：最近有更新的项目\n• 经典项目：经过时间检验的项目\n\n【筛选条件】\n• 时间范围：今天/本周/本月/本季度/今年\n• Star门槛：可自定义（50-1000+）\n• 排序方式：Star数/Fork数/更新时间\n• 编程语言：支持多种语言筛选\n\n【适合场景】\n一站式发现各类热门项目，灵活筛选满足不同需求。',
+            '【Project Type】\n• New: Recently created projects\n• Active: Recently updated projects\n• Classic: Time-tested projects\n\n【Filters】\n• Time range: Today/Week/Month/Quarter/Year\n• Star threshold: Customizable (50-1000+)\n• Sort by: Stars/Forks/Updated\n• Language: Multiple language support\n\n【Best for】\nOne-stop discovery of hot projects with flexible filtering.'
           ),
         };
       case 'topic':
         return {
-          title: t('主题探索', 'Topic Exploration'),
+          title: t('专题浏览', 'Topics'),
           highlight: t('🏷️ 按技术主题浏览', '🏷️ Browse by tech topic'),
           description: t(
             '【特点】\n• 按选定主题标签筛选\n• Star门槛：10+\n• 排序方式：按Star数降序\n\n【适合场景】\n按特定技术领域（AI、数据库、Web开发等）浏览优质项目。',
@@ -142,6 +144,15 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
             '【Features】\n• Custom keyword search\n• Sort options: Best match, Most stars, Most forks\n• Language and platform filters\n\n【Best for】\nPrecise search for specific projects or tech stack related repos.'
           ),
         };
+      case 'rss-trending':
+        return {
+          title: t('RSS 趋势', 'RSS Trending'),
+          highlight: t('📡 第三方 RSS 源获取 GitHub Trending', '📡 Third-party RSS feed for GitHub Trending'),
+          description: t(
+            '【特点】\n• 数据源：GitHubTrendingRSS 第三方服务\n• 时间范围：今日 / 本周 / 本月\n• 排序方式：与 GitHub Trending 官方一致\n• 自动补全：通过 GitHub API 获取完整仓库信息\n\n【适合场景】\n获取与 GitHub 官方 Trending 页面一致的实时热门项目，数据更新更及时。',
+            '【Features】\n• Source: GitHubTrendingRSS third-party service\n• Time range: Daily / Weekly / Monthly\n• Sort: Same as official GitHub Trending\n• Auto-complete: Fetch full repo info via GitHub API\n\n【Best for】\nGetting real-time trending repos consistent with GitHub official Trending page, with more timely updates.'
+          ),
+        };
       default:
         return {
           title: t('排序算法', 'Sorting Algorithm'),
@@ -153,15 +164,11 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
 
   const info = getAlgorithmInfo(channelId);
 
-  const handleMouseEnter = () => setIsVisible(true);
-  const handleMouseLeave = () => setIsVisible(false);
   const handleClick = () => setIsVisible(prev => !prev);
 
   return (
     <div className="relative inline-flex items-center" ref={containerRef}>
       <button
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         className="p-1 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
         aria-label={t('排序算法说明', 'Sorting algorithm info')}
@@ -173,16 +180,18 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
       {isVisible && createPortal(
         <div 
           ref={tooltipRef}
-          className="fixed z-[9999] w-[calc(100vw-2rem)] max-w-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl"
+          className="fixed z-[9999] w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
           style={{ 
             top: position?.top ?? 0,
             left: position?.left ?? 0,
+            width: position ? 'calc(100vw - 2rem)' : 0,
+            maxWidth: '380px',
             opacity: position ? 1 : 0,
             transition: 'opacity 0.15s ease-out',
           }}
-          role="tooltip"
+          role="dialog"
+          aria-modal="true"
         >
-          {/* Arrow */}
           {position && (
             <div 
               className="absolute w-3 h-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
@@ -200,18 +209,27 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
             />
           )}
           
-          <div className="relative p-3 sm:p-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 text-sm truncate">
-              {info.title}
-            </h4>
+          <div className="relative p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
+                {info.title}
+              </h4>
+              <button
+                onClick={() => setIsVisible(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
+                aria-label={t('关闭', 'Close')}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
             {info.highlight && (
-              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 mb-1.5 sm:mb-2 line-clamp-2">
+              <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-3">
                 {info.highlight}
               </p>
             )}
-            <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
+            <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line leading-relaxed">
               {info.description}
-            </p>
+            </div>
           </div>
         </div>,
         document.body
