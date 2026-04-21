@@ -125,8 +125,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const descriptionRef = useRef<HTMLParagraphElement>(null);
+
+  // Track mounted state to prevent state updates after unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -311,26 +320,27 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         analysis_failed: false
       };
 
-      updateRepository(updatedRepo);
-
-      const successMessage = repository.analyzed_at
-        ? (language === 'zh' ? 'AI重新分析完成！' : 'AI re-analysis completed!')
-        : (language === 'zh' ? 'AI分析完成！' : 'AI analysis completed!');
-
-      alert(successMessage);
+      // Only update store if component is still mounted (prevents race condition on unmount)
+      if (isMountedRef.current) {
+        updateRepository(updatedRepo);
+        const successMessage = repository.analyzed_at
+          ? (language === 'zh' ? 'AI重新分析完成！' : 'AI re-analysis completed!')
+          : (language === 'zh' ? 'AI分析完成！' : 'AI analysis completed!');
+        alert(successMessage);
+      }
     } catch (error) {
       console.error('AI analysis failed:', error);
-      
-      // 标记为分析失败
-      const failedRepo = {
-        ...repository,
-        analyzed_at: new Date().toISOString(),
-        analysis_failed: true
-      };
-      
-      updateRepository(failedRepo);
-      
-      alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
+
+      // Only update store if component is still mounted (prevents race condition on unmount)
+      if (isMountedRef.current) {
+        const failedRepo = {
+          ...repository,
+          analyzed_at: new Date().toISOString(),
+          analysis_failed: true
+        };
+        updateRepository(failedRepo);
+        alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
+      }
     } finally {
       setLoading(false);
     }

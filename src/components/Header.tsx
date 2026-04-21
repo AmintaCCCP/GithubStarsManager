@@ -239,6 +239,7 @@ export const Header: React.FC = () => {
           <nav className="hidden md:flex lg:hidden items-center space-x-1 hd-btns lg:hd-btns">
             <button
               onClick={() => setCurrentView('repositories')}
+              aria-label={t('仓库', 'Repositories')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'repositories'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -250,6 +251,7 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('releases')}
+              aria-label={t('发布', 'Releases')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'releases'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -261,6 +263,7 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('subscription')}
+              aria-label={t('趋势', 'Trending')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'subscription'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
@@ -272,6 +275,7 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('settings')}
+              aria-label={t('设置', 'Settings')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'settings'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'

@@ -337,7 +337,6 @@ export class GitHubApiService {
           topics: [],
           rank: i + 1,
           channel: 'trending',
-          forks_count: forks,
         });
       }
 

@@ -226,41 +226,41 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
-    // 确保 subscription 相关状态包含 trending 键
+    // 确保 subscription 相关状态包含 trending 键（默认放后面，这样 persisted 数据优先）
     subscriptionRepos: {
+      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
       'most-stars': [],
       'most-forks': [],
       'most-dev': [],
       'trending': [],
-      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
     },
     subscriptionLastRefresh: {
+      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
       'most-stars': null,
       'most-forks': null,
       'most-dev': null,
       'trending': null,
-      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
     },
     subscriptionIsLoading: {
+      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
       'most-stars': false,
       'most-forks': false,
       'most-dev': false,
       'trending': false,
-      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
     },
     // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
     subscriptionChannels: (() => {
       const persisted = safePersisted.subscriptionChannels;
       const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
       if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
-      // 合并：使用 persisted 的频道，但补全缺失的字段（nameEn、trending 等）
+      // 合并：使用 persisted 的频道，但补全缺失的字段（保留用户自定义的 name）
       return persisted.map((ch: SubscriptionChannel) => {
         const defaultCh = defaultChannelsMap.get(ch.id);
         if (defaultCh) {
           return {
             ...ch,
-            name: defaultCh.name, // 始终使用中文名称（默认定义）
-            nameEn: ch.nameEn || defaultCh.nameEn || ch.name || defaultCh.nameEn,
+            name: ch.name || defaultCh.name, // 保留用户自定义名称，否则使用默认
+            nameEn: ch.nameEn || defaultCh.nameEn || ch.name,
             icon: ch.icon || defaultCh.icon,
             description: ch.description || defaultCh.description,
           };
