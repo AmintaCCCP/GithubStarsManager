@@ -1225,10 +1225,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingParams, topicParams, searchParams, rssTimeRange]);
 
-  // 切换频道时重置页码、恢复滚动位置，并自动加载空频道
+  // 切换频道时恢复滚动位置，并自动加载空频道
   useEffect(() => {
-    console.log(`[Discovery] Channel changed to ${selectedDiscoveryChannel}, resetting page to 1`);
-    setDiscoveryCurrentPage(selectedDiscoveryChannel, 1);
+    const savedPage = useAppStore.getState().discoveryCurrentPage[selectedDiscoveryChannel] || 1;
+    console.log(`[Discovery] Channel changed to ${selectedDiscoveryChannel}, current page: ${savedPage}`);
     if (scrollContainerRef.current) {
       const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
       scrollContainerRef.current.scrollTop = savedPosition;
@@ -1238,11 +1238,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if ((!currentRepos || currentRepos.length === 0) && githubToken) {
       const channelLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
       if (!channelLoading) {
-        console.log(`[Discovery] Auto-loading empty channel: ${selectedDiscoveryChannel}`);
-        refreshChannel(selectedDiscoveryChannel, 1, false);
+        console.log(`[Discovery] Auto-loading empty channel: ${selectedDiscoveryChannel}, page: ${savedPage}`);
+        refreshChannel(selectedDiscoveryChannel, savedPage, false);
       }
     }
-  }, [selectedDiscoveryChannel, setDiscoveryCurrentPage, githubToken, refreshChannel]);
+  }, [selectedDiscoveryChannel, githubToken, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
