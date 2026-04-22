@@ -1469,15 +1469,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [currentPage, currentIsLoading, selectedDiscoveryChannel, setDiscoveryCurrentPage, refreshChannel, setDiscoveryScrollPosition]);
 
   const refreshAll = useCallback(async () => {
-    const enabledChannels = discoveryChannels.filter(ch => ch.enabled);
+    const channels = discoveryChannels || [];
+    const enabledChannels = channels.filter(ch => ch && ch.enabled);
     for (const channel of enabledChannels) {
       await refreshChannel(channel.id, 1, false);
     }
   }, [discoveryChannels, refreshChannel]);
 
   const mobileChannels = useMemo(() => {
-    return discoveryChannels
-      .filter(ch => ch.enabled)
+    const channels = discoveryChannels || [];
+    return channels
+      .filter(ch => ch && ch.enabled)
       .map(ch => ({
         ...ch,
         icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
@@ -1862,24 +1864,30 @@ class DiscoveryViewErrorBoundary extends React.Component<{ children: React.React
     return { hasError: true, error };
   }
   componentDidCatch(error: unknown, info: React.ErrorInfo) {
-    de('React ErrorBoundary caught', error);
+    try { de('React ErrorBoundary caught', error); } catch (_) {}
     console.error('Component stack:', info.componentStack);
   }
   render() {
     if (this.state.hasError) {
+      const logs = (window as unknown as Record<string, unknown>).__discoveryLogs;
+      const errors = (window as unknown as Record<string, unknown>).__discoveryErrors;
       return (
         <div style={{ padding: 20, background: '#fee', border: '2px solid #c00', borderRadius: 8 }}>
           <h2 style={{ color: '#c00', margin: '0 0 10px' }}>DiscoveryView Error</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: '#fff', padding: 10, borderRadius: 4 }}>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: '#fff', padding: 10, borderRadius: 4, maxHeight: 200, overflow: 'auto' }}>
             {this.state.error instanceof Error ? `${this.state.error.message}\n${this.state.error.stack}` : String(this.state.error)}
           </pre>
           <h3>Recent Logs:</h3>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 10, borderRadius: 4 }}>
-            {JSON.stringify(__discoveryLogs.slice(-20), null, 2)}
+            {logs ? JSON.stringify((logs as unknown[]).slice(-20), null, 2) : 'No logs available'}
+          </pre>
+          <h3>Errors:</h3>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 10, borderRadius: 4 }}>
+            {errors ? JSON.stringify((errors as unknown[]).slice(-10), null, 2) : 'No errors captured'}
           </pre>
           <button onClick={() => {
             console.log('=== DISCOVERY LOGS ===');
-            console.log({ logs: __discoveryLogs, errors: __discoveryErrors });
+            console.log({ logs, errors });
             alert('Logs exported to console (F12)');
           }} style={{ padding: '8px 16px', background: '#0066cc', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
             Export Logs to Console
