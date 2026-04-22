@@ -582,6 +582,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryNextPage,
     discoveryTotalCount,
     setDiscoveryTotalCount,
+    discoveryScrollPositions,
     setDiscoveryScrollPosition,
     appendDiscoveryRepos,
   } = useAppStore();
@@ -600,8 +601,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
   const lastScrollY = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 用于在频道切换时直接读取最新滚动位置，避免订阅整个 map 导致 effect 重跑
-  const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
@@ -641,15 +640,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
   const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
-  // 切换频道时重置页码并恢复滚动位置（只依赖 selectedDiscoveryChannel，不订阅 discoveryScrollPositions）
+  // 切换频道时重置页码并恢复滚动位置
   useEffect(() => {
     setCurrentPage(1);
-    // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
+    // 恢复当前频道的滚动位置
     if (scrollContainerRef.current) {
-      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
+      const savedPosition = discoveryScrollPositions[selectedDiscoveryChannel] || 0;
       scrollContainerRef.current.scrollTop = savedPosition;
     }
-  }, [selectedDiscoveryChannel]);
+  }, [selectedDiscoveryChannel, discoveryScrollPositions]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -759,8 +758,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
     const currentScrollY = scrollContainerRef.current.scrollTop;
 
-    // 同时更新 ref 和 state，保证频道切换 effect 读取到最新值，且 UI 仍保持响应
-    discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = currentScrollY;
+    // 保存当前频道的滚动位置
     setDiscoveryScrollPosition(selectedDiscoveryChannel, currentScrollY);
 
     // 控制工具栏显示/隐藏
@@ -948,11 +946,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
         channels={mobileChannels}
         selectedChannel={selectedDiscoveryChannel}
         onChannelSelect={(channel) => {
-          // 保存当前频道的滚动位置到 ref 和 state
+          // 保存当前频道的滚动位置
           if (scrollContainerRef.current) {
-            const scrollTop = scrollContainerRef.current.scrollTop;
-            discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-            setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
+            setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollContainerRef.current.scrollTop);
           }
           setSelectedDiscoveryChannel(channel);
           setCurrentPage(1);
@@ -966,11 +962,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
             channels={discoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
-              // 保存当前频道的滚动位置到 ref 和 state
+              // 保存当前频道的滚动位置
               if (scrollContainerRef.current) {
-                const scrollTop = scrollContainerRef.current.scrollTop;
-                discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
+                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollContainerRef.current.scrollTop);
               }
               setSelectedDiscoveryChannel(channel);
               setCurrentPage(1);
@@ -1188,10 +1182,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     className="px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="All">{t('所有平台', 'All Platforms')}</option>
+                    <option value="iOS">iOS</option>
                     <option value="Android">Android</option>
-                    <option value="Macos">macOS</option>
-                    <option value="Windows">Windows</option>
-                    <option value="Linux">Linux</option>
+                    <option value="Web">Web</option>
+                    <option value="Desktop">Desktop</option>
+                    <option value="CrossPlatform">{t('跨平台', 'Cross Platform')}</option>
                   </select>
                 </div>
               </div>

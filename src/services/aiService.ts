@@ -272,7 +272,7 @@ ${options.user}` : options.user;
     throw new Error('No content received from AI service');
   }
 
-  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], signal?: AbortSignal): Promise<{
+  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[]): Promise<{
     summary: string;
     tags: string[];
     platforms: string[];
@@ -291,7 +291,6 @@ ${options.user}` : options.user;
         user: prompt,
         temperature: 0.3,
         maxTokens: 700,
-        signal,
       });
 
       return this.parseAIResponse(content);

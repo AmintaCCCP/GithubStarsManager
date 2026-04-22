@@ -47,7 +47,6 @@ type DeleteOperation =
   | 'categorySettings'
   | 'assetFilters'
   | 'discoveryData'
-  | 'subscriptionData'
   | 'releaseSubscriptions'
   | 'searchHistory'
   | 'all';
@@ -90,10 +89,10 @@ interface ExportData {
     hiddenDefaultCategoryIds?: string[];
     defaultCategoryOverrides?: Record<string, Partial<Category>>;
     categoryOrder?: string[];
-    theme?: 'light' | 'dark';
+    theme?: 'light' | 'dark' | 'system';
     language?: 'zh' | 'en';
     isSidebarCollapsed?: boolean;
-    releaseViewMode?: 'timeline' | 'repository';
+    releaseViewMode?: 'timeline' | 'list';
     releaseSelectedFilters?: string[];
     releaseSearchQuery?: string;
     releaseExpandedRepositories?: number[];
@@ -360,29 +359,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
   };
 
-  const deleteSubscriptionData = async () => {
-    try {
-      useAppStore.setState({
-        subscriptionRepos: {
-          'most-stars': [],
-          'most-forks': [],
-          'most-dev': [],
-          'trending': [],
-        },
-      });
-      addLog(t('删除订阅页数据', 'Delete subscription data'), true);
-      showSuccess(t('订阅页数据已删除', 'Subscription data deleted'));
-    } catch (error) {
-      addLog(
-        t('删除订阅页数据', 'Delete subscription data'),
-        false,
-        String(error)
-      );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
-      throw error;
-    }
-  };
-
   const deleteReleaseSubscriptions = async () => {
     try {
       useAppStore.setState({ 
@@ -610,7 +586,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           useAppStore.setState({ searchFilters: importedData.searchFilters });
         }
         if (selectedTypes.includes('uiSettings')) {
-          if (importedData.theme === 'light' || importedData.theme === 'dark') {
+          if (importedData.theme) {
             useAppStore.setState({ theme: importedData.theme });
           }
           if (importedData.language) {
@@ -619,7 +595,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (typeof importedData.isSidebarCollapsed === 'boolean') {
             useAppStore.setState({ isSidebarCollapsed: importedData.isSidebarCollapsed });
           }
-          if (importedData.releaseViewMode === 'timeline' || importedData.releaseViewMode === 'repository') {
+          if (importedData.releaseViewMode) {
             useAppStore.setState({ releaseViewMode: importedData.releaseViewMode });
           }
           if (importedData.releaseSelectedFilters) {
@@ -887,9 +863,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         case 'discoveryData':
           await deleteDiscoveryData();
           break;
-        case 'subscriptionData':
-          await deleteSubscriptionData();
-          break;
         case 'releaseSubscriptions':
           await deleteReleaseSubscriptions();
           break;
@@ -957,11 +930,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           '这将删除发现页缓存的仓库数据。此操作不可恢复。',
           'This will delete cached repository data from discovery page. This action cannot be undone.'
         );
-      case 'subscriptionData':
-        return t(
-          '这将删除订阅页的所有仓库数据。此操作不可恢复。',
-          'This will delete all repository data from subscription page. This action cannot be undone.'
-        );
       case 'releaseSubscriptions':
         return t(
           '这将删除所有Release订阅和已读标记数据。此操作不可恢复。',
@@ -998,8 +966,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         return t('删除资源过滤器数据', 'Delete Asset Filters');
       case 'discoveryData':
         return t('删除发现页缓存数据', 'Delete Discovery Cache');
-      case 'subscriptionData':
-        return t('删除订阅页数据', 'Delete Subscription Data');
       case 'releaseSubscriptions':
         return t('删除Release订阅数据', 'Delete Release Subscriptions');
       case 'searchHistory':

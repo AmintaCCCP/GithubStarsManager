@@ -117,11 +117,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const isAnalyzing = analyzingRepositoryIds.has(repoId);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
+  // 组件卸载时清理分析状态
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
       setAnalyzingRepository(repoId, false);
     };
   }, [repoId, setAnalyzingRepository]);
@@ -288,10 +286,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       }
     }
 
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     setAnalyzingRepository(repoId, true);
     try {
       const result = await analyzeRepository({
@@ -300,10 +294,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         aiConfig: activeConfig,
         language,
         categories: allCategories,
-        signal: controller.signal,
       });
-
-      if (controller.signal.aborted) return;
 
       const updatedRepo = {
         ...repository,
@@ -324,24 +315,20 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       alert(successMessage);
     } catch (error) {
-      if (!controller.signal.aborted) {
-        console.error('AI analysis failed:', error);
-
-        const failedResult = createFailedAnalysisResult();
-        const failedRepo = {
-          ...repository,
-          analyzed_at: failedResult.analyzed_at,
-          analysis_failed: failedResult.analysis_failed
-        };
-
-        updateRepository(failedRepo);
-
-        alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
-      }
+      console.error('AI analysis failed:', error);
+      
+      const failedResult = createFailedAnalysisResult();
+      const failedRepo = {
+        ...repository,
+        analyzed_at: failedResult.analyzed_at,
+        analysis_failed: failedResult.analysis_failed
+      };
+      
+      updateRepository(failedRepo);
+      
+      alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
     } finally {
-      if (!controller.signal.aborted) {
-        setAnalyzingRepository(repoId, false);
-      }
+      setAnalyzingRepository(repoId, false);
     }
   };
 
