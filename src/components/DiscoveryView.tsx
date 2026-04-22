@@ -602,6 +602,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 用于在频道切换时直接读取最新滚动位置，避免订阅整个 map 导致 effect 重跑
   const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
+  // 用于记录最近一次自动拉取的频道，防止空频道无限循环拉取
+  const autoFetchChannelRef = useRef<string | null>(null);
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const isDesktopSafeMode = useMemo(() => {
@@ -699,8 +701,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
       }
 
       // 合并AI分析结果（如果仓库之前被分析过）
+      const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
-        const existingRepo = allRepos.find(r => r.id === newRepo.id);
+        const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
           return {
             ...newRepo,
@@ -732,7 +735,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       setDiscoveryLoading(channelId, false);
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, allRepos]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos]);
 
   // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
   useEffect(() => {
@@ -746,7 +749,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     // 取消持久化后，首次打开或切换到空频道时自动加载
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (!hasRepos && !isLoading) {
+    if (!hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+      autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
