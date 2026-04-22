@@ -249,18 +249,15 @@ export const SubscriptionView: React.FC = React.memo(() => {
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-      {/* Sidebar with sticky positioning */}
-      <div className="w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
-        <SubscriptionSidebar
-          channels={subscriptionChannels}
-          selectedChannel={selectedSubscriptionChannel}
-          onChannelSelect={setSelectedSubscriptionChannel}
-          onRefreshAll={refreshAll}
-          isLoading={subscriptionIsLoading}
-          lastRefresh={subscriptionLastRefresh}
-          isAnalyzing={isAnalyzing}
-        />
-      </div>
+      <SubscriptionSidebar
+        channels={subscriptionChannels}
+        selectedChannel={selectedSubscriptionChannel}
+        onChannelSelect={setSelectedSubscriptionChannel}
+        onRefreshAll={refreshAll}
+        isLoading={subscriptionIsLoading}
+        lastRefresh={subscriptionLastRefresh}
+        isAnalyzing={isAnalyzing}
+      />
 
       <div className="flex-1 space-y-4">
         {/* Toolbar */}
