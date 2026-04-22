@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { RefreshCw, TrendingUp, Bot, Loader2, Star, Flame, User, GitFork } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { RefreshCw, TrendingUp, Bot, Loader2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
@@ -10,167 +10,6 @@ import { SubscriptionSidebar } from './SubscriptionSidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SubscriptionDevCard } from './SubscriptionDevCard';
 import type { SubscriptionChannelId, SubscriptionRepo, SubscriptionDev, Repository } from '../types';
-
-// 移动端标签导航组件
-interface MobileTabNavProps {
-  channels: { id: SubscriptionChannelId; name: string; nameEn: string; icon: React.ReactNode }[];
-  selectedChannel: SubscriptionChannelId;
-  onChannelSelect: (channel: SubscriptionChannelId) => void;
-  language: 'zh' | 'en';
-}
-
-const MobileTabNav: React.FC<MobileTabNavProps> = ({ 
-  channels, 
-  selectedChannel, 
-  onChannelSelect,
-  language 
-}) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Map<SubscriptionChannelId, HTMLButtonElement>>(new Map());
-  const [indicatorStyle, setIndicatorStyle] = useState({ translateX: 0, width: 0 });
-  const isScrollingRef = useRef(false);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rafRef = useRef<number | null>(null);
-
-  // 使用 requestAnimationFrame 更新指示器，避免闪烁
-  const updateIndicator = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-    }
-
-    rafRef.current = requestAnimationFrame(() => {
-      const activeButton = tabRefs.current.get(selectedChannel);
-      if (activeButton && scrollContainerRef.current) {
-        // 使用 offsetLeft 代替 getBoundingClientRect，避免重排导致的闪烁
-        const container = scrollContainerRef.current;
-        const translateX = activeButton.offsetLeft - container.scrollLeft;
-        const width = activeButton.offsetWidth;
-
-        setIndicatorStyle({ translateX, width });
-      }
-    });
-  }, [selectedChannel]);
-
-  // 滚动到活动标签
-  const scrollToActiveTab = useCallback(() => {
-    const activeButton = tabRefs.current.get(selectedChannel);
-    if (activeButton && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const scrollLeft = activeButton.offsetLeft - (container.offsetWidth / 2) + (activeButton.offsetWidth / 2);
-      
-      container.scrollTo({
-        left: Math.max(0, scrollLeft),
-        behavior: 'smooth',
-      });
-    }
-  }, [selectedChannel]);
-
-  // 分离 useEffect：初始化和标签切换时更新指示器
-  useEffect(() => {
-    // 初始计算
-    updateIndicator();
-  }, [updateIndicator]);
-
-  // 标签切换时先滚动再更新指示器
-  useEffect(() => {
-    scrollToActiveTab();
-    // 延迟更新指示器，等待滚动完成
-    const timer = setTimeout(() => {
-      updateIndicator();
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [selectedChannel, scrollToActiveTab]);
-
-  // 处理滚动状态 - 使用 ref 避免重新创建函数
-  const handleScroll = useCallback(() => {
-    if (!isScrollingRef.current) {
-      isScrollingRef.current = true;
-    }
-    
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-    
-    scrollTimeoutRef.current = setTimeout(() => {
-      isScrollingRef.current = false;
-      updateIndicator();
-    }, 150);
-  }, [updateIndicator]);
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <div 
-      className="relative w-full border-b border-gray-200 dark:border-gray-700 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm lg:hidden"
-    >
-      {/* 滚动容器 */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        role="tablist"
-        className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
-        style={{
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {channels.map((channel) => (
-          <button
-            key={channel.id}
-            ref={(el) => {
-              if (el) tabRefs.current.set(channel.id, el);
-            }}
-            onClick={() => onChannelSelect(channel.id)}
-            role="tab"
-            id={`subscription-tab-${channel.id}`}
-            aria-selected={selectedChannel === channel.id}
-            aria-controls={`subscription-tabpanel-${channel.id}`}
-            className={`
-              flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
-              transition-all duration-150 ease-out snap-center
-              min-h-[36px] touch-manipulation
-              ${selectedChannel === channel.id
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50'
-              }
-            `}
-            style={{
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span className="w-4 h-4 flex-shrink-0">{channel.icon}</span>
-            <span className="font-medium text-sm whitespace-nowrap">
-              {language === 'zh' ? channel.name : channel.nameEn}
-            </span>
-          </button>
-        ))}
-      </div>
-      
-      {/* 底部活动指示器 */}
-      <div
-        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-200 ease-out will-change-transform"
-        style={{
-          transform: `translateX(${indicatorStyle.translateX}px)`,
-          width: indicatorStyle.width,
-        }}
-      />
-      
-      {/* 左右渐变遮罩 */}
-      <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-gray-50 dark:from-gray-800 to-transparent pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-gray-50 dark:from-gray-800 to-transparent pointer-events-none" />
-    </div>
-  );
-};
 
 export const SubscriptionView: React.FC = React.memo(() => {
   const {
@@ -408,61 +247,22 @@ export const SubscriptionView: React.FC = React.memo(() => {
     analysisProgress.total > 0
   );
 
-  // 准备移动端菜单数据
-  const mobileChannels = useMemo(() => {
-    const enabledChannels = (subscriptionChannels || []).filter(ch => ch.enabled).map(ch => {
-      // 将Emoji图标替换为Lucide React图标
-      let icon: React.ReactNode;
-      switch (ch.id) {
-        case 'most-stars':
-          icon = <Star className="w-4 h-4" />;
-          break;
-        case 'most-forks':
-          icon = <GitFork className="w-4 h-4" />;
-          break;
-        case 'most-dev':
-        case 'daily-dev':
-          icon = <User className="w-4 h-4" />;
-          break;
-        case 'trending':
-          icon = <Flame className="w-4 h-4" />;
-          break;
-        default:
-          icon = <Star className="w-4 h-4" />;
-      }
-      
-      return ch.id === 'daily-dev' 
-        ? { ...ch, id: 'most-dev' as const, name: 'Most DEV', nameEn: 'Most DEV', icon } 
-        : { ...ch, icon };
-    });
-    return enabledChannels;
-  }, [subscriptionChannels]);
-
   return (
-    <div className="flex flex-col gap-4">
-      {/* 移动端标签导航 */}
-      <MobileTabNav
-        channels={mobileChannels}
-        selectedChannel={selectedSubscriptionChannel}
-        onChannelSelect={setSelectedSubscriptionChannel}
-        language={language}
-      />
+    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      {/* Sidebar with sticky positioning */}
+      <div className="w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
+        <SubscriptionSidebar
+          channels={subscriptionChannels}
+          selectedChannel={selectedSubscriptionChannel}
+          onChannelSelect={setSelectedSubscriptionChannel}
+          onRefreshAll={refreshAll}
+          isLoading={subscriptionIsLoading}
+          lastRefresh={subscriptionLastRefresh}
+          isAnalyzing={isAnalyzing}
+        />
+      </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-        {/* Sidebar with sticky positioning */}
-        <div className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <SubscriptionSidebar
-            channels={subscriptionChannels}
-            selectedChannel={selectedSubscriptionChannel}
-            onChannelSelect={setSelectedSubscriptionChannel}
-            onRefreshAll={refreshAll}
-            isLoading={subscriptionIsLoading}
-            lastRefresh={subscriptionLastRefresh}
-            isAnalyzing={isAnalyzing}
-          />
-        </div>
-
-        <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-4">
         {/* Toolbar */}
         <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-3">
@@ -592,7 +392,6 @@ export const SubscriptionView: React.FC = React.memo(() => {
             ))}
           </div>
         )}
-      </div>
       </div>
     </div>
   );

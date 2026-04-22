@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package } from 'lucide-react';
+import { Star, ExternalLink, Bot, GitFork } from 'lucide-react';
 import type { SubscriptionRepo } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -37,20 +37,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   }, [repo.rank]);
 
   const platformIconMap = useMemo(() => ({
-    mac: <Monitor className="w-3 h-3" />, 
-    macos: <Monitor className="w-3 h-3" />, 
-    ios: <Smartphone className="w-3 h-3" />, 
-    windows: <Monitor className="w-3 h-3" />, 
-    win: <Monitor className="w-3 h-3" />,
-    linux: <Monitor className="w-3 h-3" />, 
-    android: <Smartphone className="w-3 h-3" />, 
-    web: <Globe className="w-3 h-3" />, 
-    cli: <Terminal className="w-3 h-3" />, 
-    docker: <Package className="w-3 h-3" />,
+    mac: '🍎', macos: '🍎', ios: '🍎', windows: '🪟', win: '🪟',
+    linux: '🐧', android: '📱', web: '🌐', cli: '⌨️', docker: '🐳',
   }), []);
 
-  const getPlatformIcon = (platform: string) => {
-    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
+  const getPlatformEmoji = (platform: string) => {
+    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || '💻';
   };
 
   return (
@@ -123,17 +115,15 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Platform icons */}
           {repo.ai_platforms && repo.ai_platforms.length > 0 && (
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-1 mb-3">
+              <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">
                 {t('平台:', 'Platforms:')}
               </span>
-              <div className="flex items-center gap-1">
-                {repo.ai_platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="text-gray-500 dark:text-gray-400" title={platform}>
-                    {getPlatformIcon(platform)}
-                  </span>
-                ))}
-              </div>
+              {repo.ai_platforms.slice(0, 5).map((platform) => (
+                <span key={platform} className="text-sm" title={platform}>
+                  {getPlatformEmoji(platform)}
+                </span>
+              ))}
             </div>
           )}
 
