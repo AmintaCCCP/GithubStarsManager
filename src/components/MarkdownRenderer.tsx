@@ -1,14 +1,10 @@
-import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import React, { memo, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-import { Copy, Check, Download } from 'lucide-react';
-import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.min.css';
-import 'highlight.js/styles/github.min.css';
+import { Copy, Check } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
 
@@ -21,53 +17,15 @@ interface MarkdownRendererProps {
   headingIds?: Map<string, string>;
 }
 
-const CodeBlock: React.FC<{
-  children: React.ReactNode;
+const CodeBlock: React.FC<{ 
+  children: React.ReactNode; 
   className?: string;
   language: string;
 }> = ({ children, className, language }) => {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const codeRef = useRef<HTMLElement>(null);
   const { language: uiLanguage } = useAppStore();
-
-  const normalizedLanguage = useMemo(() => {
-    if (!language) return '';
-    const langLower = language.toLowerCase();
-    const langMap: Record<string, string> = {
-      'sh': 'bash',
-      'shell': 'bash',
-      'zsh': 'bash',
-      'fish': 'bash',
-      'ksh': 'bash',
-      'csh': 'bash',
-      'tcsh': 'bash',
-      'yml': 'yaml',
-      'py': 'python',
-      'js': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'jsx': 'javascript',
-      'rb': 'ruby',
-      'cs': 'csharp',
-      'kt': 'kotlin',
-      'rs': 'rust',
-      'go': 'go',
-      'md': 'markdown',
-    };
-    return langMap[langLower] || langLower;
-  }, [language]);
-
-  useEffect(() => {
-    if (codeRef.current) {
-      try {
-        hljs.highlightElement(codeRef.current);
-      } catch (error) {
-        console.warn('highlight.js failed:', error);
-      }
-    }
-  }, [children, normalizedLanguage]);
-
+  
   const handleCopy = useCallback(async () => {
     const codeText = typeof children === 'string'
       ? children
@@ -85,133 +43,43 @@ const CodeBlock: React.FC<{
       setCopyError(result.error || getClipboardErrorMessage('write', uiLanguage));
     }
   }, [children, uiLanguage]);
-
-  const codeLines = typeof children === 'string' ? children.split('\n') : [];
-  const lineCount = codeLines.length;
-  const showLineNumbers = lineCount > 3;
-
-  const isBashLike = ['bash', 'sh', 'shell', 'zsh'].includes(normalizedLanguage);
-  const isPowerShell = ['powershell', 'ps1'].includes(normalizedLanguage);
-  const isCmdLike = ['cmd', 'bat'].includes(normalizedLanguage);
-
+  
   return (
-    <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
-      isBashLike
-        ? 'border-green-500/30 dark:border-green-400/30'
-        : isPowerShell
-          ? 'border-blue-500/30 dark:border-blue-400/30'
-          : isCmdLike
-            ? 'border-cyan-500/30 dark:border-cyan-400/30'
-            : 'border-gray-200 dark:border-gray-700'
-    }`}>
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100 dark:bg-gray-800/90 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2.5">
-          <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-500/80 dark:bg-red-500/70" />
-            <span className="w-3 h-3 rounded-full bg-yellow-500/80 dark:bg-yellow-500/70" />
-            <span className="w-3 h-3 rounded-full bg-green-500/80 dark:bg-green-500/70" />
-          </div>
-          {language && (
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
-              isBashLike
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                : isPowerShell
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                  : isCmdLike
-                    ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600'
-            }`}>
-              {isBashLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              )}
-              {isPowerShell && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              )}
-              {isCmdLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-              )}
-              {language}
-            </span>
+    <div className="relative group my-3">
+      <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {language && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-700 dark:bg-gray-600 px-2 py-1 rounded">
+            {language}
+          </span>
+        )}
+        <button
+          onClick={handleCopy}
+          className={`p-1.5 rounded transition-colors ${
+            copyError 
+              ? 'bg-red-600 dark:bg-red-500 text-white' 
+              : 'bg-gray-600 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 text-gray-200 dark:text-gray-100'
+          }`}
+          title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
+        >
+          {copyError ? (
+            <span className="text-xs">!</span>
+          ) : copied ? (
+            <Check className="w-4 h-4 text-green-400" />
+          ) : (
+            <Copy className="w-4 h-4" />
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          {showLineNumbers && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
-              {lineCount} {uiLanguage === 'zh' ? '行' : 'lines'}
-            </span>
-          )}
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              copyError
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
-                : copied
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
-                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
-            }`}
-            title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
-          >
-            {copyError ? (
-              <span>!</span>
-            ) : copied ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                {uiLanguage === 'zh' ? '已复制' : 'Copied'}
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                {uiLanguage === 'zh' ? '复制' : 'Copy'}
-              </>
-            )}
-          </button>
-        </div>
+        </button>
       </div>
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-red-200 dark:border-red-800">
+        <div className="absolute top-2 right-14 max-w-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-xs px-2 py-1 rounded shadow-lg z-20">
           {copyError}
         </div>
       )}
-      <div className={`overflow-x-auto ${
-        isBashLike
-          ? 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/95 dark:to-gray-800/95'
-          : isPowerShell
-            ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/20 dark:to-slate-900/20'
-            : isCmdLike
-              ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-cyan-950/15 dark:to-slate-900/10'
-              : 'bg-gray-50 dark:bg-[#1e1e1e]'
-      }`}>
-        {showLineNumbers ? (
-          <div className="flex">
-            <div className={`flex-shrink-0 py-3 px-3 text-right select-none border-r ${
-              isBashLike
-                ? 'border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-900/10'
-                : isPowerShell
-                  ? 'border-blue-200 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-900/10'
-                  : isCmdLike
-                    ? 'border-cyan-200 dark:border-cyan-800 bg-cyan-50/20 dark:bg-cyan-900/10'
-                    : 'border-gray-200 dark:border-gray-700 bg-gray-100/50 dark:bg-gray-800/30'
-            }`}>
-              {codeLines.map((_, i) => (
-                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-gray-500 font-mono tabular-nums">
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-            <pre className={`flex-1 p-4 overflow-x-auto ${className || ''}`}>
-              <code ref={codeRef} className={`text-sm font-mono leading-6 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-                {children}
-              </code>
-            </pre>
-          </div>
-        ) : (
-          <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-            <code ref={codeRef} className={`text-sm font-mono leading-6 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-              {children}
-            </code>
-          </pre>
-        )}
-      </div>
+      <pre className={`bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto ${className || ''}`}>
+        <code className="text-xs font-mono text-gray-800 dark:text-gray-200">
+          {children}
+        </code>
+      </pre>
     </div>
   );
 };
@@ -262,18 +130,6 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   baseUrl 
 }) => {
   const [hasError, setHasError] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isZoomed, setIsZoomed] = React.useState(false);
-  const [isInsideLink, setIsInsideLink] = React.useState(false);
-  const [parentLinkHref, setParentLinkHref] = React.useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = React.useState(false);
-  const [naturalWidth, setNaturalWidth] = React.useState<number>(0);
-  const [naturalHeight, setNaturalHeight] = React.useState<number>(0);
-  const [zoomScale, setZoomScale] = React.useState(1);
-  const [zoomPos, setZoomPos] = React.useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = React.useState(false);
-  const dragStartRef = React.useRef({ x: 0, y: 0, posX: 0, posY: 0 });
-  const imgRef = React.useRef<HTMLImageElement>(null);
   const { language } = useAppStore();
   
   if (!src) return null;
@@ -294,385 +150,21 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   const imageUrl = resolveImageSrc(src);
 
-  React.useEffect(() => {
-    if (imgRef.current) {
-      const parent = imgRef.current.closest('a');
-      setIsInsideLink(!!parent);
-      if (parent) {
-        setParentLinkHref(parent.getAttribute('href'));
-      }
-    }
-  }, []);
-
-  const handleImageClick = React.useCallback((e: React.MouseEvent) => {
-    if (isInsideLink && parentLinkHref) {
-      // 带链接的图片：Ctrl+点击打开链接，普通点击放大
-      if (e.ctrlKey || e.metaKey) {
-        window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
-        return;
-      }
-    }
-    // 普通点击放大图片
-    e.preventDefault();
-    e.stopPropagation();
-    setIsZoomed(true);
-  }, [isInsideLink, parentLinkHref]);
-
-  const handleDownload = React.useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (isDownloading) return;
-    
-    setIsDownloading(true);
-    let objectUrl: string | null = null;
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      const fileName = alt 
-        ? `${alt.replace(/[/\\?%*:|"<>]/g, '_')}.${blob.type.split('/')[1] || 'png'}`
-        : `image-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch {
-      try {
-        const a = document.createElement('a');
-        a.href = imageUrl;
-        a.download = alt ? alt.replace(/[/\\?%*:|"<>]/g, '_') : 'image';
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch {
-        // fallback failed
-      }
-    } finally {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setIsDownloading(false);
-    }
-  }, [imageUrl, alt, isDownloading]);
-
-  const truncateUrl = (url: string, maxLength: number = 50): string => {
-    if (url.length <= maxLength) return url;
-    try {
-      const urlObj = new URL(url);
-      const path = urlObj.pathname;
-      if (path.length > 20) {
-        return `${urlObj.host}${path.substring(0, 20)}...`;
-      }
-      return `${urlObj.host}${path}`;
-    } catch {
-      return url.substring(0, maxLength) + '...';
-    }
-  };
-
-  // 判断是否需要限制小图片尺寸（小于300px的图片不放大显示）
-  const isSmallImage = naturalWidth > 0 && naturalWidth < 300;
-
   if (hasError) {
     return (
-      <div className="my-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-3">
-        <svg className="w-5 h-5 text-red-400 dark:text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-            {language === 'zh' ? '图片加载失败' : 'Image failed to load'}
-          </p>
-          {alt && <p className="text-xs text-red-500 dark:text-red-500 truncate">{alt}</p>}
-        </div>
-        <button
-          onClick={() => { setHasError(false); setIsLoading(true); }}
-          className="px-2 py-1 text-xs bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex-shrink-0"
-        >
-          {language === 'zh' ? '重试' : 'Retry'}
-        </button>
-      </div>
+      <span className="text-gray-500 italic">
+        [{language === 'zh' ? '图片加载失败' : 'Image failed to load'}: {alt || 'image'}]
+      </span>
     );
   }
 
   return (
-    <>
-      {isSmallImage ? (
-        <span className="inline-flex items-center my-1">
-          {isLoading && (
-            <span className="w-20 h-7 bg-gray-100 dark:bg-gray-700 rounded animate-pulse inline-block" />
-          )}
-          <span className="relative inline-block">
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt={alt || ''}
-              className={`
-                h-auto rounded
-                ${isInsideLink
-                  ? 'hover:opacity-80'
-                  : 'hover:opacity-80 transition-opacity duration-200 cursor-pointer'
-                }
-                ${isLoading ? 'opacity-0 absolute' : 'opacity-100'}
-                min-h-[16px]
-              `}
-              style={{
-                maxWidth: `${naturalWidth}px`,
-                width: `${naturalWidth}px`,
-                objectFit: 'contain'
-              }}
-              onLoad={(e) => {
-                setIsLoading(false);
-                setNaturalWidth((e.target as HTMLImageElement).naturalWidth);
-                setNaturalHeight((e.target as HTMLImageElement).naturalHeight);
-              }}
-              onError={() => {
-                setHasError(true);
-                setIsLoading(false);
-              }}
-              onClick={handleImageClick}
-            />
-          </span>
-        </span>
-      ) : (
-        <div className="my-4 flex flex-col items-center group/img">
-          {isLoading && (
-            <div className="w-full max-w-md h-48 bg-gray-100 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center animate-pulse gap-2">
-              <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
-            </div>
-          )}
-
-          <div className={`relative inline-block rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 ${isLoading ? 'hidden' : ''}`}>
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt={alt || ''}
-              className={`
-                h-auto rounded-xl
-                ${isInsideLink
-                  ? 'hover:brightness-95 transition-all duration-200'
-                  : 'hover:brightness-95 transition-all duration-200 cursor-pointer'
-                }
-              `}
-              style={{
-                maxHeight: '65vh',
-                maxWidth: '100%',
-                width: 'auto',
-                objectFit: 'contain'
-              }}
-              onLoad={(e) => {
-                setIsLoading(false);
-                setNaturalWidth((e.target as HTMLImageElement).naturalWidth);
-                setNaturalHeight((e.target as HTMLImageElement).naturalHeight);
-              }}
-              onError={() => {
-                setHasError(true);
-                setIsLoading(false);
-              }}
-              onClick={handleImageClick}
-            />
-            <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none" />
-          </div>
-
-          {!isLoading && !hasError && (
-            <div className="text-center mt-2 text-xs text-gray-400 dark:text-gray-500 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
-              <span>
-                {isInsideLink
-                  ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')
-                  : (language === 'zh' ? '点击可放大' : 'Click to zoom')
-                }
-              </span>
-              {naturalWidth > 0 && (
-                <span className="text-gray-300 dark:text-gray-600">|</span>
-              )}
-              {naturalWidth > 0 && (
-                <span>{naturalWidth} × {naturalHeight}</span>
-              )}
-            </div>
-          )}
-
-          {!isLoading && !hasError && isInsideLink && parentLinkHref && (
-            <div
-              className="text-center mt-1 text-xs text-blue-500 dark:text-blue-400 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
-              <span className="truncate max-w-[200px]" title={parentLinkHref}>
-                {truncateUrl(parentLinkHref)}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 放大视图：通过Portal渲染到body，避免链接冒泡 */}
-      {isZoomed && createPortal(
-        <div 
-          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-sm flex items-center justify-center cursor-default select-none"
-          onClick={() => {
-            if (!isDragging) {
-              setIsZoomed(false);
-              setZoomScale(1);
-              setZoomPos({ x: 0, y: 0 });
-            }
-          }}
-          onWheel={(e) => {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.15 : 0.15;
-            setZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
-          }}
-        >
-          {/* 顶部工具栏 */}
-          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
-            <div className="flex items-center gap-2 pointer-events-auto">
-              {alt && (
-                <span className="text-white/70 text-sm truncate max-w-[300px]">{alt}</span>
-              )}
-              {naturalWidth > 0 && (
-                <span className="text-white/50 text-xs">{naturalWidth} × {naturalHeight}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 pointer-events-auto">
-              {isInsideLink && parentLinkHref && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
-                  }}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
-                  title={language === 'zh' ? '打开链接' : 'Open link'}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </button>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload(e);
-                }}
-                disabled={isDownloading}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
-                title={language === 'zh' ? '下载图片' : 'Download image'}
-              >
-                <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomScale(prev => Math.min(5, prev + 0.5));
-                }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
-                title={language === 'zh' ? '放大' : 'Zoom in'}
-              >
-                +
-              </button>
-              <span className="text-white/60 text-xs min-w-[3rem] text-center">
-                {Math.round(zoomScale * 100)}%
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomScale(prev => Math.max(0.5, prev - 0.5));
-                }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
-                title={language === 'zh' ? '缩小' : 'Zoom out'}
-              >
-                −
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomScale(1);
-                  setZoomPos({ x: 0, y: 0 });
-                }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
-                title={language === 'zh' ? '重置' : 'Reset'}
-              >
-                1:1
-              </button>
-              <button
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsZoomed(false);
-                  setZoomScale(1);
-                  setZoomPos({ x: 0, y: 0 });
-                }}
-                title={language === 'zh' ? '关闭' : 'Close'}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          {/* 图片区域 */}
-          <div 
-            className="flex items-center justify-center w-full h-full"
-            onMouseDown={(e) => {
-              if (zoomScale > 1) {
-                setIsDragging(true);
-                dragStartRef.current = {
-                  x: e.clientX,
-                  y: e.clientY,
-                  posX: zoomPos.x,
-                  posY: zoomPos.y
-                };
-              }
-            }}
-            onMouseMove={(e) => {
-              if (isDragging && zoomScale > 1) {
-                const dx = e.clientX - dragStartRef.current.x;
-                const dy = e.clientY - dragStartRef.current.y;
-                setZoomPos({
-                  x: dragStartRef.current.posX + dx,
-                  y: dragStartRef.current.posY + dy
-                });
-              }
-            }}
-            onMouseUp={() => {
-              setTimeout(() => setIsDragging(false), 50);
-            }}
-            onMouseLeave={() => {
-              setIsDragging(false);
-            }}
-          >
-            <img
-              src={imageUrl}
-              alt={alt || ''}
-              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-100"
-              style={{
-                transform: `scale(${zoomScale}) translate(${zoomPos.x / zoomScale}px, ${zoomPos.y / zoomScale}px)`,
-                cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
-              }}
-              onClick={(e) => e.stopPropagation()}
-              draggable={false}
-            />
-          </div>
-          
-          {/* 底部提示 */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/50 text-xs pointer-events-none flex items-center gap-3">
-            <span>{language === 'zh' ? '滚轮缩放 · 拖拽移动' : 'Scroll to zoom · Drag to pan'}</span>
-            <span className="text-white/30">|</span>
-            <span>{language === 'zh' ? '点击背景关闭' : 'Click background to close'}</span>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
+    <img
+      src={imageUrl}
+      alt={alt || ''}
+      className="max-w-full h-auto rounded-lg my-4"
+      onError={() => setHasError(true)}
+    />
   );
 };
 
@@ -720,28 +212,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
             const id = getHeadingId(children);
             return <h3 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>;
           },
-          p: ({ children }) => {
-            const childArray = React.Children.toArray(children);
-            const hasImagesOnly = childArray.every(
-              child => {
-                if (React.isValidElement(child)) {
-                  if (child.type === MarkdownImage) return true;
-                  if (child.type === 'img') return true;
-                }
-                if (typeof child === 'string' && child.trim() === '') return true;
-                return false;
-              }
-            );
-            return (
-              <p className={`text-gray-700 dark:text-gray-300 mb-2 leading-relaxed ${
-                hasImagesOnly
-                  ? 'flex flex-wrap items-center justify-center gap-3'
-                  : ''
-              }`}>
-                {children}
-              </p>
-            );
-          },
+          p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-2 leading-relaxed">{children}</p>,
           ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,

@@ -51,7 +51,6 @@ interface AppActions {
   // Repository actions
   setRepositories: (repos: Repository[]) => void;
   updateRepository: (repo: Repository) => void;
-  addRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
   setLastSync: (timestamp: string) => void;
   deleteRepository: (repoId: number) => void;
@@ -197,8 +196,6 @@ type PersistedAppState = Partial<
     | 'discoveryRepos'
     | 'discoveryLastRefresh'
     | 'discoveryTotalCount'
-    | 'discoveryHasMore'
-    | 'discoveryNextPage'
     | 'selectedDiscoveryChannel'
     | 'discoveryPlatform'
     | 'discoveryLanguage'
@@ -453,7 +450,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
     id: 'trending',
     name: '热门仓库',
     nameEn: 'Trending',
-    icon: 'trending',
+    icon: '🔥',
     description: '最近30天内星标数超过50的热门仓库',
     enabled: true,
   },
@@ -461,7 +458,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
     id: 'hot-release',
     name: '热门发布',
     nameEn: 'Hot Release',
-    icon: 'rocket',
+    icon: '🚀',
     description: '最近14天内活跃更新的仓库',
     enabled: true,
   },
@@ -469,7 +466,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
     id: 'most-popular',
     name: '最受欢迎',
     nameEn: 'Most Popular',
-    icon: 'star',
+    icon: '⭐',
     description: '星标数超过1000的稳定热门仓库',
     enabled: true,
   },
@@ -477,7 +474,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
     id: 'topic',
     name: '主题探索',
     nameEn: 'Topic',
-    icon: 'tag',
+    icon: '🏷️',
     description: '按主题分类浏览仓库',
     enabled: true,
   },
@@ -485,7 +482,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
     id: 'search',
     name: '搜索发现',
     nameEn: 'Search',
-    icon: 'search',
+    icon: '🔍',
     description: '自定义搜索发现新项目',
     enabled: true,
   },
@@ -583,42 +580,6 @@ export const useAppStore = create<AppState & AppActions>()(
         return {
           repositories: updatedRepositories,
           searchResults: state.searchResults.map(r => r.id === repo.id ? repo : r)
-        };
-      }),
-      addRepository: (repo) => set((state) => {
-        // 检查是否已存在相同 full_name 的仓库
-        const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
-        let updatedRepositories;
-        
-        if (existingRepoIndex >= 0) {
-          // 如果存在，更新现有仓库（保留ID）
-          updatedRepositories = [...state.repositories];
-          updatedRepositories[existingRepoIndex] = {
-            ...repo,
-            id: updatedRepositories[existingRepoIndex].id,
-            // 保留自定义编辑的内容
-            custom_description: updatedRepositories[existingRepoIndex].custom_description,
-            custom_tags: updatedRepositories[existingRepoIndex].custom_tags,
-            custom_category: updatedRepositories[existingRepoIndex].custom_category,
-            category_locked: updatedRepositories[existingRepoIndex].category_locked,
-            last_edited: updatedRepositories[existingRepoIndex].last_edited,
-            subscribed_to_releases: updatedRepositories[existingRepoIndex].subscribed_to_releases,
-          };
-        } else {
-          // 如果不存在，添加新仓库（生成新ID）
-          // 使用 timestamp + random 确保唯一性，避免并发时的竞态条件
-          const timestamp = Date.now();
-          const random = Math.floor(Math.random() * 10000);
-          const maxExistingId = state.repositories.length > 0
-            ? Math.max(...state.repositories.map(r => r.id))
-            : 0;
-          const newId = Math.max(timestamp, maxExistingId + 1) + random;
-          updatedRepositories = [...state.repositories, { ...repo, id: newId }];
-        }
-        
-        return {
-          repositories: updatedRepositories,
-          searchResults: updatedRepositories
         };
       }),
       setLoading: (isLoading) => set({ isLoading }),
@@ -1171,9 +1132,6 @@ export const useAppStore = create<AppState & AppActions>()(
       selectedDiscoveryChannel: state.selectedDiscoveryChannel,
       discoveryRepos: state.discoveryRepos,
       discoveryLastRefresh: state.discoveryLastRefresh,
-      discoveryTotalCount: state.discoveryTotalCount,
-      discoveryHasMore: state.discoveryHasMore,
-      discoveryNextPage: state.discoveryNextPage,
       discoveryPlatform: state.discoveryPlatform,
       discoveryLanguage: state.discoveryLanguage,
       discoverySortBy: state.discoverySortBy,
@@ -1252,7 +1210,7 @@ export const useAppStore = create<AppState & AppActions>()(
         id: 'trending',
         name: '热门趋势',
         nameEn: 'Trending',
-        icon: 'trending',
+        icon: '🔥',
         description: 'GitHub 上近期最受关注的项目 Top 10',
         enabled: true,
       } as SubscriptionChannel);
