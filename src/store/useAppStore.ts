@@ -339,6 +339,40 @@ const normalizePersistedState = (
     selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
       ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
       : 'trending',
+    // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）
+    discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+    // discoveryHasMore 从持久化恢复，确保对象格式
+    discoveryHasMore: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryHasMore;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': false,
+          'hot-release': false,
+          'most-popular': false,
+          'topic': false,
+          'search': false,
+          ...(persisted as Record<string, boolean>),
+        };
+      }
+      return { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false };
+    })(),
+    // discoveryNextPage 从持久化恢复，确保对象格式
+    discoveryNextPage: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryNextPage;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': 1,
+          'hot-release': 1,
+          'most-popular': 1,
+          'topic': 1,
+          'search': 1,
+          ...(persisted as Record<string, number>),
+        };
+      }
+      return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
+    })(),
+    // discoveryScrollPositions 不持久化，始终重置为 0
+    discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: {
       'most-stars': [],
@@ -1334,6 +1368,16 @@ export const useAppStore = create<AppState & AppActions>()(
   }
   if (state && !state.discoverySortOrder) {
     state.discoverySortOrder = 'Descending';
+  }
+  // discoveryIsLoading 不应持久化，migrate 时始终重置防止旧数据格式异常导致 spread 崩溃
+  if (state) {
+    (state as Record<string, unknown>).discoveryIsLoading = {
+      'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false,
+    };
+    // discoveryScrollPositions 同样不应持久化，重置以避免 stale 滚动位置
+    (state as Record<string, unknown>).discoveryScrollPositions = {
+      'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0,
+    };
   }
 
         return state as PersistedAppState;
