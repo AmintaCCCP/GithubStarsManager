@@ -1,28 +1,16 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { X, Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
-interface TocItem {
-  id: string;
-  text: string;
-  level: number;
-}
-
 interface ReadmeModalProps {
   isOpen: boolean;
   onClose: () => void;
   repository: Repository | null;
 }
-
-const FONT_SIZES = [
-  { label: '小', labelEn: 'Small', value: 'text-sm' },
-  { label: '中', labelEn: 'Medium', value: 'text-base' },
-  { label: '大', labelEn: 'Large', value: 'text-lg' },
-];
 
 export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   isOpen,
@@ -33,67 +21,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [showToc, setShowToc] = useState(false);
-  const [fontSizeIndex, setFontSizeIndex] = useState(1);
-  const [tocItems, setTocItems] = useState<TocItem[]>([]);
-  const [headingIdMap, setHeadingIdMap] = useState<Map<string, string>>(new Map());
-  
   const modalRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  const currentFontSize = FONT_SIZES[fontSizeIndex].value;
-
-  const extractToc = useCallback((content: string): { items: TocItem[], idMap: Map<string, string> } => {
-    const items: TocItem[] = [];
-    const idMap = new Map<string, string>();
-    const regex = /^(#{1,3})\s+(.+)$/gm;
-    let match;
-    let idCounter = 0;
-    
-    while ((match = regex.exec(content)) !== null) {
-      const level = match[1].length;
-      const text = match[2].trim();
-      const id = `heading-${idCounter++}`;
-      items.push({ id, text, level });
-      idMap.set(text, id);
-    }
-    
-    return { items, idMap };
-  }, []);
-
-  const scrollToHeading = useCallback((id: string) => {
-    const element = document.getElementById(id);
-    if (element && contentRef.current) {
-      const container = contentRef.current;
-      const elementRect = element.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      const scrollTop = container.scrollTop + elementRect.top - containerRect.top - 20;
-      
-      container.scrollTo({
-        top: scrollTop,
-        behavior: 'smooth'
-      });
-    }
-  }, []);
-
-  const handleScroll = useCallback(() => {
-    if (contentRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = contentRef.current;
-      const progress = scrollHeight > clientHeight 
-        ? (scrollTop / (scrollHeight - clientHeight)) * 100 
-        : 0;
-      setScrollProgress(Math.min(100, Math.max(0, progress)));
-    }
-  }, []);
-
-  const cycleFontSize = useCallback(() => {
-    setFontSizeIndex((prev) => (prev + 1) % FONT_SIZES.length);
-  }, []);
-
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const fetchReadme = useCallback(async () => {
     if (!repository) return;
@@ -126,9 +56,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
       if (content.trim()) {
         setReadmeContent(content);
-        const { items, idMap } = extractToc(content);
-        setTocItems(items);
-        setHeadingIdMap(idMap);
       } else {
         setError(language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file');
       }
@@ -159,10 +86,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setReadmeContent('');
       setError(null);
       setLoading(false);
-      setScrollProgress(0);
-      setShowToc(false);
-      setTocItems([]);
-      setHeadingIdMap(new Map());
     }
   }, [isOpen]);
 
@@ -229,7 +152,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
             <div className="flex items-center space-x-3">
               <img
                 src={repository.owner.avatar_url}
@@ -245,36 +168,16 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-1">
-              {tocItems.length > 0 && (
-                <button
-                  onClick={() => setShowToc(!showToc)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    showToc 
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                  title={t('目录', 'Table of Contents')}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                onClick={cycleFontSize}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
-              >
-                <Type className="w-4 h-4" />
-              </button>
+            <div className="flex items-center space-x-2">
               <a
                 href={repository.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title={t('在 GitHub 上查看', 'View on GitHub')}
+                title={language === 'zh' ? '在 GitHub 上查看' : 'View on GitHub'}
               >
                 <ExternalLink className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('在 GitHub 上查看', 'View on GitHub')}</span>
+                <span className="hidden sm:inline">{language === 'zh' ? '在 GitHub 上查看' : 'View on GitHub'}</span>
               </a>
               <button
                 onClick={onClose}
@@ -286,48 +189,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          {/* Scroll Progress Bar */}
-          <div className="h-1 bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-150"
-              style={{ width: `${scrollProgress}%` }}
-            />
-          </div>
-
-          {/* Main Content Area */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* TOC Sidebar */}
-            {showToc && tocItems.length > 0 && (
-              <div className="w-56 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 flex-shrink-0">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  {t('目录', 'Contents')}
-                </h4>
-                <nav className="space-y-1">
-                  {tocItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => scrollToHeading(item.id)}
-                      className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors ${
-                        item.level === 1 
-                          ? 'font-semibold text-gray-900 dark:text-white' 
-                          : item.level === 2 
-                            ? 'pl-4 text-gray-700 dark:text-gray-300'
-                            : 'pl-6 text-gray-500 dark:text-gray-400'
-                      } hover:bg-gray-100 dark:hover:bg-gray-700`}
-                    >
-                      {item.text}
-                    </button>
-                  ))}
-                </nav>
-              </div>
-            )}
-
-            {/* Content */}
-            <div 
-              ref={contentRef}
-              onScroll={handleScroll}
-              className={`flex-1 overflow-y-auto p-6 ${currentFontSize}`}
-            >
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
@@ -353,7 +216,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 content={readmeContent}
                 enableHtml={true}
                 baseUrl={repository?.html_url}
-                headingIds={headingIdMap}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
@@ -363,7 +225,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </p>
               </div>
             )}
-            </div>
           </div>
         </div>
       </div>
