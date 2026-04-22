@@ -6,7 +6,7 @@ import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
-import { DiscoveryView } from './components/DiscoveryView';
+import { SubscriptionView } from './components/SubscriptionView';
 import { BackToTop } from './components/BackToTop';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
@@ -116,7 +116,7 @@ function App() {
       case 'releases':
         return <ReleasesView />;
       case 'subscription':
-        return <DiscoveryView />;
+        return <SubscriptionView />;
       case 'settings':
         return <SettingsView />;
       default:

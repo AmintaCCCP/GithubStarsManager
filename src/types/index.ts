@@ -5,28 +5,29 @@ export interface Repository {
   description: string | null;
   html_url: string;
   stargazers_count: number;
-  forks_count: number;
-  forks: number;
   language: string | null;
   created_at: string;
   updated_at: string;
   pushed_at: string;
-  starred_at?: string;
+  starred_at?: string; // 新增：加入星标的时间
   owner: {
     login: string;
     avatar_url: string;
   };
   topics: string[];
+  // AI generated fields
   ai_summary?: string;
   ai_tags?: string[];
-  ai_platforms?: string[];
+  ai_platforms?: string[]; // 新增：支持的平台类型
   analyzed_at?: string;
-  analysis_failed?: boolean;
+  analysis_failed?: boolean; // 新增：AI分析是否失败
+  // Release subscription
   subscribed_to_releases?: boolean;
+  // Manual editing fields
   custom_description?: string;
   custom_tags?: string[];
   custom_category?: string;
-  category_locked?: boolean;
+  category_locked?: boolean; // 是否锁定分类（锁定后同步不自动改分类）
   last_edited?: string;
 }
 
@@ -141,7 +142,6 @@ export interface AppState {
   repositories: Repository[];
   isLoading: boolean;
   lastSync: string | null;
-  analyzingRepositoryIds: Set<number>;
   
   // AI
   aiConfigs: AIConfig[];
@@ -194,22 +194,13 @@ export interface AppState {
   releaseExpandedRepositories: Set<number>;
   releaseIsRefreshing: boolean;
 
-  // Discovery
-  discoveryChannels: DiscoveryChannel[];
-  discoveryRepos: Record<DiscoveryChannelId, DiscoveryRepo[]>;
-  discoveryLastRefresh: Record<DiscoveryChannelId, string | null>;
-  discoveryIsLoading: Record<DiscoveryChannelId, boolean>;
-  selectedDiscoveryChannel: DiscoveryChannelId;
-  discoveryPlatform: DiscoveryPlatform;
-  discoveryLanguage: ProgrammingLanguage;
-  discoverySortBy: SortBy;
-  discoverySortOrder: SortOrder;
-  discoverySearchQuery: string;
-  discoverySelectedTopic: TopicCategory | null;
-  discoveryHasMore: Record<DiscoveryChannelId, boolean>;
-  discoveryNextPage: Record<DiscoveryChannelId, number>;
-  discoveryTotalCount: Record<DiscoveryChannelId, number>;
-  discoveryScrollPositions: Record<DiscoveryChannelId, number>;
+  // Subscription
+  subscriptionChannels: SubscriptionChannel[];
+  subscriptionRepos: Record<SubscriptionChannelId, SubscriptionRepo[]>;
+  subscriptionDevs: SubscriptionDev[];
+  subscriptionLastRefresh: Record<SubscriptionChannelId, string | null>;
+  subscriptionIsLoading: Record<SubscriptionChannelId, boolean>;
+  selectedSubscriptionChannel: SubscriptionChannelId;
 }
 
 export interface UpdateNotification {
@@ -225,33 +216,10 @@ export interface AnalysisProgress {
   total: number;
 }
 
-export type DiscoveryPlatform = 'All' | 'Android' | 'Macos' | 'Windows' | 'Linux';
+export type SubscriptionChannelId = 'most-stars' | 'most-forks' | 'most-dev' | 'trending';
 
-export type ProgrammingLanguage = 
-  | 'All' 
-  | 'Kotlin' 
-  | 'Java' 
-  | 'JavaScript' 
-  | 'TypeScript' 
-  | 'Python' 
-  | 'Swift' 
-  | 'Rust' 
-  | 'Go' 
-  | 'CSharp' 
-  | 'CPlusPlus' 
-  | 'C' 
-  | 'Dart' 
-  | 'Ruby' 
-  | 'PHP';
-
-export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
-
-export type SortOrder = 'Descending' | 'Ascending';
-
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search';
-
-export interface DiscoveryChannel {
-  id: DiscoveryChannelId;
+export interface SubscriptionChannel {
+  id: SubscriptionChannelId;
   name: string;
   nameEn: string;
   icon: string;
@@ -259,32 +227,21 @@ export interface DiscoveryChannel {
   enabled: boolean;
 }
 
-export interface PaginatedDiscoveryRepositories {
-  repos: DiscoveryRepo[];
-  hasMore: boolean;
-  nextPageIndex: number;
-  totalCount?: number;
-}
-
-export interface DiscoveryRepo extends Repository {
+export interface SubscriptionRepo extends Repository {
   rank: number;
-  channel: DiscoveryChannelId;
-  platform: DiscoveryPlatform;
+  channel: SubscriptionChannelId;
+  forks?: number;
+  forks_count?: number;
 }
 
-export type TopicCategory = 
-  | 'ai' 
-  | 'ml' 
-  | 'database' 
-  | 'web' 
-  | 'mobile' 
-  | 'devtools' 
-  | 'security' 
-  | 'game';
-
-export interface TopicInfo {
-  id: TopicCategory;
-  name: string;
-  nameEn: string;
-  keywords: string;
+export interface SubscriptionDev {
+  rank: number;
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  topRepo: SubscriptionRepo | null;
 }
