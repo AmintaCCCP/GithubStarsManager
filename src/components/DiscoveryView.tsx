@@ -979,7 +979,42 @@ const CompactPagination = React.memo<CompactPaginationProps>(({
 
 CompactPagination.displayName = 'CompactPagination';
 
+// 全局错误日志存储
+const __discoveryLogs: { ts: string; msg: string; data?: unknown }[] = [];
+const __discoveryErrors: { ts: string; msg: string; err?: unknown; stack?: string }[] = [];
+
+try {
+  (window as unknown as Record<string, unknown>).__discoveryLogs = __discoveryLogs;
+  (window as unknown as Record<string, unknown>).__discoveryErrors = __discoveryErrors;
+} catch (_) {}
+
+const dl = (msg: string, data?: unknown) => {
+  const entry = { ts: new Date().toISOString(), msg, data };
+  __discoveryLogs.push(entry);
+  console.log(`[DV] ${msg}`, data || '');
+};
+const de = (msg: string, err?: unknown) => {
+  const entry = { ts: new Date().toISOString(), msg, err, stack: err instanceof Error ? err.stack : undefined };
+  __discoveryErrors.push(entry);
+  console.error(`[DV ERROR] ${msg}`, err || '');
+};
+
 export const DiscoveryView: React.FC = React.memo(() => {
+  dl('DiscoveryView render start');
+
+  let storeSnapshot: Record<string, unknown> = {};
+  try {
+    const s = useAppStore.getState();
+    storeSnapshot = {
+      selChannel: s.selectedDiscoveryChannel,
+      chanKeys: s.discoveryChannels ? Object.keys(s.discoveryChannels) : 'N/A',
+      reposKeys: s.discoveryRepos ? Object.keys(s.discoveryRepos) : 'N/A',
+      currPageKeys: s.discoveryCurrentPage ? Object.keys(s.discoveryCurrentPage) : 'N/A',
+      isLoadingKeys: s.discoveryIsLoading ? Object.keys(s.discoveryIsLoading) : 'N/A',
+    };
+    dl('Store state snapshot', storeSnapshot);
+  } catch (e) { de('Failed to get store snapshot', e); }
+
   const {
     githubToken,
     language,
@@ -1024,11 +1059,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setRssTimeRange,
   } = useAppStore();
 
+  dl('After store destructuring', { selectedDiscoveryChannel, reposKeys: discoveryRepos ? Object.keys(discoveryRepos) : null });
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
   const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
-  
+
   // 使用 store 中的当前页码
   const currentPage = discoveryCurrentPage[selectedDiscoveryChannel] || 1;
 
@@ -1815,4 +1852,55 @@ export const DiscoveryView: React.FC = React.memo(() => {
   );
 });
 
+// 错误边界组件
+class DiscoveryViewErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: unknown }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    de('React ErrorBoundary caught', error);
+    console.error('Component stack:', info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, background: '#fee', border: '2px solid #c00', borderRadius: 8 }}>
+          <h2 style={{ color: '#c00', margin: '0 0 10px' }}>DiscoveryView Error</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: '#fff', padding: 10, borderRadius: 4 }}>
+            {this.state.error instanceof Error ? `${this.state.error.message}\n${this.state.error.stack}` : String(this.state.error)}
+          </pre>
+          <h3>Recent Logs:</h3>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 10, borderRadius: 4 }}>
+            {JSON.stringify(__discoveryLogs.slice(-20), null, 2)}
+          </pre>
+          <button onClick={() => {
+            console.log('=== DISCOVERY LOGS ===');
+            console.log({ logs: __discoveryLogs, errors: __discoveryErrors });
+            alert('Logs exported to console (F12)');
+          }} style={{ padding: '8px 16px', background: '#0066cc', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+            Export Logs to Console
+          </button>
+          <button onClick={() => window.location.reload()} style={{ marginLeft: 10, padding: '8px 16px', background: '#666', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 DiscoveryView.displayName = 'DiscoveryView';
+
+// 包装后的导出
+export const DiscoveryViewWithErrorBoundary: React.FC = () => {
+  return (
+    <DiscoveryViewErrorBoundary>
+      <DiscoveryView />
+    </DiscoveryViewErrorBoundary>
+  );
+};

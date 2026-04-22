@@ -16,7 +16,7 @@ import type { AppState } from './types';
 const RepositoryList = lazy(() => import('./components/RepositoryList').then(m => ({ default: m.RepositoryList })));
 const ReleaseTimeline = lazy(() => import('./components/ReleaseTimeline').then(m => ({ default: m.ReleaseTimeline })));
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
-const DiscoveryView = lazy(() => import('./components/DiscoveryView').then(m => ({ default: m.DiscoveryView })));
+const DiscoveryView = lazy(() => import('./components/DiscoveryView').then(m => ({ default: m.DiscoveryViewWithErrorBoundary })));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-[400px]">
