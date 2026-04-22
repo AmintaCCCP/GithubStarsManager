@@ -21,11 +21,10 @@ export interface AnalyzeRepositoryOptions {
   language: string;
   categories: Category[];
   onProgress?: (status: string) => void;
-  signal?: AbortSignal;
 }
 
 export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Promise<AIAnalysisResult> => {
-  const { repository, githubToken, aiConfig, language, categories, onProgress, signal } = options;
+  const { repository, githubToken, aiConfig, language, categories, onProgress } = options;
 
   onProgress?.('Initializing...');
   
@@ -37,14 +36,14 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   onProgress?.('Fetching README...');
   const readmeContent = backend.isAvailable
     ? await backend.getRepositoryReadme(owner, name)
-    : await githubApi.getRepositoryReadme(owner, name, signal);
+    : await githubApi.getRepositoryReadme(owner, name);
 
   const categoryNames = categories
     .filter(cat => cat.id !== 'all')
     .map(cat => cat.name);
 
   onProgress?.('Analyzing with AI...');
-  const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames, signal);
+  const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames);
 
   const resolvedCategory = resolveCategoryAssignment(repository as Repository, analysis.tags, categories);
 
