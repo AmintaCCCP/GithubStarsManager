@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
 import { 
   AppState, 
   Repository, 
@@ -27,6 +27,39 @@ import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
+
+// Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
+// which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
+const debouncedPersistStorage: PersistStorage<any> = {
+  getItem: async (name) => {
+    const str = await indexedDBStorage.getItem(name);
+    if (!str) return null;
+    try {
+      return JSON.parse(str);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let latestValue: StorageValue<any> | null = null;
+    return (name: string, value: StorageValue<any>) => {
+      latestValue = value;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        try {
+          const str = JSON.stringify(latestValue);
+          indexedDBStorage.setItem(name, str);
+        } catch (e) {
+          console.error('Failed to stringify state for persistence', e);
+        }
+      }, 1000);
+    };
+  })(),
+  removeItem: (name) => {
+    indexedDBStorage.removeItem(name);
+  }
+};
 
 const readSessionBackendSecret = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -1189,7 +1222,7 @@ export const useAppStore = create<AppState & AppActions>()(
     {
       name: 'github-stars-manager',
       version: 5,
-      storage: createJSONStorage(() => indexedDBStorage),
+      storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
         user: state.user,
