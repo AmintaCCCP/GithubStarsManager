@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import legacy from '@vitejs/plugin-legacy';
 
+// https://vitejs.dev/config/
 export default defineConfig({
   base: './',
   plugins: [
@@ -16,15 +17,14 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
+    // 确保生成兼容性更好的代码
+    target: 'es2015',
+    // 分块策略，避免单个文件过大
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
-            return 'react-vendor';
-          }
-          if (id.includes('node_modules/lucide-react')) {
-            return 'ui-vendor';
-          }
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['lucide-react'],
         },
       },
     },
