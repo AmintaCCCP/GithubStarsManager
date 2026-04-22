@@ -1089,6 +1089,50 @@ export const useAppStore = create<AppState & AppActions>()(
     state.selectedSubscriptionChannel = 'most-dev';
   }
 
+  // 迁移 subscription 相关状态：确保所有频道键存在
+  if (state) {
+    const channels = ['most-stars', 'most-forks', 'most-dev', 'trending'] as const;
+    const defaultSubscriptionRepos = { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] };
+    const defaultSubscriptionLastRefresh = { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null };
+    const defaultSubscriptionIsLoading = { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false };
+
+    if (!state.subscriptionRepos || typeof state.subscriptionRepos !== 'object') {
+      console.log('Migrating: initializing subscriptionRepos');
+      state.subscriptionRepos = defaultSubscriptionRepos;
+    } else {
+      for (const ch of channels) {
+        if (!(ch in state.subscriptionRepos)) {
+          console.log(`Migrating: adding missing key ${ch} to subscriptionRepos`);
+          (state.subscriptionRepos as Record<string, unknown>)[ch] = [];
+        }
+      }
+    }
+
+    if (!state.subscriptionLastRefresh || typeof state.subscriptionLastRefresh !== 'object') {
+      console.log('Migrating: initializing subscriptionLastRefresh');
+      state.subscriptionLastRefresh = defaultSubscriptionLastRefresh;
+    } else {
+      for (const ch of channels) {
+        if (!(ch in (state.subscriptionLastRefresh as Record<string, unknown>))) {
+          console.log(`Migrating: adding missing key ${ch} to subscriptionLastRefresh`);
+          (state.subscriptionLastRefresh as Record<string, unknown>)[ch] = null;
+        }
+      }
+    }
+
+    if (!state.subscriptionIsLoading || typeof state.subscriptionIsLoading !== 'object') {
+      console.log('Migrating: initializing subscriptionIsLoading');
+      state.subscriptionIsLoading = defaultSubscriptionIsLoading;
+    } else {
+      for (const ch of channels) {
+        if (!(ch in (state.subscriptionIsLoading as Record<string, unknown>))) {
+          console.log(`Migrating: adding missing key ${ch} to subscriptionIsLoading`);
+          (state.subscriptionIsLoading as Record<string, unknown>)[ch] = false;
+        }
+      }
+    }
+  }
+
         return state as PersistedAppState;
       },
       merge: (persistedState, currentState) => {
