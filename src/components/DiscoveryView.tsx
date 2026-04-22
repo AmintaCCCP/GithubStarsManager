@@ -1120,7 +1120,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
   const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
-  const currentChannelIcon = discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending';
+  const currentChannelIcon = (discoveryChannels || []).find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
@@ -1541,8 +1541,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <div className="min-w-0">
                     <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">
                       {language === 'zh'
-                        ? discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.name
-                        : discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
+                        ? (discoveryChannels || []).find(ch => ch.id === selectedDiscoveryChannel)?.name
+                        : (discoveryChannels || []).find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
                     </h2>
                     {currentLastRefresh && (
                       <p className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block">
