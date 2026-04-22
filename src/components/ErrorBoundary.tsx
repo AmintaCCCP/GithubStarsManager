@@ -1,5 +1,5 @@
 import React, { Component, ReactNode } from 'react';
-import { PROJECT_ISSUES_URL } from '../constants/project';
+import { DB_NAME } from '../services/indexedDbStorage';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +9,6 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
-  showDetails: boolean;
 }
 
 const getLocalizedStrings = () => {
@@ -17,27 +16,27 @@ const getLocalizedStrings = () => {
   return {
     title: lang === 'zh' ? '应用加载出错' : 'Application Error',
     description: lang === 'zh'
-      ? '应用遇到了问题。请查看下方错误详情或将问题反馈给我们。'
-      : 'Sorry, the application encountered an issue. Please see the error details below or report the issue to us.',
+      ? '抱歉，应用遇到了问题。这可能是由于浏览器兼容性或数据损坏导致的。'
+      : 'Sorry, the application encountered an issue. This may be due to browser compatibility or data corruption.',
     reload: lang === 'zh' ? '重新加载页面' : 'Reload Page',
-    reportIssue: lang === 'zh' ? '在 GitHub 上反馈问题' : 'Report Issue on GitHub',
-    toggleDetails: lang === 'zh' ? '显示/隐藏详细信息' : 'Show/Hide Details',
-    errorDetails: lang === 'zh' ? '错误详情' : 'Error Details',
-    stackTrace: lang === 'zh' ? '堆栈跟踪' : 'Stack Trace',
+    clearData: lang === 'zh' ? '清除本地数据并重启' : 'Clear Local Data & Restart',
     browserHint: lang === 'zh' ? '建议使用的浏览器：' : 'Recommended browsers:',
-    copyError: lang === 'zh' ? '复制错误信息' : 'Copy Error Info',
-    copied: lang === 'zh' ? '已复制！' : 'Copied!',
+    fallbackTitle: lang === 'zh' ? '应用加载失败' : 'Application Failed to Load',
+    fallbackDesc: lang === 'zh'
+      ? '您的浏览器可能不支持运行此应用。请尝试使用最新版本的 Chrome、Firefox、Safari 或 Edge。'
+      : 'Your browser may not support running this app. Please try using the latest version of Chrome, Firefox, Safari, or Edge.',
+    fallbackButton: lang === 'zh' ? '重新加载' : 'Reload',
   };
 };
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null, showDetails: false };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, errorInfo: null, showDetails: false };
+    return { hasError: true, error, errorInfo: null };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -50,41 +49,32 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  handleReportIssue = () => {
-    window.open(PROJECT_ISSUES_URL, '_blank');
-  };
-
-  handleToggleDetails = () => {
-    this.setState(prev => ({ showDetails: !prev.showDetails }));
-  };
-
-  handleCopyError = async () => {
-    const { error, errorInfo } = this.state;
-    const errorText = [
-      'Error: ' + (error?.message || String(error)),
-      '',
-      'Stack Trace:',
-      error?.stack || '',
-      '',
-      'Component Stack:',
-      errorInfo?.componentStack || '',
-    ].join('\n');
-
+  handleClearStorage = () => {
     try {
-      await navigator.clipboard.writeText(errorText);
+      localStorage.clear();
+      sessionStorage.clear();
+      // Clear IndexedDB
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => {
+        console.log('[ErrorBoundary] IndexedDB cleared');
+        window.location.reload();
+      };
+      req.onerror = () => {
+        console.error('[ErrorBoundary] Failed to clear IndexedDB');
+        window.location.reload();
+      };
     } catch (e) {
-      console.error('Failed to copy:', e);
+      console.error('[ErrorBoundary] Failed to clear storage:', e);
+      window.location.reload();
     }
   };
 
   render() {
     if (this.state.hasError) {
       const strings = getLocalizedStrings();
-      const { error, errorInfo, showDetails } = this.state;
-
       return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="text-center">
               <div className="text-5xl mb-4">😵</div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -94,57 +84,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 {strings.description}
               </p>
               
-              {/* 错误信息显示 */}
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded text-left">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold text-red-700 dark:text-red-300">
-                      {strings.errorDetails}
-                    </span>
-                    <button
-                      onClick={this.handleCopyError}
-                      className="text-xs px-2 py-1 bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
-                    >
-                      {strings.copyError}
-                    </button>
-                  </div>
-                  <p className="text-sm text-red-600 dark:text-red-400 font-mono break-words">
-                    {error?.message || error?.toString() || String(error)}
+              {this.state.error && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded text-left overflow-auto max-h-32">
+                  <p className="text-sm text-red-600 dark:text-red-400 font-mono">
+                    {this.state.error?.message || this.state.error?.toString() || String(this.state.error)}
                   </p>
                 </div>
               )}
 
-              {/* 详细信息折叠面板 */}
-              <div className="mb-4">
-                <button
-                  onClick={this.handleToggleDetails}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-                >
-                  {strings.toggleDetails}
-                </button>
-                {showDetails && errorInfo && (
-                  <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded text-left overflow-auto max-h-64">
-                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      {strings.stackTrace}:
-                    </p>
-                    <pre className="text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap">
-                      {error?.stack || 'No stack trace available'}
-                    </pre>
-                    {errorInfo?.componentStack && (
-                      <>
-                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-2">
-                          Component Stack:
-                        </p>
-                        <pre className="text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap">
-                          {errorInfo.componentStack}
-                        </pre>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 操作按钮 */}
               <div className="space-y-2">
                 <button
                   onClick={this.handleReload}
@@ -153,14 +100,13 @@ export class ErrorBoundary extends Component<Props, State> {
                   {strings.reload}
                 </button>
                 <button
-                  onClick={this.handleReportIssue}
-                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  onClick={this.handleClearStorage}
+                  className="w-full px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
                 >
-                  {strings.reportIssue}
+                  {strings.clearData}
                 </button>
               </div>
 
-              {/* 浏览器提示 */}
               <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
                 <p>{strings.browserHint}</p>
                 <p>Chrome 80+ / Firefox 75+ / Safari 13+ / Edge 80+</p>

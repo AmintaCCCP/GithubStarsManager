@@ -82,12 +82,12 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
       </button>
 
       {isVisible && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[9999]" style={{ zIndex: 9999 }}>
-          <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 w-80">
+        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50">
+          <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 w-80">
             {/* Arrow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-[10000]">
-              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-gray-200 dark:border-b-gray-700" />
-              <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-gray-800" />
+            <div className="absolute left-0 top-1/2 -translate-x-full -translate-y-1/2">
+              <div className="w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-gray-200 dark:border-r-gray-700" />
+              <div className="absolute top-1/2 -translate-y-1/2 left-0.5 w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-white dark:border-r-gray-800" />
             </div>
 
             <h4 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm">

@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
+import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Bookmark, BookmarkCheck, Sparkles, BookOpen } from 'lucide-react';
 import type { DiscoveryRepo } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
 import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
-import { Modal } from './Modal';
 
 interface SubscriptionRepoCardProps {
   repo: DiscoveryRepo;
@@ -21,28 +20,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const activeAIConfig = useAppStore(state => state.activeAIConfig);
   const customCategories = useAppStore(state => state.customCategories);
   const updateDiscoveryRepo = useAppStore(state => state.updateDiscoveryRepo);
-  const repositories = useAppStore(state => state.repositories);
-  const addRepository = useAppStore(state => state.addRepository);
-  const deleteRepository = useAppStore(state => state.deleteRepository);
   
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const [isStarring, setIsStarring] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
-  // 本地乐观状态，用于立即反映Star操作结果
-  const [optimisticStarred, setOptimisticStarred] = useState<boolean | null>(null);
-  // 取消Star确认对话框状态
-  const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
-  const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
-  
-  // 检查仓库是否已在本地存在（已被Star）
-  const isStarredComputed = useMemo(() => {
-    return repositories.some(r => r.full_name === repo.full_name);
-  }, [repositories, repo.full_name]);
-  
-  // 优先使用乐观状态，否则使用计算状态
-  const isStarred = optimisticStarred !== null ? optimisticStarred : isStarredComputed;
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -86,100 +70,30 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
   };
 
-  // 执行取消Star操作
-  const executeUnstar = useCallback(async () => {
-    if (!githubToken) return;
-    
-    setIsStarring(true);
-    
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const [owner, name] = repo.full_name.split('/');
-      
-      // 乐观更新：立即更新UI状态
-      setOptimisticStarred(false);
-      
-      await githubApi.unstarRepository(owner, name);
-      
-      // 从本地删除
-      const existingRepo = repositories.find(r => r.full_name === repo.full_name);
-      if (existingRepo) {
-        deleteRepository(existingRepo.id);
-      }
-      
-      await forceSyncToBackend();
-      
-      // 操作成功，清除乐观状态
-      setOptimisticStarred(null);
-    } catch (error) {
-      // 操作失败，回滚乐观状态
-      setOptimisticStarred(null);
-      console.error('Failed to unstar repository:', error);
-      const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
-      alert(errorMessage);
-    } finally {
-      setIsStarring(false);
-      setPendingUnstarAction(null);
-    }
-  }, [githubToken, repo, repositories, deleteRepository, t]);
-
-  // 处理添加/取消Star
+  // 处理添加Star
   const handleStar = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!githubToken || isStarring) return;
 
-    if (isStarred) {
-      // 取消Star - 显示自定义确认对话框
-      setPendingUnstarAction(() => executeUnstar);
-      setUnstarConfirmOpen(true);
-      return;
-    }
-    
-    // 添加Star
     setIsStarring(true);
-    
     try {
       const githubApi = new GitHubApiService(githubToken);
       const [owner, name] = repo.full_name.split('/');
-      
-      // 乐观更新：立即更新UI状态
-      setOptimisticStarred(true);
-      
       await githubApi.starRepository(owner, name);
-      
-      // 将DiscoveryRepo转换为Repository并添加到本地，保留AI分析结果
-      const repositoryToAdd = {
-        ...repo,
-        // 移除Discovery/Subscription特有的字段
-        rank: undefined,
-        channel: undefined,
-        platform: undefined,
-        // 添加Star时间
-        starred_at: new Date().toISOString(),
-      };
-      
-      addRepository(repositoryToAdd);
+      setIsStarred(true);
       
       if (onStar) {
         onStar(repo);
       }
       
       await forceSyncToBackend();
-      
-      // 操作成功，清除乐观状态
-      setOptimisticStarred(null);
-      
-      alert(t('已成功添加 Star', 'Successfully starred'));
     } catch (error) {
-      // 操作失败，回滚乐观状态
-      setOptimisticStarred(null);
       console.error('Failed to star repository:', error);
-      const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
-      alert(errorMessage);
+      alert(t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.'));
     } finally {
       setIsStarring(false);
     }
-  }, [githubToken, isStarring, repo, onStar, t, isStarred, addRepository, executeUnstar]);
+  }, [githubToken, isStarring, repo, onStar, t]);
 
   // 处理在ZRead打开
   const handleOpenInZRead = useCallback((e: React.MouseEvent) => {
@@ -261,10 +175,6 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <div 
       onClick={handleCardClick}
       className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow duration-200 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer"
-      style={{ userSelect: 'none' }}
-      onCopy={(e) => e.preventDefault()}
-      onCut={(e) => e.preventDefault()}
-      onSelect={(e) => e.preventDefault()}
     >
       <div className="flex items-start gap-4">
         {/* Rank badge */}
@@ -340,20 +250,20 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {/* Star button */}
               <button
                 onClick={handleStar}
-                disabled={!githubToken || isStarring}
+                disabled={!githubToken || isStarring || isStarred}
                 className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
-                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800'
+                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400'
                     : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
                 }`}
-                title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
+                title={isStarred ? t('已Star', 'Starred') : t('添加Star', 'Add Star')}
               >
                 {isStarring ? (
                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : isStarred ? (
-                  <Star className="w-4 h-4" fill="currentColor" />
+                  <BookmarkCheck className="w-4 h-4" />
                 ) : (
-                  <Star className="w-4 h-4" />
+                  <Bookmark className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -429,50 +339,6 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         </div>
       </div>
     </div>
-
-    {/* Unstar Confirm Modal */}
-    <Modal
-      isOpen={unstarConfirmOpen}
-      onClose={() => {
-        setUnstarConfirmOpen(false);
-        setPendingUnstarAction(null);
-      }}
-      title={t('确认取消 Star', 'Confirm Unstar')}
-      maxWidth="max-w-sm"
-    >
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {language === 'zh' 
-              ? `确定要取消 Star "${repo.full_name}" 吗？这将会从您的 GitHub 收藏中移除该仓库。`
-              : `Are you sure you want to unstar "${repo.full_name}"? This will remove the repository from your GitHub stars.`}
-          </p>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={() => {
-              setUnstarConfirmOpen(false);
-              setPendingUnstarAction(null);
-            }}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            {t('取消', 'Cancel')}
-          </button>
-          <button
-            onClick={() => {
-              setUnstarConfirmOpen(false);
-              if (pendingUnstarAction) {
-                pendingUnstarAction();
-              }
-            }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
-          >
-            {t('确认取消', 'Confirm Unstar')}
-          </button>
-        </div>
-      </div>
-    </Modal>
 
     {/* README Modal */}
     <ReadmeModal

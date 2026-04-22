@@ -20,7 +20,6 @@ import {
   Eye,
   HardDrive,
   RefreshCw,
-  Rss,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
@@ -77,25 +76,12 @@ interface ExportData {
     customCategories?: Category[];
     assetFilters?: AssetFilter[];
     discoveryRepos?: Record<string, DiscoveryRepo[]>;
-    discoveryTotalCount?: Record<string, number>;
-    discoveryHasMore?: Record<string, boolean>;
-    discoveryNextPage?: Record<string, number>;
-    subscriptionRepos?: Record<string, DiscoveryRepo[]>;
-    subscriptionLastRefresh?: Record<string, string | null>;
-    subscriptionChannels?: Array<{ id: string; name: string; nameEn: string }>;
     releaseSubscriptions?: number[];
     readReleases?: number[];
     searchFilters?: SearchFilters;
     hiddenDefaultCategoryIds?: string[];
     defaultCategoryOverrides?: Record<string, Partial<Category>>;
     categoryOrder?: string[];
-    theme?: 'light' | 'dark' | 'system';
-    language?: 'zh' | 'en';
-    isSidebarCollapsed?: boolean;
-    releaseViewMode?: 'timeline' | 'list';
-    releaseSelectedFilters?: string[];
-    releaseSearchQuery?: string;
-    releaseExpandedRepositories?: number[];
   };
 }
 
@@ -123,7 +109,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     hiddenDefaultCategoryIds,
     assetFilters,
     discoveryRepos,
-    subscriptionRepos,
     releaseSubscriptions,
     readReleases,
     searchFilters,
@@ -441,14 +426,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
       if (selectedTypes.includes('discoveryRepos')) {
         exportDataObj.data.discoveryRepos = store.discoveryRepos;
-        exportDataObj.data.discoveryTotalCount = store.discoveryTotalCount;
-        exportDataObj.data.discoveryHasMore = store.discoveryHasMore;
-        exportDataObj.data.discoveryNextPage = store.discoveryNextPage;
-      }
-      if (selectedTypes.includes('subscriptionRepos')) {
-        exportDataObj.data.subscriptionRepos = store.subscriptionRepos;
-        exportDataObj.data.subscriptionLastRefresh = store.subscriptionLastRefresh;
-        exportDataObj.data.subscriptionChannels = store.subscriptionChannels;
       }
       if (selectedTypes.includes('releaseSubscriptions')) {
         exportDataObj.data.releaseSubscriptions = Array.from(store.releaseSubscriptions);
@@ -456,15 +433,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
       if (selectedTypes.includes('searchFilters')) {
         exportDataObj.data.searchFilters = store.searchFilters;
-      }
-      if (selectedTypes.includes('uiSettings')) {
-        exportDataObj.data.theme = store.theme;
-        exportDataObj.data.language = store.language;
-        exportDataObj.data.isSidebarCollapsed = store.isSidebarCollapsed;
-        exportDataObj.data.releaseViewMode = store.releaseViewMode;
-        exportDataObj.data.releaseSelectedFilters = store.releaseSelectedFilters;
-        exportDataObj.data.releaseSearchQuery = store.releaseSearchQuery;
-        exportDataObj.data.releaseExpandedRepositories = Array.from(store.releaseExpandedRepositories);
       }
 
       const blob = new Blob([JSON.stringify(exportDataObj, null, 2)], { type: 'application/json' });
@@ -549,31 +517,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
           store.setAssetFilters(importedData.assetFilters);
         }
-        if (selectedTypes.includes('discoveryRepos')) {
-          if (importedData.discoveryRepos) {
-            useAppStore.setState({ discoveryRepos: importedData.discoveryRepos });
-          }
-          if (importedData.discoveryTotalCount) {
-            useAppStore.setState({ discoveryTotalCount: importedData.discoveryTotalCount });
-          }
-          if (importedData.discoveryHasMore) {
-            useAppStore.setState({ discoveryHasMore: importedData.discoveryHasMore });
-          }
-          if (importedData.discoveryNextPage) {
-            useAppStore.setState({ discoveryNextPage: importedData.discoveryNextPage });
-          }
-        }
-        if (selectedTypes.includes('subscriptionRepos')) {
-          if (importedData.subscriptionRepos) {
-            useAppStore.setState({ subscriptionRepos: importedData.subscriptionRepos });
-          }
-          if (importedData.subscriptionLastRefresh) {
-            useAppStore.setState({ subscriptionLastRefresh: importedData.subscriptionLastRefresh });
-          }
-          if (importedData.subscriptionChannels) {
-            useAppStore.setState({ subscriptionChannels: importedData.subscriptionChannels });
-          }
-        }
         if (selectedTypes.includes('releaseSubscriptions')) {
           if (importedData.releaseSubscriptions) {
             useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions) });
@@ -584,29 +527,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
           useAppStore.setState({ searchFilters: importedData.searchFilters });
-        }
-        if (selectedTypes.includes('uiSettings')) {
-          if (importedData.theme) {
-            useAppStore.setState({ theme: importedData.theme });
-          }
-          if (importedData.language) {
-            useAppStore.setState({ language: importedData.language });
-          }
-          if (typeof importedData.isSidebarCollapsed === 'boolean') {
-            useAppStore.setState({ isSidebarCollapsed: importedData.isSidebarCollapsed });
-          }
-          if (importedData.releaseViewMode) {
-            useAppStore.setState({ releaseViewMode: importedData.releaseViewMode });
-          }
-          if (importedData.releaseSelectedFilters) {
-            useAppStore.setState({ releaseSelectedFilters: importedData.releaseSelectedFilters });
-          }
-          if (importedData.releaseSearchQuery !== undefined) {
-            useAppStore.setState({ releaseSearchQuery: importedData.releaseSearchQuery });
-          }
-          if (importedData.releaseExpandedRepositories) {
-            useAppStore.setState({ releaseExpandedRepositories: new Set(importedData.releaseExpandedRepositories) });
-          }
         }
       } else {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
@@ -981,10 +901,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     return Object.values(discoveryRepos || {}).flat().length;
   }, [discoveryRepos]);
 
-  const totalSubscriptionReposCount = useMemo(() => {
-    return Object.values(subscriptionRepos || {}).flat().length;
-  }, [subscriptionRepos]);
-
   const dataStats = [
     {
       key: 'repositories',
@@ -1041,14 +957,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       icon: <Sparkles className="w-5 h-5" />,
       color: 'text-pink-600 dark:text-pink-400',
       bgColor: 'bg-pink-50 dark:bg-pink-900/20',
-    },
-    {
-      key: 'subscriptionData',
-      label: t('订阅页数据', 'Subscription Data'),
-      count: totalSubscriptionReposCount,
-      icon: <Rss className="w-5 h-5" />,
-      color: 'text-amber-600 dark:text-amber-400',
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
       key: 'releaseSubscriptions',
@@ -1142,11 +1050,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
                 { key: 'customCategories', label: t('分类设置', 'Categories') },
                 { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
-                { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
-                { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
-                { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
-                { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
-                { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
               ].map((item) => (
                 <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                   <input
