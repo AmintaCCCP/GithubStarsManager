@@ -4,6 +4,7 @@ import {
   TrendingUp, 
   Bot, 
   Loader2, 
+  Star, 
   Rocket, 
   Tag, 
   Search,
@@ -44,34 +45,6 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
   star: <Crown className="w-4 h-4" />,
   tag: <Tag className="w-4 h-4" />,
   search: <Search className="w-4 h-4" />,
-};
-
-const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
-  trending: {
-    gradient: 'from-blue-500 to-indigo-600',
-    shadow: 'shadow-blue-500/25',
-    largeIcon: <TrendingUp className="w-9 h-9 text-white" />,
-  },
-  rocket: {
-    gradient: 'from-orange-500 to-red-600',
-    shadow: 'shadow-orange-500/25',
-    largeIcon: <Rocket className="w-9 h-9 text-white" />,
-  },
-  star: {
-    gradient: 'from-amber-400 to-yellow-600',
-    shadow: 'shadow-amber-500/25',
-    largeIcon: <Crown className="w-9 h-9 text-white" />,
-  },
-  tag: {
-    gradient: 'from-emerald-500 to-teal-600',
-    shadow: 'shadow-emerald-500/25',
-    largeIcon: <Tag className="w-9 h-9 text-white" />,
-  },
-  search: {
-    gradient: 'from-violet-500 to-purple-600',
-    shadow: 'shadow-violet-500/25',
-    largeIcon: <Search className="w-9 h-9 text-white" />,
-  },
 };
 
 interface MobileTabNavProps {
@@ -636,9 +609,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
   const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
   const currentNextPage = discoveryNextPage?.[selectedDiscoveryChannel] ?? 1;
-  const currentChannelIcon = discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending';
-  const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
-  const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
   // 切换频道时重置页码并恢复滚动位置
   useEffect(() => {
@@ -935,7 +905,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       .filter(ch => ch.enabled)
       .map(ch => ({
         ...ch,
-        icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
+        icon: discoveryChannelIconMap[ch.icon] || <Star className="w-4 h-4" />,
       }));
   }, [discoveryChannels]);
 
@@ -988,11 +958,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
               {/* 第一行：标题和刷新按钮 */}
               <div className="flex items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                    {currentChannelIconNode}
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+                    <TrendingUp className="w-5 h-5 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">
+                    <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight flex items-center gap-2">
+                      {discoveryChannelIconMap[discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending']}
                       {language === 'zh'
                         ? discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.name
                         : discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
@@ -1213,8 +1184,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {!currentIsLoading && allRepos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
-                <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                  {currentChannelStyle.largeIcon}
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm">
+                  <TrendingUp className="w-9 h-9 text-gray-300 dark:text-gray-600" />
                 </div>
                 <div className="space-y-2 max-w-xs">
                   <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
