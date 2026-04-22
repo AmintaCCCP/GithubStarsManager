@@ -1,15 +1,57 @@
-import React, { useMemo } from 'react';
-import { Star, ExternalLink, Bot, GitFork } from 'lucide-react';
-import type { SubscriptionRepo } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Star, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
+import type { DiscoveryRepo } from '../types';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
+import { forceSyncToBackend } from '../services/autoSync';
+import { GitHubApiService } from '../services/githubApi';
+import { ReadmeModal } from './ReadmeModal';
+import { Modal } from './Modal';
 
 interface SubscriptionRepoCardProps {
-  repo: SubscriptionRepo;
+  repo: DiscoveryRepo;
+  onStar?: (repo: DiscoveryRepo) => void;
+  onAnalyze?: (repo: DiscoveryRepo) => void;
+  desktopSafeMode?: boolean;
 }
 
-export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo }) => {
+export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo, onStar, onAnalyze, desktopSafeMode = false }) => {
   const language = useAppStore(state => state.language);
+  const githubToken = useAppStore(state => state.githubToken);
+  const aiConfigs = useAppStore(state => state.aiConfigs);
+  const activeAIConfig = useAppStore(state => state.activeAIConfig);
+  const customCategories = useAppStore(state => state.customCategories);
+  const updateDiscoveryRepo = useAppStore(state => state.updateDiscoveryRepo);
+  const repositories = useAppStore(state => state.repositories);
+  const addRepository = useAppStore(state => state.addRepository);
+  const deleteRepository = useAppStore(state => state.deleteRepository);
+  
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const [isStarring, setIsStarring] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [readmeModalOpen, setReadmeModalOpen] = useState(false);
+  // 本地乐观状态，用于立即反映Star操作结果
+  const [optimisticStarred, setOptimisticStarred] = useState<boolean | null>(null);
+  // 取消Star确认对话框状态
+  const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
+  const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+  
+  // 检查仓库是否已在本地存在（已被Star）
+  const isStarredComputed = useMemo(() => {
+    return repositories.some(r => r.full_name === repo.full_name);
+  }, [repositories, repo.full_name]);
+  
+  // 优先使用乐观状态，否则使用计算状态
+  const isStarred = optimisticStarred !== null ? optimisticStarred : isStarredComputed;
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -37,16 +79,219 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   }, [repo.rank]);
 
   const platformIconMap = useMemo(() => ({
-    mac: '🍎', macos: '🍎', ios: '🍎', windows: '🪟', win: '🪟',
-    linux: '🐧', android: '📱', web: '🌐', cli: '⌨️', docker: '🐳',
+    mac: <Monitor className="w-3 h-3" />, 
+    macos: <Monitor className="w-3 h-3" />, 
+    ios: <Smartphone className="w-3 h-3" />, 
+    windows: <Monitor className="w-3 h-3" />, 
+    win: <Monitor className="w-3 h-3" />,
+    linux: <Monitor className="w-3 h-3" />, 
+    android: <Smartphone className="w-3 h-3" />, 
+    web: <Globe className="w-3 h-3" />, 
+    cli: <Terminal className="w-3 h-3" />, 
+    docker: <Package className="w-3 h-3" />,
   }), []);
 
-  const getPlatformEmoji = (platform: string) => {
-    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || '💻';
+  const getPlatformIcon = (platform: string) => {
+    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
   };
 
+  // 执行取消Star操作
+  const executeUnstar = useCallback(async () => {
+    if (!githubToken) return;
+    
+    setIsStarring(true);
+    
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const [owner, name] = repo.full_name.split('/');
+      
+      // 乐观更新：立即更新UI状态
+      setOptimisticStarred(false);
+      
+      await githubApi.unstarRepository(owner, name);
+      
+      // 从本地删除
+      const existingRepo = repositories.find(r => r.full_name === repo.full_name);
+      if (existingRepo) {
+        deleteRepository(existingRepo.id);
+      }
+      
+      await forceSyncToBackend();
+      
+      // 操作成功，清除乐观状态
+      setOptimisticStarred(null);
+    } catch (error) {
+      // 操作失败，回滚乐观状态
+      setOptimisticStarred(null);
+      console.error('Failed to unstar repository:', error);
+      const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
+      alert(errorMessage);
+    } finally {
+      setIsStarring(false);
+      setPendingUnstarAction(null);
+    }
+  }, [githubToken, repo, repositories, deleteRepository, t]);
+
+  // 处理添加/取消Star
+  const handleStar = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!githubToken || isStarring) return;
+
+    if (isStarred) {
+      // 取消Star - 显示自定义确认对话框
+      setPendingUnstarAction(() => executeUnstar);
+      setUnstarConfirmOpen(true);
+      return;
+    }
+    
+    // 添加Star
+    setIsStarring(true);
+    
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const [owner, name] = repo.full_name.split('/');
+      
+      // 乐观更新：立即更新UI状态
+      setOptimisticStarred(true);
+      
+      await githubApi.starRepository(owner, name);
+      
+      // 将DiscoveryRepo转换为Repository并添加到本地，保留AI分析结果
+      const repositoryToAdd = {
+        ...repo,
+        // 移除Discovery/Subscription特有的字段
+        rank: undefined,
+        channel: undefined,
+        platform: undefined,
+        // 添加Star时间
+        starred_at: new Date().toISOString(),
+      };
+      
+      addRepository(repositoryToAdd);
+      
+      if (onStar) {
+        onStar(repo);
+      }
+      
+      await forceSyncToBackend();
+      
+      // 操作成功，清除乐观状态
+      setOptimisticStarred(null);
+      
+      alert(t('已成功添加 Star', 'Successfully starred'));
+    } catch (error) {
+      // 操作失败，回滚乐观状态
+      setOptimisticStarred(null);
+      console.error('Failed to star repository:', error);
+      const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
+      alert(errorMessage);
+    } finally {
+      setIsStarring(false);
+    }
+  }, [githubToken, isStarring, repo, onStar, t, isStarred, addRepository, executeUnstar]);
+
+  // 处理在ZRead打开
+  const handleOpenInZRead = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const zreadUrl = `https://zread.ai/${repo.full_name}`;
+    window.open(zreadUrl, '_blank');
+  }, [repo.full_name]);
+
+  // 处理单个项目AI分析
+  const handleAnalyze = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!githubToken) {
+      alert(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'));
+      return;
+    }
+
+    const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
+    if (!activeConfig) {
+      alert(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'));
+      return;
+    }
+
+    if (isAnalyzing) return;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setIsAnalyzing(true);
+
+    try {
+      const allCategories = getAllCategories(customCategories, language);
+
+      const result = await analyzeRepository({
+        repository: repo,
+        githubToken,
+        aiConfig: activeConfig,
+        language,
+        categories: allCategories,
+        signal: controller.signal,
+      });
+
+      if (controller.signal.aborted) return;
+
+      const updatedRepo: DiscoveryRepo = {
+        ...repo,
+        ai_summary: result.summary,
+        ai_tags: result.tags,
+        ai_platforms: result.platforms,
+        analyzed_at: result.analyzed_at,
+        analysis_failed: result.analysis_failed,
+      };
+      updateDiscoveryRepo(updatedRepo);
+      
+      if (onAnalyze) {
+        onAnalyze(updatedRepo);
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error('AI analysis error:', error);
+        const failedResult = createFailedAnalysisResult();
+        const failedRepo: DiscoveryRepo = {
+          ...repo,
+          analyzed_at: failedResult.analyzed_at,
+          analysis_failed: failedResult.analysis_failed,
+        };
+        updateDiscoveryRepo(failedRepo);
+        alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsAnalyzing(false);
+      }
+    }
+  }, [githubToken, aiConfigs, activeAIConfig, language, repo, isAnalyzing, customCategories, updateDiscoveryRepo, onAnalyze, t]);
+
+  // 判断是否已分析
+  const isAnalyzed = !!repo.analyzed_at && !repo.analysis_failed;
+  const isFailed = !!repo.analysis_failed;
+
+  // 点击卡片打开 README
+  const handleCardClick = useCallback(() => {
+    if (desktopSafeMode) return;
+    setReadmeModalOpen(true);
+  }, [desktopSafeMode]);
+
+  const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow duration-200 hover:border-blue-300 dark:hover:border-blue-600">
+    <>
+    <div 
+      onClick={handleCardClick}
+      className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5 transition-shadow duration-200 ${
+        desktopSafeMode
+          ? 'rounded-lg'
+          : 'rounded-xl hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer'
+      }`}
+      style={{ userSelect: 'none' }}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onSelect={(e) => e.preventDefault()}
+    >
       <div className="flex items-start gap-4">
         {/* Rank badge */}
         <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${rankBadgeClass}`}>
@@ -58,39 +303,99 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="flex items-center gap-2 min-w-0">
-              <img
-                src={repo.owner.avatar_url}
-                alt={repo.owner.login}
-                className="w-6 h-6 rounded-full flex-shrink-0"
-              />
+              {!desktopSafeMode && repo.owner?.avatar_url && (
+                <img
+                  src={repo.owner.avatar_url}
+                  alt={repo.owner.login}
+                  className="w-6 h-6 rounded-full flex-shrink-0"
+                />
+              )}
+              <span className="font-semibold text-gray-900 dark:text-white truncate">
+                {cardTitle}
+              </span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* AI Analyze button */}
+              <button
+                onClick={handleAnalyze}
+                disabled={!githubToken || isAnalyzing}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isAnalyzed
+                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
+                    : isFailed
+                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
+                    : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+                }`}
+                title={
+                  isAnalyzed 
+                    ? t('重新分析', 'Re-analyze') 
+                    : isFailed 
+                    ? t('重新分析', 'Re-analyze')
+                    : t('AI分析', 'AI Analyze')
+                }
+              >
+                {isAnalyzing ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : isAnalyzed ? (
+                  <Sparkles className="w-4 h-4" />
+                ) : (
+                  <Bot className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* ZRead button */}
+              <button
+                onClick={handleOpenInZRead}
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                title={t('在ZRead打开', 'Open in ZRead')}
+              >
+                <BookOpen className="w-4 h-4" />
+              </button>
+
+              {/* GitHub button */}
               <a
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title={t('在GitHub打开', 'Open on GitHub')}
               >
-                {repo.full_name}
+                <ExternalLink className="w-4 h-4" />
               </a>
-              <a
-                href={repo.html_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-shrink-0 text-gray-400 hover:text-blue-500"
+
+              {/* Star button */}
+              <button
+                onClick={handleStar}
+                disabled={!githubToken || isStarring}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isStarred
+                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800'
+                    : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
+                }`}
+                title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+                {isStarring ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : isStarred ? (
+                  <Star className="w-4 h-4" fill="currentColor" />
+                ) : (
+                  <Star className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 
           {/* Description */}
-          {repo.description && (
+          {!desktopSafeMode && repo.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
               {repo.description}
             </p>
           )}
 
           {/* AI Summary */}
-          {repo.ai_summary && (
+          {!desktopSafeMode && repo.ai_summary && (
             <div className="flex items-start gap-1.5 mb-3">
               <Bot className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-purple-600 dark:text-purple-400 line-clamp-2">
@@ -100,7 +405,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Tags */}
-          {((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0)) && (
+          {!desktopSafeMode && ((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0)) && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
@@ -114,16 +419,18 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Platform icons */}
-          {repo.ai_platforms && repo.ai_platforms.length > 0 && (
-            <div className="flex items-center gap-1 mb-3">
-              <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">
+          {!desktopSafeMode && repo.ai_platforms && repo.ai_platforms.length > 0 && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
                 {t('平台:', 'Platforms:')}
               </span>
-              {repo.ai_platforms.slice(0, 5).map((platform) => (
-                <span key={platform} className="text-sm" title={platform}>
-                  {getPlatformEmoji(platform)}
-                </span>
-              ))}
+              <div className="flex items-center gap-1">
+                {repo.ai_platforms.slice(0, 5).map((platform) => (
+                  <span key={platform} className="text-gray-500 dark:text-gray-400" title={platform}>
+                    {getPlatformIcon(platform)}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
@@ -150,5 +457,59 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         </div>
       </div>
     </div>
+
+    {/* Unstar Confirm Modal */}
+    <Modal
+      isOpen={unstarConfirmOpen}
+      onClose={() => {
+        setUnstarConfirmOpen(false);
+        setPendingUnstarAction(null);
+      }}
+      title={t('确认取消 Star', 'Confirm Unstar')}
+      maxWidth="max-w-sm"
+    >
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="w-8 h-8 flex-shrink-0" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {language === 'zh' 
+              ? `确定要取消 Star "${repo.full_name}" 吗？这将会从您的 GitHub 收藏中移除该仓库。`
+              : `Are you sure you want to unstar "${repo.full_name}"? This will remove the repository from your GitHub stars.`}
+          </p>
+        </div>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => {
+              setUnstarConfirmOpen(false);
+              setPendingUnstarAction(null);
+            }}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            {t('取消', 'Cancel')}
+          </button>
+          <button
+            onClick={() => {
+              setUnstarConfirmOpen(false);
+              if (pendingUnstarAction) {
+                pendingUnstarAction();
+              }
+            }}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            {t('确认取消', 'Confirm Unstar')}
+          </button>
+        </div>
+      </div>
+    </Modal>
+
+    {/* README Modal */}
+    {!desktopSafeMode && (
+      <ReadmeModal
+        isOpen={readmeModalOpen}
+        onClose={() => setReadmeModalOpen(false)}
+        repository={repo}
+      />
+    )}
+    </>
   );
 };

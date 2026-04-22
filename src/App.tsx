@@ -6,8 +6,9 @@ import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
-import { SubscriptionView } from './components/SubscriptionView';
+import { DiscoveryView } from './components/DiscoveryView';
 import { BackToTop } from './components/BackToTop';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
@@ -116,7 +117,11 @@ function App() {
       case 'releases':
         return <ReleasesView />;
       case 'subscription':
-        return <SubscriptionView />;
+        return (
+          <ErrorBoundary>
+            <DiscoveryView />
+          </ErrorBoundary>
+        );
       case 'settings':
         return <SettingsView />;
       default:

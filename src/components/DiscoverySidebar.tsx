@@ -1,19 +1,27 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
-import type { SubscriptionChannel, SubscriptionChannelId } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'lucide-react';
+import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 
-interface SubscriptionSidebarProps {
-  channels: SubscriptionChannel[];
-  selectedChannel: SubscriptionChannelId;
-  onChannelSelect: (channel: SubscriptionChannelId) => void;
+const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
+  trending: <TrendingUp className="w-4 h-4" />,
+  rocket: <Rocket className="w-4 h-4" />,
+  star: <Crown className="w-4 h-4" />,
+  tag: <Tag className="w-4 h-4" />,
+  search: <Search className="w-4 h-4" />,
+};
+
+interface DiscoverySidebarProps {
+  channels: DiscoveryChannel[];
+  selectedChannel: DiscoveryChannelId;
+  onChannelSelect: (channel: DiscoveryChannelId) => void;
   onRefreshAll: () => void;
-  isLoading: Record<SubscriptionChannelId, boolean>;
-  lastRefresh: Record<SubscriptionChannelId, string | null>;
+  isLoading: Record<DiscoveryChannelId, boolean>;
+  lastRefresh: Record<DiscoveryChannelId, string | null>;
   isAnalyzing: boolean;
+  language: 'zh' | 'en';
 }
 
-export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
+export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   channels,
   selectedChannel,
   onChannelSelect,
@@ -21,8 +29,8 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
   isLoading,
   lastRefresh,
   isAnalyzing,
+  language,
 }) => {
-  const language = useAppStore(state => state.language);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const formatLastRefresh = (timestamp: string | null | undefined) => {
@@ -38,9 +46,11 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
     return date.toLocaleDateString();
   };
 
-  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => 
-    ch.id === 'daily-dev' ? { ...ch, id: 'most-dev' as const, name: 'Most DEV', nameEn: 'Most DEV', icon: '👤' } : ch
-  );
+  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => ({
+    ...ch,
+    icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
+  }));
+  
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 
   return (
@@ -48,7 +58,7 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('订阅频道', 'Channels')}
+            {t('发现频道', 'Discovery Channels')}
           </h3>
           <button
             onClick={onRefreshAll}
@@ -63,8 +73,7 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
         <div className="space-y-1">
           {enabledChannels.map((channel) => {
             const isSelected = selectedChannel === channel.id;
-            const isLoadingNorm = isLoading && typeof isLoading === 'object' && isLoading['daily-dev'] !== undefined ? { ...isLoading, 'most-dev': isLoading['most-dev'] ?? isLoading['daily-dev'] } : isLoading;
-    const channelLoading = isLoadingNorm && typeof isLoadingNorm === 'object' ? !!(isLoadingNorm as Record<string, unknown>)[channel.id === 'daily-dev' ? 'most-dev' : channel.id] : false;
+            const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
 
             return (
               <button
@@ -76,31 +85,25 @@ export const SubscriptionSidebar: React.FC<SubscriptionSidebarProps> = ({
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
-                  <span className="text-base flex-shrink-0">{channel.icon}</span>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium truncate block">
-                      {language === 'zh' ? channel.name : channel.nameEn}
-                    </span>
-                    {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id === 'daily-dev' ? 'most-dev' : channel.id]) ? (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id === 'daily-dev' ? 'most-dev' : channel.id])}
-                      </span>
-                    ) : null}
-                  </div>
+                <div className="flex items-center gap-2">
+                  {channel.icon}
+                  <span className="font-medium text-sm">
+                    {language === 'zh' ? channel.name : channel.nameEn}
+                  </span>
                 </div>
-                {channelLoading && (
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                )}
+                <div className="flex items-center gap-2">
+                  {channelLoading && (
+                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                  )}
+                  {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id]) ? (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
+                    </span>
+                  ) : null}
+                </div>
               </button>
             );
           })}
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            {t('点击刷新获取最新排行数据', 'Click refresh to fetch latest ranking data')}
-          </p>
         </div>
       </div>
     </div>

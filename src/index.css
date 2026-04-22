@@ -153,3 +153,477 @@
 .dark .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
   background: rgba(75, 85, 99, 0.8);
 }
+
+/* ========== Markdown Code Block Enhancement ========== */
+
+/* highlight.js 主题作用域隔离 */
+/* 亮色主题（github.css）后导入，默认生效 */
+/* 暗色主题（github-dark.css）先导入，在 .dark 下通过覆盖恢复 */
+
+.dark .hljs {
+  color: #c9d1d9;
+  background: transparent !important;
+}
+
+.dark .hljs-doctag,
+.dark .hljs-keyword,
+.dark .hljs-meta .hljs-keyword,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+.dark .hljs-title,
+.dark .hljs-title.class_,
+.dark .hljs-title.class_.inherited__,
+.dark .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+.dark .hljs-attr,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-meta,
+.dark .hljs-number,
+.dark .hljs-operator,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-class,
+.dark .hljs-selector-id,
+.dark .hljs-variable {
+  color: #79c0ff;
+}
+
+.dark .hljs-meta .hljs-string,
+.dark .hljs-regexp,
+.dark .hljs-string {
+  color: #a5d6ff;
+}
+
+.dark .hljs-built_in,
+.dark .hljs-symbol {
+  color: #ffa657;
+}
+
+.dark .hljs-code,
+.dark .hljs-comment,
+.dark .hljs-formula {
+  color: #8b949e;
+}
+
+.dark .hljs-name,
+.dark .hljs-quote,
+.dark .hljs-selector-pseudo,
+.dark .hljs-selector-tag {
+  color: #7ee787;
+}
+
+.dark .hljs-subst {
+  color: #c9d1d9;
+}
+
+.dark .hljs-section {
+  color: #1f6feb;
+  font-weight: 700;
+}
+
+.dark .hljs-bullet {
+  color: #f2cc60;
+}
+
+.dark .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.dark .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+/* 基础代码块容器 */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* 浅色模式 - 灰色背景 */
+.prose pre code {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  tab-size: 2;
+  -moz-tab-size: 2;
+}
+
+/* 浅色模式代码高亮颜色 */
+.prose :not(pre) > code {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-weight: 500;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+}
+
+.dark .prose :not(pre) > code {
+  background-color: #374151;
+  color: #f9fafb;
+  border-color: #4b5563;
+}
+
+/* ========== Terminal / Shell Code Block Enhancement ========== */
+
+/* 终端代码块容器 */
+.prose pre:has(code.language-bash),
+.prose pre:has(code.language-sh),
+.prose pre:has(code.language-shell),
+.prose pre:has(code.language-zsh),
+.prose pre:has(code.language-cmd),
+.prose pre:has(code.language-bat),
+.prose pre:has(code.language-powershell),
+.prose pre:has(code.language-ps1) {
+  position: relative;
+}
+
+/* Shell/Bash 特殊样式 - Unix 风格 */
+.language-bash,
+.language-sh,
+.language-shell,
+.language-zsh {
+  position: relative;
+}
+
+/* Bash 提示符 - 每行前面添加 $ 符号 */
+.language-bash::before,
+.language-sh::before,
+.language-shell::before,
+.language-zsh::before {
+  content: '$';
+  color: #16a34a;
+  margin-right: 0.6em;
+  font-weight: 700;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  user-select: none;
+  opacity: 0.85;
+}
+
+.dark .language-bash::before,
+.dark .language-sh::before,
+.dark .language-shell::before,
+.dark .language-zsh::before {
+  color: #4ade80;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
+}
+
+/* PowerShell 特殊样式 */
+.language-powershell::before,
+.language-ps1::before {
+  content: 'PS>';
+  color: #2563eb;
+  margin-right: 0.5em;
+  font-weight: 700;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  user-select: none;
+  opacity: 0.85;
+}
+
+.dark .language-powershell::before,
+.dark .language-ps1::before {
+  color: #60a5fa;
+  text-shadow: 0 0 8px rgba(96, 165, 250, 0.3);
+}
+
+/* CMD 特殊样式 - Windows 命令提示符风格 */
+.language-cmd::before,
+.language-bat::before {
+  content: '>';
+  color: #0891b2;
+  margin-right: 0.6em;
+  font-weight: 700;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  user-select: none;
+  opacity: 0.85;
+}
+
+.dark .language-cmd::before,
+.dark .language-bat::before {
+  color: #22d3ee;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+}
+
+/* ========== 终端代码高亮颜色增强 ========== */
+
+/* 关键字 - 紫色系 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
+  color: #8b5cf6 !important;
+  font-weight: 600;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-section,
+.dark .hljs-link {
+  color: #c084fc !important;
+}
+
+/* 字符串 - 绿色系 */
+.hljs-string {
+  color: #059669 !important;
+}
+
+.dark .hljs-string {
+  color: #4ade80 !important;
+}
+
+/* 注释 - 灰色斜体 */
+.hljs-comment {
+  color: #6b7280 !important;
+  font-style: italic;
+}
+
+.dark .hljs-comment {
+  color: #6b7280 !important;
+}
+
+/* 数字 - 橙色/金色 */
+.hljs-number {
+  color: #d97706 !important;
+}
+
+.dark .hljs-number {
+  color: #fbbf24 !important;
+}
+
+/* 函数名 - 蓝色系 */
+.hljs-title.function_,
+.hljs-title.class_ {
+  color: #2563eb !important;
+  font-weight: 600;
+}
+
+.dark .hljs-title.function_,
+.dark .hljs-title.class_ {
+  color: #60a5fa !important;
+}
+
+/* 变量 - 红色系 */
+.hljs-variable,
+.hljs-template-variable {
+  color: #dc2626 !important;
+}
+
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #f87171 !important;
+}
+
+/* 内建函数/命令 (Shell 命令高亮) - 青色系 */
+.hljs-built_in,
+.hljs-type {
+  color: #0891b2 !important;
+  font-weight: 600;
+}
+
+.dark .hljs-built_in,
+.dark .hljs-type {
+  color: #22d3ee !important;
+}
+
+/* 属性名/参数名 - 紫色系 */
+.hljs-attr {
+  color: #7c3aed !important;
+}
+
+.dark .hljs-attr {
+  color: #a78bfa !important;
+}
+
+/* 正则表达式 - 橙红色 */
+.hljs-regexp {
+  color: #ea580c !important;
+}
+
+.dark .hljs-regexp {
+  color: #fb923c !important;
+}
+
+/* 符号/标点 - 中性灰 */
+.hljs-symbol,
+.hljs-bullet {
+  color: #64748b !important;
+}
+
+.dark .hljs-symbol,
+.dark .hljs-bullet {
+  color: #94a3b8 !important;
+}
+
+/* 元数据/标签 - 靛蓝色 */
+.hljs-meta {
+  color: #6366f1 !important;
+}
+
+.dark .hljs-meta {
+  color: #818cf8 !important;
+}
+
+/* 删除线 */
+.hljs-deletion {
+  background-color: #fecaca !important;
+  color: #991b1b !important;
+}
+
+.dark .hljs-deletion {
+  background-color: #7f1d1d !important;
+  color: #fecaca !important;
+}
+
+/* 新增标记 */
+.hljs-addition {
+  background-color: #bbf7d0 !important;
+  color: #166534 !important;
+}
+
+.dark .hljs-addition {
+  background-color: #14532d !important;
+  color: #86efac !important;
+}
+
+/* 强调文本 */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* ========== 终端专用视觉效果增强 ========== */
+
+/* 终端代码块 - 等宽字体优化 */
+.prose pre code[class*="language-"] {
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Shell 终端代码块特殊背景 */
+.prose pre:has(code.language-bash),
+.prose pre:has(code.language-sh),
+.prose pre:has(code.language-shell),
+.prose pre:has(code.language-zsh) {
+  background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%) !important;
+}
+
+.dark .prose pre:has(code.language-bash),
+.dark .prose pre:has(code.language-sh),
+.dark .prose pre:has(code.language-shell),
+.dark .prose pre:has(code.language-zsh) {
+  background: linear-gradient(135deg, #0d1117 0%, #161b22 100%) !important;
+}
+
+/* CMD 终端代码块特殊背景 */
+.prose pre:has(code.language-cmd),
+.prose pre:has(code.language-bat) {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+}
+
+.dark .prose pre:has(code.language-cmd),
+.dark .prose pre:has(code.language-bat) {
+  background: linear-gradient(135deg, #0c1222 0%, #1a2332 100%) !important;
+}
+
+/* PowerShell 终端代码块特殊背景 */
+.prose pre:has(code.language-powershell),
+.prose pre:has(code.language-ps1) {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+}
+
+.dark .prose pre:has(code.language-powershell),
+.dark .prose pre:has(code.language-ps1) {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+}
+
+/* 终端行高调整 */
+.prose pre:has(code[class*="language-bash"]) code,
+.prose pre:has(code[class*="language-cmd"]) code,
+.prose pre:has(code[class*="language-powershell"]) code {
+  line-height: 1.6;
+}
+
+/* 代码块滚动条美化 */
+.prose pre::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.prose pre::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.dark .prose pre::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.prose pre::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.dark .prose pre::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.prose pre::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark .prose pre::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* 行号悬停效果 */
+.prose pre div[class*="border-r"] > div:hover {
+  background-color: rgba(156, 163, 175, 0.1);
+  border-radius: 2px;
+}
+
+.dark .prose pre div[class*="border-r"] > div:hover {
+  background-color: rgba(75, 85, 99, 0.3);
+}
+
+/* ========== Image Display Enhancement ========== */
+
+/* 小图片（徽章）悬停效果 */
+.prose p > span > span > img:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+/* 大图片容器 */
+.prose p > div.group\/img {
+  position: relative;
+}
+
+/* 大图片圆角阴影 */
+.prose p > div > div > img {
+  border-radius: 0.75rem;
+}
+
+/* 响应式：小屏幕时图片自适应 */
+@media (max-width: 640px) {
+  .prose p > span > span > img {
+    max-width: 100%;
+    height: auto;
+  }
+}
