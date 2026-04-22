@@ -1421,6 +1421,93 @@ const store = create<AppState & AppActions>()(
           }
         }
 
+        // 迁移 discovery 相关状态：确保所有频道键存在
+        if (state) {
+          const discoveryChannels = ['trending', 'topic', 'search', 'rss-trending'] as const;
+          const defaultDiscoveryRepos = { 'trending': [], 'topic': [], 'search': [], 'rss-trending': [] };
+          const defaultDiscoveryLastRefresh = { 'trending': null, 'topic': null, 'search': null, 'rss-trending': null };
+          const defaultDiscoveryIsLoading = { 'trending': false, 'topic': false, 'search': false, 'rss-trending': false };
+          const defaultDiscoveryHasMore = { 'trending': false, 'topic': false, 'search': false, 'rss-trending': false };
+          const defaultDiscoveryTotalCount = { 'trending': 0, 'topic': 0, 'search': 0, 'rss-trending': 0 };
+          const defaultDiscoveryCurrentPage = { 'trending': 1, 'topic': 1, 'search': 1, 'rss-trending': 1 };
+
+          if (!state.discoveryRepos || typeof state.discoveryRepos !== 'object') {
+            console.log('Migrating: initializing discoveryRepos');
+            state.discoveryRepos = defaultDiscoveryRepos;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryRepos as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryRepos`);
+                (state.discoveryRepos as Record<string, unknown>)[ch] = [];
+              }
+            }
+          }
+
+          if (!state.discoveryLastRefresh || typeof state.discoveryLastRefresh !== 'object') {
+            console.log('Migrating: initializing discoveryLastRefresh');
+            state.discoveryLastRefresh = defaultDiscoveryLastRefresh;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryLastRefresh as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryLastRefresh`);
+                (state.discoveryLastRefresh as Record<string, unknown>)[ch] = null;
+              }
+            }
+          }
+
+          if (!state.discoveryIsLoading || typeof state.discoveryIsLoading !== 'object') {
+            console.log('Migrating: initializing discoveryIsLoading');
+            state.discoveryIsLoading = defaultDiscoveryIsLoading;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryIsLoading as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryIsLoading`);
+                (state.discoveryIsLoading as Record<string, unknown>)[ch] = false;
+              }
+            }
+          }
+
+          if (!state.discoveryHasMore || typeof state.discoveryHasMore !== 'object') {
+            console.log('Migrating: initializing discoveryHasMore');
+            state.discoveryHasMore = defaultDiscoveryHasMore;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryHasMore as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryHasMore`);
+                (state.discoveryHasMore as Record<string, unknown>)[ch] = false;
+              }
+            }
+          }
+
+          if (!state.discoveryTotalCount || typeof state.discoveryTotalCount !== 'object') {
+            console.log('Migrating: initializing discoveryTotalCount');
+            state.discoveryTotalCount = defaultDiscoveryTotalCount;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryTotalCount as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryTotalCount`);
+                (state.discoveryTotalCount as Record<string, unknown>)[ch] = 0;
+              }
+            }
+          }
+
+          if (!state.discoveryCurrentPage || typeof state.discoveryCurrentPage !== 'object') {
+            console.log('Migrating: initializing discoveryCurrentPage');
+            state.discoveryCurrentPage = defaultDiscoveryCurrentPage;
+          } else {
+            for (const ch of discoveryChannels) {
+              if (!(ch in (state.discoveryCurrentPage as Record<string, unknown>))) {
+                console.log(`Migrating: adding missing key ${ch} to discoveryCurrentPage`);
+                (state.discoveryCurrentPage as Record<string, unknown>)[ch] = 1;
+              }
+            }
+          }
+
+          if (!state.selectedDiscoveryChannel) {
+            state.selectedDiscoveryChannel = 'trending';
+          }
+        }
+
         return state as PersistedAppState;
       },
       merge: (persistedState, currentState) => {
