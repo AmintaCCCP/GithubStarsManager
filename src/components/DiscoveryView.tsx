@@ -604,6 +604,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const safeDiscoveryChannels = useMemo(
+    () => Array.isArray(discoveryChannels) ? discoveryChannels.filter(Boolean) : [],
+    [discoveryChannels]
+  );
 
   const ITEMS_PER_PAGE = 20;
 
@@ -637,7 +641,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
   const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
   const currentNextPage = discoveryNextPage?.[selectedDiscoveryChannel] ?? 1;
-  const currentChannelIcon = discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.icon || 'trending';
+  const currentChannel = safeDiscoveryChannels.find(ch => ch.id === selectedDiscoveryChannel);
+  const currentChannelIcon = currentChannel?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
   const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
@@ -926,20 +931,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [allRepos.length, currentHasMore, currentIsLoading, currentNextPage, refreshChannel, selectedDiscoveryChannel]);
 
   const refreshAll = useCallback(async () => {
-    const enabledChannels = discoveryChannels.filter(ch => ch.enabled);
+    const enabledChannels = safeDiscoveryChannels.filter(ch => ch.enabled);
     for (const channel of enabledChannels) {
       await refreshChannel(channel.id, 1, false);
     }
-  }, [discoveryChannels, refreshChannel]);
+  }, [safeDiscoveryChannels, refreshChannel]);
 
   const mobileChannels = useMemo(() => {
-    return discoveryChannels
+    return safeDiscoveryChannels
       .filter(ch => ch.enabled)
       .map(ch => ({
         ...ch,
         icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4" />,
       }));
-  }, [discoveryChannels]);
+  }, [safeDiscoveryChannels]);
 
   return (
     <div className="h-full flex flex-col">
@@ -963,7 +968,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0">
         <div className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
           <DiscoverySidebar
-            channels={discoveryChannels}
+            channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
               // 保存当前频道的滚动位置到 ref 和 state
@@ -1000,8 +1005,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <div className="min-w-0">
                     <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">
                       {language === 'zh'
-                        ? discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.name
-                        : discoveryChannels.find(ch => ch.id === selectedDiscoveryChannel)?.nameEn}
+                        ? currentChannel?.name
+                        : currentChannel?.nameEn}
                     </h2>
                     {currentLastRefresh && (
                       <p className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block">

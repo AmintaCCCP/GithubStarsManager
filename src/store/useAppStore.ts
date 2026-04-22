@@ -232,6 +232,7 @@ const normalizePersistedState = (
   currentState: AppState & AppActions
 ): Partial<AppState & AppActions> => {
   const safePersisted = persisted ?? {};
+  const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
@@ -273,27 +274,71 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
+    discoveryChannels: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryChannels;
+      if (!Array.isArray(persisted)) return defaultDiscoveryChannels;
+
+      return defaultDiscoveryChannels.map((defaultChannel) => {
+        const persistedChannel = persisted.find((channel: unknown) => {
+          return (channel as Record<string, unknown>)?.id === defaultChannel.id;
+        }) as Record<string, unknown> | undefined;
+
+        if (!persistedChannel) {
+          return defaultChannel;
+        }
+
+        return {
+          ...defaultChannel,
+          ...(persistedChannel as Partial<typeof defaultChannel>),
+          enabled: persistedChannel.enabled !== false,
+        };
+      });
+    })(),
     discoveryRepos: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        return persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
+        return {
+          'trending': [],
+          'hot-release': [],
+          'most-popular': [],
+          'topic': [],
+          'search': [],
+          ...(persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>),
+        };
       }
       return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
     })(),
     discoveryLastRefresh: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        return persisted as Record<string, string | null>;
+        return {
+          'trending': null,
+          'hot-release': null,
+          'most-popular': null,
+          'topic': null,
+          'search': null,
+          ...(persisted as Record<string, string | null>),
+        };
       }
       return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
     })(),
     discoveryTotalCount: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        return persisted as Record<string, number>;
+        return {
+          'trending': 0,
+          'hot-release': 0,
+          'most-popular': 0,
+          'topic': 0,
+          'search': 0,
+          ...(persisted as Record<string, number>),
+        };
       }
       return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
     })(),
+    selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
+      ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
+      : 'trending',
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: {
       'most-stars': [],
@@ -1220,6 +1265,26 @@ export const useAppStore = create<AppState & AppActions>()(
 
   if (state && !state.selectedDiscoveryChannel) {
     state.selectedDiscoveryChannel = 'trending';
+  }
+  if (state && (!state.discoveryChannels || !Array.isArray(state.discoveryChannels))) {
+    state.discoveryChannels = defaultDiscoveryChannels;
+  } else if (state && Array.isArray(state.discoveryChannels)) {
+    const persistedChannels = state.discoveryChannels as unknown[];
+    state.discoveryChannels = defaultDiscoveryChannels.map((defaultChannel) => {
+      const persistedChannel = persistedChannels.find((channel) => {
+        return (channel as Record<string, unknown>)?.id === defaultChannel.id;
+      }) as Record<string, unknown> | undefined;
+
+      if (!persistedChannel) {
+        return defaultChannel;
+      }
+
+      return {
+        ...defaultChannel,
+        ...(persistedChannel as Partial<typeof defaultChannel>),
+        enabled: persistedChannel.enabled !== false,
+      };
+    });
   }
   // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
   const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
