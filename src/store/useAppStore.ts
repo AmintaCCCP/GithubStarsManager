@@ -1248,11 +1248,15 @@ export const useAppStore = create<AppState & AppActions>()(
       // 持久化发现设置
       discoveryChannels: state.discoveryChannels,
       selectedDiscoveryChannel: state.selectedDiscoveryChannel,
-      discoveryRepos: state.discoveryRepos,
-      discoveryLastRefresh: state.discoveryLastRefresh,
-      discoveryTotalCount: state.discoveryTotalCount,
-      discoveryHasMore: state.discoveryHasMore,
-      discoveryNextPage: state.discoveryNextPage,
+      // discoveryRepos 不持久化，它是极其庞大的 JSON 对象。
+      // 在 Electron 41/v8/macOS 上的 IDB partialize 阶段，
+      // 由于频繁序列化这个可能达数MB的大对象，会触发底层 JIT CHECK assertion failed (brk 0) 导致崩溃。
+      // 这里的会话级运行时数据都取消持久化：
+      // discoveryRepos
+      // discoveryLastRefresh
+      // discoveryTotalCount
+      // discoveryHasMore
+      // discoveryNextPage
       discoveryPlatform: state.discoveryPlatform,
       discoveryLanguage: state.discoveryLanguage,
       discoverySortBy: state.discoverySortBy,

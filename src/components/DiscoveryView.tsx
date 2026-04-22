@@ -604,6 +604,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const isDesktopSafeMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.protocol === 'file:' || navigator.userAgent.includes('Electron');
+  }, []);
   const safeDiscoveryChannels = useMemo(
     () => Array.isArray(discoveryChannels) ? discoveryChannels.filter(Boolean) : [],
     [discoveryChannels]
@@ -646,7 +650,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
   const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
-  // 切换频道时重置页码并恢复滚动位置（只依赖 selectedDiscoveryChannel，不订阅 discoveryScrollPositions）
+  // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
   useEffect(() => {
     setCurrentPage(1);
     // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
@@ -654,7 +658,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
       const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
       scrollContainerRef.current.scrollTop = savedPosition;
     }
-  }, [selectedDiscoveryChannel]);
+    
+    // 取消持久化后，首次打开或切换到空频道时自动加载
+    const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
+    const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
+    if (!hasRepos && !isLoading) {
+      refreshChannel(selectedDiscoveryChannel, 1, false);
+    }
+  }, [selectedDiscoveryChannel, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -1119,10 +1130,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
           <div 
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto space-y-4 pr-2"
+            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-gray-900' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20">
+              <div className={isDesktopSafeMode
+                ? 'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4'
+                : 'bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -1138,7 +1151,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <button
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium"
+                    className={isDesktopSafeMode
+                      ? 'px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
+                      : 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -1223,9 +1238,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {!currentIsLoading && allRepos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
-                <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                  {currentChannelStyle.largeIcon}
-                </div>
+                {isDesktopSafeMode ? (
+                  <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                    {currentChannelIconNode}
+                  </div>
+                ) : (
+                  <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                    {currentChannelStyle.largeIcon}
+                  </div>
+                )}
                 <div className="space-y-2 max-w-xs">
                   <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
                     {t('暂无数据', 'No data yet')}
@@ -1237,7 +1258,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 <button
                   onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                   disabled={currentIsLoading}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                  className={isDesktopSafeMode
+                    ? 'px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium'
+                    : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
                 >
                   <RefreshCw className="w-4 h-4" />
                   {t('立即刷新', 'Refresh Now')}
@@ -1245,15 +1268,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
               {currentPageRepos.map(repo => (
-                <SubscriptionRepoCard key={repo.id} repo={repo} />
+                <SubscriptionRepoCard key={repo.id} repo={repo} desktopSafeMode={isDesktopSafeMode} />
               ))}
             </div>
 
             {/* Page Info */}
             {allRepos.length > 0 && (
-              <div className="flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-gray-100 dark:border-gray-700/50 text-sm">
+              <div className={isDesktopSafeMode
+                ? 'flex items-center justify-between py-3.5 px-5 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-sm'
+                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-gray-100 dark:border-gray-700/50 text-sm'}>
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   <span>
@@ -1286,7 +1311,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 <button
                   onClick={() => refreshChannel(selectedDiscoveryChannel, currentNextPage, true)}
                   disabled={currentIsLoading}
-                  className="group px-8 py-3 rounded-xl bg-gray-100/80 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2.5 text-sm font-medium shadow-sm"
+                  className={isDesktopSafeMode
+                    ? 'group px-8 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2.5 text-sm font-medium'
+                    : 'group px-8 py-3 rounded-xl bg-gray-100/80 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2.5 text-sm font-medium shadow-sm'}
                 >
                   {currentIsLoading ? (
                     <>
