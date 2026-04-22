@@ -650,29 +650,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
   const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
-  // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
-  useEffect(() => {
-    setCurrentPage(1);
-    // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
-    if (scrollContainerRef.current) {
-      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
-      scrollContainerRef.current.scrollTop = savedPosition;
-    }
-    
-    // 取消持久化后，首次打开或切换到空频道时自动加载
-    const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
-    const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (!hasRepos && !isLoading) {
-      refreshChannel(selectedDiscoveryChannel, 1, false);
-    }
-  }, [selectedDiscoveryChannel, refreshChannel]);
 
-  // 主题改变时刷新数据
-  useEffect(() => {
-    if (selectedDiscoveryChannel === 'topic' && discoverySelectedTopic) {
-      refreshChannel('topic', 1, false);
-    }
-  }, [discoverySelectedTopic, selectedDiscoveryChannel]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
     if (!githubToken) {
@@ -755,6 +733,30 @@ export const DiscoveryView: React.FC = React.memo(() => {
       setDiscoveryLoading(channelId, false);
     }
   }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, allRepos]);
+
+  // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
+  useEffect(() => {
+    setCurrentPage(1);
+    // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
+    if (scrollContainerRef.current) {
+      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
+      scrollContainerRef.current.scrollTop = savedPosition;
+    }
+    
+    // 取消持久化后，首次打开或切换到空频道时自动加载
+    const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
+    const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
+    if (!hasRepos && !isLoading) {
+      refreshChannel(selectedDiscoveryChannel, 1, false);
+    }
+  }, [selectedDiscoveryChannel, refreshChannel]);
+
+  // 主题改变时刷新数据
+  useEffect(() => {
+    if (selectedDiscoveryChannel === 'topic' && discoverySelectedTopic) {
+      refreshChannel('topic', 1, false);
+    }
+  }, [discoverySelectedTopic, selectedDiscoveryChannel]);
 
   const formatLastRefresh = useCallback((timestamp: string | null) => {
     if (!timestamp) return '';
