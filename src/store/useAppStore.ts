@@ -1,10 +1,65 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, Repository, Release, AIConfig, WebDAVConfig, SearchFilters, GitHubUser, Category, AssetFilter, UpdateNotification, AnalysisProgress, SubscriptionChannel, SubscriptionChannelId, SubscriptionRepo, SubscriptionDev } from '../types';
+import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
+import { 
+  AppState, 
+  Repository, 
+  Release, 
+  AIConfig, 
+  WebDAVConfig, 
+  SearchFilters, 
+  GitHubUser, 
+  Category, 
+  AssetFilter, 
+  UpdateNotification, 
+  AnalysisProgress, 
+  DiscoveryChannel, 
+  DiscoveryChannelId, 
+  DiscoveryRepo,
+  DiscoveryPlatform,
+  ProgrammingLanguage,
+  SortBy,
+  SortOrder,
+  TopicCategory,
+  SubscriptionChannel,
+  defaultSubscriptionChannels
+} from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
+
+// Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
+// which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
+const debouncedPersistStorage: PersistStorage<any> = {
+  getItem: async (name) => {
+    const str = await indexedDBStorage.getItem(name);
+    if (!str) return null;
+    try {
+      return JSON.parse(str);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let latestValue: StorageValue<any> | null = null;
+    return (name: string, value: StorageValue<any>) => {
+      latestValue = value;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        try {
+          const str = JSON.stringify(latestValue);
+          indexedDBStorage.setItem(name, str);
+        } catch (e) {
+          console.error('Failed to stringify state for persistence', e);
+        }
+      }, 1000);
+    };
+  })(),
+  removeItem: (name) => {
+    indexedDBStorage.removeItem(name);
+  }
+};
 
 const readSessionBackendSecret = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -29,9 +84,11 @@ interface AppActions {
   // Repository actions
   setRepositories: (repos: Repository[]) => void;
   updateRepository: (repo: Repository) => void;
+  addRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
   setLastSync: (timestamp: string) => void;
   deleteRepository: (repoId: number) => void;
+  setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
   
   // AI actions
   addAIConfig: (config: AIConfig) => void;
@@ -107,15 +164,24 @@ interface AppActions {
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   setReleaseIsRefreshing: (refreshing: boolean) => void;
 
-  // Subscription actions
-  setSelectedSubscriptionChannel: (channel: SubscriptionChannelId) => void;
-  setSubscriptionLoading: (channel: SubscriptionChannelId, loading: boolean) => void;
-  setSubscriptionRepos: (channel: SubscriptionChannelId, repos: SubscriptionRepo[]) => void;
-  setSubscriptionDevs: (devs: SubscriptionDev[]) => void;
-  setSubscriptionLastRefresh: (channel: SubscriptionChannelId, timestamp: string) => void;
-  updateSubscriptionRepo: (repo: SubscriptionRepo) => void;
-  updateSubscriptionDev: (dev: SubscriptionDev) => void;
-  toggleSubscriptionChannel: (channelId: SubscriptionChannelId) => void;
+  // Discovery actions
+  setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
+  setDiscoveryLoading: (channel: DiscoveryChannelId, loading: boolean) => void;
+  setDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[], append?: boolean) => void;
+  setDiscoveryLastRefresh: (channel: DiscoveryChannelId, timestamp: string) => void;
+  updateDiscoveryRepo: (repo: DiscoveryRepo) => void;
+  toggleDiscoveryChannel: (channelId: DiscoveryChannelId) => void;
+  setDiscoveryPlatform: (platform: DiscoveryPlatform) => void;
+  setDiscoveryLanguage: (language: ProgrammingLanguage) => void;
+  setDiscoverySortBy: (sortBy: SortBy) => void;
+  setDiscoverySortOrder: (sortOrder: SortOrder) => void;
+  setDiscoverySearchQuery: (query: string) => void;
+  setDiscoverySelectedTopic: (topic: TopicCategory | null) => void;
+  setDiscoveryHasMore: (channel: DiscoveryChannelId, hasMore: boolean) => void;
+  setDiscoveryNextPage: (channel: DiscoveryChannelId, page: number) => void;
+  setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
+  setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
+  appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 
 const initialSearchFilters: SearchFilters = {
@@ -161,6 +227,20 @@ type PersistedAppState = Partial<
     | 'releaseViewMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
+    | 'discoveryRepos'
+    | 'discoveryLastRefresh'
+    | 'discoveryTotalCount'
+    | 'discoveryHasMore'
+    | 'discoveryNextPage'
+    | 'selectedDiscoveryChannel'
+    | 'discoveryPlatform'
+    | 'discoveryLanguage'
+    | 'discoverySortBy'
+    | 'discoverySortOrder'
+    | 'subscriptionRepos'
+    | 'subscriptionLastRefresh'
+    | 'subscriptionIsLoading'
+    | 'subscriptionChannels'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -185,6 +265,7 @@ const normalizePersistedState = (
   currentState: AppState & AppActions
 ): Partial<AppState & AppActions> => {
   const safePersisted = persisted ?? {};
+  const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
@@ -226,6 +307,150 @@ const normalizePersistedState = (
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
+    discoveryChannels: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryChannels;
+      if (!Array.isArray(persisted)) return defaultDiscoveryChannels;
+
+      return defaultDiscoveryChannels.map((defaultChannel) => {
+        const persistedChannel = persisted.find((channel: unknown) => {
+          return (channel as Record<string, unknown>)?.id === defaultChannel.id;
+        }) as Record<string, unknown> | undefined;
+
+        if (!persistedChannel) {
+          return defaultChannel;
+        }
+
+        return {
+          ...defaultChannel,
+          ...(persistedChannel as Partial<typeof defaultChannel>),
+          enabled: persistedChannel.enabled !== false,
+        };
+      });
+    })(),
+    discoveryRepos: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': [],
+          'hot-release': [],
+          'most-popular': [],
+          'topic': [],
+          'search': [],
+          ...(persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>),
+        };
+      }
+      return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
+    })(),
+    discoveryLastRefresh: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': null,
+          'hot-release': null,
+          'most-popular': null,
+          'topic': null,
+          'search': null,
+          ...(persisted as Record<string, string | null>),
+        };
+      }
+      return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
+    })(),
+    discoveryTotalCount: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': 0,
+          'hot-release': 0,
+          'most-popular': 0,
+          'topic': 0,
+          'search': 0,
+          ...(persisted as Record<string, number>),
+        };
+      }
+      return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
+    })(),
+    selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
+      ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
+      : 'trending',
+    // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）
+    discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+    // discoveryHasMore 从持久化恢复，确保对象格式
+    discoveryHasMore: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryHasMore;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': false,
+          'hot-release': false,
+          'most-popular': false,
+          'topic': false,
+          'search': false,
+          ...(persisted as Record<string, boolean>),
+        };
+      }
+      return { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false };
+    })(),
+    // discoveryNextPage 从持久化恢复，确保对象格式
+    discoveryNextPage: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).discoveryNextPage;
+      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        return {
+          'trending': 1,
+          'hot-release': 1,
+          'most-popular': 1,
+          'topic': 1,
+          'search': 1,
+          ...(persisted as Record<string, number>),
+        };
+      }
+      return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
+    })(),
+    // discoveryScrollPositions 不持久化，始终重置为 0
+    discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+    // 确保 subscription 相关状态包含 trending 键
+    subscriptionRepos: {
+      'most-stars': [],
+      'most-forks': [],
+      'most-dev': [],
+      'trending': [],
+      ...(safePersisted.subscriptionRepos as Record<string, unknown> || {}),
+    },
+    subscriptionLastRefresh: {
+      'most-stars': null,
+      'most-forks': null,
+      'most-dev': null,
+      'trending': null,
+      ...((safePersisted as Record<string, unknown>).subscriptionLastRefresh as Record<string, unknown> || {}),
+    },
+    subscriptionIsLoading: {
+      'most-stars': false,
+      'most-forks': false,
+      'most-dev': false,
+      'trending': false,
+      ...((safePersisted as Record<string, unknown>).subscriptionIsLoading as Record<string, unknown> || {}),
+    },
+    // 确保 subscriptionChannels 包含 trending，且所有频道都有 nameEn（兼容旧数据）
+    subscriptionChannels: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).subscriptionChannels;
+      const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
+      if (!Array.isArray(persisted)) return defaultSubscriptionChannels;
+      // 合并：使用 persisted 的频道，但补全缺失的字段（nameEn、trending 等）
+      return persisted.map((ch: unknown) => {
+        const chRecord = ch as Record<string, unknown>;
+        const defaultCh = defaultChannelsMap.get(chRecord.id as string);
+        if (defaultCh) {
+          return {
+            ...(chRecord as Partial<SubscriptionChannel>),
+            name: defaultCh.name, // 始终使用中文名称（默认定义）
+            nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
+            icon: (chRecord.icon as string) || defaultCh.icon,
+            description: (chRecord.description as string) || defaultCh.description,
+          } as unknown as SubscriptionChannel;
+        }
+        return chRecord as unknown as SubscriptionChannel;
+      }).concat(
+        defaultSubscriptionChannels.filter(dch => !persisted.some((ch: unknown) => (ch as Record<string, unknown>).id === dch.id))
+      );
+    })(),
   };
 };
 
@@ -316,6 +541,9 @@ const defaultCategories: Category[] = [
   }
 ];
 
+// 导出默认分类供其他模块使用
+export { defaultCategories };
+
 // 预设筛选器图标映射
 const PRESET_FILTER_ICONS: Record<string, string> = {
   'preset-windows': 'Monitor',
@@ -332,37 +560,45 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
   icon: PRESET_FILTER_ICONS[pf.id] || 'Package',
 }));
 
-const defaultSubscriptionChannels: SubscriptionChannel[] = [
-  {
-    id: 'most-stars',
-    name: '最多 Star',
-    nameEn: 'Most Stars',
-    icon: '⭐',
-    description: 'GitHub 上 Star 数量最多的项目 Top 10',
-    enabled: true,
-  },
-  {
-    id: 'most-forks',
-    name: '最多 Fork',
-    nameEn: 'Most Forks',
-    icon: '🔱',
-    description: 'GitHub 上 Fork 数量最多的项目 Top 10',
-    enabled: true,
-  },
-  {
-    id: 'most-dev',
-    name: '热门开发者',
-    nameEn: 'Top Developers',
-    icon: '👤',
-    description: 'GitHub 上最受关注的开发者 Top 10 及其最热项目',
-    enabled: true,
-  },
+const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '热门趋势',
+    name: '热门仓库',
     nameEn: 'Trending',
-    icon: '🔥',
-    description: 'GitHub 上近期最受关注的项目 Top 10',
+    icon: 'trending',
+    description: '最近30天内星标数超过50的热门仓库',
+    enabled: true,
+  },
+  {
+    id: 'hot-release',
+    name: '热门发布',
+    nameEn: 'Hot Release',
+    icon: 'rocket',
+    description: '最近14天内活跃更新的仓库',
+    enabled: true,
+  },
+  {
+    id: 'most-popular',
+    name: '最受欢迎',
+    nameEn: 'Most Popular',
+    icon: 'star',
+    description: '星标数超过1000的稳定热门仓库',
+    enabled: true,
+  },
+  {
+    id: 'topic',
+    name: '主题探索',
+    nameEn: 'Topic',
+    icon: 'tag',
+    description: '按主题分类浏览仓库',
+    enabled: true,
+  },
+  {
+    id: 'search',
+    name: '搜索发现',
+    nameEn: 'Search',
+    icon: 'search',
+    description: '自定义搜索发现新项目',
     enabled: true,
   },
 ];
@@ -377,6 +613,7 @@ export const useAppStore = create<AppState & AppActions>()(
       repositories: [],
       isLoading: false,
       lastSync: null,
+      analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
       webdavConfigs: [],
@@ -407,13 +644,27 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseExpandedRepositories: new Set<number>(),
       releaseIsRefreshing: false,
 
-    // Subscription
-    subscriptionChannels: defaultSubscriptionChannels,
-    subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
-    subscriptionDevs: [],
-    subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
-    subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
-    selectedSubscriptionChannel: 'most-stars',
+      discoveryChannels: defaultDiscoveryChannels,
+      discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
+      discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
+      discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      selectedDiscoveryChannel: 'trending',
+      discoveryPlatform: 'All',
+      discoveryLanguage: 'All',
+      discoverySortBy: 'BestMatch',
+      discoverySortOrder: 'Descending',
+      discoverySearchQuery: '',
+      discoverySelectedTopic: null,
+      discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
+      discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+      discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+
+      // Subscription
+      subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
+      subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
+      subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
+      subscriptionChannels: defaultSubscriptionChannels,
 
       // Auth actions
       setUser: (user) => {
@@ -432,6 +683,7 @@ export const useAppStore = create<AppState & AppActions>()(
         releases: [],
         releaseSubscriptions: new Set(),
         readReleases: new Set(),
+        analyzingRepositoryIds: new Set(),
         searchResults: [],
         lastSync: null,
       }),
@@ -443,6 +695,42 @@ export const useAppStore = create<AppState & AppActions>()(
         return {
           repositories: updatedRepositories,
           searchResults: state.searchResults.map(r => r.id === repo.id ? repo : r)
+        };
+      }),
+      addRepository: (repo) => set((state) => {
+        // 检查是否已存在相同 full_name 的仓库
+        const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
+        let updatedRepositories;
+        
+        if (existingRepoIndex >= 0) {
+          // 如果存在，更新现有仓库（保留ID）
+          updatedRepositories = [...state.repositories];
+          updatedRepositories[existingRepoIndex] = {
+            ...repo,
+            id: updatedRepositories[existingRepoIndex].id,
+            // 保留自定义编辑的内容
+            custom_description: updatedRepositories[existingRepoIndex].custom_description,
+            custom_tags: updatedRepositories[existingRepoIndex].custom_tags,
+            custom_category: updatedRepositories[existingRepoIndex].custom_category,
+            category_locked: updatedRepositories[existingRepoIndex].category_locked,
+            last_edited: updatedRepositories[existingRepoIndex].last_edited,
+            subscribed_to_releases: updatedRepositories[existingRepoIndex].subscribed_to_releases,
+          };
+        } else {
+          // 如果不存在，添加新仓库（生成新ID）
+          // 使用 timestamp + random 确保唯一性，避免并发时的竞态条件
+          const timestamp = Date.now();
+          const random = Math.floor(Math.random() * 10000);
+          const maxExistingId = state.repositories.length > 0
+            ? Math.max(...state.repositories.map(r => r.id))
+            : 0;
+          const newId = Math.max(timestamp, maxExistingId + 1) + random;
+          updatedRepositories = [...state.repositories, { ...repo, id: newId }];
+        }
+        
+        return {
+          repositories: updatedRepositories,
+          searchResults: updatedRepositories
         };
       }),
       setLoading: (isLoading) => set({ isLoading }),
@@ -464,6 +752,15 @@ export const useAppStore = create<AppState & AppActions>()(
           releaseSubscriptions: nextReleaseSubscriptions,
           readReleases: nextReadReleases,
         };
+      }),
+      setAnalyzingRepository: (repoId, isAnalyzing) => set((state) => {
+        const nextAnalyzingIds = new Set(state.analyzingRepositoryIds);
+        if (isAnalyzing) {
+          nextAnalyzingIds.add(repoId);
+        } else {
+          nextAnalyzingIds.delete(repoId);
+        }
+        return { analyzingRepositoryIds: nextAnalyzingIds };
       }),
 
       // AI actions
@@ -868,41 +1165,64 @@ export const useAppStore = create<AppState & AppActions>()(
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
 
-    // Subscription actions
-    setSelectedSubscriptionChannel: (selectedSubscriptionChannel) => set({ selectedSubscriptionChannel }),
-    setSubscriptionLoading: (channel, loading) => set((state) => ({
-      subscriptionIsLoading: { ...state.subscriptionIsLoading, [channel]: loading },
+    // Discovery actions
+    setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set({ selectedDiscoveryChannel }),
+    setDiscoveryLoading: (channel, loading) => set((state) => ({
+      discoveryIsLoading: { ...state.discoveryIsLoading, [channel]: loading },
     })),
-    setSubscriptionRepos: (channel, repos) => set((state) => ({
-      subscriptionRepos: { ...state.subscriptionRepos, [channel]: repos },
+    setDiscoveryRepos: (channel, repos, append = false) => set((state) => ({
+      discoveryRepos: { 
+        ...state.discoveryRepos, 
+        [channel]: append ? [...(state.discoveryRepos[channel] || []), ...repos] : repos 
+      },
     })),
-    setSubscriptionDevs: (devs) => set({ subscriptionDevs: devs }),
-    setSubscriptionLastRefresh: (channel, timestamp) => set((state) => ({
-      subscriptionLastRefresh: { ...state.subscriptionLastRefresh, [channel]: timestamp },
+    setDiscoveryLastRefresh: (channel, timestamp) => set((state) => ({
+      discoveryLastRefresh: { ...state.discoveryLastRefresh, [channel]: timestamp },
     })),
-    updateSubscriptionRepo: (repo) => set((state) => {
+    updateDiscoveryRepo: (repo) => set((state) => {
       const channel = repo.channel;
-      const channelRepos = state.subscriptionRepos[channel] || [];
+      const channelRepos = state.discoveryRepos[channel] || [];
       return {
-        subscriptionRepos: {
-          ...state.subscriptionRepos,
+        discoveryRepos: {
+          ...state.discoveryRepos,
           [channel]: channelRepos.map(r => r.id === repo.id ? repo : r),
         },
       };
     }),
-    updateSubscriptionDev: (dev) => set((state) => ({
-      subscriptionDevs: state.subscriptionDevs.map(d => d.login === dev.login ? dev : d),
-    })),
-    toggleSubscriptionChannel: (channelId) => set((state) => ({
-      subscriptionChannels: state.subscriptionChannels.map(ch =>
+    toggleDiscoveryChannel: (channelId) => set((state) => ({
+      discoveryChannels: state.discoveryChannels.map(ch =>
         ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch
       ),
+    })),
+    setDiscoveryPlatform: (discoveryPlatform) => set({ discoveryPlatform }),
+    setDiscoveryLanguage: (discoveryLanguage) => set({ discoveryLanguage }),
+    setDiscoverySortBy: (discoverySortBy) => set({ discoverySortBy }),
+    setDiscoverySortOrder: (discoverySortOrder) => set({ discoverySortOrder }),
+    setDiscoverySearchQuery: (discoverySearchQuery) => set({ discoverySearchQuery }),
+    setDiscoverySelectedTopic: (discoverySelectedTopic) => set({ discoverySelectedTopic }),
+    setDiscoveryHasMore: (channel, hasMore) => set((state) => ({
+      discoveryHasMore: { ...state.discoveryHasMore, [channel]: hasMore },
+    })),
+    setDiscoveryNextPage: (channel, page) => set((state) => ({
+      discoveryNextPage: { ...state.discoveryNextPage, [channel]: page },
+    })),
+    setDiscoveryTotalCount: (channel, count) => set((state) => ({
+      discoveryTotalCount: { ...state.discoveryTotalCount, [channel]: count },
+    })),
+    setDiscoveryScrollPosition: (channel, position) => set((state) => ({
+      discoveryScrollPositions: { ...state.discoveryScrollPositions, [channel]: position },
+    })),
+    appendDiscoveryRepos: (channel, repos) => set((state) => ({
+      discoveryRepos: { 
+        ...state.discoveryRepos, 
+        [channel]: [...(state.discoveryRepos[channel] || []), ...repos] 
+      },
     })),
     }),
     {
       name: 'github-stars-manager',
       version: 5,
-      storage: createJSONStorage(() => indexedDBStorage),
+      storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
         user: state.user,
@@ -958,12 +1278,23 @@ export const useAppStore = create<AppState & AppActions>()(
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
 
-      // 持久化订阅设置
-      subscriptionChannels: state.subscriptionChannels,
-      selectedSubscriptionChannel: state.selectedSubscriptionChannel,
-      subscriptionRepos: state.subscriptionRepos,
-      subscriptionDevs: state.subscriptionDevs,
-      subscriptionLastRefresh: state.subscriptionLastRefresh,
+      // 持久化发现设置
+      discoveryChannels: state.discoveryChannels,
+      selectedDiscoveryChannel: state.selectedDiscoveryChannel,
+      // discoveryRepos 不持久化，它是极其庞大的 JSON 对象。
+      // 在 Electron 41/v8/macOS 上的 IDB partialize 阶段，
+      // 由于频繁序列化这个可能达数MB的大对象，会触发底层 JIT CHECK assertion failed (brk 0) 导致崩溃。
+      // 这里的会话级运行时数据都取消持久化：
+      // discoveryRepos
+      // discoveryLastRefresh
+      // discoveryTotalCount
+      // discoveryHasMore
+      // discoveryNextPage
+      discoveryPlatform: state.discoveryPlatform,
+      discoveryLanguage: state.discoveryLanguage,
+      discoverySortBy: state.discoverySortBy,
+      discoverySortOrder: state.discoverySortOrder,
+      discoverySelectedTopic: state.discoverySelectedTopic,
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
@@ -1003,22 +1334,87 @@ export const useAppStore = create<AppState & AppActions>()(
           }
         }
 
-  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending）
+  if (state && !state.selectedDiscoveryChannel) {
+    state.selectedDiscoveryChannel = 'trending';
+  }
+  if (state && (!state.discoveryChannels || !Array.isArray(state.discoveryChannels))) {
+    state.discoveryChannels = defaultDiscoveryChannels;
+  } else if (state && Array.isArray(state.discoveryChannels)) {
+    const persistedChannels = state.discoveryChannels as unknown[];
+    state.discoveryChannels = defaultDiscoveryChannels.map((defaultChannel) => {
+      const persistedChannel = persistedChannels.find((channel) => {
+        return (channel as Record<string, unknown>)?.id === defaultChannel.id;
+      }) as Record<string, unknown> | undefined;
+
+      if (!persistedChannel) {
+        return defaultChannel;
+      }
+
+      return {
+        ...defaultChannel,
+        ...(persistedChannel as Partial<typeof defaultChannel>),
+        enabled: persistedChannel.enabled !== false,
+      };
+    });
+  }
+  // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
+  const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));
   if (state && !Array.isArray(state.subscriptionChannels)) {
     console.log('Migrating: initializing subscription channels');
     state.subscriptionChannels = defaultSubscriptionChannels;
   } else if (state && Array.isArray(state.subscriptionChannels)) {
-    state.subscriptionChannels = state.subscriptionChannels.map((ch: Record<string, unknown>) => {
-      if (ch.id === 'daily-dev' || ch.id === 'most-dev') {
-        return { ...ch, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' };
+    state.subscriptionChannels = state.subscriptionChannels.map((ch: unknown) => {
+      const chRecord = ch as Record<string, unknown>;
+      const defaultCh = defaultChannelsMap.get(chRecord.id as string);
+      if (chRecord.id === 'daily-dev' || chRecord.id === 'most-dev') {
+        return { ...chRecord, id: 'most-dev', name: '热门开发者', nameEn: 'Top Developers', icon: '👤' } as unknown as SubscriptionChannel;
       }
-      return ch;
+      if (defaultCh) {
+        return {
+          ...(chRecord as Partial<SubscriptionChannel>),
+          name: defaultCh.name, // 始终使用中文名称
+          nameEn: (chRecord.nameEn as string) || defaultCh.nameEn || (chRecord.name as string) || defaultCh.nameEn,
+          icon: (chRecord.icon as string) || defaultCh.icon,
+          description: (chRecord.description as string) || defaultCh.description,
+        } as unknown as SubscriptionChannel;
+      }
+      return chRecord as unknown as SubscriptionChannel;
     });
+    // 确保 trending 频道存在（如果缺失则添加）
+    const hasTrending = state.subscriptionChannels.some((ch: SubscriptionChannel) => ch.id === 'trending');
+    if (!hasTrending) {
+      console.log('Migrating: adding trending channel');
+      state.subscriptionChannels.push({
+        id: 'trending',
+        name: '热门趋势',
+        nameEn: 'Trending',
+        icon: 'trending',
+        description: 'GitHub 上近期最受关注的项目 Top 10',
+        enabled: true,
+      } as SubscriptionChannel);
+    }
   }
-  if (state && !state.selectedSubscriptionChannel) {
-    state.selectedSubscriptionChannel = 'most-stars';
-  } else if (state && state.selectedSubscriptionChannel === 'daily-dev') {
-    state.selectedSubscriptionChannel = 'most-dev';
+  if (state && !state.discoveryPlatform) {
+    state.discoveryPlatform = 'All';
+  }
+  if (state && !state.discoveryLanguage) {
+    state.discoveryLanguage = 'All';
+  }
+  if (state && !state.discoverySortBy) {
+    state.discoverySortBy = 'BestMatch';
+  }
+  if (state && !state.discoverySortOrder) {
+    state.discoverySortOrder = 'Descending';
+  }
+  // discoveryIsLoading 不应持久化，migrate 时始终重置防止旧数据格式异常导致 spread 崩溃
+  if (state) {
+    (state as Record<string, unknown>).discoveryIsLoading = {
+      'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false,
+    };
+    // discoveryScrollPositions 同样不应持久化，重置以避免 stale 滚动位置
+    (state as Record<string, unknown>).discoveryScrollPositions = {
+      'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0,
+    };
   }
 
         return state as PersistedAppState;

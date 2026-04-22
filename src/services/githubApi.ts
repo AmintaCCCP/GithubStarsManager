@@ -1,4 +1,19 @@
-import { Repository, Release, GitHubUser, SubscriptionRepo, SubscriptionDev } from '../types';
+import { 
+  Repository, 
+  Release, 
+  GitHubUser, 
+  DiscoveryPlatform, 
+  ProgrammingLanguage, 
+  SortBy, 
+  SortOrder, 
+  PaginatedDiscoveryRepositories,
+  DiscoveryChannelId,
+  TopicCategory,
+  SubscriptionRepo,
+  SubscriptionDev,
+  GitHubSearchUserResponse,
+  GitHubUserDetail
+} from '../types';
 
 interface GitHubStarredItem {
   starred_at?: string;
@@ -17,25 +32,10 @@ const GITHUB_API_BASE = 'https://api.github.com';
 
 interface GitHubSearchRepoResponse {
   items: (Repository & { forks_count?: number })[];
+  total_count: number;
 }
 
-interface GitHubSearchUserResponse {
-  items: Array<{
-    login: string;
-    avatar_url: string;
-    html_url: string;
-  }>;
-}
 
-interface GitHubUserDetail {
-  login: string;
-  avatar_url: string;
-  html_url: string;
-  name: string | null;
-  bio: string | null;
-  public_repos: number;
-  followers: number;
-}
 
 export class GitHubApiService {
   private token: string;
@@ -245,12 +245,34 @@ export class GitHubApiService {
     });
   }
 
+  async starRepository(owner: string, repo: string): Promise<void> {
+    await this.makeRequest<void>(`/user/starred/${owner}/${repo}`, {
+      method: 'PUT',
+    });
+  }
+
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
     const response = await this.makeRequest<GitHubRateLimitResponse>('/rate_limit');
     return {
       remaining: response.rate.remaining,
       reset: response.rate.reset,
     };
+  }
+
+  private buildPlatformQuery(platform: DiscoveryPlatform): string {
+    switch (platform) {
+      case 'Android':
+        return 'android';
+      case 'Macos':
+        return 'macos OR mac OR osx';
+      case 'Windows':
+        return 'windows';
+      case 'Linux':
+        return 'linux';
+      case 'All':
+      default:
+        return '';
+    }
   }
 
   async searchMostStars(perPage = 10): Promise<SubscriptionRepo[]> {
@@ -261,7 +283,6 @@ export class GitHubApiService {
       ...repo,
       rank: index + 1,
       channel: 'most-stars' as const,
-      forks_count: repo.forks_count,
     }));
   }
 
@@ -277,18 +298,102 @@ export class GitHubApiService {
     }));
   }
 
-  async searchTrending(perPage = 10): Promise<SubscriptionRepo[]> {
-    // 模拟 Trending: 获取过去 7 天内创建且 Star 较多的项目
-    const lastWeek = new Set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T'))[0];
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=created:>${lastWeek}&sort=stars&order=desc&per_page=${perPage}`
-    );
-    return (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: index + 1,
-      channel: 'trending' as const,
-      forks_count: repo.forks_count,
-    }));
+  async searchTrending(perPage = 10, timeRange: 'daily' | 'weekly' | 'monthly' = 'weekly'): Promise<SubscriptionRepo[]> {
+    // 使用 GitHubTrendingRSS API
+    const rssUrl = `https://mshibanami.github.io/GitHubTrendingRSS/${timeRange}/all.xml`;
+
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`RSS fetch failed: ${response.status}`);
+      }
+
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const repos: SubscriptionRepo[] = [];
+      for (let i = 0; i < Math.min(items.length, perPage); i++) {
+        const item = items[i];
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        // description 可能包含 HTML，需要解码
+        const descriptionEl = item.querySelector('description');
+        let description = descriptionEl?.textContent || '';
+        // 解码 HTML 实体
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        description = tempDiv.textContent || tempDiv.innerText || description;
+        // 清理多余空白
+        description = description.replace(/\s+/g, ' ').trim();
+
+        // 解析 link 获取 owner/repo 格式
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
+        const owner = match?.[1] || '';
+        const repoName = match?.[2] || title;
+
+        // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
+        const starsMatch = description.match(/⭐\s*([\d,]+)/);
+        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        let stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        let forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+
+        repos.push({
+          id: i + 1,
+          name: repoName,
+          full_name: `${owner}/${repoName}`,
+          description: description.slice(0, 200),
+          html_url: link,
+          stargazers_count: stars,
+          forks_count: forks,
+          forks: forks,
+          language: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pushed_at: new Date().toISOString(),
+          owner: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+          topics: [],
+          rank: i + 1,
+          channel: 'trending',
+        });
+      }
+
+      // 如果 stars 或 forks 为 0，从 GitHub API 获取
+      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0);
+      if (reposNeedUpdate.length > 0) {
+        await Promise.all(reposNeedUpdate.map(async (r) => {
+          try {
+            const [owner, repo] = r.full_name.split('/');
+            if (!owner || !repo) return;
+            const data = await this.makeRequest<{
+              stargazers_count: number;
+              forks_count: number;
+              language: string | null;
+              description: string | null;
+            }>(`/repos/${owner}/${repo}`);
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.forks_count = data.forks_count ?? r.forks_count;
+            r.language = data.language;
+            if (data.description && !r.description) {
+              r.description = data.description;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+          }
+          // 避免 GitHub API 限流
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }));
+      }
+
+      return repos;
+    } catch (error) {
+      console.error('Failed to fetch trending from RSS:', error);
+      return [];
+    }
   }
 
   async searchDailyDevs(perPage = 10): Promise<SubscriptionDev[]> {
@@ -346,6 +451,239 @@ export class GitHubApiService {
     }
     return devs;
   }
+
+  private buildLanguageQuery(language: ProgrammingLanguage): string {
+    if (language === 'All') return '';
+    const languageMap: Record<ProgrammingLanguage, string> = {
+      'All': '',
+      'Kotlin': 'Kotlin',
+      'Java': 'Java',
+      'JavaScript': 'JavaScript',
+      'TypeScript': 'TypeScript',
+      'Python': 'Python',
+      'Swift': 'Swift',
+      'Rust': 'Rust',
+      'Go': 'Go',
+      'CSharp': 'C#',
+      'CPlusPlus': 'C++',
+      'C': 'C',
+      'Dart': 'Dart',
+      'Ruby': 'Ruby',
+      'PHP': 'PHP',
+    };
+    return `language:${languageMap[language]}`;
+  }
+
+  private buildSortParams(sortBy: SortBy, sortOrder: SortOrder): { sort: string; order: string } {
+    const sortMap: Record<SortBy, string> = {
+      'BestMatch': 'best-match',
+      'MostStars': 'stars',
+      'MostForks': 'forks',
+    };
+    const orderMap: Record<SortOrder, string> = {
+      'Descending': 'desc',
+      'Ascending': 'asc',
+    };
+    return {
+      sort: sortMap[sortBy],
+      order: orderMap[sortOrder],
+    };
+  }
+
+  async getTrendingRepositories(
+    platform: DiscoveryPlatform,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const platformQuery = this.buildPlatformQuery(platform);
+    
+    let query = `stars:>50 archived:false pushed:>=${thirtyDaysAgo}`;
+    if (platformQuery) {
+      query += ` ${platformQuery}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
+    );
+
+    const repos = (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: (page - 1) * perPage + index + 1,
+      channel: 'trending' as DiscoveryChannelId,
+      platform,
+    }));
+
+    return {
+      repos,
+      hasMore: repos.length === perPage,
+      nextPageIndex: page + 1,
+      totalCount: data.total_count,
+    };
+  }
+
+  async getHotReleaseRepositories(
+    platform: DiscoveryPlatform,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const platformQuery = this.buildPlatformQuery(platform);
+    
+    let query = `stars:>10 archived:false pushed:>=${fourteenDaysAgo}`;
+    if (platformQuery) {
+      query += ` ${platformQuery}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`
+    );
+
+    const repos = (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: (page - 1) * perPage + index + 1,
+      channel: 'hot-release' as DiscoveryChannelId,
+      platform,
+    }));
+
+    return {
+      repos,
+      hasMore: repos.length === perPage,
+      nextPageIndex: page + 1,
+      totalCount: data.total_count,
+    };
+  }
+
+  async getMostPopular(
+    platform: DiscoveryPlatform,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const platformQuery = this.buildPlatformQuery(platform);
+    
+    let query = `stars:>1000 archived:false created:<${sixMonthsAgo} pushed:>=${oneYearAgo}`;
+    if (platformQuery) {
+      query += ` ${platformQuery}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
+    );
+
+    const repos = (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: (page - 1) * perPage + index + 1,
+      channel: 'most-popular' as DiscoveryChannelId,
+      platform,
+    }));
+
+    return {
+      repos,
+      hasMore: repos.length === perPage,
+      nextPageIndex: page + 1,
+      totalCount: data.total_count,
+    };
+  }
+
+  async searchByTopic(
+    searchKeywords: string,
+    platform: DiscoveryPlatform,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const platformQuery = this.buildPlatformQuery(platform);
+    
+    let query = `${searchKeywords} in:name,description,topics stars:>10 archived:false`;
+    if (platformQuery) {
+      query += ` ${platformQuery}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
+    );
+
+    const repos = (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: (page - 1) * perPage + index + 1,
+      channel: 'topic' as DiscoveryChannelId,
+      platform,
+    }));
+
+    return {
+      repos,
+      hasMore: repos.length === perPage,
+      nextPageIndex: page + 1,
+      totalCount: data.total_count,
+    };
+  }
+
+  async getTopicRepositories(
+    topic: TopicCategory,
+    platform: DiscoveryPlatform,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const topicKeywords: Record<TopicCategory, string> = {
+      'ai': 'artificial-intelligence machine-learning ai',
+      'ml': 'machine-learning deep-learning neural-network',
+      'database': 'database sql nosql mongodb postgresql mysql',
+      'web': 'web frontend backend react vue angular',
+      'mobile': 'mobile android ios flutter react-native',
+      'devtools': 'devtools ide editor tools',
+      'security': 'security cybersecurity encryption',
+      'game': 'game game-engine unity unreal',
+    };
+
+    return this.searchByTopic(topicKeywords[topic], platform, page, perPage);
+  }
+
+  async searchRepositories(
+    query: string,
+    platform: DiscoveryPlatform,
+    language: ProgrammingLanguage,
+    sortBy: SortBy,
+    sortOrder: SortOrder,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<PaginatedDiscoveryRepositories> {
+    const platformQuery = this.buildPlatformQuery(platform);
+    const languageQuery = this.buildLanguageQuery(language);
+    const { sort, order } = this.buildSortParams(sortBy, sortOrder);
+
+    let searchQuery = `${query} archived:false`;
+    if (platformQuery) {
+      searchQuery += ` ${platformQuery}`;
+    }
+    if (languageQuery) {
+      searchQuery += ` ${languageQuery}`;
+    }
+
+    let url = `/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&page=${page}`;
+    if (sort) {
+      url += `&sort=${sort}&order=${order}`;
+    }
+
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(url);
+
+    const repos = (data.items || []).map((repo, index) => ({
+      ...repo,
+      rank: (page - 1) * perPage + index + 1,
+      channel: 'search' as DiscoveryChannelId,
+      platform,
+    }));
+
+    return {
+      repos,
+      hasMore: repos.length === perPage,
+      nextPageIndex: page + 1,
+      totalCount: data.total_count,
+    };
+  }
+
+
+
 }
 
 export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): string => {
