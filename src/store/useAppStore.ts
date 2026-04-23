@@ -323,10 +323,9 @@ const normalizePersistedState = (
         }
 
         return {
-          ...defaultChannel,
-          ...(persistedChannel as Partial<typeof defaultChannel>),
-          enabled: persistedChannel.enabled !== false,
-        };
+      ...defaultChannel,
+      enabled: persistedChannel.enabled !== false,
+    };
       });
     })(),
     discoveryRepos: (() => {
@@ -1356,10 +1355,9 @@ export const useAppStore = create<AppState & AppActions>()(
       }
 
       return {
-        ...defaultChannel,
-        ...(persistedChannel as Partial<typeof defaultChannel>),
-        enabled: persistedChannel.enabled !== false,
-      };
+      ...defaultChannel,
+      enabled: persistedChannel.enabled !== false,
+    };
     });
   }
   // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
