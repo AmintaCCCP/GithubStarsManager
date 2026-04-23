@@ -1117,33 +1117,57 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {!currentIsLoading && allRepos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
-                {isDesktopSafeMode ? (
-                  <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                    {currentChannelIconNode}
-                  </div>
+                {selectedDiscoveryChannel === 'search' ? (
+                  <>
+                    {isDesktopSafeMode ? (
+                      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        {currentChannelIconNode}
+                      </div>
+                    ) : (
+                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                        {currentChannelStyle.largeIcon}
+                      </div>
+                    )}
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
+                        {t('搜索发现', 'Search & Discover')}
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+                        {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                    {currentChannelStyle.largeIcon}
-                  </div>
+                  <>
+                    {isDesktopSafeMode ? (
+                      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        {currentChannelIconNode}
+                      </div>
+                    ) : (
+                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                        {currentChannelStyle.largeIcon}
+                      </div>
+                    )}
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
+                        {t('暂无数据', 'No data yet')}
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+                        {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
+                      disabled={currentIsLoading}
+                      className={isDesktopSafeMode
+                        ? 'px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium'
+                        : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      {t('立即刷新', 'Refresh Now')}
+                    </button>
+                  </>
                 )}
-                <div className="space-y-2 max-w-xs">
-                  <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
-                    {t('暂无数据', 'No data yet')}
-                  </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
-                    {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
-                  </p>
-                </div>
-                <button
-                  onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
-                  disabled={currentIsLoading}
-                  className={isDesktopSafeMode
-                    ? 'px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium'
-                    : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  {t('立即刷新', 'Refresh Now')}
-                </button>
               </div>
             )}
 
