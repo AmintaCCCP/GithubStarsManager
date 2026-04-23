@@ -22,6 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
@@ -531,6 +532,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
 
       const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
+      const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
         const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
@@ -541,6 +543,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
             ai_platforms: existingRepo.ai_platforms,
             analyzed_at: existingRepo.analyzed_at,
             analysis_failed: existingRepo.analysis_failed,
+          };
+        }
+        const persisted = persistedAnalyses.get(newRepo.id);
+        if (persisted && persisted.analyzed_at) {
+          return {
+            ...newRepo,
+            ai_summary: persisted.ai_summary,
+            ai_tags: persisted.ai_tags,
+            ai_platforms: persisted.ai_platforms,
+            analyzed_at: persisted.analyzed_at,
+            analysis_failed: persisted.analysis_failed,
           };
         }
         return newRepo;
@@ -739,6 +752,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
               analysis_failed: false,
             };
             updateDiscoveryRepo(updatedRepo);
+            discoveryAnalysisStorage.saveAnalysis(updatedRepo.id, {
+              ai_summary: result.summary,
+              ai_tags: result.tags,
+              ai_platforms: result.platforms,
+              analyzed_at: updatedRepo.analyzed_at,
+              analysis_failed: false,
+            });
           } else if (!result.success && result.repo) {
             const failedRepo: DiscoveryRepo = {
               ...result.repo,
@@ -749,6 +769,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
               analysis_failed: true,
             };
             updateDiscoveryRepo(failedRepo);
+            discoveryAnalysisStorage.saveAnalysis(failedRepo.id, {
+              analyzed_at: failedRepo.analyzed_at,
+              analysis_failed: true,
+            });
           }
         }
       );
