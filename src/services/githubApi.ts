@@ -493,33 +493,135 @@ export class GitHubApiService {
   async getTrendingRepositories(
     platform: DiscoveryPlatform,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    timeRange: TrendingTimeRange = 'weekly'
   ): Promise<PaginatedDiscoveryRepositories> {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const platformQuery = this.buildPlatformQuery(platform);
-    
-    let query = `stars:>50 archived:false pushed:>=${thirtyDaysAgo}`;
-    if (platformQuery) {
-      query += ` ${platformQuery}`;
-    }
-
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
-    );
-
-    const repos = (data.items || []).map((repo, index) => ({
-      ...repo,
-      rank: (page - 1) * perPage + index + 1,
-      channel: 'trending' as DiscoveryChannelId,
-      platform,
-    }));
-
-    return {
-      repos,
-      hasMore: repos.length === perPage,
-      nextPageIndex: page + 1,
-      totalCount: data.total_count,
+    const rssUrlMap: Record<TrendingTimeRange, string> = {
+      daily: 'https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml',
+      weekly: 'https://mshibanami.github.io/GitHubTrendingRSS/weekly/all.xml',
+      monthly: 'https://mshibanami.github.io/GitHubTrendingRSS/monthly/all.xml',
     };
+    const rssUrl = rssUrlMap[timeRange];
+
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' }
+      });
+      if (!response.ok) {
+        throw new Error(`RSS fetch failed: ${response.status}`);
+      }
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const repos: DiscoveryRepo[] = [];
+      const startIndex = (page - 1) * perPage;
+      const endIndex = Math.min(startIndex + perPage, items.length);
+
+      for (let i = startIndex; i < endIndex; i++) {
+        const item = items[i];
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+
+        // Parse description - strip XML/HTML tags
+        const descriptionEl = item.querySelector('description');
+        let description = descriptionEl?.textContent || '';
+        // Decode HTML entities and strip HTML tags
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        description = tempDiv.textContent || tempDiv.innerText || '';
+        // Clean up extra whitespace
+        description = description.replace(/\s+/g, ' ').trim();
+
+        // Parse link to get owner/repo
+        const match = link.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
+        const owner = match?.[1] || '';
+        const repoName = match?.[2] || title;
+
+        // Extract stars and forks from description (format like "⭐ 1,234 | 🍴 456")
+        const starsMatch = description.match(/⭐\s*([\d,]+)/);
+        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
+        const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
+
+        repos.push({
+          id: 0, // will be filled by GitHub API
+          name: repoName,
+          full_name: `${owner}/${repoName}`,
+          description: description,
+          html_url: link,
+          stargazers_count: stars,
+          forks_count: forks,
+          forks: forks,
+          language: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pushed_at: new Date().toISOString(),
+          owner: {
+            login: owner,
+            avatar_url: `https://github.com/${owner}.png`,
+          },
+          topics: [],
+          rank: i + 1,
+          channel: 'trending' as DiscoveryChannelId,
+          platform,
+        });
+      }
+
+      // Supplement missing fields via GitHub API
+      const reposNeedUpdate = repos.filter(r => r.id === 0 || r.stargazers_count === 0 || r.forks_count === 0 || !r.language);
+      if (reposNeedUpdate.length > 0) {
+        await Promise.all(reposNeedUpdate.map(async (r) => {
+          try {
+            const [owner, repo] = r.full_name.split('/');
+            if (!owner || !repo) return;
+            const data = await this.makeRequest<{
+              id: number;
+              stargazers_count: number;
+              forks_count: number;
+              forks: number;
+              language: string | null;
+              description: string | null;
+              topics: string[];
+              created_at: string;
+              updated_at: string;
+              pushed_at: string;
+            }>(`/repos/${owner}/${repo}`);
+            r.id = data.id;
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.forks_count = data.forks_count ?? r.forks_count;
+            r.forks = data.forks ?? r.forks;
+            r.language = data.language ?? r.language;
+            r.topics = data.topics ?? r.topics;
+            r.created_at = data.created_at ?? r.created_at;
+            r.updated_at = data.updated_at ?? r.updated_at;
+            r.pushed_at = data.pushed_at ?? r.pushed_at;
+            // Use GitHub API description as fallback (RSS description may contain emoji markers)
+            if (data.description) {
+              r.description = data.description;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+          }
+          // Avoid GitHub API rate limiting
+          await new Promise(resolve => setTimeout(resolve, 80));
+        }));
+      }
+
+      // Assign rank based on position
+      repos.forEach((r, idx) => { r.rank = startIndex + idx + 1; });
+
+      return {
+        repos,
+        hasMore: endIndex < items.length,
+        nextPageIndex: page + 1,
+        totalCount: items.length,
+      };
+    } catch (error) {
+      console.error('Failed to fetch trending from RSS:', error);
+      return { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
+    }
   }
 
   async getHotReleaseRepositories(
