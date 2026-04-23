@@ -281,10 +281,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <>
     <div 
       onClick={handleCardClick}
-      className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5 transition-shadow duration-200 ${
+      className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5 transition-all duration-200 ${
         desktopSafeMode
-          ? 'rounded-lg'
-          : 'rounded-xl hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer'
+          ? 'rounded-lg hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 hover:-translate-y-0.5 cursor-pointer'
+          : 'rounded-xl hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 hover:-translate-y-0.5 cursor-pointer'
       }`}
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
