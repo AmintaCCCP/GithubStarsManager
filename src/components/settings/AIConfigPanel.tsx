@@ -3,6 +3,7 @@ import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, 
 import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
+import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 
 interface AIConfigPanelProps {
   t: (zh: string, en: string) => string;
@@ -357,6 +358,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <option value="openai-responses">OpenAI (Responses)</option>
                 <option value="claude">Claude</option>
                 <option value="gemini">Gemini</option>
+                <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
               </select>
             </div>
             
@@ -374,15 +376,30 @@ Focus on practicality and accurate categorization to help users quickly understa
                     ? 'https://api.openai.com/v1'
                     : form.apiType === 'claude'
                       ? 'https://api.anthropic.com/v1'
-                      : 'https://generativelanguage.googleapis.com/v1beta'
+                      : form.apiType === 'openai-compatible'
+                        ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+                        : 'https://generativelanguage.googleapis.com/v1beta'
                 }
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {t(
-                  '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
-                  'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
-                )}
+                {form.apiType === 'openai-compatible'
+                  ? t(
+                      '填写完整的API调用地址，包含完整路径',
+                      'Enter the full API endpoint URL including the complete path'
+                    )
+                  : t(
+                      '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
+                      'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
+                    )}
               </p>
+              {form.baseUrl && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  {t('最终请求地址: ', 'Final request URL: ')}
+                  <span className="font-mono break-all">
+                    {buildFinalApiUrl(form.baseUrl, form.apiType)}
+                  </span>
+                </p>
+              )}
             </div>
             
             <div>

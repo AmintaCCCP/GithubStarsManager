@@ -19,6 +19,7 @@ import {
   ProgrammingLanguage,
   SortBy,
   SortOrder,
+  TrendingTimeRange,
   TopicCategory,
   SubscriptionChannel,
   defaultSubscriptionChannels
@@ -167,6 +168,8 @@ interface AppActions {
   // Discovery actions
   setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
   setDiscoveryLoading: (channel: DiscoveryChannelId, loading: boolean) => void;
+  setDiscoveryLoadingMore: (channel: DiscoveryChannelId, loading: boolean) => void;
+  setDiscoveryLoadMoreError: (channel: DiscoveryChannelId, error: string | null) => void;
   setDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[], append?: boolean) => void;
   setDiscoveryLastRefresh: (channel: DiscoveryChannelId, timestamp: string) => void;
   updateDiscoveryRepo: (repo: DiscoveryRepo) => void;
@@ -181,6 +184,7 @@ interface AppActions {
   setDiscoveryNextPage: (channel: DiscoveryChannelId, page: number) => void;
   setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
   setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
+  setTrendingTimeRange: (range: TrendingTimeRange) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 
@@ -227,6 +231,7 @@ type PersistedAppState = Partial<
     | 'releaseViewMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
+    | 'discoveryChannels'
     | 'discoveryRepos'
     | 'discoveryLastRefresh'
     | 'discoveryTotalCount'
@@ -321,22 +326,21 @@ const normalizePersistedState = (
         }
 
         return {
-          ...defaultChannel,
-          ...(persistedChannel as Partial<typeof defaultChannel>),
-          enabled: persistedChannel.enabled !== false,
-        };
+      ...defaultChannel,
+      enabled: persistedChannel.enabled !== false,
+    };
       });
     })(),
     discoveryRepos: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const persistedRepos = persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
         return {
-          'trending': [],
-          'hot-release': [],
-          'most-popular': [],
-          'topic': [],
-          'search': [],
-          ...(persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>),
+          'trending': persistedRepos['trending'] || [],
+          'hot-release': persistedRepos['hot-release'] || [],
+          'most-popular': persistedRepos['most-popular'] || [],
+          'topic': persistedRepos['topic'] || [],
+          'search': persistedRepos['search'] || [],
         };
       }
       return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
@@ -344,13 +348,13 @@ const normalizePersistedState = (
     discoveryLastRefresh: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const persistedRefresh = persisted as Record<string, string | null>;
         return {
-          'trending': null,
-          'hot-release': null,
-          'most-popular': null,
-          'topic': null,
-          'search': null,
-          ...(persisted as Record<string, string | null>),
+          'trending': persistedRefresh['trending'] || null,
+          'hot-release': persistedRefresh['hot-release'] || null,
+          'most-popular': persistedRefresh['most-popular'] || null,
+          'topic': persistedRefresh['topic'] || null,
+          'search': persistedRefresh['search'] || null,
         };
       }
       return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
@@ -358,13 +362,13 @@ const normalizePersistedState = (
     discoveryTotalCount: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const persistedCount = persisted as Record<string, number>;
         return {
-          'trending': 0,
-          'hot-release': 0,
-          'most-popular': 0,
-          'topic': 0,
-          'search': 0,
-          ...(persisted as Record<string, number>),
+          'trending': persistedCount['trending'] || 0,
+          'hot-release': persistedCount['hot-release'] || 0,
+          'most-popular': persistedCount['most-popular'] || 0,
+          'topic': persistedCount['topic'] || 0,
+          'search': persistedCount['search'] || 0,
         };
       }
       return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
@@ -374,17 +378,19 @@ const normalizePersistedState = (
       : 'trending',
     // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）
     discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+    discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+    discoveryLoadMoreError: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
     // discoveryHasMore 从持久化恢复，确保对象格式
     discoveryHasMore: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryHasMore;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const persistedHasMore = persisted as Record<string, boolean>;
         return {
-          'trending': false,
-          'hot-release': false,
-          'most-popular': false,
-          'topic': false,
-          'search': false,
-          ...(persisted as Record<string, boolean>),
+          'trending': persistedHasMore['trending'] || false,
+          'hot-release': persistedHasMore['hot-release'] || false,
+          'most-popular': persistedHasMore['most-popular'] || false,
+          'topic': persistedHasMore['topic'] || false,
+          'search': persistedHasMore['search'] || false,
         };
       }
       return { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false };
@@ -393,19 +399,20 @@ const normalizePersistedState = (
     discoveryNextPage: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryNextPage;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
+        const persistedPage = persisted as Record<string, number>;
         return {
-          'trending': 1,
-          'hot-release': 1,
-          'most-popular': 1,
-          'topic': 1,
-          'search': 1,
-          ...(persisted as Record<string, number>),
+          'trending': persistedPage['trending'] || 1,
+          'hot-release': persistedPage['hot-release'] || 1,
+          'most-popular': persistedPage['most-popular'] || 1,
+          'topic': persistedPage['topic'] || 1,
+          'search': persistedPage['search'] || 1,
         };
       }
       return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
     })(),
     // discoveryScrollPositions 不持久化，始终重置为 0
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+  trendingTimeRange: 'weekly' as TrendingTimeRange,
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: {
       'most-stars': [],
@@ -563,10 +570,10 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
 const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '热门仓库',
+    name: '趋势',
     nameEn: 'Trending',
     icon: 'trending',
-    description: '最近30天内星标数超过50的热门仓库',
+    description: 'GitHub 趋势仓库，支持今日/本周/本月筛选',
     enabled: true,
   },
   {
@@ -648,6 +655,8 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
       discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
       discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+      discoveryLoadMoreError: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
       selectedDiscoveryChannel: 'trending',
       discoveryPlatform: 'All',
       discoveryLanguage: 'All',
@@ -659,6 +668,7 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
       discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
       discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+  trendingTimeRange: 'weekly' as TrendingTimeRange,
 
       // Subscription
       subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
@@ -1166,9 +1176,41 @@ export const useAppStore = create<AppState & AppActions>()(
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
 
     // Discovery actions
-    setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set({ selectedDiscoveryChannel }),
+    setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({
+      selectedDiscoveryChannel,
+      discoveryRepos: {
+        ...state.discoveryRepos,
+        [selectedDiscoveryChannel]: []
+      },
+      discoveryNextPage: {
+        ...state.discoveryNextPage,
+        [selectedDiscoveryChannel]: 1
+      },
+      discoveryHasMore: {
+        ...state.discoveryHasMore,
+        [selectedDiscoveryChannel]: false
+      },
+      discoveryTotalCount: {
+        ...state.discoveryTotalCount,
+        [selectedDiscoveryChannel]: 0
+      },
+      discoveryIsLoadingMore: {
+        ...state.discoveryIsLoadingMore,
+        [selectedDiscoveryChannel]: false
+      },
+      discoveryLoadMoreError: {
+        ...state.discoveryLoadMoreError,
+        [selectedDiscoveryChannel]: null
+      }
+    })),
     setDiscoveryLoading: (channel, loading) => set((state) => ({
       discoveryIsLoading: { ...state.discoveryIsLoading, [channel]: loading },
+    })),
+    setDiscoveryLoadingMore: (channel, loading) => set((state) => ({
+      discoveryIsLoadingMore: { ...state.discoveryIsLoadingMore, [channel]: loading },
+    })),
+    setDiscoveryLoadMoreError: (channel, error) => set((state) => ({
+      discoveryLoadMoreError: { ...state.discoveryLoadMoreError, [channel]: error },
     })),
     setDiscoveryRepos: (channel, repos, append = false) => set((state) => ({
       discoveryRepos: { 
@@ -1209,7 +1251,8 @@ export const useAppStore = create<AppState & AppActions>()(
     setDiscoveryTotalCount: (channel, count) => set((state) => ({
       discoveryTotalCount: { ...state.discoveryTotalCount, [channel]: count },
     })),
-    setDiscoveryScrollPosition: (channel, position) => set((state) => ({
+    setTrendingTimeRange: (range) => set({ trendingTimeRange: range }),
+  setDiscoveryScrollPosition: (channel, position) => set((state) => ({
       discoveryScrollPositions: { ...state.discoveryScrollPositions, [channel]: position },
     })),
     appendDiscoveryRepos: (channel, repos) => set((state) => ({
@@ -1351,10 +1394,9 @@ export const useAppStore = create<AppState & AppActions>()(
       }
 
       return {
-        ...defaultChannel,
-        ...(persistedChannel as Partial<typeof defaultChannel>),
-        enabled: persistedChannel.enabled !== false,
-      };
+      ...defaultChannel,
+      enabled: persistedChannel.enabled !== false,
+    };
     });
   }
   // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）

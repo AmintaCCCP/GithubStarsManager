@@ -67,7 +67,7 @@ export interface GitHubUser {
   email: string | null;
 }
 
-export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini';
+export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'openai-compatible';
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
@@ -199,6 +199,8 @@ export interface AppState {
   discoveryRepos: Record<DiscoveryChannelId, DiscoveryRepo[]>;
   discoveryLastRefresh: Record<DiscoveryChannelId, string | null>;
   discoveryIsLoading: Record<DiscoveryChannelId, boolean>;
+  discoveryIsLoadingMore: Record<DiscoveryChannelId, boolean>;
+  discoveryLoadMoreError: Record<DiscoveryChannelId, string | null>;
   selectedDiscoveryChannel: DiscoveryChannelId;
   discoveryPlatform: DiscoveryPlatform;
   discoveryLanguage: ProgrammingLanguage;
@@ -210,6 +212,7 @@ export interface AppState {
   discoveryNextPage: Record<DiscoveryChannelId, number>;
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
+  trendingTimeRange: TrendingTimeRange;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -279,6 +282,8 @@ export interface DiscoveryRepo extends Repository {
   channel: DiscoveryChannelId;
   platform: DiscoveryPlatform;
 }
+
+export type TrendingTimeRange = 'daily' | 'weekly' | 'monthly';
 
 export type TopicCategory = 
   | 'ai' 

@@ -10,19 +10,19 @@ import {
   Crown,
   Filter,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Monitor,
   Apple,
   Terminal,
   Smartphone,
   Globe,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
@@ -35,7 +35,8 @@ import type {
   ProgrammingLanguage,
   SortBy,
   SortOrder,
-  TopicCategory 
+  TopicCategory,
+  TrendingTimeRange
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
@@ -284,264 +285,104 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
   );
 };
 
-// Pagination Component
-interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
+interface LoadMoreButtonProps {
+  onLoadMore: () => void;
+  isLoading: boolean;
+  hasMore: boolean;
+  currentCount: number;
+  totalCount: number;
   language: 'zh' | 'en';
 }
 
-const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, language }) => {
+const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
+  onLoadMore,
+  isLoading,
+  hasMore,
+  currentCount,
+  totalCount,
+  language
+}) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-  const [inputPage, setInputPage] = useState<string>(currentPage.toString());
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // 同步外部页码变化到输入框
-  useEffect(() => {
-    if (!isEditing) {
-      setInputPage(currentPage.toString());
-    }
-  }, [currentPage, isEditing]);
-
-  // 聚焦输入框
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const delta = 2;
-
-    for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= currentPage - delta && i <= currentPage + delta)
-      ) {
-        pages.push(i);
-      } else if (pages[pages.length - 1] !== '...') {
-        pages.push('...');
-      }
-    }
-
-    return pages;
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // 只允许数字
-    if (value === '' || /^\d*$/.test(value)) {
-      setInputPage(value);
-    }
-  };
-
-  const handleInputSubmit = () => {
-    const pageNum = parseInt(inputPage, 10);
-    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
-      onPageChange(pageNum);
-    } else {
-      // 无效输入，重置为当前页
-      setInputPage(currentPage.toString());
-    }
-    setIsEditing(false);
-  };
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleInputSubmit();
-    } else if (e.key === 'Escape') {
-      setInputPage(currentPage.toString());
-      setIsEditing(false);
-    }
-  };
-
-  const handleInputBlur = () => {
-    handleInputSubmit();
-  };
-
-  if (totalPages <= 1) return null;
+  if (!hasMore) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-8">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+          <div className="w-8 h-px bg-gray-300 dark:bg-gray-600" />
+          <span className="text-sm">{t('已加载全部', 'All loaded')}</span>
+          <div className="w-8 h-px bg-gray-300 dark:bg-gray-600" />
+        </div>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {t(`共 ${totalCount} 个项目`, `Total ${totalCount} items`)}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center justify-center gap-2 py-4 flex-wrap">
+    <div className="flex flex-col items-center gap-3 py-6">
       <button
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        onClick={onLoadMore}
+        disabled={isLoading}
+        className={`
+          group relative px-8 py-3 rounded-xl font-medium
+          bg-gradient-to-r from-blue-500 to-indigo-600 
+          hover:from-blue-600 hover:to-indigo-700
+          text-white shadow-lg shadow-blue-500/25 
+          hover:shadow-xl hover:shadow-blue-500/30
+          disabled:opacity-50 disabled:cursor-not-allowed
+          transition-all duration-200
+          flex items-center gap-2
+          overflow-hidden
+        `}
       >
-        <ChevronLeft className="w-4 h-4" />
-        {t('上一页', 'Prev')}
-      </button>
-
-      <div className="flex items-center gap-1">
-        {getPageNumbers().map((page, index) => (
-          <React.Fragment key={index}>
-            {page === '...' ? (
-              <span className="px-2 text-gray-400">...</span>
-            ) : (
-              <button
-                onClick={() => onPageChange(page as number)}
-                className={`min-w-[36px] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === page
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {page}
-              </button>
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-
-      <button
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {t('下一页', 'Next')}
-        <ChevronRight className="w-4 h-4" />
-      </button>
-
-      {/* 可编辑页码跳转 */}
-      <div className="flex items-center gap-2 ml-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{t('跳转到', 'Go to')}</span>
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputPage}
-            onChange={handleInputChange}
-            onKeyDown={handleInputKeyDown}
-            onBlur={handleInputBlur}
-            className="w-12 px-2 py-1 text-sm text-center border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-blue-400"
-          />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        
+        {isLoading ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>{t('加载中...', 'Loading...')}</span>
+          </>
         ) : (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="w-12 px-2 py-1 text-sm text-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:border-blue-500 dark:hover:border-blue-400 transition-colors dark:text-white"
-            title={t('点击编辑页码', 'Click to edit page')}
-          >
-            {currentPage}
-          </button>
+          <>
+            <ChevronDown className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+            <span>{t('加载更多', 'Load More')}</span>
+          </>
         )}
-        <span className="text-sm text-gray-500 dark:text-gray-400">/ {totalPages}</span>
+      </button>
+      
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <span>
+          {t(
+            `已加载 ${currentCount} / ${totalCount} 个项目`,
+            `Loaded ${currentCount} / ${totalCount} items`
+          )}
+        </span>
       </div>
     </div>
   );
 };
 
-interface CompactPaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  language: 'zh' | 'en';
+interface DataStatsProps {
+  currentCount: number;
   totalCount: number;
+  language: 'zh' | 'en';
 }
 
-const CompactPagination: React.FC<CompactPaginationProps> = ({ 
-  currentPage, 
-  totalPages, 
-  onPageChange, 
-  language,
-  totalCount 
-}) => {
+const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, language }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-  const [inputPage, setInputPage] = useState<string>(currentPage.toString());
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setInputPage(currentPage.toString());
-    }
-  }, [currentPage, isEditing]);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '' || /^\d*$/.test(value)) {
-      setInputPage(value);
-    }
-  };
-
-  const handleInputSubmit = () => {
-    const pageNum = parseInt(inputPage, 10);
-    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
-      onPageChange(pageNum);
-    } else {
-      setInputPage(currentPage.toString());
-    }
-    setIsEditing(false);
-  };
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleInputSubmit();
-    } else if (e.key === 'Escape') {
-      setInputPage(currentPage.toString());
-      setIsEditing(false);
-    }
-  };
-
-  if (totalPages <= 1) return null;
-
+  
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-      <button
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title={t('上一页', 'Previous')}
-      >
-        <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-      </button>
-      
-      <span className="hidden xl:inline text-xs text-gray-500 dark:text-gray-400">
-        {t('共', 'Total')} {totalCount}
-      </span>
-      
-      <div className="flex items-center gap-1">
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputPage}
-            onChange={handleInputChange}
-            onKeyDown={handleInputKeyDown}
-            onBlur={handleInputSubmit}
-            className="w-10 px-1.5 py-0.5 text-xs text-center border border-blue-500 rounded focus:outline-none dark:bg-gray-700 dark:text-white"
-          />
-        ) : (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="w-10 px-1.5 py-0.5 text-xs text-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:border-blue-500 transition-colors dark:text-white"
-            title={t('点击跳转', 'Click to jump')}
-          >
-            {currentPage}
-          </button>
+    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+      <span>
+        {t('共', 'Total')} <strong className="text-gray-900 dark:text-white">{currentCount}</strong> {t('个项目', 'items')}
+        {totalCount > 0 && currentCount < totalCount && (
+          <span className="text-gray-400 dark:text-gray-500">
+            {' '}{t('（总计', '(total')} {totalCount} {t('个）', 'items)')}
+          </span>
         )}
-        <span className="text-xs text-gray-500 dark:text-gray-400">/ {totalPages}</span>
-      </div>
-      
-      <button
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title={t('下一页', 'Next')}
-      >
-        <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-      </button>
+      </span>
     </div>
   );
 };
@@ -554,9 +395,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
     discoveryRepos,
     discoveryLastRefresh,
     discoveryIsLoading,
+    discoveryIsLoadingMore,
+    discoveryLoadMoreError,
     selectedDiscoveryChannel,
     setSelectedDiscoveryChannel,
     setDiscoveryLoading,
+    setDiscoveryLoadingMore,
+    setDiscoveryLoadMoreError,
     setDiscoveryRepos,
     setDiscoveryLastRefresh,
     updateDiscoveryRepo,
@@ -584,6 +429,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryTotalCount,
     setDiscoveryScrollPosition,
     appendDiscoveryRepos,
+    trendingTimeRange,
+    setTrendingTimeRange,
   } = useAppStore();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -591,10 +438,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
   
-  // 当前页码状态（从1开始）
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // 滚动容器引用
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
@@ -615,8 +458,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
     [discoveryChannels]
   );
 
-  const ITEMS_PER_PAGE = 20;
-
   // 获取当前频道的所有仓库
   const allRepos = useMemo(
     () => (discoveryRepos && discoveryRepos[selectedDiscoveryChannel]) || [],
@@ -626,27 +467,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 从 store 获取当前频道的总数量
   const currentTotalCount = discoveryTotalCount?.[selectedDiscoveryChannel] ?? 0;
 
-  const totalPages = useMemo(() => {
-    if (currentTotalCount > 0) {
-      return Math.ceil(currentTotalCount / ITEMS_PER_PAGE);
-    }
-    if (allRepos.length > 0) {
-      return Math.ceil(allRepos.length / ITEMS_PER_PAGE);
-    }
-    return 0;
-  }, [currentTotalCount, allRepos.length]);
-
-  // 获取当前页显示的仓库
-  const currentPageRepos = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return allRepos.slice(startIndex, endIndex);
-  }, [allRepos, currentPage]);
-
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
-  const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
-  const currentNextPage = discoveryNextPage?.[selectedDiscoveryChannel] ?? 1;
+  const currentIsLoadingMore = discoveryIsLoadingMore?.[selectedDiscoveryChannel] ?? false;
+  const currentLoadMoreError = discoveryLoadMoreError?.[selectedDiscoveryChannel] ?? null;
   const currentChannel = safeDiscoveryChannels.find(ch => ch.id === selectedDiscoveryChannel);
   const currentChannelIcon = currentChannel?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
@@ -660,14 +484,19 @@ export const DiscoveryView: React.FC = React.memo(() => {
       return;
     }
 
-    setDiscoveryLoading(channelId, true);
+    if (append) {
+      setDiscoveryLoadingMore(channelId, true);
+      setDiscoveryLoadMoreError(channelId, null);
+    } else {
+      setDiscoveryLoading(channelId, true);
+    }
     try {
       const githubApi = new GitHubApiService(githubToken);
       let result;
 
       switch (channelId) {
         case 'trending':
-          result = await githubApi.getTrendingRepositories(discoveryPlatform, page);
+          result = await githubApi.getTrendingRepositories(discoveryPlatform, page, 20, trendingTimeRange);
           break;
         case 'hot-release':
           result = await githubApi.getHotReleaseRepositories(discoveryPlatform, page);
@@ -700,8 +529,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
 
-      // 合并AI分析结果（如果仓库之前被分析过）
+      const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
+
       const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
+      const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
         const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
@@ -714,6 +545,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
             analysis_failed: existingRepo.analysis_failed,
           };
         }
+        const persisted = persistedAnalyses.get(newRepo.id);
+        if (persisted && persisted.analyzed_at) {
+          return {
+            ...newRepo,
+            ai_summary: persisted.ai_summary,
+            ai_tags: persisted.ai_tags,
+            ai_platforms: persisted.ai_platforms,
+            analyzed_at: persisted.analyzed_at,
+            analysis_failed: persisted.analysis_failed,
+          };
+        }
         return newRepo;
       });
 
@@ -724,22 +566,39 @@ export const DiscoveryView: React.FC = React.memo(() => {
       }
       setDiscoveryHasMore(channelId, result.hasMore);
       setDiscoveryNextPage(channelId, result.nextPageIndex);
-      // 保存总数量用于计算总页数
       if (result.totalCount !== undefined) {
         setDiscoveryTotalCount(channelId, result.totalCount);
       }
       setDiscoveryLastRefresh(channelId, new Date().toISOString());
+
+      if (append && scrollContainerRef.current) {
+        requestAnimationFrame(() => {
+          if (!scrollContainerRef.current) return;
+          const repoCards = scrollContainerRef.current.querySelectorAll('[data-repo-index]');
+          const targetCard = repoCards[prevCount] as HTMLElement | undefined;
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      }
     } catch (error) {
       console.error(`Failed to refresh channel ${channelId}:`, error);
-      alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+      if (append) {
+        setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
+      } else {
+        alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+      }
     } finally {
-      setDiscoveryLoading(channelId, false);
+      if (append) {
+        setDiscoveryLoadingMore(channelId, false);
+      } else {
+        setDiscoveryLoading(channelId, false);
+      }
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);
 
-  // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
+  // 切换频道时恢复滚动位置，并自动加载空数据
   useEffect(() => {
-    setCurrentPage(1);
     // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
     if (scrollContainerRef.current) {
       const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
@@ -754,6 +613,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
+
+  // 趋势时间范围改变时刷新数据
+  useEffect(() => {
+    if (selectedDiscoveryChannel === 'trending' && trendingTimeRange) {
+      refreshChannel('trending', 1, false);
+    }
+  }, [trendingTimeRange, selectedDiscoveryChannel, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -823,11 +689,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
       return;
     }
 
-    // 获取当前页的20个项目
-    const pageRepos = currentPageRepos;
+    const pageRepos = allRepos;
     
     if (pageRepos.length === 0) {
-      alert(t('当前页面没有项目。', 'No projects on current page.'));
+      alert(t('当前没有项目。', 'No projects available.'));
       return;
     }
 
@@ -887,6 +752,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
               analysis_failed: false,
             };
             updateDiscoveryRepo(updatedRepo);
+            discoveryAnalysisStorage.saveAnalysis(updatedRepo.id, {
+              ai_summary: result.summary,
+              ai_tags: result.tags,
+              ai_platforms: result.platforms,
+              analyzed_at: updatedRepo.analyzed_at,
+              analysis_failed: false,
+            });
           } else if (!result.success && result.repo) {
             const failedRepo: DiscoveryRepo = {
               ...result.repo,
@@ -897,6 +769,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
               analysis_failed: true,
             };
             updateDiscoveryRepo(failedRepo);
+            discoveryAnalysisStorage.saveAnalysis(failedRepo.id, {
+              analyzed_at: failedRepo.analyzed_at,
+              analysis_failed: true,
+            });
           }
         }
       );
@@ -917,7 +793,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       setAnalysisOptimizer(null);
       setAnalysisProgress({ current: 0, total: 0 });
     }
-  }, [githubToken, aiConfigs, activeAIConfig, language, currentPageRepos, t, updateDiscoveryRepo, setAnalysisProgress]);
+  }, [githubToken, aiConfigs, activeAIConfig, language, allRepos, t, updateDiscoveryRepo, setAnalysisProgress]);
 
 
 
@@ -937,15 +813,28 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [selectedDiscoveryChannel, searchInput, setDiscoverySearchQuery, refreshChannel]);
 
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-    
-    // 如果目标页的数据还没有加载，先加载数据
-    const requiredItems = page * ITEMS_PER_PAGE;
-    if (allRepos.length < requiredItems && currentHasMore && !currentIsLoading) {
-      refreshChannel(selectedDiscoveryChannel, currentNextPage, true);
+  const handleLoadMore = useCallback(async () => {
+    if (!discoveryHasMore[selectedDiscoveryChannel]) {
+      return;
     }
-  }, [allRepos.length, currentHasMore, currentIsLoading, currentNextPage, refreshChannel, selectedDiscoveryChannel]);
+    
+    if (currentIsLoading) {
+      return;
+    }
+    
+    const nextPage = discoveryNextPage[selectedDiscoveryChannel];
+    if (!nextPage) {
+      return;
+    }
+    
+    await refreshChannel(selectedDiscoveryChannel, nextPage, true);
+  }, [
+    discoveryHasMore,
+    discoveryNextPage,
+    selectedDiscoveryChannel,
+    currentIsLoading,
+    refreshChannel
+  ]);
 
   const refreshAll = useCallback(async () => {
     const enabledChannels = safeDiscoveryChannels.filter(ch => ch.enabled);
@@ -970,14 +859,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
         channels={mobileChannels}
         selectedChannel={selectedDiscoveryChannel}
         onChannelSelect={(channel) => {
-          // 保存当前频道的滚动位置到 ref 和 state
           if (scrollContainerRef.current) {
             const scrollTop = scrollContainerRef.current.scrollTop;
             discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
             setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
           }
           setSelectedDiscoveryChannel(channel);
-          setCurrentPage(1);
         }}
         language={language}
       />
@@ -988,14 +875,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
             channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
-              // 保存当前频道的滚动位置到 ref 和 state
               if (scrollContainerRef.current) {
                 const scrollTop = scrollContainerRef.current.scrollTop;
                 discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
                 setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
               }
               setSelectedDiscoveryChannel(channel);
-              setCurrentPage(1);
             }}
             onRefreshAll={refreshAll}
             isLoading={discoveryIsLoading}
@@ -1054,7 +939,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
               
               {/* 第二行：筛选和操作按钮 */}
               <div className="flex items-center gap-2 flex-wrap">
-                {selectedDiscoveryChannel === 'topic' && (
+                {selectedDiscoveryChannel === 'trending' && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <select
+                value={trendingTimeRange}
+                onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="daily">{t('今日', 'Today')}</option>
+                <option value="weekly">{t('本周', 'This Week')}</option>
+                <option value="monthly">{t('本月', 'This Month')}</option>
+              </select>
+            </div>
+          )}
+        {selectedDiscoveryChannel === 'topic' && (
                   <select
                     value={discoverySelectedTopic || ''}
                     onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
@@ -1114,18 +1013,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={t('AI分析当前页', 'Analyze current page with AI')}
+                      title={t('AI分析', 'Analyze with AI')}
                     >
                       <Bot className="w-4 h-4" />
                       <span className="hidden sm:inline">{t('AI分析', 'AI Analyze')}</span>
                     </button>
                   )}
-                  <CompactPagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={handlePageChange}
+                  <DataStats
+                    currentCount={allRepos.length}
+                    totalCount={currentTotalCount}
                     language={language}
-                    totalCount={currentTotalCount || allRepos.length}
                   />
                 </div>
               </div>
@@ -1244,97 +1141,126 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {!currentIsLoading && allRepos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
-                {isDesktopSafeMode ? (
-                  <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                    {currentChannelIconNode}
-                  </div>
+                {selectedDiscoveryChannel === 'search' ? (
+                  <>
+                    {isDesktopSafeMode ? (
+                      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        {currentChannelIconNode}
+                      </div>
+                    ) : (
+                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                        {currentChannelStyle.largeIcon}
+                      </div>
+                    )}
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
+                        {t('搜索发现', 'Search & Discover')}
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+                        {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                    {currentChannelStyle.largeIcon}
-                  </div>
+                  <>
+                    {isDesktopSafeMode ? (
+                      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        {currentChannelIconNode}
+                      </div>
+                    ) : (
+                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                        {currentChannelStyle.largeIcon}
+                      </div>
+                    )}
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
+                        {t('暂无数据', 'No data yet')}
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+                        {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
+                      disabled={currentIsLoading}
+                      className={isDesktopSafeMode
+                        ? 'px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium'
+                        : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      {t('立即刷新', 'Refresh Now')}
+                    </button>
+                  </>
                 )}
-                <div className="space-y-2 max-w-xs">
-                  <p className="text-gray-600 dark:text-gray-400 font-medium text-base">
-                    {t('暂无数据', 'No data yet')}
-                  </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
-                    {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
-                  </p>
+              </div>
+            )}
+
+            {allRepos.length > 0 && (
+              <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
+                {allRepos.map((repo, index) => (
+                  <div key={repo.id} data-repo-index={index}>
+                    <SubscriptionRepoCard repo={repo} desktopSafeMode={isDesktopSafeMode} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {currentIsLoadingMore && (
+              <div className="flex items-center justify-center py-6 gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                <span className="text-sm text-gray-500 dark:text-gray-400">{t('正在加载更多...', 'Loading more...')}</span>
+              </div>
+            )}
+
+            {currentLoadMoreError && (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="flex items-center gap-2 text-red-500 dark:text-red-400">
+                  <X className="w-4 h-4" />
+                  <span className="text-sm">{currentLoadMoreError}</span>
                 </div>
                 <button
-                  onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
-                  disabled={currentIsLoading}
-                  className={isDesktopSafeMode
-                    ? 'px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium'
-                    : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                  onClick={() => {
+                    const nextPage = discoveryNextPage[selectedDiscoveryChannel];
+                    if (nextPage) {
+                      refreshChannel(selectedDiscoveryChannel, nextPage, true);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-2"
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  {t('立即刷新', 'Refresh Now')}
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {t('重试', 'Retry')}
                 </button>
               </div>
             )}
 
-            <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
-              {currentPageRepos.map(repo => (
-                <SubscriptionRepoCard key={repo.id} repo={repo} desktopSafeMode={isDesktopSafeMode} />
-              ))}
-            </div>
-
             {/* Page Info */}
-            {allRepos.length > 0 && (
+            {!currentIsLoading && allRepos.length > 0 && (
               <div className={isDesktopSafeMode
                 ? 'flex items-center justify-between py-3.5 px-5 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-sm'
                 : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-gray-100 dark:border-gray-700/50 text-sm'}>
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   <span>
-                    {t('共', 'Total')} <strong className="text-gray-900 dark:text-white">{currentTotalCount || allRepos.length}</strong> {t('个项目', 'items')}
-                    {totalPages > 1 && (
-                      <> · {t('第', 'Page')} <strong>{currentPage}/{totalPages}</strong> {t('页', 'pages')}</>
-                    )}
+                    {t('共', 'Total')} <strong className="text-gray-900 dark:text-white">{allRepos.length}</strong> {t('个项目', 'items')}
                   </span>
                 </div>
-                {currentHasMore && (
-                  <div className="flex items-center gap-1.5 text-blue-500 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    {t('还有更多', 'More available')}
-                  </div>
-                )}
+
               </div>
             )}
-
-            {/* Pagination */}
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              language={language}
-            />
 
             {/* Load More Button */}
-            {currentHasMore && (
-              <div className="flex justify-center py-4">
-                <button
-                  onClick={() => refreshChannel(selectedDiscoveryChannel, currentNextPage, true)}
-                  disabled={currentIsLoading}
-                  className={isDesktopSafeMode
-                    ? 'group px-8 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2.5 text-sm font-medium'
-                    : 'group px-8 py-3 rounded-xl bg-gray-100/80 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2.5 text-sm font-medium shadow-sm'}
-                >
-                  {currentIsLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {t('加载中...', 'Loading...')}
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
-                      {t('加载更多数据', 'Load More Data')}
-                    </>
-                  )}
-                </button>
-              </div>
+            {!currentIsLoading && !currentIsLoadingMore && allRepos.length > 0 && (
+              <LoadMoreButton
+                onLoadMore={handleLoadMore}
+                isLoading={false}
+                hasMore={discoveryHasMore[selectedDiscoveryChannel] ?? false}
+                currentCount={allRepos.length}
+                totalCount={currentTotalCount}
+                language={language}
+              />
             )}
+
+
           </div>
 
           {/* 滚动到底部按钮 */}
