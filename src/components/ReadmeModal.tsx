@@ -46,19 +46,35 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   const currentFontSize = FONT_SIZES[fontSizeIndex].value;
 
+  const stripMarkdownFormatting = (text: string): string => {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+      .replace(/~~(.+?)~~/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   const extractToc = useCallback((content: string): { items: TocItem[], idMap: Map<string, string> } => {
     const items: TocItem[] = [];
     const idMap = new Map<string, string>();
     const regex = /^(#{1,3})\s+(.+)$/gm;
     let match;
     let idCounter = 0;
+    const textCountMap = new Map<string, number>();
     
     while ((match = regex.exec(content)) !== null) {
       const level = match[1].length;
-      const text = match[2].trim();
+      const rawText = match[2].trim();
+      const displayText = stripMarkdownFormatting(rawText);
       const id = `heading-${idCounter++}`;
-      items.push({ id, text, level });
-      idMap.set(text, id);
+      const count = textCountMap.get(displayText) || 0;
+      const mapKey = count === 0 ? displayText : `${displayText}__${count}`;
+      textCountMap.set(displayText, count + 1);
+      items.push({ id, text: displayText, level });
+      idMap.set(mapKey, id);
     }
     
     return { items, idMap };
@@ -72,10 +88,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       const containerRect = container.getBoundingClientRect();
       const scrollTop = container.scrollTop + elementRect.top - containerRect.top - 20;
       
-      container.scrollTo({
-        top: scrollTop,
-        behavior: 'smooth'
-      });
+      try {
+        container.scrollTo({
+          top: scrollTop,
+          behavior: 'smooth'
+        });
+      } catch {
+        container.scrollTop = scrollTop;
+      }
     }
   }, []);
 

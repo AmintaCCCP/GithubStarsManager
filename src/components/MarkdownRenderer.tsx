@@ -691,13 +691,29 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   const remarkPlugins = [remarkGfm, remarkBreaks];
   const rehypePlugins = enableHtml ? [rehypeRaw, rehypeSanitize] : [];
 
+  let headingCounter = 0;
+  const headingTextCountMap = new Map<string, number>();
+
+  const extractTextFromChildren = (children: React.ReactNode): string => {
+    if (typeof children === 'string') return children;
+    if (typeof children === 'number') return String(children);
+    if (Array.isArray(children)) return children.map(extractTextFromChildren).join('');
+    if (React.isValidElement(children)) {
+      return extractTextFromChildren((children.props as { children?: React.ReactNode }).children);
+    }
+    return '';
+  };
+
   const getHeadingId = (children: React.ReactNode): string | undefined => {
-    const text = typeof children === 'string' 
-      ? children 
-      : Array.isArray(children) 
-        ? children.join('') 
-        : String(children);
-    return headingIds?.get(text);
+    if (headingIds && headingIds.size > 0) {
+      const text = extractTextFromChildren(children);
+      const count = headingTextCountMap.get(text) || 0;
+      const mapKey = count === 0 ? text : `${text}__${count}`;
+      headingTextCountMap.set(text, count + 1);
+      const id = headingIds.get(mapKey);
+      if (id) return id;
+    }
+    return `heading-${headingCounter++}`;
   };
 
   return (
