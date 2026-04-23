@@ -566,7 +566,7 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
 const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '趋势(Trending)',
+    name: '趋势',
     nameEn: 'Trending',
     icon: 'trending',
     description: 'GitHub 趋势仓库，支持今日/本周/本月筛选',

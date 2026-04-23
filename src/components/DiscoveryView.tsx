@@ -17,7 +17,8 @@ import {
   Terminal,
   Smartphone,
   Globe,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
