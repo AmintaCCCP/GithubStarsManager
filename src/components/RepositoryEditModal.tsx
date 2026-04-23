@@ -119,7 +119,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     // 优先级: custom_description(非undefined) > ai_summary > description
     // custom_description === '' 表示用户明确清空，来源为 'none'
     let descSource: DataSource;
-    if (repo.custom_description !== undefined) {
+    if (repo.custom_description !== undefined && repo.custom_description !== null) {
       if (repo.custom_description.trim() !== '') {
         descSource = 'custom';
       } else {
@@ -176,7 +176,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     // custom_description === '' 表示用户明确清空，表单中显示为空
     // custom_description === undefined 表示无自定义，回退到AI/原始
     let effectiveDescription = '';
-    if (repo.custom_description !== undefined) {
+    if (repo.custom_description !== undefined && repo.custom_description !== null) {
       effectiveDescription = repo.custom_description;
     } else if (repo.ai_summary && repo.ai_summary.trim() !== '') {
       effectiveDescription = repo.ai_summary;
@@ -277,7 +277,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       case 'keep-custom':
       default: {
         // 保持自定义：检查内容是否与原始来源一致
-        const descTrimmed = formData.description.trim();
+        const descTrimmed = (formData.description || '').trim();
 
         // 如果内容为空，视为清除
         if (descTrimmed === '') {
@@ -457,9 +457,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     if (!repository) return { description: false, tags: false, category: false };
 
     const isDescCustom = editIntent.description === 'keep-custom' &&
-      formData.description.trim() !== '' &&
-      formData.description.trim() !== (repository.ai_summary || '').trim() &&
-      formData.description.trim() !== (repository.description || '').trim();
+      (formData.description || '').trim() !== '' &&
+      (formData.description || '').trim() !== (repository.ai_summary || '').trim() &&
+      (formData.description || '').trim() !== (repository.description || '').trim();
 
     const aiTags = repository.ai_tags || [];
     const topics = repository.topics || [];
@@ -644,12 +644,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           {/* Source Indicator */}
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs text-gray-500 dark:text-gray-400">{t('当前来源:', 'Source:')}</span>
-            {editIntent.description === 'keep-custom' && formData.description.trim() !== '' ? (
+            {editIntent.description === 'keep-custom' && (formData.description || '').trim() !== '' ? (
               <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-full">
                 <Edit3 className="w-3 h-3 mr-1" />
                 {t('自定义', 'Custom')}
               </span>
-            ) : editIntent.description === 'keep-custom' && formData.description.trim() === '' ? (
+            ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
               <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 rounded-full">
                 <AlertTriangle className="w-3 h-3 mr-1" />
                 {t('将回退', 'Will fallback')}
@@ -720,7 +720,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 </span>
               </p>
             </div>
-          ) : editIntent.description === 'keep-custom' && formData.description.trim() === '' ? (
+          ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
             <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start">
                 <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
