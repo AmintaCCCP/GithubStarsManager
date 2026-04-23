@@ -701,7 +701,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     );
     
     if (unanalyzed.length === 0) {
-      alert(t('当前页面所有项目已完成AI分析。', 'All projects on current page have been analyzed.'));
+      alert(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'));
       return;
     }
 
