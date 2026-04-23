@@ -17,7 +17,8 @@ import {
   Terminal,
   Smartphone,
   Globe,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -584,6 +585,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoveryTotalCount,
     setDiscoveryScrollPosition,
     appendDiscoveryRepos,
+    trendingTimeRange,
+    setTrendingTimeRange,
   } = useAppStore();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -667,7 +670,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
       switch (channelId) {
         case 'trending':
-          result = await githubApi.getTrendingRepositories(discoveryPlatform, page);
+          result = await githubApi.getTrendingRepositories(discoveryPlatform, page, 20, trendingTimeRange);
           break;
         case 'hot-release':
           result = await githubApi.getHotReleaseRepositories(discoveryPlatform, page);
@@ -735,7 +738,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       setDiscoveryLoading(channelId, false);
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);
 
   // 切换频道时重置页码、恢复滚动位置，并自动加载空数据
   useEffect(() => {
@@ -754,6 +757,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
+
+  // 趋势时间范围改变时刷新数据
+  useEffect(() => {
+    if (selectedDiscoveryChannel === 'trending' && trendingTimeRange) {
+      refreshChannel('trending', 1, false);
+    }
+  }, [trendingTimeRange, selectedDiscoveryChannel, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -1054,7 +1064,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
               
               {/* 第二行：筛选和操作按钮 */}
               <div className="flex items-center gap-2 flex-wrap">
-                {selectedDiscoveryChannel === 'topic' && (
+                {selectedDiscoveryChannel === 'trending' && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <select
+                value={trendingTimeRange}
+                onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100/80 text-gray-700 dark:bg-gray-700/80 dark:text-gray-300 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="daily">{t('今日', 'Today')}</option>
+                <option value="weekly">{t('本周', 'This Week')}</option>
+                <option value="monthly">{t('本月', 'This Month')}</option>
+              </select>
+            </div>
+          )}
+        {selectedDiscoveryChannel === 'topic' && (
                   <select
                     value={discoverySelectedTopic || ''}
                     onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}

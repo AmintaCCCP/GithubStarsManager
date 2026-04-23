@@ -210,6 +210,7 @@ export interface AppState {
   discoveryNextPage: Record<DiscoveryChannelId, number>;
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
+  trendingTimeRange: TrendingTimeRange;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -279,6 +280,8 @@ export interface DiscoveryRepo extends Repository {
   channel: DiscoveryChannelId;
   platform: DiscoveryPlatform;
 }
+
+export type TrendingTimeRange = 'daily' | 'weekly' | 'monthly';
 
 export type TopicCategory = 
   | 'ai' 

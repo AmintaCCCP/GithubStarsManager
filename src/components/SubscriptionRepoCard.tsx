@@ -272,9 +272,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   // 点击卡片打开 README
   const handleCardClick = useCallback(() => {
-    if (desktopSafeMode) return;
     setReadmeModalOpen(true);
-  }, [desktopSafeMode]);
+  }, []);
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
 
@@ -388,14 +387,14 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           </div>
 
           {/* Description */}
-          {!desktopSafeMode && repo.description && (
+          {repo.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
               {repo.description}
             </p>
           )}
 
           {/* AI Summary */}
-          {!desktopSafeMode && repo.ai_summary && (
+          {repo.ai_summary && (
             <div className="flex items-start gap-1.5 mb-3">
               <Bot className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-purple-600 dark:text-purple-400 line-clamp-2">
@@ -405,7 +404,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Tags */}
-          {!desktopSafeMode && ((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0)) && (
+          {((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0)) && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
@@ -419,7 +418,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Platform icons */}
-          {!desktopSafeMode && repo.ai_platforms && repo.ai_platforms.length > 0 && (
+          {repo.ai_platforms && repo.ai_platforms.length > 0 && (
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs text-gray-400 dark:text-gray-500">
                 {t('平台:', 'Platforms:')}
@@ -503,13 +502,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     </Modal>
 
     {/* README Modal */}
-    {!desktopSafeMode && (
       <ReadmeModal
         isOpen={readmeModalOpen}
         onClose={() => setReadmeModalOpen(false)}
-        repository={repo}
-      />
-    )}
+        repository={repo} />
     </>
   );
 };
