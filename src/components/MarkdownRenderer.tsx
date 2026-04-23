@@ -1,13 +1,12 @@
 import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { Copy, Check, Download } from 'lucide-react';
 import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.min.css';
 import 'highlight.js/styles/github.min.css';
 import { useAppStore } from '../store/useAppStore';
 import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
@@ -199,14 +198,14 @@ const CodeBlock: React.FC<{
               ))}
             </div>
             <pre className={`flex-1 p-4 overflow-x-auto ${className || ''}`}>
-              <code ref={codeRef} className={`text-sm font-mono leading-6 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+              <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
                 {children}
               </code>
             </pre>
           </div>
         ) : (
           <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-            <code ref={codeRef} className={`text-sm font-mono leading-6 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
               {children}
             </code>
           </pre>
@@ -716,92 +715,120 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     return `heading-${headingCounter++}`;
   };
 
+  const markdownComponents: Components = {
+    a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} />,
+    img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
+    h1: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>;
+    },
+    h2: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h2 id={id} className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
+    },
+    h3: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h3 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>;
+    },
+    h4: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h4 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h4>;
+    },
+    h5: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h5 id={id} className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1 mb-1">{children}</h5>;
+    },
+    h6: ({ children }) => {
+      const id = getHeadingId(children);
+      return <h6 id={id} className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1 mb-1">{children}</h6>;
+    },
+    p: ({ children }) => {
+      const childArray = React.Children.toArray(children);
+      const hasImagesOnly = childArray.every(
+        child => {
+          if (React.isValidElement(child)) {
+            if (child.type === MarkdownImage) return true;
+            if (child.type === 'img') return true;
+          }
+          if (typeof child === 'string' && child.trim() === '') return true;
+          return false;
+        }
+      );
+      return (
+        <p className={`text-gray-700 dark:text-gray-300 mb-2 leading-relaxed ${
+          hasImagesOnly
+            ? 'flex flex-wrap items-center justify-center gap-3'
+            : ''
+        }`}>
+          {children}
+        </p>
+      );
+    },
+    ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
+    li: ({ children, className, ...props }) => (
+      <li className={`ml-2 ${className || ''}`} {...props}>
+        {children}
+      </li>
+    ),
+    strong: ({ children }) => (
+      <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+    ),
+    em: ({ children }) => (
+      <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
+    ),
+    del: ({ children }) => (
+      <del className="line-through text-gray-500 dark:text-gray-400">{children}</del>
+    ),
+    code: ({ className, children, node, ...props }) => {
+      const isInline = !className;
+      const match = /language-(\w+)/.exec(className || '');
+      const language = match ? match[1] : '';
+      
+      return isInline ? (
+        <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
+          {children}
+        </code>
+      ) : (
+        <CodeBlock className={className} language={language}>
+          {children}
+        </CodeBlock>
+      );
+    },
+    pre: ({ children }) => <>{children}</>,
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
+        {children}
+      </blockquote>
+    ),
+    hr: () => <hr className="my-4 border-gray-200 dark:border-gray-700" />,
+    table: ({ children }) => (
+      <div className="overflow-x-auto my-3">
+        <table className="min-w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>,
+    tbody: ({ children }) => <tbody className="text-gray-700 dark:text-gray-300">{children}</tbody>,
+    th: ({ children }) => (
+      <th className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-gray-700 dark:text-gray-300">
+        {children}
+      </td>
+    ),
+  };
+
   return (
     <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
-        components={{
-          a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} />,
-          img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
-          h1: ({ children }) => {
-            const id = getHeadingId(children);
-            return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>;
-          },
-          h2: ({ children }) => {
-            const id = getHeadingId(children);
-            return <h2 id={id} className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
-          },
-          h3: ({ children }) => {
-            const id = getHeadingId(children);
-            return <h3 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>;
-          },
-          p: ({ children }) => {
-            const childArray = React.Children.toArray(children);
-            const hasImagesOnly = childArray.every(
-              child => {
-                if (React.isValidElement(child)) {
-                  if (child.type === MarkdownImage) return true;
-                  if (child.type === 'img') return true;
-                }
-                if (typeof child === 'string' && child.trim() === '') return true;
-                return false;
-              }
-            );
-            return (
-              <p className={`text-gray-700 dark:text-gray-300 mb-2 leading-relaxed ${
-                hasImagesOnly
-                  ? 'flex flex-wrap items-center justify-center gap-3'
-                  : ''
-              }`}>
-                {children}
-              </p>
-            );
-          },
-          ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
-          li: ({ children }) => <li className="ml-2">{children}</li>,
-          code: ({ className, children, ...props }) => {
-            const isInline = !className;
-            const match = /language-(\w+)/.exec(className || '');
-            const language = match ? match[1] : '';
-            
-            return isInline ? (
-              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
-                {children}
-              </code>
-            ) : (
-              <CodeBlock className={className} language={language}>
-                {children}
-              </CodeBlock>
-            );
-          },
-          pre: ({ children }) => <>{children}</>,
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
-              {children}
-            </blockquote>
-          ),
-          hr: () => <hr className="my-4 border-gray-200 dark:border-gray-700" />,
-          table: ({ children }) => (
-            <div className="overflow-x-auto my-3">
-              <table className="min-w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm">
-                {children}
-              </table>
-            </div>
-          ),
-          thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>,
-          th: ({ children }) => (
-            <th className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">
-              {children}
-            </th>
-          ),
-          td: ({ children }) => (
-            <td className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-gray-700 dark:text-gray-300">
-              {children}
-            </td>
-          ),
-        }}
+        components={markdownComponents}
       >
         {content}
       </ReactMarkdown>

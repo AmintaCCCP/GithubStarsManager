@@ -29,12 +29,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   onClose,
   repository
 }) => {
-  const { githubToken, language } = useAppStore();
+  const { githubToken, language, setReadmeModalOpen } = useAppStore();
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [showToc, setShowToc] = useState(false);
+  const [showToc, setShowToc] = useState(true);
   const [fontSizeIndex, setFontSizeIndex] = useState(1);
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
   const [headingIdMap, setHeadingIdMap] = useState<Map<string, string>>(new Map());
@@ -99,16 +98,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     }
   }, []);
 
-  const handleScroll = useCallback(() => {
-    if (contentRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = contentRef.current;
-      const progress = scrollHeight > clientHeight 
-        ? (scrollTop / (scrollHeight - clientHeight)) * 100 
-        : 0;
-      setScrollProgress(Math.min(100, Math.max(0, progress)));
-    }
-  }, []);
-
   const cycleFontSize = useCallback(() => {
     setFontSizeIndex((prev) => (prev + 1) % FONT_SIZES.length);
   }, []);
@@ -169,6 +158,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     }
   }, [isOpen, repository, fetchReadme]);
 
+  useEffect(() => {
+    setReadmeModalOpen(isOpen);
+    return () => setReadmeModalOpen(false);
+  }, [isOpen, setReadmeModalOpen]);
+
   // Reset state when modal closes and cancel pending requests
   useEffect(() => {
     if (!isOpen) {
@@ -179,10 +173,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setReadmeContent('');
       setError(null);
       setLoading(false);
-      setScrollProgress(0);
-      setShowToc(false);
       setTocItems([]);
       setHeadingIdMap(new Map());
+    } else {
+      setShowToc(true);
     }
   }, [isOpen]);
 
@@ -307,19 +301,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          {/* Scroll Progress Bar */}
-          <div className="h-1 bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-150"
-              style={{ width: `${scrollProgress}%` }}
-            />
-          </div>
-
           {/* Main Content Area */}
           <div className="flex-1 flex overflow-hidden">
             {/* TOC Sidebar */}
             {showToc && tocItems.length > 0 && (
-              <div className="w-56 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 flex-shrink-0">
+              <div className="w-56 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 flex-shrink-0 readme-scrollbar">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   {t('目录', 'Contents')}
                 </h4>
@@ -346,8 +332,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             {/* Content */}
             <div 
               ref={contentRef}
-              onScroll={handleScroll}
-              className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text`}
+              className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar`}
             >
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">

@@ -144,6 +144,7 @@ interface AppActions {
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setReadmeModalOpen: (open: boolean) => void;
   
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
@@ -645,6 +646,7 @@ export const useAppStore = create<AppState & AppActions>()(
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
       isSidebarCollapsed: false,
+      readmeModalOpen: false,
       releaseViewMode: 'timeline',
       releaseSelectedFilters: [],
       releaseSearchQuery: '',
@@ -1143,6 +1145,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),
       setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
+      setReadmeModalOpen: (readmeModalOpen) => set({ readmeModalOpen }),
       
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
