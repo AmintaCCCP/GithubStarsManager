@@ -199,6 +199,8 @@ export interface AppState {
   discoveryRepos: Record<DiscoveryChannelId, DiscoveryRepo[]>;
   discoveryLastRefresh: Record<DiscoveryChannelId, string | null>;
   discoveryIsLoading: Record<DiscoveryChannelId, boolean>;
+  discoveryIsLoadingMore: Record<DiscoveryChannelId, boolean>;
+  discoveryLoadMoreError: Record<DiscoveryChannelId, string | null>;
   selectedDiscoveryChannel: DiscoveryChannelId;
   discoveryPlatform: DiscoveryPlatform;
   discoveryLanguage: ProgrammingLanguage;

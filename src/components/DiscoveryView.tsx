@@ -34,7 +34,8 @@ import type {
   ProgrammingLanguage,
   SortBy,
   SortOrder,
-  TopicCategory 
+  TopicCategory,
+  TrendingTimeRange
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
@@ -393,9 +394,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
     discoveryRepos,
     discoveryLastRefresh,
     discoveryIsLoading,
+    discoveryIsLoadingMore,
+    discoveryLoadMoreError,
     selectedDiscoveryChannel,
     setSelectedDiscoveryChannel,
     setDiscoveryLoading,
+    setDiscoveryLoadingMore,
+    setDiscoveryLoadMoreError,
     setDiscoveryRepos,
     setDiscoveryLastRefresh,
     updateDiscoveryRepo,
@@ -463,6 +468,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
+  const currentIsLoadingMore = discoveryIsLoadingMore?.[selectedDiscoveryChannel] ?? false;
+  const currentLoadMoreError = discoveryLoadMoreError?.[selectedDiscoveryChannel] ?? null;
   const currentChannel = safeDiscoveryChannels.find(ch => ch.id === selectedDiscoveryChannel);
   const currentChannelIcon = currentChannel?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
@@ -476,7 +483,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
       return;
     }
 
-    setDiscoveryLoading(channelId, true);
+    if (append) {
+      setDiscoveryLoadingMore(channelId, true);
+      setDiscoveryLoadMoreError(channelId, null);
+    } else {
+      setDiscoveryLoading(channelId, true);
+    }
     try {
       const githubApi = new GitHubApiService(githubToken);
       let result;
@@ -516,7 +528,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
 
-      // 合并AI分析结果（如果仓库之前被分析过）
+      const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
+
       const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
         const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
@@ -540,18 +553,36 @@ export const DiscoveryView: React.FC = React.memo(() => {
       }
       setDiscoveryHasMore(channelId, result.hasMore);
       setDiscoveryNextPage(channelId, result.nextPageIndex);
-      // 保存总数量用于计算总页数
       if (result.totalCount !== undefined) {
         setDiscoveryTotalCount(channelId, result.totalCount);
       }
       setDiscoveryLastRefresh(channelId, new Date().toISOString());
+
+      if (append && scrollContainerRef.current) {
+        requestAnimationFrame(() => {
+          if (!scrollContainerRef.current) return;
+          const repoCards = scrollContainerRef.current.querySelectorAll('[data-repo-index]');
+          const targetCard = repoCards[prevCount] as HTMLElement | undefined;
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      }
     } catch (error) {
       console.error(`Failed to refresh channel ${channelId}:`, error);
-      alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+      if (append) {
+        setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
+      } else {
+        alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+      }
     } finally {
-      setDiscoveryLoading(channelId, false);
+      if (append) {
+        setDiscoveryLoadingMore(channelId, false);
+      } else {
+        setDiscoveryLoading(channelId, false);
+      }
     }
-  }, [githubToken, t, setDiscoveryLoading, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);
+  }, [githubToken, t, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);
 
   // 切换频道时恢复滚动位置，并自动加载空数据
   useEffect(() => {
@@ -1116,14 +1147,46 @@ export const DiscoveryView: React.FC = React.memo(() => {
               </div>
             )}
 
-            <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
-              {allRepos.map(repo => (
-                <SubscriptionRepoCard key={repo.id} repo={repo} desktopSafeMode={isDesktopSafeMode} />
-              ))}
-            </div>
+            {allRepos.length > 0 && (
+              <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
+                {allRepos.map((repo, index) => (
+                  <div key={repo.id} data-repo-index={index}>
+                    <SubscriptionRepoCard repo={repo} desktopSafeMode={isDesktopSafeMode} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {currentIsLoadingMore && (
+              <div className="flex items-center justify-center py-6 gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                <span className="text-sm text-gray-500 dark:text-gray-400">{t('正在加载更多...', 'Loading more...')}</span>
+              </div>
+            )}
+
+            {currentLoadMoreError && (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="flex items-center gap-2 text-red-500 dark:text-red-400">
+                  <X className="w-4 h-4" />
+                  <span className="text-sm">{currentLoadMoreError}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const nextPage = discoveryNextPage[selectedDiscoveryChannel];
+                    if (nextPage) {
+                      refreshChannel(selectedDiscoveryChannel, nextPage, true);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {t('重试', 'Retry')}
+                </button>
+              </div>
+            )}
 
             {/* Page Info */}
-            {allRepos.length > 0 && (
+            {!currentIsLoading && allRepos.length > 0 && (
               <div className={isDesktopSafeMode
                 ? 'flex items-center justify-between py-3.5 px-5 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-sm'
                 : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-gray-100 dark:border-gray-700/50 text-sm'}>
@@ -1138,10 +1201,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {/* Load More Button */}
-            {allRepos.length > 0 && (
+            {!currentIsLoading && !currentIsLoadingMore && allRepos.length > 0 && (
               <LoadMoreButton
                 onLoadMore={handleLoadMore}
-                isLoading={currentIsLoading}
+                isLoading={false}
                 hasMore={discoveryHasMore[selectedDiscoveryChannel] ?? false}
                 currentCount={allRepos.length}
                 totalCount={currentTotalCount}
