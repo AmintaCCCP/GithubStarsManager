@@ -645,8 +645,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
-  const currentHasMore = discoveryHasMore?.[selectedDiscoveryChannel] ?? false;
-  const currentNextPage = discoveryNextPage?.[selectedDiscoveryChannel] ?? 1;
   const currentChannel = safeDiscoveryChannels.find(ch => ch.id === selectedDiscoveryChannel);
   const currentChannelIcon = currentChannel?.icon || 'trending';
   const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
@@ -940,12 +938,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
     
-    // 如果目标页的数据还没有加载，先加载数据
-    const requiredItems = page * ITEMS_PER_PAGE;
-    if (allRepos.length < requiredItems && currentHasMore && !currentIsLoading) {
-      refreshChannel(selectedDiscoveryChannel, currentNextPage, true);
+    // 分页切换时滚动到顶部
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
     }
-  }, [allRepos.length, currentHasMore, currentIsLoading, currentNextPage, refreshChannel, selectedDiscoveryChannel]);
+    
+    // 分页逻辑：仅设置当前页码，不再自动加载更多数据
+  }, [setCurrentPage]);
 
   const refreshAll = useCallback(async () => {
     const enabledChannels = safeDiscoveryChannels.filter(ch => ch.enabled);
@@ -1294,12 +1296,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                   </span>
                 </div>
-                {currentHasMore && (
-                  <div className="flex items-center gap-1.5 text-blue-500 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    {t('还有更多', 'More available')}
-                  </div>
-                )}
+
               </div>
             )}
 
@@ -1311,30 +1308,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               language={language}
             />
 
-            {/* Load More Button */}
-            {currentHasMore && (
-              <div className="flex justify-center py-4">
-                <button
-                  onClick={() => refreshChannel(selectedDiscoveryChannel, currentNextPage, true)}
-                  disabled={currentIsLoading}
-                  className={isDesktopSafeMode
-                    ? 'group px-8 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2.5 text-sm font-medium'
-                    : 'group px-8 py-3 rounded-xl bg-gray-100/80 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2.5 text-sm font-medium shadow-sm'}
-                >
-                  {currentIsLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {t('加载中...', 'Loading...')}
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
-                      {t('加载更多数据', 'Load More Data')}
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+
           </div>
 
           {/* 滚动到底部按钮 */}
