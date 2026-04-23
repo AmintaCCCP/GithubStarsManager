@@ -19,6 +19,7 @@ import {
   ProgrammingLanguage,
   SortBy,
   SortOrder,
+  TrendingTimeRange,
   TopicCategory,
   SubscriptionChannel,
   defaultSubscriptionChannels
@@ -181,6 +182,7 @@ interface AppActions {
   setDiscoveryNextPage: (channel: DiscoveryChannelId, page: number) => void;
   setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
   setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
+  setTrendingTimeRange: (range: TrendingTimeRange) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 
@@ -406,6 +408,7 @@ const normalizePersistedState = (
     })(),
     // discoveryScrollPositions 不持久化，始终重置为 0
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+  trendingTimeRange: 'weekly' as TrendingTimeRange,
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: {
       'most-stars': [],
@@ -563,10 +566,10 @@ const defaultPresetFilters: AssetFilter[] = PRESET_FILTERS.map(pf => ({
 const defaultDiscoveryChannels: DiscoveryChannel[] = [
   {
     id: 'trending',
-    name: '热门仓库',
+    name: '趋势(Trending)',
     nameEn: 'Trending',
     icon: 'trending',
-    description: '最近30天内星标数超过50的热门仓库',
+    description: 'GitHub 趋势仓库，支持今日/本周/本月筛选',
     enabled: true,
   },
   {
@@ -659,6 +662,7 @@ export const useAppStore = create<AppState & AppActions>()(
       discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
       discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
       discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
+  trendingTimeRange: 'weekly' as TrendingTimeRange,
 
       // Subscription
       subscriptionRepos: { 'most-stars': [], 'most-forks': [], 'most-dev': [], 'trending': [] },
@@ -1209,7 +1213,8 @@ export const useAppStore = create<AppState & AppActions>()(
     setDiscoveryTotalCount: (channel, count) => set((state) => ({
       discoveryTotalCount: { ...state.discoveryTotalCount, [channel]: count },
     })),
-    setDiscoveryScrollPosition: (channel, position) => set((state) => ({
+    setTrendingTimeRange: (range) => set({ trendingTimeRange: range }),
+  setDiscoveryScrollPosition: (channel, position) => set((state) => ({
       discoveryScrollPositions: { ...state.discoveryScrollPositions, [channel]: position },
     })),
     appendDiscoveryRepos: (channel, repos) => set((state) => ({
