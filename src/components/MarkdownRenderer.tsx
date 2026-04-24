@@ -20,6 +20,10 @@ interface MarkdownRendererProps {
   headingIds?: Map<string, string>;
 }
 
+const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
+const REHYPE_PLUGINS_WITH_HTML = [rehypeRaw, rehypeSanitize];
+const REHYPE_PLUGINS_NO_HTML: never[] = [];
+
 const CodeBlock: React.FC<{
   children: React.ReactNode;
   className?: string;
@@ -57,6 +61,13 @@ const CodeBlock: React.FC<{
     return langMap[langLower] || langLower;
   }, [language]);
 
+  const codeText = useMemo(() => {
+    if (typeof children === 'string') {
+      return children.replace(/\n$/, '');
+    }
+    return String(children).replace(/\n$/, '');
+  }, [children]);
+
   useEffect(() => {
     if (codeRef.current) {
       try {
@@ -68,10 +79,6 @@ const CodeBlock: React.FC<{
   }, [children, normalizedLanguage]);
 
   const handleCopy = useCallback(async () => {
-    const codeText = typeof children === 'string'
-      ? children
-      : String(children);
-
     setCopyError(null);
 
     const result = await safeWriteText(codeText);
@@ -83,9 +90,9 @@ const CodeBlock: React.FC<{
       console.error('Failed to copy:', result.error);
       setCopyError(result.error || getClipboardErrorMessage('write', uiLanguage));
     }
-  }, [children, uiLanguage]);
+  }, [codeText, uiLanguage]);
 
-  const codeLines = typeof children === 'string' ? children.split('\n') : [];
+  const codeLines = codeText.split('\n');
   const lineCount = codeLines.length;
   const showLineNumbers = lineCount > 3;
 
@@ -199,14 +206,14 @@ const CodeBlock: React.FC<{
             </div>
             <pre className={`flex-1 p-4 overflow-x-auto ${className || ''}`}>
               <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-                {children}
+                {codeText}
               </code>
             </pre>
           </div>
         ) : (
           <pre className={`p-4 overflow-x-auto ${className || ''}`}>
             <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-              {children}
+              {codeText}
             </code>
           </pre>
         )}
@@ -215,18 +222,25 @@ const CodeBlock: React.FC<{
   );
 };
 
-const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string }> = ({ 
-  href, 
-  children, 
-  baseUrl 
+const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string; headingIds?: Map<string, string> }> = ({
+  href,
+  children,
+  baseUrl,
+  headingIds
 }) => {
   if (!href) return <>{children}</>;
+
+  const isMailto = href.startsWith('mailto:');
+  const isTel = href.startsWith('tel:');
 
   const resolveHref = (link: string): string => {
     if (link.startsWith('http://') || link.startsWith('https://') || link.startsWith('//')) {
       return link;
     }
     if (link.startsWith('#')) {
+      return link;
+    }
+    if (link.startsWith('mailto:') || link.startsWith('tel:')) {
       return link;
     }
     if (baseUrl) {
@@ -241,59 +255,95 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
 
   const resolvedHref = resolveHref(href);
   const isHashLink = href.startsWith('#');
+  const isSpecialLink = isMailto || isTel;
+
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.stopPropagation();
+    if (isHashLink && headingIds) {
+      e.preventDefault();
+      const anchorText = decodeURIComponent(href.substring(1));
+      const targetId = headingIds.get(anchorText);
+      if (targetId) {
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+      }
+      const elementById = document.getElementById(anchorText);
+      if (elementById) {
+        elementById.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
 
   return (
     <a
       href={resolvedHref}
-      target={isHashLink ? undefined : "_blank"}
-      rel={isHashLink ? undefined : "noopener noreferrer"}
+      target={isHashLink || isSpecialLink ? undefined : "_blank"}
+      rel={isHashLink || isSpecialLink ? undefined : "noopener noreferrer"}
       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
-      onClick={(e) => e.stopPropagation()}
+      onClick={handleAnchorClick}
     >
       {children}
     </a>
   );
 };
 
-const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> = ({ 
-  src, 
-  alt, 
-  baseUrl 
-}) => {
-  const [hasError, setHasError] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isZoomed, setIsZoomed] = React.useState(false);
-  const [isInsideLink, setIsInsideLink] = React.useState(false);
-  const [parentLinkHref, setParentLinkHref] = React.useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = React.useState(false);
-  const [naturalWidth, setNaturalWidth] = React.useState<number>(0);
-  const [naturalHeight, setNaturalHeight] = React.useState<number>(0);
-  const [zoomScale, setZoomScale] = React.useState(1);
-  const [zoomPos, setZoomPos] = React.useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = React.useState(false);
-  const dragStartRef = React.useRef({ x: 0, y: 0, posX: 0, posY: 0 });
-  const imgRef = React.useRef<HTMLImageElement>(null);
-  const { language } = useAppStore();
-  
-  if (!src) return null;
-
-  const resolveImageSrc = (imageSrc: string): string => {
-    if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://') || imageSrc.startsWith('//')) {
+const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
+  if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://') || imageSrc.startsWith('//')) {
+    return imageSrc;
+  }
+  if (baseUrl) {
+    try {
+      return new URL(imageSrc, baseUrl + '/raw/HEAD/').href;
+    } catch {
       return imageSrc;
     }
-    if (baseUrl) {
-      try {
-        return new URL(imageSrc, baseUrl + '/raw/HEAD/').href;
-      } catch {
-        return imageSrc;
-      }
+  }
+  return imageSrc;
+};
+
+const truncateUrl = (url: string, maxLength: number = 50): string => {
+  if (url.length <= maxLength) return url;
+  try {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname;
+    if (path.length > 20) {
+      return `${urlObj.host}${path.substring(0, 20)}...`;
     }
-    return imageSrc;
-  };
+    return `${urlObj.host}${path}`;
+  } catch {
+    return url.substring(0, maxLength) + '...';
+  }
+};
 
-  const imageUrl = resolveImageSrc(src);
+const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> = ({
+  src,
+  alt,
+  baseUrl
+}) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [isInsideLink, setIsInsideLink] = useState(false);
+  const [parentLinkHref, setParentLinkHref] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [naturalWidth, setNaturalWidth] = useState<number>(0);
+  const [naturalHeight, setNaturalHeight] = useState<number>(0);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [imageSizeKnown, setImageSizeKnown] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+  const imgRef = useRef<HTMLImageElement>(null);
+  const zoomOverlayRef = useRef<HTMLDivElement>(null);
+  const { language } = useAppStore();
 
-  React.useEffect(() => {
+  const imageUrl = useMemo(() => resolveImageSrc(src || '', baseUrl), [src, baseUrl]);
+
+  useEffect(() => {
+    if (!src) return;
     if (imgRef.current) {
       const parent = imgRef.current.closest('a');
       setIsInsideLink(!!parent);
@@ -301,27 +351,59 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
         setParentLinkHref(parent.getAttribute('href'));
       }
     }
+  }, [src]);
+
+  const closeZoom = useCallback(() => {
+    setIsZoomed(false);
+    setZoomScale(1);
+    setZoomPos({ x: 0, y: 0 });
   }, []);
 
-  const handleImageClick = React.useCallback((e: React.MouseEvent) => {
+  useEffect(() => {
+    if (!isZoomed) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeZoom();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isZoomed, closeZoom]);
+
+  useEffect(() => {
+    if (!isZoomed || !zoomOverlayRef.current) return;
+
+    const overlay = zoomOverlayRef.current;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
+    };
+
+    overlay.addEventListener('wheel', handleWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleWheel);
+  }, [isZoomed]);
+
+  const handleImageClick = useCallback((e: React.MouseEvent) => {
     if (isInsideLink && parentLinkHref) {
-      // 带链接的图片：Ctrl+点击打开链接，普通点击放大
       if (e.ctrlKey || e.metaKey) {
         window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
         return;
       }
     }
-    // 普通点击放大图片
     e.preventDefault();
     e.stopPropagation();
     setIsZoomed(true);
   }, [isInsideLink, parentLinkHref]);
 
-  const handleDownload = React.useCallback(async (e: React.MouseEvent) => {
+  const handleDownload = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (isDownloading) return;
-    
+
     setIsDownloading(true);
     let objectUrl: string | null = null;
     try {
@@ -330,7 +412,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
-      const fileName = alt 
+      const fileName = alt
         ? `${alt.replace(/[/\\?%*:|"<>]/g, '_')}.${blob.type.split('/')[1] || 'png'}`
         : `image-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
       a.download = fileName;
@@ -356,22 +438,58 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     }
   }, [imageUrl, alt, isDownloading]);
 
-  const truncateUrl = (url: string, maxLength: number = 50): string => {
-    if (url.length <= maxLength) return url;
-    try {
-      const urlObj = new URL(url);
-      const path = urlObj.pathname;
-      if (path.length > 20) {
-        return `${urlObj.host}${path.substring(0, 20)}...`;
-      }
-      return `${urlObj.host}${path}`;
-    } catch {
-      return url.substring(0, maxLength) + '...';
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (zoomScale > 1 && e.touches.length === 1) {
+      setIsDragging(true);
+      const touch = e.touches[0];
+      dragStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        posX: zoomPos.x,
+        posY: zoomPos.y
+      };
     }
-  };
+  }, [zoomScale, zoomPos]);
 
-  // 判断是否需要限制小图片尺寸（小于300px的图片不放大显示）
-  const isSmallImage = naturalWidth > 0 && naturalWidth < 300;
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isDragging && zoomScale > 1 && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - dragStartRef.current.x;
+      const dy = touch.clientY - dragStartRef.current.y;
+      setZoomPos({
+        x: dragStartRef.current.posX + dx,
+        y: dragStartRef.current.posY + dy
+      });
+    }
+  }, [isDragging, zoomScale]);
+
+  const handleTouchEnd = useCallback(() => {
+    setTimeout(() => setIsDragging(false), 50);
+  }, []);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    setIsLoading(false);
+    const w = (e.target as HTMLImageElement).naturalWidth;
+    const h = (e.target as HTMLImageElement).naturalHeight;
+    setNaturalWidth(w);
+    setNaturalHeight(h);
+    setImageSizeKnown(true);
+  }, []);
+
+  const handleImageError = useCallback(() => {
+    setHasError(true);
+    setIsLoading(false);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setHasError(false);
+    setIsLoading(true);
+    setImageSizeKnown(false);
+  }, []);
+
+  const isSmallImage = imageSizeKnown && naturalWidth > 0 && naturalWidth < 300;
+
+  if (!src) return null;
 
   if (hasError) {
     return (
@@ -386,7 +504,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           {alt && <p className="text-xs text-red-500 dark:text-red-500 truncate">{alt}</p>}
         </div>
         <button
-          onClick={() => { setHasError(false); setIsLoading(true); }}
+          onClick={handleRetry}
           className="px-2 py-1 text-xs bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex-shrink-0"
         >
           {language === 'zh' ? '重试' : 'Retry'}
@@ -421,15 +539,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 width: `${naturalWidth}px`,
                 objectFit: 'contain'
               }}
-              onLoad={(e) => {
-                setIsLoading(false);
-                setNaturalWidth((e.target as HTMLImageElement).naturalWidth);
-                setNaturalHeight((e.target as HTMLImageElement).naturalHeight);
-              }}
-              onError={() => {
-                setHasError(true);
-                setIsLoading(false);
-              }}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
               onClick={handleImageClick}
             />
           </span>
@@ -463,15 +574,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 width: 'auto',
                 objectFit: 'contain'
               }}
-              onLoad={(e) => {
-                setIsLoading(false);
-                setNaturalWidth((e.target as HTMLImageElement).naturalWidth);
-                setNaturalHeight((e.target as HTMLImageElement).naturalHeight);
-              }}
-              onError={() => {
-                setHasError(true);
-                setIsLoading(false);
-              }}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
               onClick={handleImageClick}
             />
             <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none" />
@@ -514,24 +618,16 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
         </div>
       )}
 
-      {/* 放大视图：通过Portal渲染到body，避免链接冒泡 */}
       {isZoomed && createPortal(
-        <div 
+        <div
+          ref={zoomOverlayRef}
           className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-sm flex items-center justify-center cursor-default select-none"
           onClick={() => {
             if (!isDragging) {
-              setIsZoomed(false);
-              setZoomScale(1);
-              setZoomPos({ x: 0, y: 0 });
+              closeZoom();
             }
           }}
-          onWheel={(e) => {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.15 : 0.15;
-            setZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
-          }}
         >
-          {/* 顶部工具栏 */}
           <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 pointer-events-auto">
               {alt && (
@@ -605,11 +701,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsZoomed(false);
-                  setZoomScale(1);
-                  setZoomPos({ x: 0, y: 0 });
+                  closeZoom();
                 }}
-                title={language === 'zh' ? '关闭' : 'Close'}
+                title={language === 'zh' ? '关闭 (Esc)' : 'Close (Esc)'}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -617,9 +711,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               </button>
             </div>
           </div>
-          
-          {/* 图片区域 */}
-          <div 
+
+          <div
             className="flex items-center justify-center w-full h-full"
             onMouseDown={(e) => {
               if (zoomScale > 1) {
@@ -648,6 +741,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             onMouseLeave={() => {
               setIsDragging(false);
             }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             <img
               src={imageUrl}
@@ -661,12 +757,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               draggable={false}
             />
           </div>
-          
-          {/* 底部提示 */}
+
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/50 text-xs pointer-events-none flex items-center gap-3">
             <span>{language === 'zh' ? '滚轮缩放 · 拖拽移动' : 'Scroll to zoom · Drag to pan'}</span>
             <span className="text-white/30">|</span>
-            <span>{language === 'zh' ? '点击背景关闭' : 'Click background to close'}</span>
+            <span>{language === 'zh' ? 'Esc 或点击背景关闭' : 'Esc or click background to close'}</span>
           </div>
         </div>,
         document.body
@@ -675,48 +770,48 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   );
 };
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({ 
-  content, 
-  className = '', 
+const extractTextFromChildren = (children: React.ReactNode): string => {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(extractTextFromChildren).join('');
+  if (React.isValidElement(children)) {
+    return extractTextFromChildren((children.props as { children?: React.ReactNode }).children);
+  }
+  return '';
+};
+
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
+  content,
+  className = '',
   shouldRender = true,
   enableHtml = false,
   baseUrl,
   headingIds
 }) => {
-  if (!shouldRender) {
-    return <div className="h-32 flex items-center justify-center text-gray-400">Loading...</div>;
-  }
+  const headingCounterRef = useRef(headingIds?.size ?? 0);
+  const headingTextCountMapRef = useRef(new Map<string, number>());
 
-  const remarkPlugins = [remarkGfm, remarkBreaks];
-  const rehypePlugins = enableHtml ? [rehypeRaw, rehypeSanitize] : [];
+  useEffect(() => {
+    headingCounterRef.current = headingIds?.size ?? 0;
+    headingTextCountMapRef.current = new Map<string, number>();
+  }, [content, headingIds]);
 
-  let headingCounter = 0;
-  const headingTextCountMap = new Map<string, number>();
+  const rehypePlugins = enableHtml ? REHYPE_PLUGINS_WITH_HTML : REHYPE_PLUGINS_NO_HTML;
 
-  const extractTextFromChildren = (children: React.ReactNode): string => {
-    if (typeof children === 'string') return children;
-    if (typeof children === 'number') return String(children);
-    if (Array.isArray(children)) return children.map(extractTextFromChildren).join('');
-    if (React.isValidElement(children)) {
-      return extractTextFromChildren((children.props as { children?: React.ReactNode }).children);
-    }
-    return '';
-  };
-
-  const getHeadingId = (children: React.ReactNode): string | undefined => {
+  const getHeadingId = useCallback((children: React.ReactNode): string | undefined => {
     if (headingIds && headingIds.size > 0) {
       const text = extractTextFromChildren(children);
-      const count = headingTextCountMap.get(text) || 0;
+      const count = headingTextCountMapRef.current.get(text) || 0;
       const mapKey = count === 0 ? text : `${text}__${count}`;
-      headingTextCountMap.set(text, count + 1);
+      headingTextCountMapRef.current.set(text, count + 1);
       const id = headingIds.get(mapKey);
       if (id) return id;
     }
-    return `heading-${headingCounter++}`;
-  };
+    return `heading-extra-${headingCounterRef.current++}`;
+  }, [headingIds]);
 
-  const markdownComponents: Components = {
-    a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} />,
+  const markdownComponents: Components = useMemo(() => ({
+    a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} headingIds={headingIds} />,
     img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
     h1: ({ children }) => {
       const id = getHeadingId(children);
@@ -780,11 +875,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     del: ({ children }) => (
       <del className="line-through text-gray-500 dark:text-gray-400">{children}</del>
     ),
-    code: ({ className, children, node, ...props }) => {
+    code: ({ className, children, ...props }) => {
       const isInline = !className;
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';
-      
+
       return isInline ? (
         <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
           {children}
@@ -821,12 +916,28 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         {children}
       </td>
     ),
-  };
+    input: (props) => {
+      if (props.type === 'checkbox') {
+        return (
+          <input
+            {...props}
+            readOnly
+            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+          />
+        );
+      }
+      return <input {...props} />;
+    },
+  }), [baseUrl, headingIds, getHeadingId]);
+
+  if (!shouldRender) {
+    return <div className="h-32 flex items-center justify-center text-gray-400">Loading...</div>;
+  }
 
   return (
     <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
       <ReactMarkdown
-        remarkPlugins={remarkPlugins}
+        remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={rehypePlugins}
         components={markdownComponents}
       >
