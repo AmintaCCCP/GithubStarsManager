@@ -54,12 +54,15 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const extractToc = useCallback((content: string): { items: TocItem[], idMap: Map<string, string> } => {
     const items: TocItem[] = [];
     const idMap = new Map<string, string>();
+
+    const codeBlockRegex = /```[\s\S]*?```|~~~[\s\S]*?~~~/g;
+    const cleanedContent = content.replace(codeBlockRegex, '');
     const regex = new RegExp(`^(#{1,${TOC_MAX_LEVEL}})\\s+(.+)$`, 'gm');
     let match;
     let idCounter = 0;
     const textCountMap = new Map<string, number>();
 
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(cleanedContent)) !== null) {
       const level = match[1].length;
       const rawText = match[2].trim();
       const displayText = stripMarkdownFormatting(rawText);
@@ -130,11 +133,15 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   useEffect(() => {
     if (!contentRef.current || !tocItems.length || !readmeContent) return;
 
+    let observer: IntersectionObserver | null = null;
+
     const timer = setTimeout(() => {
       const container = contentRef.current;
       if (!container) return;
 
-      const observer = new IntersectionObserver(
+      if (observer) observer.disconnect();
+
+      observer = new IntersectionObserver(
         (entries) => {
           const visibleEntries = entries.filter(e => e.isIntersecting);
           if (visibleEntries.length > 0) {
@@ -163,13 +170,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             }
           }
         }
-        if (el) observer.observe(el);
+        if (el && observer) observer.observe(el);
       });
-
-      return () => observer.disconnect();
     }, 150);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
   }, [tocItems, readmeContent]);
 
   const scrollToTop = useCallback(() => {
