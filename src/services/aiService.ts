@@ -1,5 +1,6 @@
 import { Repository, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
+import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 
 interface OpenAIResponseContentPart {
   text?: string;
@@ -46,46 +47,6 @@ export class AIService {
     return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
   }
 
-  private buildApiUrl(pathWithVersion: string): string {
-    const baseUrlWithSlash = this.config.baseUrl.endsWith('/')
-      ? this.config.baseUrl
-      : `${this.config.baseUrl}/`;
-
-    const versionPrefix = pathWithVersion.split('/')[0] || '';
-
-    try {
-      const base = new URL(baseUrlWithSlash);
-      const basePath = base.pathname.replace(/\/$/, '');
-
-      // 检测 baseUrl 是否已经以任何版本号结尾（v1, v2, v3, v1beta, v1alpha 等）
-      // 这样可以兼容火山引擎（/v3）、OpenAI（/v1）、Gemini（/v1beta）等不同版本号
-      const anyVersionPattern = /\/v\d+(?:beta|alpha)?$/;
-      const hasVersionInBase = anyVersionPattern.test(basePath);
-
-      if (hasVersionInBase) {
-        // baseUrl 已包含版本号，只补全端点路径（去掉版本号部分）
-        const endpointPath = pathWithVersion.includes('/')
-          ? pathWithVersion.split('/').slice(1).join('/')
-          : pathWithVersion;
-        return new URL(endpointPath, baseUrlWithSlash).toString();
-      }
-
-      // 兼容用户把 baseUrl 写成 .../v1 或 .../v1beta 的情况，避免拼成 /v1/v1/...
-      if (versionPrefix) {
-        const versionRe = new RegExp(`/${versionPrefix}$`);
-        if (versionRe.test(basePath) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
-          const rest = pathWithVersion.slice(versionPrefix.length + 1);
-          return new URL(rest, baseUrlWithSlash).toString();
-        }
-      }
-
-      return new URL(pathWithVersion, baseUrlWithSlash).toString();
-    } catch {
-      // baseUrl 非绝对 URL 时这里会抛错；上层会在 testConnection/调用处处理失败
-      return `${baseUrlWithSlash}${pathWithVersion}`;
-    }
-  }
-
   private async requestText(options: {
     system: string;
     user: string;
@@ -96,7 +57,7 @@ export class AIService {
     const apiType = this.getApiType();
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
@@ -125,7 +86,7 @@ export class AIService {
       if (backend.isAvailable && this.config.id) {
         data = await backend.proxyAIRequest(this.config.id, requestBody) as Record<string, unknown>;
       } else {
-        const url = this.buildApiUrl(apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
+        const url = buildFinalApiUrl(this.config.baseUrl, apiType);
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -182,7 +143,7 @@ export class AIService {
       if (backend.isAvailable && this.config.id) {
         data = await backend.proxyAIRequest(this.config.id, requestBody);
       } else {
-        const url = this.buildApiUrl('v1/messages');
+        const url = buildApiUrl(this.config.baseUrl, 'v1/messages');
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -238,7 +199,7 @@ ${options.user}` : options.user;
       data = await backend.proxyAIRequest(this.config.id, requestBody);
     } else {
       const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
-      const urlObj = new URL(this.buildApiUrl(path));
+      const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
       urlObj.searchParams.set('key', this.config.apiKey);
       const response = await fetch(urlObj.toString(), {
         method: 'POST',

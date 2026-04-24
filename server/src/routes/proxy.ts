@@ -116,8 +116,11 @@ router.post('/api/proxy/ai', async (req, res) => {
       'Accept': 'application/json',
     };
 
-    if (apiType === 'openai' || apiType === 'openai-responses') {
-      targetUrl = buildApiUrl(baseUrl, apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
+      // openai-compatible 类型直接使用 baseUrl 作为完整地址
+      targetUrl = apiType === 'openai-compatible'
+        ? baseUrl.replace(/\/$/, '')
+        : buildApiUrl(baseUrl, apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
       headers['Authorization'] = `Bearer ${apiKey}`;
     } else if (apiType === 'claude') {
       targetUrl = buildApiUrl(baseUrl, 'v1/messages');
@@ -138,7 +141,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       reasoningEffort
       && typeof requestBody === 'object'
       && requestBody !== null
-      && (apiType === 'openai' || apiType === 'openai-responses')
+      && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible')
       && !('reasoning' in requestBody)
     )
       ? { ...requestBody, reasoning: { effort: reasoningEffort } }
