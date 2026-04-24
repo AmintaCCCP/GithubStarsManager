@@ -312,7 +312,7 @@ Focus on practicality and accurate categorization to help users quickly understa
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Bot className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('AI服务配置', 'AI Service Configuration')}
           </h3>
         </div>
@@ -326,33 +326,33 @@ Focus on practicality and accurate categorization to help users quickly understa
       </div>
 
       {showForm && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-4">
+        <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
             {editingId ? t('编辑AI配置', 'Edit AI Configuration') : t('添加AI配置', 'Add AI Configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('接口格式', 'API Format')} *
               </label>
               <select
                 value={form.apiType}
                 onChange={(e) => setForm(prev => ({ ...prev, apiType: e.target.value as AIApiType }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               >
                 <option value="openai">OpenAI (Chat Completions)</option>
                 <option value="openai-responses">OpenAI (Responses)</option>
@@ -363,14 +363,14 @@ Focus on practicality and accurate categorization to help users quickly understa
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('API端点', 'API Endpoint')} *
               </label>
               <input
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={
                   form.apiType === 'openai' || form.apiType === 'openai-responses'
                     ? 'https://api.openai.com/v1'
@@ -381,7 +381,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                         : 'https://generativelanguage.googleapis.com/v1beta'
                 }
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {form.apiType === 'openai-compatible'
                   ? t(
                       '填写完整的API调用地址，包含完整路径',
@@ -393,7 +393,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     )}
               </p>
               {form.baseUrl && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                <p className="text-xs text-blue-600 dark:text-brand-violet mt-1">
                   {t('最终请求地址: ', 'Final request URL: ')}
                   <span className="font-mono break-all">
                     {buildFinalApiUrl(form.baseUrl, form.apiType)}
@@ -403,33 +403,33 @@ Focus on practicality and accurate categorization to help users quickly understa
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('API密钥', 'API Key')} *
               </label>
               <input
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('输入API密钥', 'Enter API key')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('模型名称', 'Model Name')} *
               </label>
               <input
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="gpt-4"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('并发数', 'Concurrency')}
               </label>
               <input
@@ -438,22 +438,22 @@ Focus on practicality and accurate categorization to help users quickly understa
                 max="10"
                 value={form.concurrency}
                 onChange={(e) => setForm(prev => ({ ...prev, concurrency: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="1"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('推理强度', 'Reasoning Effort')}
               </label>
               <select
                 value={form.reasoningEffort}
                 onChange={(e) => setForm(prev => ({ ...prev, reasoningEffort: e.target.value as '' | AIReasoningEffort }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               >
                 <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
                 <option value="none">none</option>
@@ -462,7 +462,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <option value="high">high</option>
                 <option value="xhigh">xhigh</option>
               </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t(
                   '仅对 OpenAI 兼容接口生效。留空时保持旧模式兼容，不额外传 reasoning。',
                   'Only applies to OpenAI-compatible APIs. Leave empty to preserve legacy behavior and omit reasoning.'
@@ -494,9 +494,9 @@ Focus on practicality and accurate categorization to help users quickly understa
                     type="checkbox"
                     checked={form.useCustomPrompt}
                     onChange={(e) => handleUseCustomPromptChange(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/8"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-gray-700 dark:text-text-secondary">
                     {t('使用自定义提示词', 'Use Custom Prompt')}
                   </span>
                 </label>
@@ -507,7 +507,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                   className={`flex items-center space-x-1 text-sm ${
                     showCustomPrompt 
                       ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                      : 'text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      : 'text-gray-600 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-gray-300'
                   }`}
                 >
                   {showDefaultPrompt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -518,7 +518,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   type="button"
                   onClick={handleRestoreDefaultPrompt}
-                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-brand-violet dark:hover:text-blue-300"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
                 </button>
@@ -527,10 +527,10 @@ Focus on practicality and accurate categorization to help users quickly understa
             
             {showDefaultPrompt && !showCustomPrompt && (
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary mb-1">
                   {t('默认提示词（只读）', 'Default Prompt (Read-only)')}
                 </label>
-                <pre className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                <pre className="w-full px-3 py-2 border border-gray-200 dark:border-white/8 rounded-lg bg-gray-50 dark:bg-panel-dark text-gray-700 dark:text-text-secondary font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
                   {defaultPrompt}
                 </pre>
               </div>
@@ -539,7 +539,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             {showCustomPrompt && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary">
                     {t('自定义提示词', 'Custom Prompt')}
                     {isCustomPromptModified && (
                       <span className="ml-2 text-amber-600 dark:text-amber-400">
@@ -560,7 +560,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary font-mono text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent"
                   placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
                 />
               </div>
@@ -605,7 +605,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
                 ? 'border-purple-300 bg-purple-50 dark:border-purple-600 dark:bg-purple-900/20'
-                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                : 'border-gray-200 dark:border-white/8 hover:border-gray-300 dark:hover:border-gray-500'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -615,10 +615,10 @@ Focus on practicality and accurate categorization to help users quickly understa
                   name="activeAI"
                   checked={config.id === activeAIConfig}
                   onChange={() => setActiveAIConfig(config.id)}
-                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/8"
                 />
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
+                  <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
                     {config.name}
                     {config.useCustomPrompt && (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -627,7 +627,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       </span>
                     )}
                   </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
                     {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
@@ -646,7 +646,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -683,7 +683,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         ))}
         
         {aiConfigs.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-gray-500 dark:text-text-tertiary">
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('还没有配置AI服务', 'No AI services configured yet')}</p>
             <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>

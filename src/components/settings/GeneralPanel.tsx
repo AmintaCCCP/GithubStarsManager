@@ -16,52 +16,52 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
         <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('通用设置', 'General Settings')}
         </h3>
       </div>
 
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-gray-200 dark:border-white/8">
         <div className="flex items-center space-x-3 mb-4">
-          <Globe className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h4 className="font-medium text-gray-900 dark:text-white">
+          <Globe className="w-5 h-5 text-blue-600 dark:text-brand-violet" />
+          <h4 className="font-medium text-gray-900 dark:text-text-primary">
             {t('语言设置', 'Language Settings')}
           </h4>
         </div>
         
         <div className="flex items-center space-x-6">
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-white/8 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <input
               type="radio"
               name="language"
               value="zh"
               checked={language === 'zh'}
               onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/8"
             />
             <div>
-              <span className="text-base font-medium text-gray-900 dark:text-white">
+              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
                 中文
               </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary">
                 Simplified Chinese
               </p>
             </div>
           </label>
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-gray-200 dark:border-white/8 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <input
               type="radio"
               name="language"
               value="en"
               checked={language === 'en'}
               onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/8"
             />
             <div>
-              <span className="text-base font-medium text-gray-900 dark:text-white">
+              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
                 English
               </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary">
                 US English
               </p>
             </div>
@@ -69,17 +69,17 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-gray-200 dark:border-white/8">
         <div className="flex items-center space-x-3 mb-4">
           <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-          <h4 className="font-medium text-gray-900 dark:text-white">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary">
             {t('检查更新', 'Check for Updates')}
           </h4>
         </div>
         
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            <p className="text-sm text-gray-600 dark:text-text-tertiary mb-1">
               {t(`当前版本: v${version}`, `Current Version: v${version}`)}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-500">
@@ -90,15 +90,15 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-gray-200 dark:border-white/8">
         <div className="flex items-center space-x-3 mb-4">
           <Mail className="w-5 h-5 text-green-600 dark:text-green-400" />
-          <h4 className="font-medium text-gray-900 dark:text-white">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary">
             {t('联系方式', 'Contact Information')}
           </h4>
         </div>
         
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <p className="text-sm text-gray-600 dark:text-text-tertiary mb-4">
           {t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}
         </p>
         
@@ -110,7 +110,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
                 newWindow.opener = null;
               }
             }}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-brand-violet hover:bg-brand-violet/90 text-white rounded-lg transition-colors"
           >
             <Twitter className="w-5 h-5" />
             <span>Twitter</span>

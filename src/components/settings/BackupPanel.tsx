@@ -257,7 +257,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
         <Cloud className="w-6 h-6 text-green-600 dark:text-green-400" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('备份与恢复', 'Backup & Restore')}
         </h3>
       </div>
@@ -288,14 +288,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="p-6 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
           <div className="flex items-center space-x-3 mb-4">
             <Upload className="w-8 h-8 text-green-600 dark:text-green-400" />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('备份数据', 'Backup Data')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('将数据备份到WebDAV', 'Backup data to WebDAV')}
               </p>
             </div>
@@ -314,14 +314,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           </button>
         </div>
 
-        <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="p-6 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
           <div className="flex items-center space-x-3 mb-4">
-            <Download className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <Download className="w-8 h-8 text-blue-600 dark:text-brand-violet" />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('恢复数据', 'Restore Data')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('从WebDAV恢复数据', 'Restore data from WebDAV')}
               </p>
             </div>
@@ -341,11 +341,11 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+      <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg">
+        <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
           {t('备份内容包括：', 'Backup includes:')}
         </h4>
-        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+        <ul className="text-sm text-gray-600 dark:text-text-tertiary space-y-1">
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('自定义分类', 'Custom categories')}</li>

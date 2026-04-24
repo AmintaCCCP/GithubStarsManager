@@ -15,6 +15,42 @@ export default {
         sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'],
       },
       colors: {
+        // Linear Base Backgrounds
+        'marketing-black': '#08090a', 
+        'panel-dark': '#0f1011',
+        'surface-3': '#191a1b',
+        'surface-sec': '#28282c',
+        
+        // Linear Text
+        'text-primary': '#f7f8f8',
+        'text-secondary': '#d0d6e0',
+        'text-tertiary': '#8a8f98',
+        'text-quaternary': '#62666d',
+        
+        // Linear Brand & Accent
+        'brand-indigo': '#5e6ad2',
+        'brand-violet': '#7170ff',
+        'brand-hover': '#828fff',
+        'security-lavender': '#7a7fad',
+        
+        // Linear Status
+        'status-green': '#27a644',
+        'status-emerald': '#10b981',
+        
+        // Linear Borders (Solid fallbacks, though we mainly use rgba)
+        'border-primary': '#23252a',
+        'border-secondary': '#34343a',
+        'border-tertiary': '#3e3e44',
+        'line-tint': '#141516',
+        'line-tertiary': '#18191a',
+        
+        // Linear Light Mode Neutrals (Fallbacks if needed)
+        'light-bg': '#f7f8f8',
+        'light-surface': '#f3f4f5',
+        'light-border': '#d0d6e0',
+        'light-border-alt': '#e6e6e6',
+
+        // Keeping existing for gradual migration
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -51,6 +87,31 @@ export default {
           800: '#92400e',
           900: '#78350f',
         }
+      },
+      fontWeight: {
+        'light': '300',
+        'normal': '400',
+        'medium': '510',
+        'semibold': '590',
+      },
+      letterSpacing: {
+        'display-xl': '-1.584px',
+        'display-lg': '-1.408px',
+        'display': '-1.056px',
+        'h1': '-0.704px',
+        'h2': '-0.288px',
+        'h3': '-0.24px',
+        'body-lg': '-0.165px',
+        'caption': '-0.13px',
+        'tiny': '-0.15px',
+      },
+      boxShadow: {
+        'subtle': '0px 1.2px 0px rgba(0,0,0,0.03)',
+        'ring': '0px 0px 0px 1px rgba(0,0,0,0.2)',
+        'elevated': '0px 2px 4px rgba(0,0,0,0.4)',
+        'dialog': '0px 8px 2px rgba(0,0,0,0), 0px 5px 2px rgba(0,0,0,0.01), 0px 3px 2px rgba(0,0,0,0.04), 0px 1px 1px rgba(0,0,0,0.07), 0px 0px 1px rgba(0,0,0,0.08)',
+        'focus': '0px 4px 12px rgba(0,0,0,0.1)',
+        'inset-panel': '0px 0px 12px 0px rgba(0,0,0,0.2) inset',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',

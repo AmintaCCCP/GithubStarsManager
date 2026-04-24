@@ -48,8 +48,8 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (
-            <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            <div className="flex items-center space-x-2 text-blue-600 dark:text-brand-violet">
+              <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
               <Search className="w-4 h-4" />
               <span className="font-medium text-sm">
                 {t('实时搜索结果', 'Real-time Search Results')}
@@ -66,7 +66,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         </div>
         
         {searchTime && (
-          <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-text-tertiary">
             <Clock className="w-3 h-3" />
             <span>{searchTime.toFixed(0)}ms</span>
           </div>
@@ -75,10 +75,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {foundRepos}
           </div>
-          <div className="text-gray-600 dark:text-gray-400">
+          <div className="text-gray-600 dark:text-text-tertiary">
             {t('找到仓库', 'Found Repos')}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500">
@@ -87,10 +87,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {stats.languages.length}
           </div>
-          <div className="text-gray-600 dark:text-gray-400">
+          <div className="text-gray-600 dark:text-text-tertiary">
             {t('编程语言', 'Languages')}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500">
@@ -100,10 +100,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {stats.avgStars.toLocaleString()}
           </div>
-          <div className="text-gray-600 dark:text-gray-400">
+          <div className="text-gray-600 dark:text-text-tertiary">
             {t('平均星标', 'Avg Stars')}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500">
@@ -113,10 +113,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {stats.recentlyUpdated}
           </div>
-          <div className="text-gray-600 dark:text-gray-400">
+          <div className="text-gray-600 dark:text-text-tertiary">
             {t('近期更新', 'Recent Updates')}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500">
@@ -128,10 +128,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       {/* 搜索查询显示 */}
       <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
         <div className="flex items-center space-x-2 text-sm">
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className="text-gray-600 dark:text-text-tertiary">
             {t('搜索查询:', 'Search Query:')}
           </span>
-          <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded border text-gray-900 dark:text-white font-mono">
+          <code className="bg-white dark:bg-panel-dark px-2 py-1 rounded border text-gray-900 dark:text-text-primary font-mono">
             "{searchQuery}"
           </code>
           {stats.aiAnalyzed > 0 && (

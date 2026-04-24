@@ -627,3 +627,67 @@
     height: auto;
   }
 }
+
+@layer components {
+  .linear-bg-base {
+    @apply bg-marketing-black text-text-primary;
+  }
+  .linear-bg-panel {
+    @apply bg-panel-dark text-text-primary;
+  }
+  
+  .btn-ghost {
+    @apply bg-white/[0.02] text-text-primary border border-white/5 rounded-md px-3 py-1.5 transition-colors duration-200;
+  }
+  .btn-ghost:hover {
+    @apply bg-white/5 border-white/10;
+  }
+  .btn-ghost:focus {
+    @apply shadow-focus outline-none;
+  }
+
+  .btn-subtle {
+    @apply bg-white/[0.04] text-text-secondary rounded-md px-[6px] py-0 transition-colors duration-200;
+  }
+  .btn-subtle:hover {
+    @apply bg-white/10 text-text-primary;
+  }
+
+  .btn-primary {
+    @apply bg-brand-indigo text-white px-4 py-2 rounded-md transition-colors duration-200 border border-transparent;
+  }
+  .btn-primary:hover {
+    @apply bg-brand-hover;
+  }
+
+  .btn-icon {
+    @apply bg-white/[0.03] text-text-primary border border-white/[0.08] rounded-full p-2 flex items-center justify-center transition-colors duration-200;
+  }
+  .btn-icon:hover {
+    @apply bg-white/10;
+  }
+
+  .pill {
+    @apply bg-transparent text-text-secondary px-[10px] py-0 rounded-full border border-border-primary text-[12px] font-medium flex items-center gap-1;
+  }
+  .pill-success {
+    @apply bg-status-emerald text-text-primary rounded-full text-[10px] font-medium;
+  }
+  .badge-subtle {
+    @apply bg-white/5 text-text-primary px-2 py-0 rounded-sm border border-white/5 text-[10px] font-medium;
+  }
+
+  .input-base {
+    @apply bg-white/[0.02] text-text-secondary border border-white/[0.08] rounded-md px-[14px] py-[12px] focus:outline-none focus:border-white/20 focus:shadow-focus transition-all duration-200;
+  }
+  .input-search {
+    @apply bg-transparent text-text-primary focus:outline-none placeholder:text-text-tertiary;
+  }
+  
+  .linear-card {
+    @apply bg-white/[0.03] border border-white/[0.08] rounded-lg shadow-subtle hover:bg-white/[0.05] transition-colors duration-200;
+  }
+  .linear-panel {
+    @apply bg-white/[0.03] border border-white/[0.08] rounded-xl shadow-elevated;
+  }
+}

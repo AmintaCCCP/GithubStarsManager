@@ -114,8 +114,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Cloud className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <Cloud className="w-6 h-6 text-blue-600 dark:text-brand-violet" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('WebDAV配置', 'WebDAV Configuration')}
           </h3>
         </div>
@@ -129,73 +129,73 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       </div>
 
       {showForm && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-4">
+        <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
             {editingId ? t('编辑WebDAV配置', 'Edit WebDAV Configuration') : t('添加WebDAV配置', 'Add WebDAV Configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('例如: 坚果云', 'e.g., Nutstore')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('WebDAV URL', 'WebDAV URL')} *
               </label>
               <input
                 type="url"
                 value={form.url}
                 onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="https://dav.jianguoyun.com/dav/"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('用户名', 'Username')} *
               </label>
               <input
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('WebDAV用户名', 'WebDAV username')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('密码', 'Password')} *
               </label>
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('WebDAV密码', 'WebDAV password')}
               />
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
                 {t('路径', 'Path')} *
               </label>
               <input
                 type="text"
                 value={form.path}
                 onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="/github-stars-manager/"
               />
             </div>
@@ -227,7 +227,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeWebDAVConfig
                 ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                : 'border-gray-200 dark:border-white/8 hover:border-gray-300 dark:hover:border-gray-500'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -237,11 +237,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   name="activeWebDAV"
                   checked={config.id === activeWebDAVConfig}
                   onChange={() => setActiveWebDAVConfig(config.id)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/8"
                 />
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">{config.name}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <h4 className="font-medium text-gray-900 dark:text-text-primary">{config.name}</h4>
+                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
                     {config.url} • {config.path}
                   </p>
                   {config.passwordStatus === 'decrypt_failed' && (
@@ -259,7 +259,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -292,7 +292,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         ))}
         
         {webdavConfigs.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-gray-500 dark:text-text-tertiary">
             <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('还没有配置WebDAV服务', 'No WebDAV services configured yet')}</p>
             <p className="text-sm">{t('点击上方按钮添加WebDAV配置', 'Click the button above to add WebDAV configuration')}</p>

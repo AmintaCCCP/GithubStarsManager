@@ -55,15 +55,15 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
 
   return (
     <div className="w-full lg:w-64 shrink-0">
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-white dark:bg-panel-dark rounded-xl border border-gray-200 dark:border-white/8 p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('发现频道', 'Discovery Channels')}
           </h3>
           <button
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            className="p-1.5 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-lg bg-blue-100 text-blue-600 dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={t('刷新全部', 'Refresh All')}
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
@@ -81,8 +81,8 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 onClick={() => onChannelSelect(channel.id)}
                 className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-white/[0.04] dark:text-text-primary ring-1 ring-blue-400 dark:ring-white/10'
+                    : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -93,10 +93,10 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   {channelLoading && (
-                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                    <Loader2 className="w-3 h-3 animate-spin text-brand-violet" />
                   )}
                   {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id]) ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-text-tertiary">
                       {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
                     </span>
                   ) : null}

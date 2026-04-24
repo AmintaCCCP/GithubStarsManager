@@ -31,7 +31,7 @@ export const UpdateNotificationBanner: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-              <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <Package className="w-4 h-4 text-blue-600 dark:text-brand-violet" />
             </div>
             <div className="flex-1">
               <div className="flex items-center space-x-2">
@@ -60,7 +60,7 @@ export const UpdateNotificationBanner: React.FC = () => {
             </button>
             <button
               onClick={dismissUpdateNotification}
-              className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-md transition-colors"
+              className="p-1.5 text-blue-600 dark:text-brand-violet hover:bg-blue-100 dark:hover:bg-blue-800 rounded-md transition-colors"
               title={t('关闭', 'Close')}
             >
               <X className="w-4 h-4" />
