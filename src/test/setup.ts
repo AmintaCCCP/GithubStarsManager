@@ -29,7 +29,6 @@ Object.defineProperty(window, 'ResizeObserver', {
   })),
 });
 
-const originalFetch = window.fetch;
 window.fetch = vi.fn();
 
 vi.mock('../store/useAppStore', () => ({
