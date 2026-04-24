@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare, Loader2 } from 'lucide-react';
+import { GripVertical, Star, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2 } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -34,8 +34,8 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
     default: '',
     ai: '', // AI variant uses dynamic classes based on state
     subscribe: '', // Subscribe variant uses dynamic classes based on state
-    edit: 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800',
-    unstar: 'flex items-center justify-center w-8 h-8 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 disabled:cursor-not-allowed',
+    edit: 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary',
+    unstar: 'flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:cursor-not-allowed',
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -155,7 +155,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         return (
           <mark
             key={index}
-            className="bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100 px-1 rounded"
+            className="bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary px-1 rounded"
           >
             {part}
           </mark>
@@ -700,9 +700,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
-    const baseClasses = 'repository-card group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-shadow transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-600 flex flex-col h-full cursor-pointer select-none';
+    const baseClasses = 'repository-card group bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 hover:shadow-subtle transition-shadow transition-colors duration-200 hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-white/20 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
-      ? 'shadow-[0_0_0_2px_theme(colors.blue.500)] dark:shadow-[0_0_0_2px_theme(colors.blue.400)] bg-blue-50 dark:bg-blue-900/20'
+      ? 'shadow-[0_0_0_2px_theme(colors.blue.500)] dark:shadow-[0_0_0_2px_theme(colors.brand.violet)] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10'
       : '';
     const exitingClasses = isExitingSelection && isSelected ? 'animate-selection-exit' : '';
     return `${baseClasses} ${selectedClasses} ${exitingClasses}`.trim();
@@ -721,24 +721,24 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className="flex items-center space-x-3 mb-3">
+      <div className="flex items-start space-x-3 mb-3">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
           className="w-8 h-8 rounded-full flex-shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+          <h3 className="font-semibold text-gray-900 dark:text-text-primary truncate">
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-sm text-gray-500 dark:text-text-secondary truncate">
             {repository.owner.login}
           </p>
         </div>
         
         {/* 拖拽按钮 - 右上角 - 手机和平板端隐藏 */}
         {!selectionMode && (
-          <div className="hidden lg:block relative flex-shrink-0 opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="hidden lg:block relative flex-shrink-0 mt-[-4px] opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
             <div
               ref={dragHandleRef}
               draggable
@@ -759,17 +759,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="flex items-center justify-center w-8 h-8 rounded-lg cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 touch-manipulation"
+              className="flex items-center justify-center w-8 h-8 rounded-lg cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/5 transition-all duration-200 touch-manipulation"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
-              <Hand className="w-4 h-4" />
+              <GripVertical className="w-4 h-4" />
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
-              <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-gray-800 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg whitespace-nowrap z-50 animate-fade-in">
+              <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-gray-800 dark:bg-surface-3 text-white dark:text-text-primary text-xs rounded-lg shadow-dialog dark:border dark:border-white/[0.04] whitespace-nowrap z-50 animate-fade-in">
                 {language === 'zh' ? '拖拽我到左侧分类栏' : 'Drag me to left sidebar'}
                 {/* 气泡箭头 */}
-                <div className="absolute bottom-full right-3 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-800 dark:border-b-gray-700"></div>
+                <div className="absolute bottom-full right-3 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-800 dark:border-b-surface-3"></div>
               </div>
             )}
           </div>
@@ -779,17 +779,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Action Buttons Row - Left and Right Aligned */}
       <div className="flex items-center justify-between mb-4">
         {/* Left side: AI Analysis, Release Subscription, and Edit */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5">
           <SelectionAwareButton
             onClick={handleAIAnalyze}
             disabled={isAnalyzing}
             selectionMode={selectionMode}
             className={`${
               repository.analysis_failed
-                ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
-                : repository.analyzed_at
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
-                  : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+              : repository.analyzed_at
+                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
             }`}
             title={aiButtonTitle}
           >
@@ -799,8 +799,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={() => toggleReleaseSubscription(repository.id)}
             selectionMode={selectionMode}
             className={`${isSubscribed
-              ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+              ? 'bg-gray-200 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary'
+              : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
             }`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
@@ -817,13 +817,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Right side: Zread/DeepWiki, GitHub Links, and Unstar */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5">
           <a
             href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -833,7 +833,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />
@@ -859,19 +859,19 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         >
           <p
             ref={descriptionRef}
-            className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-3 mb-2"
+            className="text-gray-900 dark:text-text-secondary text-sm leading-relaxed line-clamp-3 mb-2"
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
 
           {/* Tooltip - Only show when text is actually truncated */}
           {isTextTruncated && showTooltip && (
-            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 max-h-48 overflow-y-auto">
+            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-black/[0.06] dark:border-white/[0.04] max-h-48 overflow-y-auto">
               <div className="whitespace-pre-wrap break-words">
                 {highlightSearchTerm(displayContent.content, searchQuery)}
               </div>
               {/* Arrow */}
-              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900 dark:border-t-surface-3"></div>
             </div>
           )}
         </div>
@@ -880,40 +880,26 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div className="flex items-center space-x-2 flex-wrap gap-y-1">
           {/* 已自定义标签 - 与筛选器逻辑一致 */}
           {displayContent.isCustomized && (
-            <div className="flex items-center space-x-1 text-xs text-orange-600 dark:text-orange-400" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
+            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
               <Edit3 className="w-3 h-3" />
               <span>{language === 'zh' ? '已自定义' : 'Customized'}</span>
             </div>
           )}
-          {/* 当前内容来源标签 - 仅显示非自定义来源 */}
-          {displayContent.contentSource === 'ai' && (
-            <div className="flex items-center space-x-1 text-xs text-purple-600 dark:text-purple-400" title={language === 'zh' ? '当前显示的是AI总结' : 'Currently showing AI summary'}>
-              <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? 'AI总结' : 'AI Summary'}</span>
-            </div>
-          )}
-
-          {/* AI分析状态标签 - 与内容来源独立显示 */}
-          {displayContent.isAnalysisFailed && (
-            <div className="flex items-center space-x-1 text-xs text-red-600 dark:text-red-400" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
+          {/* AI 分析状态标签 (合并展示) */}
+          {displayContent.isAnalysisFailed ? (
+            <div className="flex items-center space-x-1 text-xs text-status-red dark:text-status-red" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
             </div>
-          )}
-          {displayContent.isAnalyzed && !displayContent.isAnalysisFailed && (
-            <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400" title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}>
-              <Bot className="w-3 h-3" />
+          ) : displayContent.isAnalyzed ? (
+            <div 
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-brand-indigo/10 to-brand-violet/10 text-brand-violet dark:from-brand-indigo/20 dark:to-brand-violet/20 dark:text-brand-violet border border-brand-violet/20 dark:border-brand-violet/20" 
+              title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
+            >
+              <Sparkles className="w-3 h-3" />
               <span>{language === 'zh' ? 'AI已分析' : 'AI Analyzed'}</span>
             </div>
-          )}
-
-          {/* 显示存在但未使用的AI总结提示 */}
-          {displayContent.hasAISummary && displayContent.contentSource !== 'ai' && (
-            <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400" title={language === 'zh' ? '有AI总结，但当前显示其他来源' : 'AI summary available but showing other source'}>
-              <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? 'AI可用' : 'AI Available'}</span>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -923,7 +909,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className="px-2 py-1 rounded-md text-xs font-medium bg-blue-50/50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary border border-transparent dark:border-white/[0.04]"
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -934,7 +920,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Platform Icons */}
       {repository.ai_platforms && repository.ai_platforms.length > 0 && (
         <div className="flex items-center space-x-2 mb-4">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-xs text-gray-700 dark:text-text-secondary">
             {language === 'zh' ? '支持平台:' : 'Platforms:'}
           </span>
           <div className="flex space-x-1">
@@ -945,7 +931,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               return (
                 <div
                   key={index}
-                  className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-default"
+                  className="w-6 h-6 flex items-center justify-center bg-light-surface dark:bg-white/[0.04] rounded text-gray-700 dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 dark:hover:text-gray-700 transition-colors cursor-default"
                   title={displayName}
                 >
                   <IconComponent className="w-3 h-3" />
@@ -959,7 +945,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Stats */}
       <div className="space-y-3 mt-auto">
         {/* Language and Stars */}
-        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex items-center space-x-4 text-sm text-gray-700 dark:text-text-secondary">
           {repository.language && (
             <div className="flex items-center space-x-1">
               <div
@@ -976,7 +962,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time - Single Row */}
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
           <div className="flex items-center space-x-1">
             <Calendar className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">
@@ -994,8 +980,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               }}
               className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
                 isSelected
-                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                  : 'text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-gray-200 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary'
+                  : 'text-gray-400 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
               }`}
               title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
             >

@@ -128,7 +128,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
 
   return (
     <div 
-      className="relative w-full border-b border-gray-200 dark:border-gray-700 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm"
+      className="relative w-full border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg95 dark:bg-panel-dark/95 backdrop-blur-sm"
     >
       {/* 滚动容器 */}
       <div
@@ -158,8 +158,8 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
               transition-all duration-150 ease-out snap-center
               min-h-[36px] touch-manipulation
               ${activeTab === tab.id
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                ? 'text-gray-900 dark:text-text-primary font-medium'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
               }
             `}
             style={{
@@ -174,7 +174,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       
       {/* 底部活动指示器 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-gray-900 dark:bg-text-primary rounded-full transition-all duration-200 ease-out will-change-transform"
         style={{
           transform: `translateX(${indicatorStyle.translateX}px)`,
           width: indicatorStyle.width,
@@ -332,26 +332,26 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         aria-modal="true"
         aria-labelledby="settings-modal-title"
       >
-        <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark">
             <div className="flex items-center space-x-3">
-              <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
+              <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-text-primary">
                 {t('设置', 'Settings')}
               </h2>
             </div>
             <button
               onClick={handleClose}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-150"
+              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-150"
               aria-label={t('关闭设置', 'Close settings')}
             >
-              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <X className="w-5 h-5 text-gray-500 dark:text-text-tertiary" />
             </button>
           </div>
 
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
-            <div className="hidden md:block w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
+            <div className="hidden md:block w-64 border-r border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark overflow-y-auto">
               <nav className="p-4 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
                 {tabs.map((tab) => (
                   <button
@@ -363,8 +363,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     aria-controls={`settings-tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
+                        : 'text-gray-900 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
                     }`}
                   >
                     {tab.icon}
@@ -399,8 +399,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center space-x-3 mb-6">
-        <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary">
           {t('设置', 'Settings')}
         </h2>
       </div>
@@ -408,7 +408,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
             <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
                 <button
@@ -420,8 +420,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   aria-controls={`settings-tabpanel-${tab.id}`}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
+                      : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
                   }`}
                 >
                   {tab.icon}
@@ -443,7 +443,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>

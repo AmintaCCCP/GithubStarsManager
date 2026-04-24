@@ -590,11 +590,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   if (!repository) return null;
 
   // 统一的卡片样式
-  const sectionClass = "p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700";
-  const labelClass = "flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3";
-  const inputClass = "w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
+  const sectionClass = "p-5 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]";
+  const labelClass = "flex items-center space-x-2 text-sm font-medium text-gray-900 dark:text-text-primary mb-3";
+  const inputClass = "w-full px-3 py-2 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-all";
   const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all";
-  const tagClass = "inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-md text-sm border border-blue-200 dark:border-blue-800";
+  const tagClass = "inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary border-transparent rounded-md text-sm border border-black/[0.06] dark:border-white/[0.04] dark:border-white/[0.04]";
 
   return (
     <Modal
@@ -605,22 +605,22 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     >
       <div className="space-y-5">
         {/* Repository Info Header */}
-        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-brand-indigo/10 dark:from-transparent dark:to-transparent rounded-xl border border-black/[0.06] dark:border-white/[0.04] dark:border-brand-violet/20">
           <img
             src={repository.owner.avatar_url}
             alt={repository.owner.login}
-            className="w-10 h-10 rounded-full border-2 border-white dark:border-gray-700 shadow-sm"
+            className="w-10 h-10 rounded-full border-2 border-white dark:border-white/[0.04] shadow-sm"
           />
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+            <h4 className="font-semibold text-gray-900 dark:text-text-primary truncate">
               {repository.name}
             </h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-text-secondary">
               {repository.owner.login}
             </p>
           </div>
           {repository.description && (
-            <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 max-w-xs truncate">
+            <div className="hidden sm:block text-xs text-gray-500 dark:text-text-secondary max-w-xs truncate">
               {repository.description}
             </div>
           )}
@@ -629,43 +629,43 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Description Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <Edit3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <Edit3 className="w-4 h-4 text-brand-violet dark:text-brand-violet" />
             <span>{t('描述', 'Description')}</span>
             {customStatus.description && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
-            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+            <span className="ml-auto text-xs text-gray-400 dark:text-text-tertiary">
               {formData.description.length > 0 ? `${formData.description.length} ${t('字符', 'chars')}` : t('无内容', 'Empty')}
             </span>
           </div>
 
           {/* Source Indicator */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs text-gray-500 dark:text-gray-400">{t('当前来源:', 'Source:')}</span>
+            <span className="text-xs text-gray-500 dark:text-text-secondary">{t('当前来源:', 'Source:')}</span>
             {editIntent.description === 'keep-custom' && (formData.description || '').trim() !== '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 <Edit3 className="w-3 h-3 mr-1" />
                 {t('自定义', 'Custom')}
               </span>
             ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 <AlertTriangle className="w-3 h-3 mr-1" />
                 {t('将回退', 'Will fallback')}
               </span>
             ) : editIntent.description === 'reset-to-ai' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 <Bot className="w-3 h-3 mr-1" />
                 {t('AI总结', 'AI Summary')}
               </span>
             ) : editIntent.description === 'reset-to-original' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 <FileText className="w-3 h-3 mr-1" />
                 {t('原始描述', 'Original')}
               </span>
             ) : editIntent.description === 'clear' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 <X className="w-3 h-3 mr-1" />
                 {t('已清空', 'Cleared')}
               </span>
@@ -685,8 +685,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Save Effect Info - always visible */}
           {editIntent.description === 'clear' ? (
-            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-xs text-red-700 dark:text-red-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-red flex items-start">
                 <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -697,8 +697,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'reset-to-ai' ? (
-            <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <p className="text-xs text-purple-700 dark:text-purple-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
                 <Bot className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -709,8 +709,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'reset-to-original' ? (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg">
-              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
                 <FileText className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -721,8 +721,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber flex items-start">
                 <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {repository?.ai_summary
@@ -734,8 +734,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && customStatus.description ? (
-            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-xs text-blue-700 dark:text-blue-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
                 <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -746,8 +746,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && formData.description.trim() !== '' && !customStatus.description ? (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg">
-              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
                 <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -769,8 +769,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-ai'
-                    ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700'
-                    : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-700 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/30'
+                    ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                    : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -785,8 +785,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-original'
-                    ? 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-600'
+                    ? 'bg-light-surfacetext-gray-900border-black/[0.06] dark:bg-white/10 dark:text-text-primary dark:border-white/20'
+                    : 'bg-white text-gray-700border-black/[0.06] hover:bg-light-bg dark:bg-white/[0.04] dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/10 dark:hover:text-gray-900'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -800,8 +800,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'clear'
-                  ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700'
-                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50 dark:bg-gray-700 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30'
+                  ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                  : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -810,9 +810,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           </div>
 
           {/* Feature Tip */}
-          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-600/50 rounded-lg">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 flex items-start">
-              <Info className="w-3.5 h-3.5 mr-1.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+          <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.04] rounded-lg">
+            <p className="text-[11px] text-gray-500 dark:text-text-secondary flex items-start">
+              <Info className="w-3.5 h-3.5 mr-1.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-text-tertiary" />
               <span>
                 {t(
                   '描述优先级：自定义描述 > AI总结 > 原始描述。"重置"会清除自定义并回退到对应来源，"清除"会明确清空描述（不显示任何来源）。',
@@ -826,10 +826,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Category Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <FolderOpen className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <FolderOpen className="w-4 h-4 text-status-emerald " />
             <span>{t('分类', 'Category')}</span>
             {customStatus.category && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
@@ -866,8 +866,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-ai'
-                    ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700'
-                    : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-700 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/30'
+                    ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                    : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -882,8 +882,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-original'
-                    ? 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-600'
+                    ? 'bg-light-surfacetext-gray-900border-black/[0.06] dark:bg-white/10 dark:text-text-primary dark:border-white/20'
+                    : 'bg-white text-gray-700border-black/[0.06] hover:bg-light-bg dark:bg-white/[0.04] dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/10'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -897,8 +897,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.category === 'clear'
-                  ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700'
-                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50 dark:bg-gray-700 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30'
+                  ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                  : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -908,8 +908,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Custom Category Selection Info */}
           {editIntent.category === 'keep-custom' && formData.category && (
-            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-xs text-blue-700 dark:text-blue-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
                 <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -923,8 +923,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Reset Category Info */}
           {editIntent.category === 'reset-to-ai' && (
-            <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <p className="text-xs text-purple-700 dark:text-purple-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
                 <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -937,8 +937,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {editIntent.category === 'reset-to-original' && (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg">
-              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
                 <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -952,8 +952,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Clear Category Warning */}
           {editIntent.category === 'clear' && (
-            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-xs text-red-700 dark:text-red-400 flex items-start">
+            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-red flex items-start">
                 <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
@@ -966,18 +966,18 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Category Lock */}
-          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+          <div className="mt-4 p-4 bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-status-amber/20">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
-                  <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <Lock className="w-4 h-4 text-gray-700 dark:text-text-secondary dark:text-status-amber" />
                 ) : (
-                  <Unlock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  <Unlock className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
                 )}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  <span className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('分类锁定', 'Category Lock')}
                   </span>
                   <label className={`inline-flex items-center ${!formData.category ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
@@ -991,10 +991,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                       disabled={!formData.category}
                       className="sr-only peer"
                     />
-                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-500 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-violet rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-black/[0.06] after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-white/[0.04] peer-checked:bg-status-amber peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
                   </label>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-gray-700 dark:text-text-secondary">
                   {!formData.category
                     ? t('请先选择分类才能启用锁定。', 'Select a category first to enable locking.')
                     : formData.categoryLocked
@@ -1010,14 +1010,14 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Tags Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <Tag className="w-4 h-4 text-gray-700 dark:text-text-secondary " />
             <span>{t('标签', 'Tags')}</span>
             {customStatus.tags && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
-            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+            <span className="ml-auto text-xs text-gray-400 dark:text-text-tertiary">
               {formData.tags.length > 0 ? `${formData.tags.length} ${t('个标签', 'tags')}` : t('无标签', 'No tags')}
             </span>
           </div>
@@ -1033,7 +1033,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="ml-1.5 p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded transition-colors"
+                    className="ml-1.5 p-0.5 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:text-text-primary dark:hover:text-text-primary rounded transition-colors"
                     title={t('移除', 'Remove')}
                   >
                     <X className="w-3 h-3" />
@@ -1043,7 +1043,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           ) : (
             <div className="mb-4">
-              <span className="text-sm text-gray-400 dark:text-gray-500">{t('暂无标签', 'No tags')}</span>
+              <span className="text-sm text-gray-400 dark:text-text-tertiary">{t('暂无标签', 'No tags')}</span>
             </div>
           )}
 
@@ -1057,8 +1057,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-ai'
-                    ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700'
-                    : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-700 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/30'
+                    ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                    : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5 mr-1.5" />
@@ -1073,8 +1073,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-original'
-                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
-                    : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50 dark:bg-gray-700 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/30'
+                    ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                    : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5 mr-1.5" />
@@ -1088,8 +1088,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'clear'
-                  ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700'
-                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50 dark:bg-gray-700 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30'
+                  ? 'bg-gray-100 text-gray-900 border-transparent dark:bg-white/[0.08] dark:text-text-primary dark:border-transparent'
+                  : 'bg-white text-gray-700 border-black/[0.06] hover:bg-gray-50 dark:bg-transparent dark:text-text-secondary dark:border-white/[0.04] dark:hover:bg-white/5 dark:hover:text-text-primary'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -1099,8 +1099,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Status Alert */}
           {formData.tags.length === 0 && (
-            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center">
+            <div className="mb-4 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
+              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber flex items-center">
                 {editIntent.tags === 'clear' ? (
                   <>
                     <span className="mr-1">⚠️</span>
@@ -1108,12 +1108,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                   </>
                 ) : editIntent.tags === 'reset-to-ai' ? (
                   <>
-                    <span className="mr-1 text-green-600">✓</span>
+                    <span className="mr-1 text-status-emerald">✓</span>
                     {t('将显示AI标签。', 'AI tags will be shown.')}
                   </>
                 ) : editIntent.tags === 'reset-to-original' ? (
                   <>
-                    <span className="mr-1 text-green-600">✓</span>
+                    <span className="mr-1 text-status-emerald">✓</span>
                     {t('将显示GitHub Topics。', 'GitHub Topics will be shown.')}
                   </>
                 ) : repository?.ai_tags && repository.ai_tags.length > 0 ? (
@@ -1152,7 +1152,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 handleAddTag();
               }}
               disabled={!newTag.trim()}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -1161,13 +1161,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleCloseWithConfirm();
             }}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 text-gray-900 dark:text-text-primary bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 dark:border dark:border-white/[0.04] transition-colors"
           >
             <X className="w-4 h-4" />
             <span>{t('取消', 'Cancel')}</span>
@@ -1178,7 +1178,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               void handleSave();
             }}
             disabled={!hasChanges}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
