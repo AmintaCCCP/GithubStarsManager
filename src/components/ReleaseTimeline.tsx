@@ -508,28 +508,28 @@ export const ReleaseTimeline: React.FC = () => {
     
     return (
       <div className="text-center py-12">
-        <Package className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-text-primary mb-2">
+               <Package className="w-16 h-16 text-text-tertiary dark:text-quaternary mx-auto mb-4" />
+         <h3 className="text-lg font-medium text-text-primary mb-2">
           {subscribedRepoCount === 0 ? t('没有Release订阅', 'No Release Subscriptions') : t('没有最近的Release', 'No Recent Releases')}
         </h3>
-        <p className="text-gray-500 dark:text-text-tertiary mb-6 max-w-md mx-auto">
-          {subscribedRepoCount === 0 
-            ? t('从仓库页面订阅仓库Release以在此查看更新。', 'Subscribe to repository releases from the Repositories tab to see updates here.')
-            : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。点击下方刷新按钮获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Click the refresh button below to get the latest updates.`)
-          }
-        </p>
+             <p className="text-text-tertiary mb-6 max-w-md mx-auto">
+               {subscribedRepoCount === 0
+                 ? t('从仓库页面订阅仓库Release以在此查看更新。', 'Subscribe to repository releases from the Repositories tab to see updates here.')
+                 : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。点击下方刷新按钮获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Click the refresh button below to get the latest updates.`)
+               }
+             </p>
         
         {/* 刷新按钮 - 在有订阅仓库时显示 */}
         {subscribedRepoCount > 0 && (
-          <div className="mb-6">
-            <button
-              onClick={handleRefresh}
-              disabled={releaseIsRefreshing}
-              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
-            >
-              <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
-            </button>
+           <div className="mb-6">
+             <button
+               onClick={handleRefresh}
+               disabled={releaseIsRefreshing}
+               className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+             >
+               <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+               <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
+             </button>
             {lastRefreshTime && (
               <p className="text-sm text-gray-500 dark:text-text-tertiary mt-2">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
@@ -539,7 +539,7 @@ export const ReleaseTimeline: React.FC = () => {
         )}
 
         {subscribedRepoCount === 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6 max-w-lg mx-auto">
+          <div className="bg-light-surface border border-light-border rounded-xl p-6 max-w-lg mx-auto">
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center">
                 <Bell className="w-6 h-6 text-blue-600 dark:text-blue-300" />
@@ -801,10 +801,10 @@ export const ReleaseTimeline: React.FC = () => {
         </div>
       </div>
 
-      {/* Releases List */}
-      <div className="space-y-1.5">
-        {paginatedReleases.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/8">
+       {/* Releases List */}
+       <div className="space-y-2">
+         {paginatedReleases.length === 0 ? (
+           <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-light-border-alt dark:border-white/8">
             <Package className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-700 dark:text-text-secondary mb-1">
               {t('无符合条件的结果', 'No matching results')}
@@ -862,7 +862,7 @@ export const ReleaseTimeline: React.FC = () => {
             const latestRelease = releases[0]?.release;
 
             return (
-              <div key={repository.id} className="bg-white dark:bg-panel-dark rounded-xl border border-gray-200 dark:border-white/8 overflow-hidden">
+              <div key={repository.id} className="bg-light-bg dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/8 overflow-hidden">
                 {/* Repository Header */}
                 <button
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
@@ -872,14 +872,14 @@ export const ReleaseTimeline: React.FC = () => {
                     {hasUnread && (
                       <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse"></div>
                     )}
-                    <div className="flex items-center justify-center w-6 h-6 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded flex-shrink-0">
-                      <LayoutGrid className="w-3.5 h-3.5 text-blue-600 dark:text-brand-violet" />
+                    <div className="flex items-center justify-center w-6 h-6 bg-brand-indigo/20 rounded flex-shrink-0">
+                      <LayoutGrid className="w-3.5 h-3.5 text-brand-violet" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-sm text-gray-900 dark:text-text-primary">
+                      <h3 className="font-semibold text-sm text-text-primary">
                         {repository.name}
                       </h3>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                      <p className="text-xs text-text-tertiary">
                         {repository.full_name}
                       </p>
                     </div>

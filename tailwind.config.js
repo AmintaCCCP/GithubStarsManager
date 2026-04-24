@@ -37,6 +37,7 @@ export default {
         // Linear Status
         'status-green': '#27a644',
         'status-emerald': '#10b981',
+        'status-red': '#ef4444',
         
         // Linear Borders (Solid fallbacks, though we mainly use rgba)
         'border-primary': '#23252a',
