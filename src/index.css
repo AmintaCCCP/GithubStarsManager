@@ -445,6 +445,26 @@
   padding: 0 !important;
 }
 
+.prose pre code,
+.prose pre code.hljs {
+  background: transparent !important;
+}
+
+.dark .prose pre code,
+.dark .prose pre code.hljs {
+  background: transparent !important;
+}
+
+/* ========== Generic Code Block Background ========== */
+
+.prose pre:not(:has(code.language-bash)):not(:has(code.language-sh)):not(:has(code.language-shell)):not(:has(code.language-zsh)):not(:has(code.language-cmd)):not(:has(code.language-bat)):not(:has(code.language-powershell)):not(:has(code.language-ps1)) {
+  background-color: #f8fafc;
+}
+
+.dark .prose pre:not(:has(code.language-bash)):not(:has(code.language-sh)):not(:has(code.language-shell)):not(:has(code.language-zsh)):not(:has(code.language-cmd)):not(:has(code.language-bat)):not(:has(code.language-powershell)):not(:has(code.language-ps1)) {
+  background-color: #1e293b;
+}
+
 /* ========== Terminal / Shell Code Block Enhancement ========== */
 
 .language-bash,
