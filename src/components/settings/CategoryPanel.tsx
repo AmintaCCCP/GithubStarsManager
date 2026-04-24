@@ -254,7 +254,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       </div>
 
       {/* 折叠侧边栏显示设置 */}
-      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <LayoutGrid className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
@@ -292,7 +292,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   setCollapsedSidebarCategoryCount(1);
                 }
               }}
-              className="w-20 px-3 py-1.5 text-center border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+              className="w-20 px-3 py-1.5 text-center border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
               placeholder="≥1"
             />
             <span className="text-sm text-gray-500 dark:text-text-tertiary">
@@ -302,7 +302,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       </div>
 
       {showAddForm && (
-        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
             {t('添加自定义分类', 'Add Custom Category')}
           </h4>
@@ -315,7 +315,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('例如: 我的项目', 'e.g., My Projects')}
               />
             </div>
@@ -333,7 +333,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     setNewCategoryIcon(value);
                   }
                 }}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="📁"
               />
             </div>
@@ -346,7 +346,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+              className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
             />
             <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
@@ -369,7 +369,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 setNewCategoryIcon('📁');
                 setNewCategoryKeywords('');
               }}
-              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-light-border dark:border-white/[0.04] transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-black/[0.06] dark:border-white/[0.04] transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('取消', 'Cancel')}</span>
@@ -380,7 +380,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
       <div className="space-y-4">
         {/* 分类排序区域 */}
-        <div className="border-t border-light-border dark:border-white/[0.04] pt-4">
+        <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
               <GripVertical className="w-4 h-4 mr-2" />
@@ -412,7 +412,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           </div>
 
           {isReordering && (
-            <div className="mb-3 p-3 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+            <div className="mb-3 p-3 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
               <p className="text-sm text-gray-700 dark:text-text-secondary ">
                 {t('提示：拖拽分类可快速调整顺序，或使用按钮进行置顶/置底操作', 'Tip: Drag categories to quickly reorder, or use buttons to move to top/bottom')}
               </p>
@@ -424,7 +424,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               {t('暂无可见分类', 'No visible categories')}
             </p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {allVisibleCategories.map((category, index) => {
                 const isEditing = editingId === category.id;
                 const isDefault = !category.isCustom;
@@ -448,13 +448,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   onDrop={(e) => handleDrop(e, index)}
                   className={`flex flex-col p-3 rounded-lg border transition-all ${
                     category.isCustom
-                      ? 'bg-light-surface dark:bg-white/[0.04] border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
-                      : 'bg-white dark:bg-panel-dark border-light-border dark:border-white/[0.04]'
+                      ? 'bg-light-surface dark:bg-white/[0.04] border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                      : 'bg-white dark:bg-panel-dark border-black/[0.06] dark:border-white/[0.04]'
                   } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-brand-violet' : ''} ${
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
                     dragOverId === category.id && draggingId !== category.id
-                      ? 'border-light-border dark:border-white/[0.04] dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
                       : ''
                   } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >
@@ -472,7 +472,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                       </div>
                       
                       {isDefault && isModified && originalCategory && (
-                        <div className="mb-2 p-2 bg-light-surface dark:bg-white/[0.04] rounded border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+                        <div className="mb-2 p-2 bg-light-surface dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
                           <p className="text-xs text-gray-700 dark:text-text-secondary ">
                             {t(
                               `已修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
@@ -494,14 +494,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-light-border dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary"
+                            className="w-14 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary"
                             placeholder="📁"
                           />
                           <input
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-light-border dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
                             placeholder={t('分类名称', 'Category name')}
                           />
                         </div>
@@ -510,7 +510,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             type="text"
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-light-border dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
                             placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
                           />
                           <button
@@ -575,8 +575,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         {isReordering && (
                           <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
                         )}
-                        <span className="text-xl w-6 text-center inline-block">{category.icon}</span>
-                        <span className="font-medium text-gray-900 dark:text-text-primary">
+                        <span className="text-base w-6 text-center inline-block">{category.icon}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-text-primary">
                           {category.name}
                         </span>
                         {category.isCustom && (
@@ -675,7 +675,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
         {/* 隐藏的默认分类 */}
         {hiddenDefaultCategories.length > 0 && (
-          <div className="border-t border-light-border dark:border-white/[0.04] pt-4">
+          <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
             <h4 className="font-medium text-gray-900 dark:text-text-primary mb-3 flex items-center">
               <EyeOff className="w-4 h-4 mr-2" />
               {t('隐藏的默认分类', 'Hidden Default Categories')}

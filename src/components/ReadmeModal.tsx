@@ -230,7 +230,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-light-border dark:border-white/[0.04] flex-shrink-0">
+          <div className="flex items-center justify-between p-4 border-b border-black/[0.06] dark:border-white/[0.04] flex-shrink-0">
             <div className="flex items-center space-x-3">
               <img
                 src={repository.owner.avatar_url}
@@ -299,7 +299,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           <div className="flex-1 flex overflow-hidden">
             {/* TOC Sidebar */}
             {showToc && tocItems.length > 0 && (
-              <div className="w-56 border-r border-light-border dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0">
+              <div className="w-56 border-r border-black/[0.06] dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary mb-3">
                   {t('目录', 'Contents')}
                 </h4>

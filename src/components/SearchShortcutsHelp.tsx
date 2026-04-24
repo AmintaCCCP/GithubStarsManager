@@ -24,7 +24,7 @@ export const SearchShortcutsHelp: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-6 max-w-md w-full mx-4 shadow-xl">
+      <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 max-w-md w-full mx-4 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Keyboard className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
@@ -44,7 +44,7 @@ export const SearchShortcutsHelp: React.FC = () => {
           {searchShortcuts.map((shortcut, index) => (
             <div key={index} className="flex items-center justify-between py-2 px-3 bg-light-bg dark:bg-white/[0.04] rounded-lg">
               <div className="flex items-center space-x-3">
-                <kbd className="px-2 py-1 bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] rounded text-xs font-mono text-gray-900 dark:text-text-secondary">
+                <kbd className="px-2 py-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded text-xs font-mono text-gray-900 dark:text-text-secondary">
                   {shortcut.key}
                 </kbd>
                 <span className="text-sm text-gray-900 dark:text-text-secondary">
@@ -55,7 +55,7 @@ export const SearchShortcutsHelp: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-6 pt-4 border-t border-light-border dark:border-white/[0.04]">
+        <div className="mt-6 pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-start space-x-2 text-sm text-gray-700 dark:text-text-tertiary">
             <HelpCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div>

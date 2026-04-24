@@ -729,7 +729,7 @@ export const SearchBar: React.FC = () => {
   });
 
   return (
-    <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-4 sm:p-6 mb-6">
+    <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6 mb-6">
       {/* Search Input */}
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
@@ -747,13 +747,13 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary placeholder-gray-500 dark:placeholder-gray-400"
+          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary placeholder-gray-500 dark:placeholder-gray-400"
         />
 
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-            <div className="p-2 border-b border-gray-100 dark:border-white/[0.04] flex items-center justify-between">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between">
               <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                 {t('搜索历史', 'Search History')}
               </span>
@@ -779,8 +779,8 @@ export const SearchBar: React.FC = () => {
 
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-            <div className="p-2 border-b border-gray-100 dark:border-white/[0.04]">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-black/[0.04] dark:border-white/[0.04]">
               <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                 {t('搜索建议', 'Search Suggestions')}
               </span>
@@ -879,7 +879,7 @@ export const SearchBar: React.FC = () => {
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
               showFilters || activeFiltersCount > 0
                 ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
-                : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -910,7 +910,7 @@ export const SearchBar: React.FC = () => {
             onChange={(e) => setSearchFilters({ 
               sortBy: e.target.value as 'stars' | 'updated' | 'name' | 'starred'
             })}
-            className="px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
           >
             <option value="stars">{t('按星标排序', 'Sort by Stars')}</option>
             <option value="updated">{t('按更新排序', 'Sort by Updated')}</option>
@@ -921,7 +921,7 @@ export const SearchBar: React.FC = () => {
             onClick={() => setSearchFilters({ 
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc' 
             })}
-            className="px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
+            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
           </button>
@@ -930,7 +930,7 @@ export const SearchBar: React.FC = () => {
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="mt-6 pt-6 border-t border-light-border dark:border-white/[0.04] space-y-6">
+        <div className="mt-6 pt-6 border-t border-black/[0.06] dark:border-white/[0.04] space-y-6">
           {/* Status Filters */}
           <div>
             <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
@@ -946,8 +946,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === true
-                      ? 'bg-status-emerald text-status-emerald '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
@@ -964,8 +964,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === false
-                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <X className="w-4 h-4" />
@@ -982,8 +982,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.analysisFailed === true
-                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <AlertCircle className="w-4 h-4" />
@@ -1001,7 +1001,7 @@ export const SearchBar: React.FC = () => {
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === true
                       ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Bell className="w-4 h-4" />
@@ -1018,8 +1018,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === false
-                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <BellOff className="w-4 h-4" />
@@ -1036,8 +1036,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isEdited === true
-                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -1055,7 +1055,7 @@ export const SearchBar: React.FC = () => {
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isCategoryLocked === true
                       ? 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300'
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Lock className="w-4 h-4" />
@@ -1072,8 +1072,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isCategoryLocked === false
-                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                      : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Unlock className="w-4 h-4" />
@@ -1098,7 +1098,7 @@ export const SearchBar: React.FC = () => {
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.languages.includes(language)
                         ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
-                        : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {language}
@@ -1121,8 +1121,8 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handlePlatformToggle(platform)}
                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.platforms.includes(platform)
-                        ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
-                        : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
@@ -1146,8 +1146,8 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handleTagToggle(tag)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.tags.includes(tag)
-                        ? 'bg-status-emerald text-status-emerald '
-                        : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {tag}
@@ -1174,7 +1174,7 @@ export const SearchBar: React.FC = () => {
                   onChange={(e) => setSearchFilters({ 
                     minStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
-                  className="w-24 px-3 py-1.5 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -1188,7 +1188,7 @@ export const SearchBar: React.FC = () => {
                   onChange={(e) => setSearchFilters({ 
                     maxStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
-                  className="w-24 px-3 py-1.5 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
                 />
               </div>
             </div>

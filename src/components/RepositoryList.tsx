@@ -908,7 +908,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
 
       {/* AI Analysis Controls - 移动端优化布局 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
@@ -929,10 +929,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
             {/* Dropdown Menu */}
             {showDropdown && !isLoading && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] rounded-lg shadow-dialog z-10">
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-dialog z-10">
                 <button
                   onClick={() => handleAIAnalyze(false)}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/[0.04]"
+                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-white/[0.04]"
                 >
                   <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('分析全部', 'Analyze All')}
@@ -944,7 +944,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 <button
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-white/[0.04]"
+                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-white/[0.04]"
                 >
                   <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
@@ -1014,7 +1014,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     checked={showAISummary}
                     onChange={() => hasAnalyzedRepos && setShowAISummary(true)}
                     disabled={!hasAnalyzedRepos}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
                   />
                   <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('AI分析内容', 'AI Analysis')}
@@ -1029,7 +1029,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     name="displayContent"
                     checked={!showAISummary}
                     onChange={() => setShowAISummary(false)}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
                   />
                   <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('原始描述', 'Original')}

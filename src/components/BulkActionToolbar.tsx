@@ -166,7 +166,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-panel-dark border-t border-light-border dark:border-white/[0.04] shadow-lg z-50 ${
+      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-panel-dark border-t border-black/[0.06] dark:border-white/[0.04] shadow-lg z-50 ${
         isClosing ? 'animate-slide-down' : 'animate-slide-up'
       } ${isShaking ? 'animate-shake' : ''}`}
       onClick={handleToolbarClick}
@@ -260,7 +260,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'subscribe'
                   ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-status-emerald text-status-emerald hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'subscribe' ? (
@@ -308,7 +308,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
                   ? 'bg-gray-700 text-white hover:bg-gray-800'
-                  : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unlock-category' ? (

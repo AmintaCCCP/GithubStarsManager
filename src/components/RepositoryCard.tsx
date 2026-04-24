@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Star, ExternalLink, Calendar, Bell, BellOff, Bot, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Hand, Square, CheckSquare, Loader2 } from 'lucide-react';
+import { GripVertical, Star, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2 } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -700,7 +700,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
-    const baseClasses = 'repository-card group bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-6 hover:shadow-subtle transition-shadow transition-colors duration-200 hover:border-light-border dark:border-white/[0.04] dark:hover:border-white/20 flex flex-col h-full cursor-pointer select-none';
+    const baseClasses = 'repository-card group bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 hover:shadow-subtle transition-shadow transition-colors duration-200 hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-white/20 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
       ? 'shadow-[0_0_0_2px_theme(colors.blue.500)] dark:shadow-[0_0_0_2px_theme(colors.brand.violet)] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10'
       : '';
@@ -721,7 +721,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className="flex items-center space-x-3 mb-3">
+      <div className="flex items-start space-x-3 mb-3">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
@@ -738,7 +738,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         
         {/* 拖拽按钮 - 右上角 - 手机和平板端隐藏 */}
         {!selectionMode && (
-          <div className="hidden lg:block relative flex-shrink-0 opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="hidden lg:block relative flex-shrink-0 mt-[-4px] opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
             <div
               ref={dragHandleRef}
               draggable
@@ -762,7 +762,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               className="flex items-center justify-center w-8 h-8 rounded-lg cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/5 transition-all duration-200 touch-manipulation"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
-              <Hand className="w-4 h-4" />
+              <GripVertical className="w-4 h-4" />
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
@@ -866,7 +866,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
           {/* Tooltip - Only show when text is actually truncated */}
           {isTextTruncated && showTooltip && (
-            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-light-border dark:border-white/[0.04] max-h-48 overflow-y-auto">
+            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-black/[0.06] dark:border-white/[0.04] max-h-48 overflow-y-auto">
               <div className="whitespace-pre-wrap break-words">
                 {highlightSearchTerm(displayContent.content, searchQuery)}
               </div>
@@ -885,35 +885,21 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <span>{language === 'zh' ? '已自定义' : 'Customized'}</span>
             </div>
           )}
-          {/* 当前内容来源标签 - 仅显示非自定义来源 */}
-          {displayContent.contentSource === 'ai' && (
-            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary " title={language === 'zh' ? '当前显示的是AI总结' : 'Currently showing AI summary'}>
-              <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? 'AI总结' : 'AI Summary'}</span>
-            </div>
-          )}
-
-          {/* AI分析状态标签 - 与内容来源独立显示 */}
-          {displayContent.isAnalysisFailed && (
-            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
+          {/* AI 分析状态标签 (合并展示) */}
+          {displayContent.isAnalysisFailed ? (
+            <div className="flex items-center space-x-1 text-xs text-status-red dark:text-status-red" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
             </div>
-          )}
-          {displayContent.isAnalyzed && !displayContent.isAnalysisFailed && (
-            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary" title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}>
-              <Bot className="w-3 h-3" />
+          ) : displayContent.isAnalyzed ? (
+            <div 
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-brand-indigo/10 to-brand-violet/10 text-brand-violet dark:from-brand-indigo/20 dark:to-brand-violet/20 dark:text-brand-violet border border-brand-violet/20 dark:border-brand-violet/20" 
+              title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
+            >
+              <Sparkles className="w-3 h-3" />
               <span>{language === 'zh' ? 'AI已分析' : 'AI Analyzed'}</span>
             </div>
-          )}
-
-          {/* 显示存在但未使用的AI总结提示 */}
-          {displayContent.hasAISummary && displayContent.contentSource !== 'ai' && (
-            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary" title={language === 'zh' ? '有AI总结，但当前显示其他来源' : 'AI summary available but showing other source'}>
-              <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? 'AI可用' : 'AI Available'}</span>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -976,7 +962,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time - Single Row */}
-        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t border-gray-100 dark:border-white/[0.04]">
+        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
           <div className="flex items-center space-x-1">
             <Calendar className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">

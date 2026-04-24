@@ -78,7 +78,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例如: macOS"
-            className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
+            className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
           />
         </div>
 
@@ -96,7 +96,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               onChange={(e) => setNewKeyword(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入关键词，如: mac, dmg"
-              className="flex-1 px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
+              className="flex-1 px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
             />
             <button
               onClick={handleAddKeyword}
@@ -141,7 +141,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         </div>
 
         {/* Help text */}
-        <div className="bg-light-surface dark:bg-white/[0.04] border border-light-border dark:border-white/[0.04] rounded-lg p-3">
+        <div className="bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-3">
           <p className="text-sm text-gray-700 dark:text-text-secondary">
             <strong>提示:</strong> 关键词将用于匹配 GitHub Release 中的文件名。例如，添加 "mac" 和 "dmg" 关键词可以匹配包含这些字符的文件。
           </p>

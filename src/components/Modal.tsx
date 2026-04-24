@@ -59,7 +59,7 @@ export const Modal: React.FC<ModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-light-border dark:border-white/[0.04]">
+          <div className="flex items-center justify-between p-6 border-b border-black/[0.06] dark:border-white/[0.04]">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
               {title}
             </h3>

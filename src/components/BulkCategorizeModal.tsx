@@ -75,7 +75,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
                     ? 'border-brand-violet bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10'
-                    : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:border-white/[0.04] dark:hover:border-white/20'
+                    : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -92,14 +92,14 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-red/10 border border-light-border dark:border-white/[0.04] dark:border-status-red/20 rounded-lg p-3">
+          <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-red/10 border border-black/[0.06] dark:border-white/[0.04] dark:border-status-red/20 rounded-lg p-3">
             <p className="text-sm text-gray-700 dark:text-text-secondary ">
               {error}
             </p>
           </div>
         )}
 
-        <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 border border-light-border dark:border-white/[0.04] dark:border-status-amber/20 rounded-lg p-3">
+        <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 border border-black/[0.06] dark:border-white/[0.04] dark:border-status-amber/20 rounded-lg p-3">
           <p className="text-sm text-gray-700 dark:text-text-secondary ">
             {t('提示：此操作将覆盖这些仓库现有的自定义分类。', 'Note: This operation will overwrite the existing custom categories of these repositories.')}
           </p>

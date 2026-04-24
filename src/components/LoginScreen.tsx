@@ -67,7 +67,7 @@ export const LoginScreen: React.FC = () => {
       {/* Theme and Language Toggle */}
       <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
         {/* Language Toggle */}
-        <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-light-border dark:border-white/[0.04] overflow-hidden">
+        <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
           <button
             onClick={() => setLanguage('zh')}
             className={`px-3 py-2 w-16 text-center text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
@@ -85,7 +85,7 @@ export const LoginScreen: React.FC = () => {
         {/* Theme Toggle */}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="p-2 rounded-lg bg-white dark:bg-panel-dark shadow-md border border-light-border dark:border-white/[0.04] hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+          className="p-2 rounded-lg bg-white dark:bg-panel-dark shadow-md border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
           title={t('切换主题', 'Toggle theme')}
         >
           {theme === 'light' ? (
@@ -113,7 +113,7 @@ export const LoginScreen: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-panel-dark rounded-2xl shadow-xl border border-light-border dark:border-white/[0.04] p-8">
+        <div className="bg-white dark:bg-panel-dark rounded-2xl shadow-xl border border-black/[0.06] dark:border-white/[0.04] p-8">
           <div className="text-center mb-6">
             <Github className="w-10 h-10 text-gray-900 dark:text-text-secondary mx-auto mb-3" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary mb-2">
@@ -126,7 +126,7 @@ export const LoginScreen: React.FC = () => {
 
           {/* 显示缓存状态 */}
           {repositories.length > 0 && lastSync && (
-            <div className="mb-4 p-3 bg-status-emerald border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] rounded-lg">
+            <div className="mb-4 p-3 bg-status-emerald border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] rounded-lg">
               <div className="flex items-center space-x-2 text-status-emerald ">
                 <div className="w-2 h-2 bg-status-emerald0 rounded-full"></div>
                 <span className="text-sm font-medium">
@@ -156,13 +156,13 @@ export const LoginScreen: React.FC = () => {
                   }}
                   onKeyDown={handleKeyPress}
                   disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary disabled:bg-light-bg dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
+                  className="w-full pl-10 pr-4 py-3 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary disabled:bg-light-bg dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-white/[0.04] border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] rounded-lg">
+              <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] rounded-lg">
                 <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
                 <p className="text-sm text-gray-700 dark:text-text-secondary ">{error}</p>
               </div>

@@ -263,7 +263,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       </div>
 
       {!activeConfig && (
-        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary mt-0.5" />
             <div>
@@ -288,7 +288,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
             <Upload className="w-8 h-8 text-status-emerald " />
             <div>
@@ -314,7 +314,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           </button>
         </div>
 
-        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
             <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
             <div>

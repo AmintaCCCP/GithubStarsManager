@@ -60,7 +60,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       className={`bg-white dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isAnyExpanded
           ? 'border-brand-indigo/20 shadow-lg ring-1 ring-brand-indigo/30'
-          : 'border-gray-200 dark:border-white/[0.04] hover:shadow-md hover:border-gray-200-alt dark:hover:border-white/10'
+          : 'border-black/[0.06] dark:border-white/[0.04] hover:shadow-md hover:border-black/[0.06]-alt dark:hover:border-white/10'
       }`}
     >
       {/* 头部区域 - 仅显示元信息，不可点击展开 */}
@@ -79,7 +79,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <h4 className="font-semibold text-gray-900 dark:text-text-primary text-sm truncate">
                     {release.repository.name}
                   </h4>
-                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-gray-200 dark:border-white/[0.04] shrink-0">
+                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
                     {release.tag_name}
                   </span>
                   {release.name && release.name !== release.tag_name && (
@@ -190,10 +190,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-1.5 sm:px-2 pb-1.5 sm:pb-2 border-t border-gray-200 dark:border-white/[0.04]">
+          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
           {isAssetsExpanded && downloadLinks.length > 0 && (
-            <div className="py-1.5">
-              <div className="flex items-center space-x-1.5 mb-1.5">
+            <div className="py-2">
+              <div className="flex items-center space-x-2 mb-3">
                 <FileArchive className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
                 <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
                   {t('下载文件', 'Download Files')}
@@ -203,14 +203,14 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="bg-gray-50 dark:bg-[#121314] rounded border border-gray-200 dark:border-white/[0.04] max-h-72 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-[#121314] rounded border border-black/[0.06] dark:border-white/[0.04] max-h-72 overflow-y-auto">
                 {downloadLinks.map((link, index) => (
                   <a
                     key={index}
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-gray-100 dark:border-white/[0.04] last:border-b-0 ${
+                    className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
                       link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
                     }`}
                     onClick={(e) => e.stopPropagation()}
@@ -240,8 +240,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           )}
 
           {isReleaseNotesExpanded && release.body && (
-            <div className="py-1.5">
-              <div className="flex items-center space-x-1.5 mb-1.5">
+            <div className="py-2">
+              <div className="flex items-center space-x-2 mb-3">
                 <BookOpen className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
                 <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
                   {t('Release 说明', 'Release Notes')}

@@ -140,7 +140,7 @@ export const Header: React.FC = () => {
 
    
   return (
-    <header className="bg-light-bg dark:bg-panel-dark border-b border-light-border dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
+    <header className="bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo and Title */}
@@ -175,7 +175,7 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('仓库', 'Repositories') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'repositories'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
@@ -197,7 +197,7 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('发布', 'Releases') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'releases'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
@@ -208,7 +208,7 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('subscription')}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'subscription'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
@@ -221,7 +221,7 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('设置', 'Settings') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'settings'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
@@ -236,7 +236,7 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('repositories')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'repositories'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('仓库', 'Repositories')}
@@ -247,7 +247,7 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('releases')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'releases'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('发布', 'Releases')}
@@ -258,7 +258,7 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('subscription')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'subscription'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('趋势', 'Trending')}
@@ -269,7 +269,7 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('settings')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'settings'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                   : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('设置', 'Settings')}
@@ -280,7 +280,7 @@ export const Header: React.FC = () => {
 
           {/* Mobile Dropdown Menu (<768px) */}
           {mobileMenuOpen && (
-            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-light-border dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
+            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-black/[0.06] dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
               <nav className="flex flex-col p-2 space-y-1">
                 <button
                   onClick={() => {
@@ -289,7 +289,7 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'repositories'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                       : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
@@ -310,7 +310,7 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'releases'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                       : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
@@ -326,7 +326,7 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'subscription'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                       : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
@@ -342,7 +342,7 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'settings'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-gray-200 dark:border-white/[0.04]'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
                       : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >

@@ -26,7 +26,7 @@ export const UpdateNotificationBanner: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/20 border-b border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+    <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/20 border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">

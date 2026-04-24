@@ -309,7 +309,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     <>
       {/* 移动端：始终显示完整侧栏 */}
       {isMobile ? (
-        <div className="w-full bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-3 sm:p-4 overflow-hidden">
+        <div className="w-full bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
               {t('应用分类', 'Categories')}
@@ -348,12 +348,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 >
                   <button
                     onClick={() => handleCategoryClick(category.id)}
-                    className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                    className={`relative flex min-w-[140px] items-center justify-between px-3 py-2 rounded-lg text-left transition-colors ${
                       isSelected
                         ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                         : isDragTarget
                           ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
-                          : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                     aria-pressed={isSelected}
@@ -385,7 +385,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start">
           {/* 侧栏容器 */}
           <div
-            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] overflow-hidden transition-all duration-250 ease-out ${
+            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
@@ -448,7 +448,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                                 : isDragTarget
                                   ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
-                                  : 'hover:bg-gray-100 dark:hover:bg-white/[0.04] text-gray-700 dark:text-text-secondary'
+                                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
                             }`}
                             title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
                             aria-label={category.name}
@@ -537,12 +537,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       >
                         <button
                           onClick={() => handleCategoryClick(category.id)}
-                          className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ease-out ${
+                          className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ease-out ${
                             isSelected
                               ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                               : isDragTarget
                                 ? 'bg-green-50 text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
-                                : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
                           } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
                           title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                         >

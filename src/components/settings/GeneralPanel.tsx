@@ -21,7 +21,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </h3>
       </div>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04]">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center space-x-3 mb-4">
           <Globe className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
           <h4 className="font-medium text-gray-900 dark:text-text-primary">
@@ -30,14 +30,14 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </div>
         
         <div className="grid grid-cols-2 gap-4 max-w-md">
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-light-border dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
             <input
               type="radio"
               name="language"
               value="zh"
               checked={language === 'zh'}
               onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+              className="w-4 h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
             />
             <div>
               <span className="text-base font-medium text-gray-900 dark:text-text-primary">
@@ -48,14 +48,14 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
               </p>
             </div>
           </label>
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-light-border dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
             <input
               type="radio"
               name="language"
               value="en"
               checked={language === 'en'}
               onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+              className="w-4 h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
             />
             <div>
               <span className="text-base font-medium text-gray-900 dark:text-text-primary">
@@ -69,7 +69,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04]">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center space-x-3 mb-4">
           <Package className="w-5 h-5 text-gray-700 dark:text-text-secondary " />
           <h4 className="font-medium text-gray-900 dark:text-text-primary">
@@ -90,7 +90,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04]">
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center space-x-3 mb-4">
           <Mail className="w-5 h-5 text-status-emerald " />
           <h4 className="font-medium text-gray-900 dark:text-text-primary">
@@ -124,7 +124,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
                 newWindow.opener = null;
               }
             }}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary border border-light-border dark:border-white/[0.04] rounded-lg transition-colors"
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary border border-black/[0.06] dark:border-white/[0.04] rounded-lg transition-colors"
           >
             <Github className="w-5 h-5" />
             <span>{t('GitHub', 'GitHub')}</span>

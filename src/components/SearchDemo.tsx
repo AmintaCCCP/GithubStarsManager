@@ -63,7 +63,7 @@ export const SearchDemo: React.FC = () => {
 
   if (!showDemo) {
     return (
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] p-4 mb-6">
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-brand-indigo/20 dark:bg-brand-indigo/20 rounded-lg">
@@ -91,7 +91,7 @@ export const SearchDemo: React.FC = () => {
   }
 
   return (
-    <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-6 mb-6">
+    <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
@@ -132,7 +132,7 @@ export const SearchDemo: React.FC = () => {
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
                     ? 'border-brand-violet bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/20'
-                    : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04]'
+                    : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center space-x-2 mb-1">
@@ -164,8 +164,8 @@ export const SearchDemo: React.FC = () => {
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
-                    ? 'border-light-border dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] '
-                    : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04]'
+                    ? 'border-black/[0.06] dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] '
+                    : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center space-x-2 mb-1">
@@ -229,7 +229,7 @@ export const SearchDemo: React.FC = () => {
       )}
 
       {/* 使用提示 */}
-      <div className="mt-6 pt-6 border-t border-light-border dark:border-white/[0.04]">
+      <div className="mt-6 pt-6 border-t border-black/[0.06] dark:border-white/[0.04]">
         <h4 className="font-medium text-gray-900 dark:text-text-primary mb-3">
           {t('使用技巧', 'Usage Tips')}
         </h4>

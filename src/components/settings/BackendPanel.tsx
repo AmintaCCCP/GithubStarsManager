@@ -207,7 +207,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       </div>
 
       {health && (
-        <div className="p-4 bg-status-emerald rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+        <div className="p-4 bg-status-emerald rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-2 mb-2">
             <CheckCircle className="w-5 h-5 text-status-emerald " />
             <span className="font-medium text-status-emerald ">
@@ -220,7 +220,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </div>
       )}
 
-      <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+      <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
         <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-2">
           {t('API 密钥', 'API Secret')}
         </label>
@@ -229,7 +229,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+            className="flex-1 px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
             placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
           />
           <button
@@ -255,7 +255,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
       {backend.isAvailable && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
               <Upload className="w-8 h-8 text-status-emerald " />
               <div>
@@ -281,7 +281,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             </button>
           </div>
 
-          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
               <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
               <div>

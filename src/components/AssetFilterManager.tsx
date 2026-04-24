@@ -230,7 +230,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                         isSelected
                           ? 'bg-gray-900 border-transparent text-white dark:bg-white/[0.12] dark:border-white/[0.2] dark:text-white font-medium'
-                          : 'bg-white border-gray-200 text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                          : 'bg-white border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                       }`}
                     >
                       <button
@@ -275,7 +275,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
                       selectedFilters.includes(filter.id)
                         ? 'bg-gray-900 border-transparent text-white dark:bg-white/[0.12] dark:border-white/[0.2] dark:text-white font-medium'
-                        : 'bg-light-surfaceborder-light-border text-gray-900 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-light-surfaceborder-black/[0.06] text-gray-900 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
                     <button
@@ -319,7 +319,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           )}
 
           {presetFilters.length === 0 && customFilters.length === 0 && (
-            <div className="text-center py-4 bg-light-bg dark:bg-panel-dark rounded-lg border-2 border-dashed border-light-border dark:border-white/[0.04]">
+            <div className="text-center py-4 bg-light-bg dark:bg-panel-dark rounded-lg border-2 border-dashed border-black/[0.06] dark:border-white/[0.04]">
               <p className="text-xs text-gray-500 dark:text-text-tertiary">
                 {t('暂无过滤器，点击"新建"创建', 'No filters, click "New" to create')}
               </p>
@@ -327,7 +327,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           )}
 
           {selectedFilters.length > 0 && (
-            <div className="flex items-center justify-between pt-2 border-t border-light-border dark:border-white/[0.04]">
+            <div className="flex items-center justify-between pt-2 border-t border-black/[0.06] dark:border-white/[0.04]">
               <span className="text-xs text-gray-700 dark:text-text-tertiary">
                 {t(`已选择 ${selectedFilters.length} 个过滤器`, `${selectedFilters.length} filters selected`)}
               </span>
