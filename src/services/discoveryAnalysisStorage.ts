@@ -29,20 +29,37 @@ const openDb = (): Promise<IDBDatabase> => {
   });
 };
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> => {
-  return await Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('DiscoveryAnalysisStorage timeout')), timeoutMs)
-    ),
-  ]);
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs = 3000,
+  onLate?: (value: T) => void
+): Promise<T> => {
+  let isSettled = false;
+  let lateValue: T | undefined;
+
+  const wrappedPromise = promise.then((value) => {
+    if (!isSettled && onLate) {
+      onLate(value);
+    }
+    lateValue = value;
+    return value;
+  });
+
+  const timeoutPromise = new Promise<T>((_, reject) =>
+    setTimeout(() => {
+      isSettled = true;
+      reject(new Error('DiscoveryAnalysisStorage timeout'));
+    }, timeoutMs)
+  );
+
+  return await Promise.race([wrappedPromise, timeoutPromise]);
 };
 
 export const discoveryAnalysisStorage = {
   async saveAnalysis(repoId: number, data: DiscoveryAnalysisData): Promise<void> {
     if (!canUseIndexedDB()) return;
     try {
-      const db = await withTimeout(openDb());
+      const db = await withTimeout(openDb(), 3000, (lateDb) => lateDb.close());
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).put(JSON.stringify(data), repoId);
@@ -64,7 +81,7 @@ export const discoveryAnalysisStorage = {
   async loadAnalysis(repoId: number): Promise<DiscoveryAnalysisData | null> {
     if (!canUseIndexedDB()) return null;
     try {
-      const db = await withTimeout(openDb());
+      const db = await withTimeout(openDb(), 3000, (lateDb) => lateDb.close());
       return await new Promise<DiscoveryAnalysisData | null>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).get(repoId);
@@ -99,7 +116,7 @@ export const discoveryAnalysisStorage = {
     if (!canUseIndexedDB()) return result;
 
     try {
-      const db = await withTimeout(openDb());
+      const db = await withTimeout(openDb(), 3000, (lateDb) => lateDb.close());
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).openCursor();
@@ -136,7 +153,7 @@ export const discoveryAnalysisStorage = {
   async deleteAnalysis(repoId: number): Promise<void> {
     if (!canUseIndexedDB()) return;
     try {
-      const db = await withTimeout(openDb());
+      const db = await withTimeout(openDb(), 3000, (lateDb) => lateDb.close());
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).delete(repoId);
