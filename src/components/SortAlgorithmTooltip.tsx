@@ -76,29 +76,29 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
         onClick={() => setIsVisible(!isVisible)}
-        className="p-1 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+        className="p-1 rounded-full text-gray-400 dark:text-text-quaternary hover:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
       >
         <Info className="w-4 h-4" />
       </button>
 
       {isVisible && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[9999]" style={{ zIndex: 9999 }}>
-          <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 w-80">
+          <div className="relative bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-xl p-4 w-80">
             {/* Arrow */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-[10000]">
-              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-gray-200 dark:border-b-gray-700" />
-              <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-gray-800" />
+              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-black/[0.06] dark:border-b-white/[0.04]" />
+              <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-panel-dark" />
             </div>
 
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm">
+            <h4 className="font-semibold text-gray-900 dark:text-text-primary mb-2 text-sm">
               {info.title}
             </h4>
             {info.highlight && (
-              <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
+              <p className="text-sm font-medium text-brand-violet dark:text-brand-violet mb-2">
                 {info.highlight}
               </p>
             )}
-            <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line leading-relaxed">
+            <p className="text-xs text-gray-700 dark:text-text-tertiary whitespace-pre-line leading-relaxed">
               {info.description}
             </p>
           </div>

@@ -256,21 +256,21 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Cloud className="w-6 h-6 text-green-600 dark:text-green-400" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <Cloud className="w-6 h-6 text-status-emerald " />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('备份与恢复', 'Backup & Restore')}
         </h3>
       </div>
 
       {!activeConfig && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary mt-0.5" />
             <div>
-              <p className="text-sm text-amber-800 dark:text-amber-200">
+              <p className="text-sm text-gray-700 dark:text-text-secondary ">
                 {t('请先配置并激活WebDAV服务', 'Please configure and activate WebDAV service first')}
               </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              <p className="text-xs text-gray-700 dark:text-text-secondary mt-1">
                 {t('备份和恢复功能需要WebDAV服务支持', 'Backup and restore features require WebDAV service')}
               </p>
             </div>
@@ -279,8 +279,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       )}
 
       {lastBackup && (
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg">
+          <p className="text-sm text-gray-700 dark:text-text-secondary ">
             <span className="font-medium">{t('上次备份:', 'Last backup:')}</span>{' '}
             {new Date(lastBackup).toLocaleString()}
           </p>
@@ -288,14 +288,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
-            <Upload className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <Upload className="w-8 h-8 text-status-emerald " />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('备份数据', 'Backup Data')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('将数据备份到WebDAV', 'Backup data to WebDAV')}
               </p>
             </div>
@@ -303,7 +303,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <button
             onClick={handleBackup}
             disabled={isBackingUp || !activeConfig}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isBackingUp ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -314,14 +314,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           </button>
         </div>
 
-        <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
-            <Download className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('恢复数据', 'Restore Data')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('从WebDAV恢复数据', 'Restore data from WebDAV')}
               </p>
             </div>
@@ -329,7 +329,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <button
             onClick={handleRestore}
             disabled={isRestoring || !activeConfig}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRestoring ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -341,11 +341,11 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         </div>
       </div>
 
-      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+      <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg">
+        <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
           {t('备份内容包括：', 'Backup includes:')}
         </h4>
-        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+        <ul className="text-sm text-gray-700 dark:text-text-tertiary space-y-1">
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('自定义分类', 'Custom categories')}</li>

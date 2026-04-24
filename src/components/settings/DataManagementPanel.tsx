@@ -701,8 +701,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Release records not updated in over 90 days',
         count: oldReleases.length,
         icon: <Tag className="w-4 h-4" />,
-        color: 'text-amber-600 dark:text-amber-400',
-        bgColor: 'bg-amber-50 dark:bg-amber-900/20'
+        color: 'text-gray-700 dark:text-text-secondary',
+        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
 
@@ -716,8 +716,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Cached repository data from discovery page, safe to clean',
         count: totalDiscoveryRepos,
         icon: <Sparkles className="w-4 h-4" />,
-        color: 'text-purple-600 dark:text-purple-400',
-        bgColor: 'bg-purple-50 dark:bg-purple-900/20'
+        color: 'text-gray-700 dark:text-text-secondary',
+        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
 
@@ -731,8 +731,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Repositories that have not been analyzed by AI',
         count: unanalyzedRepos,
         icon: <Bot className="w-4 h-4" />,
-        color: 'text-blue-600 dark:text-blue-400',
-        bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+        color: 'text-gray-700 dark:text-text-secondary',
+        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
 
@@ -746,8 +746,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Records of read releases',
         count: oldReadReleases,
         icon: <Eye className="w-4 h-4" />,
-        color: 'text-green-600 dark:text-green-400',
-        bgColor: 'bg-green-50 dark:bg-green-900/20'
+        color: 'text-gray-700 dark:text-text-secondary',
+        bgColor: 'bg-status-emerald '
       });
     }
 
@@ -1025,80 +1025,80 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       label: t('GitHub Stars仓库', 'GitHub Stars Repositories'),
       count: repositories.length,
       icon: <Github className="w-5 h-5" />,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'releases',
       label: t('Release发布信息', 'Release Information'),
       count: releases.length,
       icon: <Tag className="w-5 h-5" />,
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'aiConfigs',
       label: t('AI服务配置', 'AI Service Configurations'),
       count: aiConfigs.length,
       icon: <Bot className="w-5 h-5" />,
-      color: 'text-purple-600 dark:text-purple-400',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'webdavConfigs',
       label: t('WebDAV配置', 'WebDAV Configurations'),
       count: webdavConfigs.length,
       icon: <Cloud className="w-5 h-5" />,
-      color: 'text-cyan-600 dark:text-cyan-400',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'categorySettings',
       label: t('自定义分类', 'Custom Categories'),
       count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
-      color: 'text-orange-600 dark:text-orange-400',
-      bgColor: 'bg-orange-50 dark:bg-orange-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'assetFilters',
       label: t('资源过滤器', 'Asset Filters'),
       count: assetFilters.length,
       icon: <Filter className="w-5 h-5" />,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'discoveryData',
       label: t('发现页缓存', 'Discovery Cache'),
       count: totalDiscoveryReposCount,
       icon: <Sparkles className="w-5 h-5" />,
-      color: 'text-pink-600 dark:text-pink-400',
-      bgColor: 'bg-pink-50 dark:bg-pink-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'subscriptionData',
       label: t('订阅页数据', 'Subscription Data'),
       count: totalSubscriptionReposCount,
       icon: <Rss className="w-5 h-5" />,
-      color: 'text-amber-600 dark:text-amber-400',
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'releaseSubscriptions',
       label: t('Release订阅', 'Release Subscriptions'),
       count: releaseSubscriptions.size,
       icon: <Eye className="w-5 h-5" />,
-      color: 'text-teal-600 dark:text-teal-400',
-      bgColor: 'bg-teal-50 dark:bg-teal-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'searchHistory',
       label: t('搜索历史', 'Search History'),
       count: searchFilters.query ? 1 : 0,
       icon: <Search className="w-5 h-5" />,
-      color: 'text-gray-600 dark:text-gray-400',
-      bgColor: 'bg-gray-50 dark:bg-gray-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
   ];
 
@@ -1106,7 +1106,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-status-emerald text-status-emerald rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -1114,7 +1114,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Error Message */}
       {showErrorMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-status-red/10 dark:bg-status-red/20 text-status-red dark:text-status-red rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <XCircle className="w-5 h-5" />
           <span>{showErrorMessage}</span>
         </div>
@@ -1122,15 +1122,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Statistics */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
+          <Database className="w-5 h-5 mr-2 text-brand-violet dark:text-brand-violet" />
           {t('数据概览', 'Data Overview')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {dataStats.map((stat) => (
             <div
               key={stat.key}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+              className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -1138,8 +1138,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <p className="text-sm text-gray-500 dark:text-text-tertiary">{stat.label}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-text-primary">
                       {stat.count}
                     </p>
                   </div>
@@ -1152,20 +1152,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Export/Import */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-          <HardDrive className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
+          <HardDrive className="w-5 h-5 mr-2 text-status-emerald " />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Export */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-brand-violet dark:text-brand-violet">
                 <Download className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">{t('导出数据', 'Export Data')}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
+                <h4 className="font-medium text-gray-900 dark:text-text-primary">{t('导出数据', 'Export Data')}</h4>
+                <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
             <div className="space-y-2 mb-4">
@@ -1182,11 +1182,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
                 { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
               ].map((item) => (
-                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-900 dark:text-text-secondary">
                   <input
                     type="checkbox"
                     defaultChecked
-                    className="export-checkbox rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                    className="export-checkbox rounded border-black/[0.06] dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet"
                     data-type={item.key}
                   />
                   <span>{item.label}</span>
@@ -1204,7 +1204,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 exportData(selectedTypes);
               }}
               disabled={isExporting}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="w-full px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
             >
               {isExporting ? (
                 <>
@@ -1221,19 +1221,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           </div>
 
           {/* Import */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+              <div className="p-2 rounded-lg bg-status-emerald text-status-emerald ">
                 <Upload className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">{t('导入数据', 'Import Data')}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
+                <h4 className="font-medium text-gray-900 dark:text-text-primary">{t('导入数据', 'Import Data')}</h4>
+                <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
               </div>
             </div>
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+            <div className="border-2 border-dashed border-black/[0.06] dark:border-white/[0.04] rounded-lg p-6 text-center">
+              <Upload className="w-8 h-8 text-gray-400 dark:text-text-quaternary mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-text-tertiary mb-2">
                 {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
               </p>
               <input
@@ -1245,7 +1245,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors inline-block"
+                className="cursor-pointer px-4 py-2 bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-text-secondary rounded-lg transition-colors inline-block"
               >
                 {t('选择文件', 'Select File')}
               </label>
@@ -1257,12 +1257,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Cleanup Suggestions */}
       {cleanupSuggestions.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <RefreshCw className="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
+            <RefreshCw className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary " />
             {t('数据清理建议', 'Data Cleanup Suggestions')}
           </h3>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-            <p className="text-sm text-amber-700 dark:text-amber-300">
+          <div className="bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-4 mb-4">
+            <p className="text-sm text-gray-700 dark:text-text-secondary ">
               {t('以下数据可以安全清理以释放存储空间，不会影响核心功能。', 'The following data can be safely cleaned to free up storage without affecting core functionality.')}
             </p>
           </div>
@@ -1270,28 +1270,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between"
+                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
                     {suggestion.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <p className="font-medium text-gray-900 dark:text-text-primary">
                       {language === 'zh' ? suggestion.label : suggestion.labelEn}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-text-tertiary">
                       {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  <span className="text-sm font-medium text-gray-700 dark:text-text-tertiary">
                     {suggestion.count} {t('条', 'items')}
                   </span>
                   <button
                     onClick={() => handleCleanup(suggestion.key)}
-                    className="px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] rounded-lg transition-colors"
                   >
                     {t('清理', 'Clean')}
                   </button>
@@ -1304,24 +1304,24 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Selective Data Deletion */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-          <Trash2 className="w-5 h-5 mr-2 text-orange-600 dark:text-orange-400" />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
+          <Trash2 className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary " />
           {t('选择性删除数据', 'Selective Data Deletion')}
         </h3>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+          <div className="divide-y divide-black/[0.06] dark:divide-gray-700">
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/10/50 transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white">{stat.label}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="font-medium text-gray-900 dark:text-text-primary">{stat.label}</p>
+                    <p className="text-sm text-gray-500 dark:text-text-tertiary">
                       {stat.count} {t('条记录', 'records')}
                     </p>
                   </div>
@@ -1329,7 +1329,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.count === 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{t('删除', 'Delete')}</span>
@@ -1342,20 +1342,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Delete All Data */}
       <section>
-        <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary mb-4 flex items-center">
           <AlertTriangle className="w-5 h-5 mr-2" />
           {t('危险区域', 'Danger Zone')}
         </h3>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+        <div className="bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-6">
           <div className="flex items-start space-x-4">
-            <div className="p-3 bg-red-100 dark:bg-red-800 rounded-lg">
-              <FileWarning className="w-6 h-6 text-red-600 dark:text-red-400" />
+            <div className="p-3 bg-status-red/10 dark:bg-status-red/20 rounded-lg">
+              <FileWarning className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
             </div>
             <div className="flex-1">
-              <h4 className="text-lg font-semibold text-red-900 dark:text-red-100">
+              <h4 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
                 {t('删除所有数据', 'Delete All Data')}
               </h4>
-              <p className="mt-2 text-red-700 dark:text-red-300">
+              <p className="mt-2 text-gray-700 dark:text-text-secondary ">
                 {t(
                   '此操作将永久删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。应用程序将重置为初始状态。此操作不可恢复！',
                   'This will permanently delete ALL application data, including all user data, GitHub tokens, configuration files, etc. The application will be reset to its initial state. This action cannot be undone!'
@@ -1363,7 +1363,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </p>
               <button
                 onClick={() => openConfirmation('all')}
-                className="mt-4 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center space-x-2"
+                className="mt-4 px-6 py-3 bg-status-red hover:bg-gray-100 dark:bg-white/[0.04] text-white font-semibold rounded-lg transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="w-5 h-5" />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>
@@ -1376,40 +1376,40 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4">
             {t('操作日志', 'Operation Logs')}
           </h3>
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                <thead className="bg-light-bg dark:bg-white/[0.04] sticky top-0">
                   <tr>
-                    <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-300">
+                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
                       {t('时间', 'Time')}
                     </th>
-                    <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-300">
+                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
                       {t('操作', 'Operation')}
                     </th>
-                    <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-300">
+                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
                       {t('状态', 'Status')}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
+                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/10/50">
+                      <td className="px-4 py-2 text-gray-500 dark:text-text-tertiary">
                         {log.timestamp}
                       </td>
-                      <td className="px-4 py-2 text-gray-900 dark:text-white">{log.operation}</td>
+                      <td className="px-4 py-2 text-gray-900 dark:text-text-primary">{log.operation}</td>
                       <td className="px-4 py-2">
                         {log.success ? (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-status-emerald bg-status-emerald rounded-full">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             {t('成功', 'Success')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 dark:text-text-secondary bg-status-red/10 dark:bg-status-red/20 rounded-full">
                             <XCircle className="w-3 h-3 mr-1" />
                             {t('失败', 'Failed')}
                           </span>
@@ -1427,18 +1427,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Confirmation Modal */}
       {confirmation.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800">
+          <div className="w-full max-w-md bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-light-surface dark:bg-white/[0.04] border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
               <div className="flex items-center space-x-3">
-                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
-                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
+                <AlertTriangle className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
                   {getDeleteTitle(confirmation.type!)}
                 </h3>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="flex items-start space-x-3 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
+              <div className="flex items-start space-x-3 text-gray-700 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] p-4 rounded-lg">
                 <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <p className="text-sm">{getDeleteDescription(confirmation.type!)}</p>
               </div>
@@ -1446,12 +1446,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               {/* GitHub Username Verification for "Delete All" */}
               {confirmation.type === 'all' && user && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t(
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
                     )}
-                    <span className="ml-2 font-mono text-blue-600 dark:text-blue-400">
+                    <span className="ml-2 font-mono text-brand-violet dark:text-brand-violet">
                       {user.login}
                     </span>
                   </label>
@@ -1465,7 +1465,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('输入GitHub用户名', 'Enter GitHub username')}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-black/[0.06] dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-primary"
                   />
                 </div>
               )}
@@ -1474,7 +1474,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={closeConfirmation}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-gray-900 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
                 </button>
@@ -1485,7 +1485,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     (confirmation.type === 'all' &&
                       confirmation.githubUsernameInput !== user?.login)
                   }
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-status-red hover:bg-gray-100 dark:bg-white/[0.04] text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isDeleting ? (
                     <>
@@ -1508,53 +1508,53 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Import Preview Modal */}
       {importPreview.isOpen && importPreview.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-800">
+          <div className="w-full max-w-lg bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-status-emerald border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
               <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-green-600 dark:text-green-400" />
-                <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">
+                <Upload className="w-6 h-6 text-status-emerald " />
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
                   {t('导入数据预览', 'Import Data Preview')}
                 </h3>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-700 dark:text-text-tertiary">
                 <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
                 <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
                 <p><strong>{t('版本:', 'Version:')}</strong> {importPreview.data.appVersion}</p>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('包含的数据:', 'Included Data:')}</p>
+              <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
+                <p className="text-sm font-medium text-gray-900 dark:text-text-secondary mb-2">{t('包含的数据:', 'Included Data:')}</p>
                 <div className="space-y-1 text-sm">
                   {importPreview.data.data.repositories && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.releases && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.aiConfigs && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.webdavConfigs && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.customCategories && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.assetFilters && (
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-700 dark:text-text-tertiary">
                       • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
                     </p>
                   )}
@@ -1565,7 +1565,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-gray-900 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
                 </button>
@@ -1575,7 +1575,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     importData(types, 'merge');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>
@@ -1592,7 +1592,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     importData(types, 'replace');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>

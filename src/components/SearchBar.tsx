@@ -729,10 +729,10 @@ export const SearchBar: React.FC = () => {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
+    <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6 mb-6">
       {/* Search Input */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
         <input
           ref={searchInputRef}
           type="text"
@@ -747,19 +747,19 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary placeholder-gray-500 dark:placeholder-gray-400"
         />
 
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-            <div className="p-2 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                 {t('搜索历史', 'Search History')}
               </span>
               <button
                 onClick={clearSearchHistory}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className="text-xs text-gray-500 dark:text-text-tertiary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary transition-colors"
               >
                 {t('清除', 'Clear')}
               </button>
@@ -768,9 +768,9 @@ export const SearchBar: React.FC = () => {
               <button
                 key={index}
                 onClick={() => handleHistoryItemClick(historyQuery)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                className="w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors flex items-center space-x-2"
               >
-                <Search className="w-4 h-4 text-gray-400" />
+                <Search className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
                 <span className="truncate">{historyQuery}</span>
               </button>
             ))}
@@ -779,9 +779,9 @@ export const SearchBar: React.FC = () => {
 
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2 border-b border-black/[0.04] dark:border-white/[0.04]">
+              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                 {t('搜索建议', 'Search Suggestions')}
               </span>
             </div>
@@ -795,10 +795,10 @@ export const SearchBar: React.FC = () => {
                 <button
                   key={index}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                  className="w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors flex items-center space-x-2"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-gray-100 dark:bg-white/[0.04] rounded-full"></div>
                   </div>
                   <span className="truncate">{suggestion}</span>
                 </button>
@@ -809,7 +809,7 @@ export const SearchBar: React.FC = () => {
           {searchQuery && (
             <button
               onClick={handleClearSearch}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="p-1.5 text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300 transition-colors"
               title={t('清除搜索', 'Clear search')}
             >
               <X className="w-4 h-4" />
@@ -818,7 +818,7 @@ export const SearchBar: React.FC = () => {
           <button
             onClick={handleAISearch}
             disabled={isSearching}
-            className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50"
+            className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm font-medium disabled:opacity-50"
             title={activeAIConfig 
               ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
@@ -827,7 +827,7 @@ export const SearchBar: React.FC = () => {
             <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
           </button>
           <div className="group relative">
-            <AlertCircle className="w-4 h-4 text-gray-400 cursor-help" />
+            <AlertCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
             <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <p className="font-medium mb-1">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="text-gray-300">
@@ -852,19 +852,19 @@ export const SearchBar: React.FC = () => {
         <div className="mb-4 flex items-center justify-between text-sm">
           <div className="flex items-center space-x-2">
             {isRealTimeSearch ? (
-              <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="flex items-center space-x-2 text-brand-violet dark:text-brand-violet">
+                <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
                 <span>{t('实时搜索模式 - 匹配仓库名称', 'Real-time search mode - matching repository names')}</span>
               </div>
             ) : searchFilters.query ? (
-              <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+              <div className="flex items-center space-x-2 text-gray-700 dark:text-text-secondary ">
                 <Bot className="w-4 h-4" />
                 <span>{t('AI语义搜索模式 - 智能匹配和排序', 'AI semantic search mode - intelligent matching and ranking')}</span>
               </div>
             ) : null}
           </div>
           {isRealTimeSearch && (
-            <div className="text-gray-500 dark:text-gray-400">
+            <div className="text-gray-500 dark:text-text-tertiary">
               {t('按回车键或点击AI搜索进行深度搜索', 'Press Enter or click AI Search for deep search')}
             </div>
           )}
@@ -878,14 +878,14 @@ export const SearchBar: React.FC = () => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
               showFilters || activeFiltersCount > 0
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
+                : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
             <span>{t('过滤器', 'Filters')}</span>
             {activeFiltersCount > 0 && (
-              <span className="bg-blue-600 text-white rounded-full px-2 py-0.5 text-xs">
+              <span className="bg-brand-indigo text-white rounded-full px-2 py-0.5 text-xs">
                 {activeFiltersCount}
               </span>
             )}
@@ -894,7 +894,7 @@ export const SearchBar: React.FC = () => {
           {activeFiltersCount > 0 && (
             <button
               onClick={clearFilters}
-              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('清除全部', 'Clear all')}</span>
@@ -910,7 +910,7 @@ export const SearchBar: React.FC = () => {
             onChange={(e) => setSearchFilters({ 
               sortBy: e.target.value as 'stars' | 'updated' | 'name' | 'starred'
             })}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
           >
             <option value="stars">{t('按星标排序', 'Sort by Stars')}</option>
             <option value="updated">{t('按更新排序', 'Sort by Updated')}</option>
@@ -921,7 +921,7 @@ export const SearchBar: React.FC = () => {
             onClick={() => setSearchFilters({ 
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc' 
             })}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
           </button>
@@ -930,10 +930,10 @@ export const SearchBar: React.FC = () => {
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-6">
+        <div className="mt-6 pt-6 border-t border-black/[0.06] dark:border-white/[0.04] space-y-6">
           {/* Status Filters */}
           <div>
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
               {t('状态过滤', 'Status Filters')}
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -946,8 +946,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === true
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
@@ -964,8 +964,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === false
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <X className="w-4 h-4" />
@@ -982,8 +982,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.analysisFailed === true
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <AlertCircle className="w-4 h-4" />
@@ -1000,8 +1000,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === true
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Bell className="w-4 h-4" />
@@ -1018,8 +1018,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === false
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <BellOff className="w-4 h-4" />
@@ -1036,8 +1036,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isEdited === true
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -1055,7 +1055,7 @@ export const SearchBar: React.FC = () => {
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isCategoryLocked === true
                       ? 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Lock className="w-4 h-4" />
@@ -1072,8 +1072,8 @@ export const SearchBar: React.FC = () => {
                   title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isCategoryLocked === false
-                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                      : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                   }`}
                 >
                   <Unlock className="w-4 h-4" />
@@ -1087,7 +1087,7 @@ export const SearchBar: React.FC = () => {
           {/* Languages */}
           {availableLanguages.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
                 {t('编程语言', 'Programming Languages')}
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -1097,8 +1097,8 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handleLanguageToggle(language)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.languages.includes(language)
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {language}
@@ -1111,7 +1111,7 @@ export const SearchBar: React.FC = () => {
           {/* Platforms */}
           {availablePlatforms.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
                 {t('支持平台', 'Supported Platforms')}
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -1121,8 +1121,8 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handlePlatformToggle(platform)}
                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.platforms.includes(platform)
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
@@ -1136,7 +1136,7 @@ export const SearchBar: React.FC = () => {
           {/* Tags */}
           {availableTags.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
                 {t('标签', 'Tags')}
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -1146,8 +1146,8 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handleTagToggle(tag)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.tags.includes(tag)
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-gray-900 border border-transparent text-white dark:bg-white/[0.12] dark:text-white font-medium shadow-sm'
+                        : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     }`}
                   >
                     {tag}
@@ -1159,12 +1159,12 @@ export const SearchBar: React.FC = () => {
 
           {/* Star Range */}
           <div>
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
               {t('Star数量范围', 'Star Count Range')}
             </h4>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 sm:gap-4">
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400">
+                <label className="text-sm text-gray-700 dark:text-text-tertiary">
                   {t('最小:', 'Min:')}
                 </label>
                 <input
@@ -1174,11 +1174,11 @@ export const SearchBar: React.FC = () => {
                   onChange={(e) => setSearchFilters({ 
                     minStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
-                  className="w-24 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400">
+                <label className="text-sm text-gray-700 dark:text-text-tertiary">
                   {t('最大:', 'Max:')}
                 </label>
                 <input
@@ -1188,7 +1188,7 @@ export const SearchBar: React.FC = () => {
                   onChange={(e) => setSearchFilters({ 
                     maxStars: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
-                  className="w-24 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
                 />
               </div>
             </div>

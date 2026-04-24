@@ -278,6 +278,8 @@ const normalizePersistedState = (
   return {
     ...currentState,
     ...safePersisted,
+    // Force dark theme: migrate legacy 'light' users to the new Linear dark-mode-first design
+    theme: 'dark',
     repositories,
     releases,
     searchResults: repositories,
@@ -637,7 +639,7 @@ export const useAppStore = create<AppState & AppActions>()(
       categoryOrder: [],
       collapsedSidebarCategoryCount: 20,
       assetFilters: defaultPresetFilters,
-      theme: 'light',
+      theme: 'dark',
       currentView: 'repositories',
       selectedCategory: 'all',
       language: 'zh',
