@@ -859,6 +859,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
         channels={mobileChannels}
         selectedChannel={selectedDiscoveryChannel}
         onChannelSelect={(channel) => {
+          if (channel === selectedDiscoveryChannel) {
+            return;
+          }
           if (scrollContainerRef.current) {
             const scrollTop = scrollContainerRef.current.scrollTop;
             discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
@@ -875,6 +878,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
             channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
+              if (channel === selectedDiscoveryChannel) {
+                return;
+              }
               if (scrollContainerRef.current) {
                 const scrollTop = scrollContainerRef.current.scrollTop;
                 discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
