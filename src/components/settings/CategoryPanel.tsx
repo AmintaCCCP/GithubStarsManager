@@ -240,7 +240,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Package className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {t('分类管理', 'Category Management')}
           </h3>
         </div>
@@ -254,18 +254,18 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       </div>
 
       {/* 折叠侧边栏显示设置 */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="p-4 bg-blue-50 dark:bg-brand-indigo/20/20 rounded-lg border border-blue-200 dark:border-blue-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <LayoutGrid className="w-5 h-5 text-blue-600 dark:text-brand-violet" />
+            <LayoutGrid className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-text-primary">
+              <h4 className="font-medium text-text-primarydark:text-text-primary">
                 {t('折叠侧边栏显示设置', 'Collapsed Sidebar Display')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-text-tertiary">
+              <p className="text-sm text-text-tertiarydark:text-text-tertiary">
                 {t('设置折叠状态下显示的分类个数', 'Set the number of categories to display when collapsed')}
               </p>
-              <p className="text-xs text-blue-600 dark:text-brand-violet mt-1">
+              <p className="text-xs text-brand-violet dark:text-brand-violet mt-1">
                 {t(
                   '提示：折叠侧边栏仅影响显示，所有分类仍可在展开状态下查看。只显示分类顺序前N个分类。',
                   'Tip: The collapsed sidebar only affects display; all categories remain accessible when expanded. Only the first N categories in the order are displayed.'
@@ -292,35 +292,35 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   setCollapsedSidebarCategoryCount(1);
                 }
               }}
-              className="w-20 px-3 py-1.5 text-center border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+              className="w-20 px-3 py-1.5 text-center border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
               placeholder="≥1"
             />
-            <span className="text-sm text-gray-500 dark:text-text-tertiary">
+            <span className="text-sm text-text-tertiarydark:text-text-tertiary">
             </span>
           </div>
         </div>
       </div>
 
       {showAddForm && (
-        <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
-          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
+        <div className="p-4 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
+          <h4 className="font-medium text-text-primarydark:text-text-primary mb-4">
             {t('添加自定义分类', 'Add Custom Category')}
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-1">
                 {t('分类名称', 'Category Name')} *
               </label>
               <input
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary"
                 placeholder={t('例如: 我的项目', 'e.g., My Projects')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-1">
                 {t('图标', 'Icon')}
               </label>
               <input
@@ -333,23 +333,23 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     setNewCategoryIcon(value);
                   }
                 }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary"
                 placeholder="📁"
               />
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+            <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-1">
               {t('关键词', 'Keywords')}
             </label>
             <input
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+              className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary"
               placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
             />
-            <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+            <p className="text-xs text-text-tertiarydark:text-text-tertiary mt-1">
               {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
             </p>
           </div>
@@ -357,7 +357,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <button
               onClick={handleAddCategory}
               disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-text-tertiary cursor-not-allowed'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-brand-indigo text-white hover:bg-green-700' : 'bg-gray-300 text-text-tertiarydark:bg-gray-600 dark:text-text-tertiary cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -380,12 +380,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
       <div className="space-y-4">
         {/* 分类排序区域 */}
-        <div className="border-t border-gray-200 dark:border-white/8 pt-4">
+        <div className="border-t border-light-border dark:border-white/12 pt-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
+            <h4 className="font-medium text-text-primarydark:text-text-primary flex items-center">
               <GripVertical className="w-4 h-4 mr-2" />
               {t('分类排序', 'Category Order')}
-              <span className="ml-2 text-sm text-gray-500 dark:text-text-tertiary">
+              <span className="ml-2 text-sm text-text-tertiarydark:text-text-tertiary">
                 ({allVisibleCategories.length})
               </span>
             </h4>
@@ -394,8 +394,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 onClick={() => setIsReordering(!isReordering)}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   isReordering
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                    ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                    : 'bg-light-surfacetext-text-primarydark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {isReordering ? t('完成', 'Done') : t('调整顺序', 'Reorder')}
@@ -403,7 +403,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               {categoryOrder.length > 0 && (
                 <button
                   onClick={handleResetOrder}
-                  className="px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm bg-light-surfacetext-text-primarydark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   {t('重置', 'Reset')}
                 </button>
@@ -420,7 +420,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           )}
 
           {allVisibleCategories.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-text-tertiary py-4">
+            <p className="text-sm text-text-tertiarydark:text-text-tertiary py-4">
               {t('暂无可见分类', 'No visible categories')}
             </p>
           ) : (
@@ -449,7 +449,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   className={`flex flex-col p-3 rounded-lg border transition-all ${
                     category.isCustom
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-                      : 'bg-white dark:bg-panel-dark border-gray-200 dark:border-white/8'
+                      : 'bg-white dark:bg-panel-dark border-light-border dark:border-white/12'
                   } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-brand-violet' : ''} ${
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
@@ -461,11 +461,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   {isEditing ? (
                     <>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-text-secondary">
+                        <span className="text-sm font-medium text-text-primarydark:text-text-secondary">
                           {t('编辑分类', 'Edit Category')}
                         </span>
                         {isDefault && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-white/[0.04] dark:text-text-tertiary">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-text-secondarydark:bg-white/[0.04] dark:text-text-tertiary">
                             {t('默认分类', 'Default Category')}
                           </span>
                         )}
@@ -494,14 +494,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-gray-300 dark:border-white/8 rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary"
+                            className="w-14 px-2 py-1.5 border border-light-border dark:border-white/12 rounded bg-white dark:bg-white/[0.04] text-center text-lg text-text-primarydark:text-text-primary"
                             placeholder="📁"
                           />
                           <input
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-white/8 rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-light-border dark:border-white/12 rounded bg-white dark:bg-white/[0.04] text-sm text-text-primarydark:text-text-primary"
                             placeholder={t('分类名称', 'Category name')}
                           />
                         </div>
@@ -510,20 +510,20 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             type="text"
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-white/8 rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-light-border dark:border-white/12 rounded bg-white dark:bg-white/[0.04] text-sm text-text-primarydark:text-text-primary"
                             placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
                           />
                           <button
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800' : 'bg-gray-100 text-gray-400 dark:bg-white/[0.04] dark:text-gray-500 cursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${hasChanges ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800' : 'bg-light-surfacetext-gray-400 dark:bg-white/[0.04] dark:text-text-tertiarycursor-not-allowed'}`}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
+                            className="p-1.5 rounded bg-light-surfacetext-text-secondarydark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
                             title={t('取消', 'Cancel')}
                           >
                             <X className="w-4 h-4" />
@@ -531,7 +531,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         </div>
                         {isDefault && isModified && (
                           <div className="flex items-center space-x-2 pt-1">
-                            <span className="text-xs text-gray-500 dark:text-text-tertiary">{t('还原:', 'Reset:')}</span>
+                            <span className="text-xs text-text-tertiarydark:text-text-tertiary">{t('还原:', 'Reset:')}</span>
                             {hasNameIconModified(category.id) && (
                               <button
                                 onClick={() => {
@@ -573,10 +573,10 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         {isReordering && (
-                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary />
                         )}
                         <span className="text-xl w-6 text-center inline-block">{category.icon}</span>
-                        <span className="font-medium text-gray-900 dark:text-text-primary">
+                        <span className="font-medium text-text-primarydark:text-text-primary">
                           {category.name}
                         </span>
                         {category.isCustom && (
@@ -585,7 +585,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           </span>
                         )}
                         {!category.isCustom && isModified && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300">
                             {t('已修改', 'Modified')}
                           </span>
                         )}
@@ -604,7 +604,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-light-surfacetext-text-secondarydark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('上移', 'Move up')}
                           >
                             <ArrowUp className="w-4 h-4" />
@@ -612,7 +612,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-light-surfacetext-text-secondarydark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('下移', 'Move down')}
                           >
                             <ArrowDown className="w-4 h-4" />
@@ -656,7 +656,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               </button>
                               <button
                                 onClick={() => hideDefaultCategory(category.id)}
-                                className="p-1.5 rounded bg-gray-100 text-gray-600 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
+                                className="p-1.5 rounded bg-light-surfacetext-text-secondarydark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
                                 title={t('隐藏', 'Hide')}
                               >
                                 <EyeOff className="w-4 h-4" />
@@ -675,11 +675,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
         {/* 隐藏的默认分类 */}
         {hiddenDefaultCategories.length > 0 && (
-          <div className="border-t border-gray-200 dark:border-white/8 pt-4">
-            <h4 className="font-medium text-gray-900 dark:text-text-primary mb-3 flex items-center">
+          <div className="border-t border-light-border dark:border-white/12 pt-4">
+            <h4 className="font-medium text-text-primarydark:text-text-primary mb-3 flex items-center">
               <EyeOff className="w-4 h-4 mr-2" />
               {t('隐藏的默认分类', 'Hidden Default Categories')}
-              <span className="ml-2 text-sm text-gray-500 dark:text-text-tertiary">
+              <span className="ml-2 text-sm text-text-tertiarydark:text-text-tertiary">
                 ({hiddenDefaultCategories.length})
               </span>
             </h4>
@@ -688,7 +688,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 <button
                   key={category.id}
                   onClick={() => showDefaultCategory(category.id)}
-                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-light-surfacetext-text-primarydark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="w-5 text-center inline-block">{category.icon}</span>

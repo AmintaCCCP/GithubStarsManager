@@ -183,7 +183,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusClass = () => {
     switch (status) {
       case 'connected':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-200';
       case 'checking':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       default:
@@ -196,7 +196,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Server className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {t('后端服务器', 'Backend Server')}
           </h3>
         </div>
@@ -207,21 +207,21 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       </div>
 
       {health && (
-        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+        <div className="p-4 bg-status-emerald dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
           <div className="flex items-center space-x-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <span className="font-medium text-green-800 dark:text-green-200">
+            <CheckCircle className="w-5 h-5 text-status-emerald dark:text-green-400" />
+            <span className="font-medium text-status-emerald dark:text-green-200">
               {t('连接正常', 'Connection OK')}
             </span>
           </div>
-          <p className="text-sm text-green-700 dark:text-green-300">
+          <p className="text-sm text-status-emerald dark:text-green-300">
             {t('版本', 'Version')}: {health.version}
           </p>
         </div>
       )}
 
-      <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
-        <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
+      <div className="p-4 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
+        <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-2">
           {t('API 密钥', 'API Secret')}
         </label>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
@@ -229,7 +229,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+            className="flex-1 px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary"
             placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
           />
           <button
@@ -245,7 +245,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <span>{t('测试连接', 'Test Connection')}</span>
           </button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-text-tertiary mt-2">
+        <p className="text-xs text-text-tertiarydark:text-text-tertiary mt-2">
           {t(
             '如果后端设置了 API_SECRET 环境变量，在此输入相同的值。未设置则留空。',
             'If the backend has API_SECRET env var set, enter the same value here. Leave empty if not set.'
@@ -255,14 +255,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
       {backend.isAvailable && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-6 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
+          <div className="p-6 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
             <div className="flex items-center space-x-3 mb-4">
-              <Upload className="w-8 h-8 text-green-600 dark:text-green-400" />
+              <Upload className="w-8 h-8 text-status-emerald dark:text-green-400" />
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-text-primary">
+                <h4 className="font-medium text-text-primarydark:text-text-primary">
                   {t('同步到后端', 'Sync to Backend')}
                 </h4>
-                <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                <p className="text-sm text-text-tertiarydark:text-text-tertiary">
                   {t('将本地数据上传到后端', 'Upload local data to backend')}
                 </p>
               </div>
@@ -270,7 +270,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <button
               onClick={handleSyncToBackend}
               disabled={isSyncingToBackend}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncingToBackend ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
@@ -281,14 +281,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             </button>
           </div>
 
-          <div className="p-6 bg-gray-50 dark:bg-white/[0.04] rounded-lg border border-gray-200 dark:border-white/8">
+          <div className="p-6 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
             <div className="flex items-center space-x-3 mb-4">
-              <Download className="w-8 h-8 text-blue-600 dark:text-brand-violet" />
+              <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-text-primary">
+                <h4 className="font-medium text-text-primarydark:text-text-primary">
                   {t('从后端同步', 'Sync from Backend')}
                 </h4>
-                <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                <p className="text-sm text-text-tertiarydark:text-text-tertiary">
                   {t('从后端下载数据到本地', 'Download data from backend to local')}
                 </p>
               </div>
@@ -296,7 +296,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <button
               onClick={handleSyncFromBackend}
               disabled={isSyncingFromBackend}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncingFromBackend ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
@@ -309,11 +309,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </div>
       )}
 
-      <div className="p-4 bg-gray-50 dark:bg-white/[0.04] rounded-lg">
-        <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
+      <div className="p-4 bg-light-bgdark:bg-white/[0.04] rounded-lg">
+        <h4 className="font-medium text-text-primarydark:text-text-primary mb-2">
           {t('同步内容包括：', 'Sync includes:')}
         </h4>
-        <ul className="text-sm text-gray-600 dark:text-text-tertiary space-y-1">
+        <ul className="text-sm text-text-secondarydark:text-text-tertiary space-y-1">
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('AI 服务配置', 'AI service configurations')}</li>

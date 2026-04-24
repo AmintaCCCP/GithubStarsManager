@@ -67,7 +67,7 @@ export const BackToTop: React.FC = () => {
         fixed z-50
         flex items-center justify-center
         w-12 h-12
-        bg-blue-600 hover:bg-blue-700
+        bg-brand-indigo hover:bg-blue-700
         dark:bg-brand-violet dark:hover:bg-brand-violet/90
         text-white
         rounded-full

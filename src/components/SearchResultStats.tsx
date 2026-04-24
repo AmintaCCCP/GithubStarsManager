@@ -48,7 +48,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (
-            <div className="flex items-center space-x-2 text-blue-600 dark:text-brand-violet">
+            <div className="flex items-center space-x-2 text-brand-violet dark:text-brand-violet">
               <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
               <Search className="w-4 h-4" />
               <span className="font-medium text-sm">
@@ -66,7 +66,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         </div>
         
         {searchTime && (
-          <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-text-tertiary">
+          <div className="flex items-center space-x-1 text-xs text-text-tertiarydark:text-text-tertiary">
             <Clock className="w-3 h-3" />
             <span>{searchTime.toFixed(0)}ms</span>
           </div>
@@ -75,51 +75,51 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <div className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {foundRepos}
           </div>
-          <div className="text-gray-600 dark:text-text-tertiary">
+          <div className="text-text-secondarydark:text-text-tertiary">
             {t('找到仓库', 'Found Repos')}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
             {filterRate}% {t('匹配率', 'Match Rate')}
           </div>
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <div className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {stats.languages.length}
           </div>
-          <div className="text-gray-600 dark:text-text-tertiary">
+          <div className="text-text-secondarydark:text-text-tertiary">
             {t('编程语言', 'Languages')}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
             {stats.languages.slice(0, 2).join(', ')}
             {stats.languages.length > 2 && '...'}
           </div>
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <div className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {stats.avgStars.toLocaleString()}
           </div>
-          <div className="text-gray-600 dark:text-text-tertiary">
+          <div className="text-text-secondarydark:text-text-tertiary">
             {t('平均星标', 'Avg Stars')}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
             <TrendingUp className="w-3 h-3 inline mr-1" />
             {t('热度指标', 'Popularity')}
           </div>
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <div className="text-lg font-semibold text-text-primarydark:text-text-primary">
             {stats.recentlyUpdated}
           </div>
-          <div className="text-gray-600 dark:text-text-tertiary">
+          <div className="text-text-secondarydark:text-text-tertiary">
             {t('近期更新', 'Recent Updates')}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
             {t('30天内', 'Within 30 days')}
           </div>
         </div>
@@ -128,14 +128,14 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       {/* 搜索查询显示 */}
       <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
         <div className="flex items-center space-x-2 text-sm">
-          <span className="text-gray-600 dark:text-text-tertiary">
+          <span className="text-text-secondarydark:text-text-tertiary">
             {t('搜索查询:', 'Search Query:')}
           </span>
-          <code className="bg-white dark:bg-panel-dark px-2 py-1 rounded border text-gray-900 dark:text-text-primary font-mono">
+          <code className="bg-white dark:bg-panel-dark px-2 py-1 rounded border text-text-primarydark:text-text-primary font-mono">
             "{searchQuery}"
           </code>
           {stats.aiAnalyzed > 0 && (
-            <span className="text-xs text-green-600 dark:text-green-400 ml-2">
+            <span className="text-xs text-status-emerald dark:text-green-400 ml-2">
               {stats.aiAnalyzed} {t('个已AI分析', 'AI analyzed')}
             </span>
           )}

@@ -636,11 +636,11 @@
     @apply bg-panel-dark text-text-primary;
   }
   
-  .btn-ghost {
-    @apply bg-white/[0.02] text-text-primary border border-white/5 rounded-md px-3 py-1.5 transition-colors duration-200;
+   .btn-ghost {
+    @apply bg-white/[0.02] text-text-primary border border-white/12 rounded-md px-3 py-1.5 transition-colors duration-200;
   }
   .btn-ghost:hover {
-    @apply bg-white/5 border-white/10;
+    @apply bg-white/5 border-white/12;
   }
   .btn-ghost:focus {
     @apply shadow-focus outline-none;
@@ -674,7 +674,7 @@
     @apply bg-status-emerald text-text-primary rounded-full text-[10px] font-medium;
   }
   .badge-subtle {
-    @apply bg-white/5 text-text-primary px-2 py-0 rounded-sm border border-white/5 text-[10px] font-medium;
+    @apply bg-white/5 text-text-primary px-2 py-0 rounded-sm border border-white/12 text-[10px] font-medium;
   }
 
   .input-base {

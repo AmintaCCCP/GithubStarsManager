@@ -78,8 +78,8 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         fixed z-[1000]
         flex items-center justify-center
         w-12 h-12
-        bg-green-600 hover:bg-green-700
-        dark:bg-green-500 dark:hover:bg-green-600
+        bg-brand-indigo hover:bg-green-700
+        dark:bg-status-emerald0 dark:hover:bg-brand-indigo
         text-white
         rounded-full
         shadow-lg hover:shadow-xl

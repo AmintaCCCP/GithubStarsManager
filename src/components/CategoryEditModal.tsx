@@ -912,14 +912,14 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       <div className="space-y-4">
         {/* Category Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
             {t('分类名称', 'Category Name')} *
           </label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+            className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
             placeholder={t('输入分类名称', 'Enter category name')}
             autoFocus
           />
@@ -927,9 +927,9 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Icon Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
             {t('选择图标', 'Select Icon')} 
-            <span className="text-xs text-gray-500 dark:text-text-secondary ml-2">
+            <span className="text-xs text-text-tertiarydark:text-text-secondary ml-2">
               ({availableIcons.length}+ {t('个可选', 'available')})
             </span>
           </label>
@@ -943,14 +943,14 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('输入任意emoji...', 'Enter any emoji...')}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-center text-lg"
+                  className="flex-1 px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary text-center text-lg"
                   maxLength={4}
                   autoFocus
                 />
                 <button
                   onClick={handleCustomIconSubmit}
                   disabled={!customIcon.trim()}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-brand-indigo/80 dark:hover:bg-brand-indigo disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2 bg-brand-indigo text-white rounded-lg hover:bg-blue-700 dark:bg-brand-indigo/80 dark:hover:bg-brand-indigo disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('确定', 'OK')}
                 </button>
@@ -964,21 +964,21 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   {t('取消', 'Cancel')}
                 </button>
               </div>
-              <p className="text-xs text-blue-600 dark:text-brand-violet mt-2">
+              <p className="text-xs text-brand-violet dark:text-brand-violet mt-2">
                 {t('提示：可以输入任何emoji表情，如 🎯 🎨 🎪 等', 'Tip: You can enter any emoji, like 🎯 🎨 🎪 etc.')}
               </p>
             </div>
           )}
           
-          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-gray-200 dark:border-white/8 rounded-lg p-3">
+          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-light-border dark:border-white/12 rounded-lg p-3">
             {availableIcons.map((iconItem) => (
               <button
                 key={iconItem.name}
                 onClick={() => handleIconSelect(iconItem.icon)}
-                className={`p-2 rounded-lg text-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors ${
+                className={`p-2 rounded-lg text-xl hover:bg-light-surfacedark:hover:bg-white/10 transition-colors ${
                   formData.icon === iconItem.icon
-                    ? 'bg-blue-100 dark:bg-brand-indigo/30 ring-2 ring-brand-violet'
-                    : 'bg-gray-50 dark:bg-white/[0.04]'
+                    ? 'bg-brand-indigo/20 dark:bg-brand-indigo/30 ring-2 ring-brand-violet'
+                    : 'bg-light-bgdark:bg-white/[0.04]'
                 }`}
                 title={iconItem.icon}
               >
@@ -986,11 +986,11 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 dark:text-text-secondary mt-1">
+          <p className="text-xs text-text-tertiarydark:text-text-secondary mt-1">
             {t('当前选择:', 'Selected:')} {formData.icon}
             <button
               onClick={() => setShowCustomInput(true)}
-              className="ml-3 text-blue-600 dark:text-brand-violet hover:underline"
+              className="ml-3 text-brand-violet dark:text-brand-violet hover:underline"
             >
               <Plus className="w-3 h-3 inline mr-1" />
               {t('自定义emoji', 'Custom emoji')}
@@ -1006,17 +1006,17 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Keywords */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
             {t('关键词', 'Keywords')}
           </label>
           <input
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-white/8 rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+            className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
             placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
           />
-          <p className="text-xs text-gray-500 dark:text-text-secondary mt-1">
+          <p className="text-xs text-text-tertiarydark:text-text-secondary mt-1">
             {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
           </p>
         </div>
@@ -1080,17 +1080,17 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
           <div className="p-3 bg-blue-50 dark:bg-brand-indigo/10 rounded-lg border border-blue-200 dark:border-brand-violet/20">
-            <p className="text-xs text-blue-600 dark:text-brand-violet">
+            <p className="text-xs text-brand-violet dark:text-brand-violet">
               {t('编辑默认分类将覆盖原始设置，可随时还原。', 'Editing default category will override original settings. You can reset anytime.')}
             </p>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-white/8 mt-4">
+        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-white/12 mt-4">
           <button
             onClick={handleClose}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-700 dark:text-text-primary bg-gray-100 dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 dark:border dark:border-white/8 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 text-text-primarydark:text-text-primary bg-light-surfacedark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 dark:border dark:border-white/12 transition-colors"
           >
             <X className="w-4 h-4" />
             <span>{t('取消', 'Cancel')}</span>
@@ -1098,7 +1098,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald' : 'bg-gray-300 text-gray-500 dark:bg-white/5 dark:text-text-tertiary cursor-not-allowed'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald' : 'bg-gray-300 text-text-tertiarydark:bg-white/5 dark:text-text-tertiary cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>

@@ -83,22 +83,22 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
 
       {isVisible && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-[9999]" style={{ zIndex: 9999 }}>
-          <div className="relative bg-white dark:bg-panel-dark border border-gray-200 dark:border-white/8 rounded-lg shadow-xl p-4 w-80">
+          <div className="relative bg-white dark:bg-panel-dark border border-light-border dark:border-white/12 rounded-lg shadow-xl p-4 w-80">
             {/* Arrow */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-[10000]">
               <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-gray-200 dark:border-b-gray-700" />
               <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-gray-800" />
             </div>
 
-            <h4 className="font-semibold text-gray-900 dark:text-text-primary mb-2 text-sm">
+            <h4 className="font-semibold text-text-primarydark:text-text-primary mb-2 text-sm">
               {info.title}
             </h4>
             {info.highlight && (
-              <p className="text-sm font-medium text-blue-600 dark:text-brand-violet mb-2">
+              <p className="text-sm font-medium text-brand-violet dark:text-brand-violet mb-2">
                 {info.highlight}
               </p>
             )}
-            <p className="text-xs text-gray-600 dark:text-text-tertiary whitespace-pre-line leading-relaxed">
+            <p className="text-xs text-text-secondarydark:text-text-tertiary whitespace-pre-line leading-relaxed">
               {info.description}
             </p>
           </div>
