@@ -22,7 +22,7 @@ export class UpdateService {
   private static getCurrentVersion(): string {
     // 在实际应用中，这个版本号应该在构建时注入
     // 这里暂时硬编码，你可以通过构建脚本或环境变量来动态设置
-    return '0.5.0';
+    return '0.5.2';
   }
 
   static async checkForUpdates(): Promise<UpdateCheckResult> {
