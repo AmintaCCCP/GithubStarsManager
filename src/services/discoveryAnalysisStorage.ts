@@ -35,15 +35,20 @@ const withTimeout = async <T>(
   onLate?: (value: T) => void
 ): Promise<T> => {
   let isSettled = false;
-  let lateValue: T | undefined;
 
-  const wrappedPromise = promise.then((value) => {
-    if (!isSettled && onLate) {
-      onLate(value);
-    }
-    lateValue = value;
-    return value;
-  });
+  const wrappedPromise = promise
+    .then((value) => {
+      if (isSettled && onLate) {
+        onLate(value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (isSettled && onLate) {
+        console.warn('[discoveryAnalysisStorage] Late error after timeout:', error);
+      }
+      throw error;
+    });
 
   const timeoutPromise = new Promise<T>((_, reject) =>
     setTimeout(() => {
