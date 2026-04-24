@@ -70,13 +70,13 @@ export const LoginScreen: React.FC = () => {
         <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-light-border dark:border-white/[0.04] overflow-hidden">
           <button
             onClick={() => setLanguage('zh')}
-            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
+            className={`px-3 py-2 w-16 text-center text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
           >
             中文
           </button>
           <button
             onClick={() => setLanguage('en')}
-            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'en' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
+            className={`px-3 py-2 w-16 text-center text-sm font-medium transition-colors ${language === 'en' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
           >
             EN
           </button>

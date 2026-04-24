@@ -915,7 +915,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               disabled={isLoading}
-              className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 dark:text-brand-violet rounded-lg hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 text-sm sm:text-base"
+              className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 dark:text-brand-violet rounded-lg hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 text-sm font-medium"
             >
               <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="whitespace-nowrap">
@@ -934,10 +934,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   onClick={() => handleAIAnalyze(false)}
                   className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/[0.04]"
                 >
-                  <div className="font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('分析全部', 'Analyze All')}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-text-tertiary">
+                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
                     {t(`分析 ${filteredRepositories.length} 个仓库`, `Analyze ${filteredRepositories.length} repositories`)}
                   </div>
                 </button>
@@ -946,10 +946,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   disabled={unanalyzedCount === 0}
                   className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-white/[0.04]"
                 >
-                  <div className="font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-text-tertiary">
+                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
                     {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
                   </div>
                 </button>
@@ -958,10 +958,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   disabled={failedCount === 0}
                   className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                     {t('重新分析失败的', 'Re-analyze Failed')}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-text-tertiary">
+                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
                     {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
                   </div>
                 </button>
@@ -1042,7 +1042,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics */}
         <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
-          <div className="text-sm text-gray-500 dark:text-text-tertiary">
+          <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
             <div className="flex items-center justify-between">
               <div>
                 {t(

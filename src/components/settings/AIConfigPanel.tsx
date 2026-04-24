@@ -318,7 +318,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加AI配置', 'Add AI Config')}</span>
@@ -570,7 +570,7 @@ Focus on practicality and accurate categorization to help users quickly understa
           <div className="flex space-x-3">
             <button
               onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -578,7 +578,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             <button
               onClick={handleTestForm}
               disabled={testingForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
+              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
             >
               {testingForm ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -646,7 +646,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -657,7 +657,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 </button>
                 <button
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -672,7 +672,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

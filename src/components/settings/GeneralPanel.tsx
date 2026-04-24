@@ -29,7 +29,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </h4>
         </div>
         
-        <div className="flex items-center space-x-6">
+        <div className="grid grid-cols-2 gap-4 max-w-md">
           <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-light-border dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
             <input
               type="radio"

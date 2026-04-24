@@ -350,7 +350,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     onClick={() => handleCategoryClick(category.id)}
                     className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                       isSelected
-                        ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
+                        ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                         : isDragTarget
                           ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
                           : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
@@ -445,7 +445,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             onClick={() => handleCategoryClick(category.id)}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
                               isSelected
-                                ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
+                                ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                                 : isDragTarget
                                   ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
                                   : 'hover:bg-gray-100 dark:hover:bg-white/[0.04] text-gray-700 dark:text-text-secondary'
@@ -539,7 +539,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ease-out ${
                             isSelected
-                              ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
+                              ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                               : isDragTarget
                                 ? 'bg-green-50 text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
                                 : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'

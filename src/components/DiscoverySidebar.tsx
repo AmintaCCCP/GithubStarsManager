@@ -63,7 +63,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
           <button
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            className="p-1.5 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={t('刷新全部', 'Refresh All')}
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
@@ -81,17 +81,17 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 onClick={() => onChannelSelect(channel.id)}
                 className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
+                    ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
                     : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {channel.icon}
                   <span className="font-medium text-sm">
                     {language === 'zh' ? channel.name : channel.nameEn}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {channelLoading && (
                     <Loader2 className="w-3 h-3 animate-spin text-brand-violet" />
                   )}

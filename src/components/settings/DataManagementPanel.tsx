@@ -701,7 +701,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Release records not updated in over 90 days',
         count: oldReleases.length,
         icon: <Tag className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary ',
+        color: 'text-gray-700 dark:text-text-secondary',
         bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
@@ -716,7 +716,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Cached repository data from discovery page, safe to clean',
         count: totalDiscoveryRepos,
         icon: <Sparkles className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary ',
+        color: 'text-gray-700 dark:text-text-secondary',
         bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
@@ -731,7 +731,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Repositories that have not been analyzed by AI',
         count: unanalyzedRepos,
         icon: <Bot className="w-4 h-4" />,
-        color: 'text-brand-violet dark:text-brand-violet',
+        color: 'text-gray-700 dark:text-text-secondary',
         bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
@@ -746,7 +746,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Records of read releases',
         count: oldReadReleases,
         icon: <Eye className="w-4 h-4" />,
-        color: 'text-status-emerald ',
+        color: 'text-gray-700 dark:text-text-secondary',
         bgColor: 'bg-status-emerald '
       });
     }
@@ -1025,80 +1025,80 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       label: t('GitHub Stars仓库', 'GitHub Stars Repositories'),
       count: repositories.length,
       icon: <Github className="w-5 h-5" />,
-      color: 'text-brand-violet dark:text-brand-violet',
-      bgColor: 'bg-light-surface dark:bg-white/[0.04]',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'releases',
       label: t('Release发布信息', 'Release Information'),
       count: releases.length,
       icon: <Tag className="w-5 h-5" />,
-      color: 'text-status-emerald ',
-      bgColor: 'bg-status-emerald ',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'aiConfigs',
       label: t('AI服务配置', 'AI Service Configurations'),
       count: aiConfigs.length,
       icon: <Bot className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary ',
-      bgColor: 'bg-light-surface dark:bg-white/[0.04]',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'webdavConfigs',
       label: t('WebDAV配置', 'WebDAV Configurations'),
       count: webdavConfigs.length,
       icon: <Cloud className="w-5 h-5" />,
-      color: 'text-cyan-600 dark:text-cyan-400',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'categorySettings',
       label: t('自定义分类', 'Custom Categories'),
       count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary ',
-      bgColor: 'bg-light-surface dark:bg-white/[0.04]',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'assetFilters',
       label: t('资源过滤器', 'Asset Filters'),
       count: assetFilters.length,
       icon: <Filter className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary ',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04] ',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'discoveryData',
       label: t('发现页缓存', 'Discovery Cache'),
       count: totalDiscoveryReposCount,
       icon: <Sparkles className="w-5 h-5" />,
-      color: 'text-pink-600 dark:text-pink-400',
-      bgColor: 'bg-pink-50 dark:bg-pink-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'subscriptionData',
       label: t('订阅页数据', 'Subscription Data'),
       count: totalSubscriptionReposCount,
       icon: <Rss className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary ',
-      bgColor: 'bg-light-surface dark:bg-white/[0.04]',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'releaseSubscriptions',
       label: t('Release订阅', 'Release Subscriptions'),
       count: releaseSubscriptions.size,
       icon: <Eye className="w-5 h-5" />,
-      color: 'text-teal-600 dark:text-teal-400',
-      bgColor: 'bg-teal-50 dark:bg-teal-900/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
     {
       key: 'searchHistory',
       label: t('搜索历史', 'Search History'),
       count: searchFilters.query ? 1 : 0,
       icon: <Search className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-tertiary',
-      bgColor: 'bg-light-bg dark:bg-panel-dark/20',
+      color: 'text-gray-700 dark:text-text-secondary',
+      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
     },
   ];
 

@@ -326,7 +326,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
         disabled={isLoading}
         className={`
           group relative px-8 py-3 rounded-xl font-medium
-          bg-gradient-to-r from-blue-500 to-indigo-600 
+          bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.04] 
           hover:from-blue-600 hover:to-indigo-700
           text-white shadow-lg shadow-blue-500/25 
           hover:shadow-xl hover:shadow-blue-500/30
@@ -945,7 +945,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <select
                 value={trendingTimeRange}
                 onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-light-surface text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary border border-light-border dark:border-white/[0.04] focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
               >
                 <option value="daily">{t('今日', 'Today')}</option>
                 <option value="weekly">{t('本周', 'This Week')}</option>
@@ -957,7 +957,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySelectedTopic || ''}
                     onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-light-surface text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary border border-light-border dark:border-white/[0.04] focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
                   >
                     <option value="">{t('主题', 'Topic')}</option>
                     <option value="ai">{t('人工智能', 'AI')}</option>
@@ -1056,7 +1056,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     disabled={!searchInput.trim() || currentIsLoading}
                     className={isDesktopSafeMode
                       ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
-                      : 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
+                      : 'px-5 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.04] text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -1067,7 +1067,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoveryLanguage}
                     onChange={(e) => setDiscoveryLanguage(e.target.value as ProgrammingLanguage)}
-                    className="px-3 py-2 text-sm rounded-xl border border-light-border dark:border-white/[0.04] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
                   >
                     <option value="All">{t('所有语言', 'All Languages')}</option>
                     <option value="JavaScript">JavaScript</option>
@@ -1089,7 +1089,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySortBy}
                     onChange={(e) => setDiscoverySortBy(e.target.value as SortBy)}
-                    className="px-3 py-2 text-sm rounded-xl border border-light-border dark:border-white/[0.04] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
                   >
                     <option value="BestMatch">{t('最佳匹配', 'Best Match')}</option>
                     <option value="MostStars">{t('最多Star', 'Most Stars')}</option>
@@ -1099,7 +1099,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySortOrder}
                     onChange={(e) => setDiscoverySortOrder(e.target.value as SortOrder)}
-                    className="px-3 py-2 text-sm rounded-xl border border-light-border dark:border-white/[0.04] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
                   >
                     <option value="Descending">{t('降序', 'Descending')}</option>
                     <option value="Ascending">{t('升序', 'Ascending')}</option>
@@ -1108,7 +1108,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoveryPlatform}
                     onChange={(e) => setDiscoveryPlatform(e.target.value as DiscoveryPlatform)}
-                    className="px-3 py-2 text-sm rounded-xl border border-light-border dark:border-white/[0.04] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
                   >
                     <option value="All">{t('所有平台', 'All Platforms')}</option>
                     <option value="Android">Android</option>
@@ -1185,7 +1185,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       disabled={currentIsLoading}
                       className={isDesktopSafeMode
                         ? 'px-6 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald transition-colors flex items-center gap-2 text-sm font-medium'
-                        : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                        : 'px-6 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.04] text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
                     >
                       <RefreshCw className="w-4 h-4" />
                       {t('立即刷新', 'Refresh Now')}

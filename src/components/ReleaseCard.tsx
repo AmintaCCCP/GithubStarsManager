@@ -57,10 +57,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`bg-light-bg dark:bg-panel-dark rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
+      className={`bg-white dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isAnyExpanded
           ? 'border-brand-indigo/20 shadow-lg ring-1 ring-brand-indigo/30'
-          : 'border-light-border dark:border-white/[0.04] hover:shadow-md hover:border-light-border-alt dark:hover:border-white/10'
+          : 'border-gray-200 dark:border-white/[0.04] hover:shadow-md hover:border-gray-200-alt dark:hover:border-white/10'
       }`}
     >
       {/* 头部区域 - 仅显示元信息，不可点击展开 */}
@@ -74,34 +74,39 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               <GitBranch className="w-4 h-4 text-gray-500 dark:text-text-tertiary" />
             </div>
             <div className="min-w-0 flex-1 ml-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-medium text-gray-900 dark:text-text-primary text-sm truncate">
-                  {release.repository.name}
-                </h4>
-                <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-[11px] font-medium rounded-md border border-transparent dark:border-white/[0.04]">
-                  {release.tag_name}
-                </span>
-                {release.name && release.name !== release.tag_name && (
-                  <span className="text-[11px] text-gray-500 dark:text-text-tertiary truncate max-w-[200px]">
-                    {release.name}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h4 className="font-semibold text-gray-900 dark:text-text-primary text-sm truncate">
+                    {release.repository.name}
+                  </h4>
+                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-gray-200 dark:border-white/[0.04] shrink-0">
+                    {release.tag_name}
                   </span>
-                )}
-                <div className="flex items-center space-x-1 text-[11px] text-gray-500 dark:text-text-tertiary ml-auto">
-                  <Calendar className="w-3 h-3" />
-                  <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
-                </div>
-                {downloadLinks.length > 0 && (
-                  <div className="flex items-center space-x-1 text-[11px] text-gray-500 dark:text-text-tertiary">
-                    <Download className="w-3 h-3" />
-                    <span>
-                      {selectedFilters.length > 0
-                        ? `${downloadLinks.filter(link => matchesActiveFilters(link.name)).length}/${downloadLinks.length}`
-                        : downloadLinks.length}
+                  {release.name && release.name !== release.tag_name && (
+                    <span className="text-xs text-gray-500 dark:text-text-tertiary truncate max-w-[200px]">
+                      {release.name}
                     </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-text-tertiary">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
                   </div>
-                )}
+                  {downloadLinks.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-text-tertiary">
+                      <Download className="w-3.5 h-3.5" />
+                      <span>
+                        {selectedFilters.length > 0
+                          ? `${downloadLinks.filter(link => matchesActiveFilters(link.name)).length}/${downloadLinks.length}`
+                          : downloadLinks.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-gray-400 dark:text-text-quaternary truncate mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-text-quaternary truncate mt-1">
                 {release.repository.full_name}
               </p>
             </div>
@@ -185,7 +190,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-1.5 sm:px-2 pb-1.5 sm:pb-2 border-t border-light-border dark:border-white/[0.04]">
+          <div className="px-1.5 sm:px-2 pb-1.5 sm:pb-2 border-t border-gray-200 dark:border-white/[0.04]">
           {isAssetsExpanded && downloadLinks.length > 0 && (
             <div className="py-1.5">
               <div className="flex items-center space-x-1.5 mb-1.5">
@@ -198,14 +203,14 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="bg-light-bg dark:bg-white/[0.02] rounded border border-light-border dark:border-white/[0.04] max-h-72 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-[#121314] rounded border border-gray-200 dark:border-white/[0.04] max-h-72 overflow-y-auto">
                 {downloadLinks.map((link, index) => (
                   <a
                     key={index}
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex items-center justify-between px-3 py-2.5 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-light-border dark:border-white/[0.04] last:border-b-0 ${
+                    className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-gray-100 dark:border-white/[0.04] last:border-b-0 ${
                       link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
                     }`}
                     onClick={(e) => e.stopPropagation()}
@@ -216,7 +221,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       ) : (
                         <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
                       )}
-                      <span className={`text-xs truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                      <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
                         {link.name}
                       </span>
                     </div>

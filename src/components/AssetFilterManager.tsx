@@ -229,8 +229,8 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       key={preset.id}
                       className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                         isSelected
-                          ? 'bg-brand-indigo border-transparent text-white dark:bg-white/[0.08] dark:border-white/[0.12] dark:text-text-primary'
-                          : 'bg-light-bg border-light-border text-gray-700 dark:bg-panel-dark dark:border-white/[0.04] dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
+                          ? 'bg-gray-900 border-transparent text-white dark:bg-white/[0.12] dark:border-white/[0.2] dark:text-white font-medium'
+                          : 'bg-white border-gray-200 text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                       }`}
                     >
                       <button
@@ -274,7 +274,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     key={filter.id}
                     className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
                       selectedFilters.includes(filter.id)
-                        ? 'bg-brand-indigo border-transparent text-white dark:bg-white/[0.08] dark:border-white/[0.12] dark:text-text-primary'
+                        ? 'bg-gray-900 border-transparent text-white dark:bg-white/[0.12] dark:border-white/[0.2] dark:text-white font-medium'
                         : 'bg-light-surfaceborder-light-border text-gray-900 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >

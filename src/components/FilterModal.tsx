@@ -118,7 +118,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center space-x-1 px-3 py-1 bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary rounded-lg text-sm"
+                    className="flex items-center space-x-1 px-3 py-1 bg-gray-900 text-white dark:bg-white/[0.12] dark:text-white font-medium rounded-lg text-sm"
                   >
                     <span>{keyword}</span>
                     <button
