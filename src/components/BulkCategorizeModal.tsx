@@ -58,12 +58,12 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
       title={t('批量分类', 'Bulk Categorize')}
     >
       <div className="space-y-4">
-        <p className="text-sm text-text-secondarydark:text-text-secondary">
+        <p className="text-sm text-text-secondary dark:text-text-secondary">
           {t(`将为 ${repositories.length} 个仓库设置分类：`, `Will set category for ${repositories.length} repositories:`)}
         </p>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primary dark:text-text-primary mb-2">
             {t('选择分类', 'Select Category')}
           </label>
 
@@ -75,11 +75,11 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
                     ? 'border-brand-violet bg-blue-50 dark:bg-brand-indigo/10'
-                    : 'border-light-border dark:border-white/12 hover:border-blue-300 dark:hover:border-white/20'
+                    : 'border-light-border dark:border-white/[0.04] hover:border-blue-300 dark:hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-text-primarydark:text-text-primary">
+                  <span className="text-sm font-medium text-text-primary dark:text-text-primary">
                     {category.name}
                   </span>
                 </div>
@@ -109,7 +109,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
           <button
             onClick={onClose}
             disabled={isProcessing}
-            className="px-4 py-2 text-text-primarydark:text-text-primary bg-light-surfacedark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50"
+            className="px-4 py-2 text-text-primary dark:text-text-primary bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50"
           >
             {t('取消', 'Cancel')}
           </button>

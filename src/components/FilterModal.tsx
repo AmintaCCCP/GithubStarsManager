@@ -70,7 +70,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       <div className="space-y-4">
         {/* Filter Name */}
         <div>
-          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primary dark:text-text-primary mb-2">
             过滤器名称
           </label>
           <input
@@ -78,13 +78,13 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例如: macOS"
-            className="w-full px-3 py-2 border border-light-border dark:border-white/12 rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary"
+            className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primary dark:text-text-primary"
           />
         </div>
 
         {/* Keywords */}
         <div>
-          <label className="block text-sm font-medium text-text-primarydark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-text-primary dark:text-text-primary mb-2">
             匹配关键词
           </label>
           
@@ -96,7 +96,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               onChange={(e) => setNewKeyword(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入关键词，如: mac, dmg"
-              className="flex-1 px-3 py-2 border border-light-border dark:border-white/12 rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary"
+              className="flex-1 px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primary dark:text-text-primary"
             />
             <button
               onClick={handleAddKeyword}
@@ -111,7 +111,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           {/* Keywords list */}
           {keywords.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-text-secondarydark:text-text-secondary">
+              <p className="text-sm text-text-secondary dark:text-text-secondary">
                 已添加的关键词:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -134,7 +134,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           )}
 
           {keywords.length === 0 && (
-            <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+            <p className="text-sm text-text-tertiary dark:text-text-tertiary">
               请添加至少一个关键词用于匹配文件名
             </p>
           )}
@@ -148,17 +148,17 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         </div>
 
         {/* Action buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-white/12 mt-4">
+        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-white/[0.04] mt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-text-primarydark:text-text-primary bg-light-surfacedark:bg-white/[0.04] dark:border dark:border-white/12 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+            className="px-4 py-2 text-text-primary dark:text-text-primary bg-light-surface dark:bg-white/[0.04] dark:border dark:border-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
           >
             取消
           </button>
           <button
             onClick={handleSave}
             disabled={!name.trim() || keywords.length === 0}
-            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-text-tertiarydark:bg-white/5 dark:text-text-tertiary cursor-not-allowed' : 'bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald'}`}
+            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-text-tertiary dark:bg-white/5 dark:text-text-tertiary cursor-not-allowed' : 'bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald'}`}
           >
             {filter ? '保存' : '创建'}
           </button>

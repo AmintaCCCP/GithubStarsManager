@@ -106,10 +106,10 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
                   <Package className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary">
+                  <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary">
                     {t('发现新版本', 'New Version Available')}
                   </h3>
-                  <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+                  <p className="text-sm text-text-tertiary dark:text-text-tertiary">
                     v{updateInfo.number}
                   </p>
                 </div>
@@ -117,19 +117,19 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
 
               {/* 版本信息 */}
               <div className="mb-4">
-                <div className="flex items-center space-x-2 text-sm text-text-secondarydark:text-text-tertiary mb-3">
+                <div className="flex items-center space-x-2 text-sm text-text-secondary dark:text-text-tertiary mb-3">
                   <Calendar className="w-4 h-4" />
                   <span>{t('发布日期:', 'Release Date:')} {formatDate(updateInfo.releaseDate)}</span>
                 </div>
 
                 {/* 更新日志 */}
                 <div className="mb-4">
-                  <h4 className="font-medium text-text-primarydark:text-text-primary mb-2">
+                  <h4 className="font-medium text-text-primary dark:text-text-primary mb-2">
                     {t('更新内容:', 'What\'s New:')}
                   </h4>
                   <ul className="space-y-1">
                     {updateInfo.changelog.map((item, index) => (
-                      <li key={index} className="text-sm text-text-secondarydark:text-text-tertiary flex items-start space-x-2">
+                      <li key={index} className="text-sm text-text-secondary dark:text-text-tertiary flex items-start space-x-2">
                         <span className="w-1.5 h-1.5 bg-brand-violet rounded-full mt-2 flex-shrink-0"></span>
                         <span>{item}</span>
                       </li>
@@ -149,7 +149,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
                 </button>
                 <button
                   onClick={() => setShowUpdateDialog(false)}
-                  className="px-4 py-2 bg-gray-200 dark:bg-white/[0.04] text-text-primarydark:text-text-secondary rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 bg-gray-200 dark:bg-white/[0.04] text-text-primary dark:text-text-secondary rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                 >
                   {t('稍后提醒', 'Later')}
                 </button>

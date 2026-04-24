@@ -140,7 +140,7 @@ export const Header: React.FC = () => {
 
    
   return (
-    <header className="bg-light-bg dark:bg-panel-dark border-b border-light-border dark:border-white/12 sticky top-0 z-50 hd-drag lg:hd-drag relative">
+    <header className="bg-light-bg dark:bg-panel-dark border-b border-light-border dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo and Title */}
@@ -280,7 +280,7 @@ export const Header: React.FC = () => {
 
           {/* Mobile Dropdown Menu (<768px) */}
           {mobileMenuOpen && (
-            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-light-border dark:border-white/12 shadow-dialog animate-expand-fade z-[100]">
+            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-light-border dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
               <nav className="flex flex-col p-2 space-y-1">
                 <button
                   onClick={() => {

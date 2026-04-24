@@ -55,9 +55,9 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
 
   return (
     <div className="w-full lg:w-64 shrink-0">
-      <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/12 p-4">
+      <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary">
+          <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary">
             {t('发现频道', 'Discovery Channels')}
           </h3>
           <button
@@ -82,7 +82,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isSelected
                     ? 'bg-brand-indigo/20 text-blue-700 dark:bg-white/[0.04] dark:text-text-primary ring-1 ring-blue-400 dark:ring-white/10'
-                    : 'text-text-primarydark:text-text-secondary hover:bg-light-surfacedark:hover:bg-white/5'
+                    : 'text-text-primary dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                     <Loader2 className="w-3 h-3 animate-spin text-brand-violet" />
                   )}
                   {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id]) ? (
-                    <span className="text-xs text-text-tertiarydark:text-text-tertiary">
+                    <span className="text-xs text-text-tertiary dark:text-text-tertiary">
                       {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
                     </span>
                   ) : null}

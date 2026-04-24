@@ -870,7 +870,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     
     return (
       <div className="text-center py-12">
-        <p className="text-text-tertiarydark:text-text-tertiary mb-4">
+        <p className="text-text-tertiary dark:text-text-tertiary mb-4">
           {searchFilters.query ? (
             language === 'zh' 
               ? `未找到与"${searchFilters.query}"相关的仓库。`
@@ -908,7 +908,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
 
       {/* AI Analysis Controls - 移动端优化布局 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/12 p-3 sm:p-4 gap-3 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
@@ -929,39 +929,39 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
             {/* Dropdown Menu */}
             {showDropdown && !isLoading && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-light-border dark:border-white/12 rounded-lg shadow-dialog z-10">
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] rounded-lg shadow-dialog z-10">
                 <button
                   onClick={() => handleAIAnalyze(false)}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bgdark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/12"
+                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/[0.04]"
                 >
-                  <div className="font-medium text-text-primarydark:text-text-primary">
+                  <div className="font-medium text-text-primary dark:text-text-primary">
                     {t('分析全部', 'Analyze All')}
                   </div>
-                  <div className="text-sm text-text-tertiarydark:text-text-tertiary">
+                  <div className="text-sm text-text-tertiary dark:text-text-tertiary">
                     {t(`分析 ${filteredRepositories.length} 个仓库`, `Analyze ${filteredRepositories.length} repositories`)}
                   </div>
                 </button>
                 <button
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bgdark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-white/12"
+                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-white/[0.04]"
                 >
-                  <div className="font-medium text-text-primarydark:text-text-primary">
+                  <div className="font-medium text-text-primary dark:text-text-primary">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
                   </div>
-                  <div className="text-sm text-text-tertiarydark:text-text-tertiary">
+                  <div className="text-sm text-text-tertiary dark:text-text-tertiary">
                     {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
                   </div>
                 </button>
                 <button
                   onClick={() => handleAIAnalyze(false, true)}
                   disabled={failedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bgdark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="font-medium text-text-primarydark:text-text-primary">
+                  <div className="font-medium text-text-primary dark:text-text-primary">
                     {t('重新分析失败的', 'Re-analyze Failed')}
                   </div>
-                  <div className="text-sm text-text-tertiarydark:text-text-tertiary">
+                  <div className="text-sm text-text-tertiary dark:text-text-tertiary">
                     {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
                   </div>
                 </button>
@@ -978,7 +978,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
-              <span className="text-xs sm:text-sm text-text-secondarydark:text-text-tertiary">
+              <span className="text-xs sm:text-sm text-text-secondary dark:text-text-tertiary">
                 {Math.round((analysisProgress.current / analysisProgress.total) * 100)}%
               </span>
               <button
@@ -1000,7 +1000,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <span className="text-xs sm:text-sm text-text-secondarydark:text-text-tertiary">
+              <span className="text-xs sm:text-sm text-text-secondary dark:text-text-tertiary">
                 {t('显示内容:', 'Display:')}
               </span>
               <div className="flex items-center space-x-3 sm:space-x-4">
@@ -1016,7 +1016,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     disabled={!hasAnalyzedRepos}
                     className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
                   />
-                  <span className="text-xs sm:text-sm font-medium text-text-primarydark:text-text-secondary">
+                  <span className="text-xs sm:text-sm font-medium text-text-primary dark:text-text-secondary">
                     {t('AI分析内容', 'AI Analysis')}
                   </span>
                 </label>
@@ -1031,7 +1031,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     onChange={() => setShowAISummary(false)}
                     className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
                   />
-                  <span className="text-xs sm:text-sm font-medium text-text-primarydark:text-text-secondary">
+                  <span className="text-xs sm:text-sm font-medium text-text-primary dark:text-text-secondary">
                     {t('原始描述', 'Original')}
                   </span>
                 </label>
@@ -1042,7 +1042,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics */}
         <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
-          <div className="text-sm text-text-tertiarydark:text-text-tertiary">
+          <div className="text-sm text-text-tertiary dark:text-text-tertiary">
             <div className="flex items-center justify-between">
               <div>
                 {t(

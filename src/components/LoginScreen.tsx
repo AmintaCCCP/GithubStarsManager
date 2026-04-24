@@ -67,16 +67,16 @@ export const LoginScreen: React.FC = () => {
       {/* Theme and Language Toggle */}
       <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
         {/* Language Toggle */}
-        <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-light-border dark:border-white/12 overflow-hidden">
+        <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-light-border dark:border-white/[0.04] overflow-hidden">
           <button
             onClick={() => setLanguage('zh')}
-            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-text-secondarydark:text-text-secondary hover:bg-light-surfacedark:hover:bg-white/10'}`}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-text-secondary dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
           >
             中文
           </button>
           <button
             onClick={() => setLanguage('en')}
-            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'en' ? 'bg-brand-indigo text-white' : 'text-text-secondarydark:text-text-secondary hover:bg-light-surfacedark:hover:bg-white/10'}`}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${language === 'en' ? 'bg-brand-indigo text-white' : 'text-text-secondary dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
           >
             EN
           </button>
@@ -85,7 +85,7 @@ export const LoginScreen: React.FC = () => {
         {/* Theme Toggle */}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="p-2 rounded-lg bg-white dark:bg-panel-dark shadow-md border border-light-border dark:border-white/12 hover:bg-light-surfacedark:hover:bg-white/10 transition-colors"
+          className="p-2 rounded-lg bg-white dark:bg-panel-dark shadow-md border border-light-border dark:border-white/[0.04] hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
           title={t('切换主题', 'Toggle theme')}
         >
           {theme === 'light' ? (
@@ -105,21 +105,21 @@ export const LoginScreen: React.FC = () => {
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="text-3xl font-bold text-text-primarydark:text-text-primary mb-2">
+          <h1 className="text-3xl font-bold text-text-primary dark:text-text-primary mb-2">
             GitHub Stars Manager
           </h1>
-          <p className="text-text-secondarydark:text-text-tertiary text-lg">
+          <p className="text-text-secondary dark:text-text-tertiary text-lg">
             {t('AI驱动的仓库管理工具', 'AI-powered repository management')}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-panel-dark rounded-2xl shadow-xl border border-light-border dark:border-white/12 p-8">
+        <div className="bg-white dark:bg-panel-dark rounded-2xl shadow-xl border border-light-border dark:border-white/[0.04] p-8">
           <div className="text-center mb-6">
-            <Github className="w-10 h-10 text-text-primarydark:text-text-secondary mx-auto mb-3" />
-            <h2 className="text-xl font-semibold text-text-primarydark:text-text-primary mb-2">
+            <Github className="w-10 h-10 text-text-primary dark:text-text-secondary mx-auto mb-3" />
+            <h2 className="text-xl font-semibold text-text-primary dark:text-text-primary mb-2">
               {t('连接GitHub', 'Connect with GitHub')}
             </h2>
-            <p className="text-text-secondarydark:text-text-tertiary text-sm">
+            <p className="text-text-secondary dark:text-text-tertiary text-sm">
               {t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}
             </p>
           </div>
@@ -141,7 +141,7 @@ export const LoginScreen: React.FC = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-2">
+              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-2">
                 GitHub Personal Access Token
               </label>
               <div className="relative">
@@ -156,7 +156,7 @@ export const LoginScreen: React.FC = () => {
                   }}
                   onKeyDown={handleKeyPress}
                   disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-light-border dark:border-white/12 rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primarydark:text-text-primary disabled:bg-light-bgdark:disabled:bg-gray-600 disabled:text-text-tertiarydark:disabled:text-gray-400"
+                  className="w-full pl-10 pr-4 py-3 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-text-primary dark:text-text-primary disabled:bg-light-bg dark:disabled:bg-gray-600 disabled:text-text-tertiary dark:disabled:text-gray-400"
                 />
               </div>
             </div>
@@ -187,11 +187,11 @@ export const LoginScreen: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-6 p-4 bg-light-bgdark:bg-white/[0.04]/50 rounded-lg">
-            <h3 className="font-medium text-text-primarydark:text-text-primary mb-2 text-sm">
+          <div className="mt-6 p-4 bg-light-bg dark:bg-white/[0.04]/50 rounded-lg">
+            <h3 className="font-medium text-text-primary dark:text-text-primary mb-2 text-sm">
               {t('如何创建GitHub token:', 'How to create a GitHub token:')}
             </h3>
-            <ol className="text-xs text-text-secondarydark:text-text-tertiary space-y-1">
+            <ol className="text-xs text-text-secondary dark:text-text-tertiary space-y-1">
               <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
               <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
               <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong> {t('和', 'and')} <strong>user</strong></li>

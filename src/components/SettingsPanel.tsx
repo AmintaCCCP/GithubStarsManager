@@ -128,7 +128,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
 
   return (
     <div 
-      className="relative w-full border-b border-light-border dark:border-white/12 bg-light-bg95 dark:bg-panel-dark/95 backdrop-blur-sm"
+      className="relative w-full border-b border-light-border dark:border-white/[0.04] bg-light-bg95 dark:bg-panel-dark/95 backdrop-blur-sm"
     >
       {/* 滚动容器 */}
       <div
@@ -159,7 +159,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
               min-h-[36px] touch-manipulation
               ${activeTab === tab.id
                 ? 'text-brand-violet dark:text-brand-violet'
-                : 'text-text-secondarydark:text-text-tertiary hover:text-text-primarydark:hover:text-gray-200 hover:bg-light-surfacedark:hover:bg-white/10/50'
+                : 'text-text-secondary dark:text-text-tertiary hover:text-text-primary dark:hover:text-gray-200 hover:bg-light-surface dark:hover:bg-white/10/50'
               }
             `}
             style={{
@@ -333,10 +333,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         aria-labelledby="settings-modal-title"
       >
         <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-light-border dark:border-white/12 bg-light-bgdark:bg-panel-dark">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-light-border dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark">
             <div className="flex items-center space-x-3">
               <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-              <h2 id="settings-modal-title" className="text-xl font-semibold text-text-primarydark:text-text-primary">
+              <h2 id="settings-modal-title" className="text-xl font-semibold text-text-primary dark:text-text-primary">
                 {t('设置', 'Settings')}
               </h2>
             </div>
@@ -345,13 +345,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-150"
               aria-label={t('关闭设置', 'Close settings')}
             >
-              <X className="w-5 h-5 text-text-tertiarydark:text-text-tertiary" />
+              <X className="w-5 h-5 text-text-tertiary dark:text-text-tertiary" />
             </button>
           </div>
 
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
-            <div className="hidden md:block w-64 border-r border-light-border dark:border-white/12 bg-light-bgdark:bg-panel-dark overflow-y-auto">
+            <div className="hidden md:block w-64 border-r border-light-border dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark overflow-y-auto">
               <nav className="p-4 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
                 {tabs.map((tab) => (
                   <button
@@ -364,7 +364,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
                         ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
-                        : 'text-text-primarydark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
+                        : 'text-text-primary dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
                     }`}
                   >
                     {tab.icon}
@@ -400,7 +400,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center space-x-3 mb-6">
         <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-        <h2 className="text-xl font-semibold text-text-primarydark:text-text-primary">
+        <h2 className="text-xl font-semibold text-text-primary dark:text-text-primary">
           {t('设置', 'Settings')}
         </h2>
       </div>
@@ -408,7 +408,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/12 overflow-hidden">
+          <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] overflow-hidden">
             <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
                 <button
@@ -421,7 +421,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
                       ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
-                      : 'text-text-primarydark:text-text-secondary hover:bg-light-surfacedark:hover:bg-white/10'
+                      : 'text-text-primary dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
                   }`}
                 >
                   {tab.icon}
@@ -443,7 +443,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
-          <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/12 p-4 sm:p-6">
+          <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>

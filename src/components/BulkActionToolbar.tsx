@@ -166,7 +166,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-panel-dark border-t border-light-border dark:border-white/12 shadow-lg z-50 ${
+      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-panel-dark border-t border-light-border dark:border-white/[0.04] shadow-lg z-50 ${
         isClosing ? 'animate-slide-down' : 'animate-slide-up'
       } ${isShaking ? 'animate-shake' : ''}`}
       onClick={handleToolbarClick}
@@ -176,7 +176,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           {/* Selection Info */}
           <div className="flex items-center justify-between sm:justify-start space-x-2 sm:space-x-4">
             <div className="flex items-center space-x-2">
-              <span className="text-base sm:text-lg font-semibold text-text-primarydark:text-text-primary">
+              <span className="text-base sm:text-lg font-semibold text-text-primary dark:text-text-primary">
                 {t(`已选择 ${selectedCount} 个`, `Selected ${selectedCount}`)}
               </span>
             </div>
@@ -186,7 +186,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               <button
                 onClick={onSelectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-text-secondarydark:text-text-tertiary hover:bg-light-surfacedark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-text-secondary dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('全选当前页面', 'Select all on page')}
               >
                 <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -195,7 +195,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               <button
                 onClick={handleDeselectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-text-secondarydark:text-text-tertiary hover:bg-light-surfacedark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-text-secondary dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('取消选择所有', 'Deselect all')}
               >
                 <Square className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -308,7 +308,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
                   ? 'bg-gray-700 text-white hover:bg-gray-800'
-                  : 'bg-light-surfacetext-text-primarydark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-light-surfacetext-text-primary dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unlock-category' ? (
@@ -323,7 +323,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             <button
               onClick={handleClose}
               disabled={isProcessing}
-              className="flex-shrink-0 p-2 text-text-tertiarydark:text-text-tertiary hover:bg-light-surfacedark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+              className="flex-shrink-0 p-2 text-text-tertiary dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
               title={t('关闭工具栏', 'Close toolbar')}
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />

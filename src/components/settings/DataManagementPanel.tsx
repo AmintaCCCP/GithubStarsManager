@@ -1097,8 +1097,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       label: t('搜索历史', 'Search History'),
       count: searchFilters.query ? 1 : 0,
       icon: <Search className="w-5 h-5" />,
-      color: 'text-text-secondarydark:text-text-tertiary',
-      bgColor: 'bg-light-bgdark:bg-panel-dark/20',
+      color: 'text-text-secondary dark:text-text-tertiary',
+      bgColor: 'bg-light-bg dark:bg-panel-dark/20',
     },
   ];
 
@@ -1122,7 +1122,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Statistics */}
       <section>
-        <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary mb-4 flex items-center">
           <Database className="w-5 h-5 mr-2 text-brand-violet dark:text-brand-violet" />
           {t('数据概览', 'Data Overview')}
         </h3>
@@ -1130,7 +1130,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {dataStats.map((stat) => (
             <div
               key={stat.key}
-              className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 p-4"
+              className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] p-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -1138,8 +1138,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="text-sm text-text-tertiarydark:text-text-tertiary">{stat.label}</p>
-                    <p className="text-2xl font-bold text-text-primarydark:text-text-primary">
+                    <p className="text-sm text-text-tertiary dark:text-text-tertiary">{stat.label}</p>
+                    <p className="text-2xl font-bold text-text-primary dark:text-text-primary">
                       {stat.count}
                     </p>
                   </div>
@@ -1152,20 +1152,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Export/Import */}
       <section>
-        <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary mb-4 flex items-center">
           <HardDrive className="w-5 h-5 mr-2 text-status-emerald dark:text-green-400" />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Export */}
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 p-4">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
               <div className="p-2 rounded-lg bg-blue-50 dark:bg-brand-indigo/20/20 text-brand-violet dark:text-brand-violet">
                 <Download className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-text-primarydark:text-text-primary">{t('导出数据', 'Export Data')}</h4>
-                <p className="text-sm text-text-tertiarydark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
+                <h4 className="font-medium text-text-primary dark:text-text-primary">{t('导出数据', 'Export Data')}</h4>
+                <p className="text-sm text-text-tertiary dark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
             <div className="space-y-2 mb-4">
@@ -1182,11 +1182,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
                 { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
               ].map((item) => (
-                <label key={item.key} className="flex items-center space-x-2 text-sm text-text-primarydark:text-text-secondary">
+                <label key={item.key} className="flex items-center space-x-2 text-sm text-text-primary dark:text-text-secondary">
                   <input
                     type="checkbox"
                     defaultChecked
-                    className="export-checkbox rounded border-light-border dark:border-white/12 text-brand-violet focus:ring-brand-violet"
+                    className="export-checkbox rounded border-light-border dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet"
                     data-type={item.key}
                   />
                   <span>{item.label}</span>
@@ -1221,19 +1221,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           </div>
 
           {/* Import */}
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 p-4">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
               <div className="p-2 rounded-lg bg-status-emerald dark:bg-green-900/20 text-status-emerald dark:text-green-400">
                 <Upload className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-text-primarydark:text-text-primary">{t('导入数据', 'Import Data')}</h4>
-                <p className="text-sm text-text-tertiarydark:text-text-tertiary">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
+                <h4 className="font-medium text-text-primary dark:text-text-primary">{t('导入数据', 'Import Data')}</h4>
+                <p className="text-sm text-text-tertiary dark:text-text-tertiary">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
               </div>
             </div>
-            <div className="border-2 border-dashed border-light-border dark:border-white/12 rounded-lg p-6 text-center">
+            <div className="border-2 border-dashed border-light-border dark:border-white/[0.04] rounded-lg p-6 text-center">
               <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-text-tertiarydark:text-text-tertiary mb-2">
+              <p className="text-sm text-text-tertiary dark:text-text-tertiary mb-2">
                 {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
               </p>
               <input
@@ -1245,7 +1245,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-light-surfacedark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 text-text-primarydark:text-text-secondary rounded-lg transition-colors inline-block"
+                className="cursor-pointer px-4 py-2 bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 text-text-primary dark:text-text-secondary rounded-lg transition-colors inline-block"
               >
                 {t('选择文件', 'Select File')}
               </label>
@@ -1257,7 +1257,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Cleanup Suggestions */}
       {cleanupSuggestions.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary mb-4 flex items-center">
+          <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary mb-4 flex items-center">
             <RefreshCw className="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400" />
             {t('数据清理建议', 'Data Cleanup Suggestions')}
           </h3>
@@ -1270,23 +1270,23 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 p-4 flex items-center justify-between"
+                className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] p-4 flex items-center justify-between"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
                     {suggestion.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-text-primarydark:text-text-primary">
+                    <p className="font-medium text-text-primary dark:text-text-primary">
                       {language === 'zh' ? suggestion.label : suggestion.labelEn}
                     </p>
-                    <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+                    <p className="text-sm text-text-tertiary dark:text-text-tertiary">
                       {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-text-secondarydark:text-text-tertiary">
+                  <span className="text-sm font-medium text-text-secondary dark:text-text-tertiary">
                     {suggestion.count} {t('条', 'items')}
                   </span>
                   <button
@@ -1304,24 +1304,24 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Selective Data Deletion */}
       <section>
-        <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary mb-4 flex items-center">
           <Trash2 className="w-5 h-5 mr-2 text-orange-600 dark:text-orange-400" />
           {t('选择性删除数据', 'Selective Data Deletion')}
         </h3>
-        <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 overflow-hidden">
+        <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] overflow-hidden">
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-light-bgdark:hover:bg-white/10/50 transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/10/50 transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-text-primarydark:text-text-primary">{stat.label}</p>
-                    <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+                    <p className="font-medium text-text-primary dark:text-text-primary">{stat.label}</p>
+                    <p className="text-sm text-text-tertiary dark:text-text-tertiary">
                       {stat.count} {t('条记录', 'records')}
                     </p>
                   </div>
@@ -1376,32 +1376,32 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary mb-4">
+          <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary mb-4">
             {t('操作日志', 'Operation Logs')}
           </h3>
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/12 overflow-hidden">
+          <div className="bg-white dark:bg-panel-dark rounded-lg border border-light-border dark:border-white/[0.04] overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-light-bgdark:bg-white/[0.04] sticky top-0">
+                <thead className="bg-light-bg dark:bg-white/[0.04] sticky top-0">
                   <tr>
-                    <th className="px-4 py-2 text-left text-text-secondarydark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-text-secondary dark:text-text-secondary">
                       {t('时间', 'Time')}
                     </th>
-                    <th className="px-4 py-2 text-left text-text-secondarydark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-text-secondary dark:text-text-secondary">
                       {t('操作', 'Operation')}
                     </th>
-                    <th className="px-4 py-2 text-left text-text-secondarydark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-text-secondary dark:text-text-secondary">
                       {t('状态', 'Status')}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-light-bgdark:hover:bg-white/10/50">
-                      <td className="px-4 py-2 text-text-tertiarydark:text-text-tertiary">
+                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/10/50">
+                      <td className="px-4 py-2 text-text-tertiary dark:text-text-tertiary">
                         {log.timestamp}
                       </td>
-                      <td className="px-4 py-2 text-text-primarydark:text-text-primary">{log.operation}</td>
+                      <td className="px-4 py-2 text-text-primary dark:text-text-primary">{log.operation}</td>
                       <td className="px-4 py-2">
                         {log.success ? (
                           <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-status-emerald dark:text-green-300 bg-status-emerald dark:bg-green-900/30 rounded-full">
@@ -1446,7 +1446,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               {/* GitHub Username Verification for "Delete All" */}
               {confirmation.type === 'all' && user && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-text-primarydark:text-text-secondary">
+                  <label className="block text-sm font-medium text-text-primary dark:text-text-secondary">
                     {t(
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
@@ -1465,7 +1465,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('输入GitHub用户名', 'Enter GitHub username')}
-                    className="w-full px-4 py-2 border border-light-border dark:border-white/12 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-white/[0.04] dark:text-text-primary"
+                    className="w-full px-4 py-2 border border-light-border dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-white/[0.04] dark:text-text-primary"
                   />
                 </div>
               )}
@@ -1474,7 +1474,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={closeConfirmation}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-2 text-text-primarydark:text-text-secondary bg-light-surfacedark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-text-primary dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
                 </button>
@@ -1519,42 +1519,42 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="text-sm text-text-secondarydark:text-text-tertiary">
+              <div className="text-sm text-text-secondary dark:text-text-tertiary">
                 <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
                 <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
                 <p><strong>{t('版本:', 'Version:')}</strong> {importPreview.data.appVersion}</p>
               </div>
 
-              <div className="border-t border-light-border dark:border-white/12 pt-4">
-                <p className="text-sm font-medium text-text-primarydark:text-text-secondary mb-2">{t('包含的数据:', 'Included Data:')}</p>
+              <div className="border-t border-light-border dark:border-white/[0.04] pt-4">
+                <p className="text-sm font-medium text-text-primary dark:text-text-secondary mb-2">{t('包含的数据:', 'Included Data:')}</p>
                 <div className="space-y-1 text-sm">
                   {importPreview.data.data.repositories && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.releases && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.aiConfigs && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.webdavConfigs && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.customCategories && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.assetFilters && (
-                    <p className="text-text-secondarydark:text-text-tertiary">
+                    <p className="text-text-secondary dark:text-text-tertiary">
                       • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
                     </p>
                   )}
@@ -1565,7 +1565,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 text-text-primarydark:text-text-secondary bg-light-surfacedark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-text-primary dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
                 </button>

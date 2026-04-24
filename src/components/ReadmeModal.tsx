@@ -225,12 +225,12 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           aria-modal="true"
           aria-labelledby="readme-modal-title"
           tabIndex={-1}
-          className="relative w-full bg-white dark:bg-panel-dark dark:border dark:border-white/12 rounded-xl shadow-xl transform transition-all max-h-[90vh] flex flex-col"
+          className="relative w-full bg-white dark:bg-panel-dark dark:border dark:border-white/[0.04] rounded-xl shadow-xl transform transition-all max-h-[90vh] flex flex-col"
           style={{ maxWidth: '1130px' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-light-border dark:border-white/12 flex-shrink-0">
+          <div className="flex items-center justify-between p-4 border-b border-light-border dark:border-white/[0.04] flex-shrink-0">
             <div className="flex items-center space-x-3">
               <img
                 src={repository.owner.avatar_url}
@@ -238,10 +238,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 className="w-8 h-8 rounded-full"
               />
               <div>
-                <h3 id="readme-modal-title" className="text-lg font-semibold text-text-primarydark:text-text-primary">
+                <h3 id="readme-modal-title" className="text-lg font-semibold text-text-primary dark:text-text-primary">
                   {repository.full_name}
                 </h3>
-                <p className="text-sm text-text-tertiarydark:text-text-secondary">
+                <p className="text-sm text-text-tertiary dark:text-text-secondary">
                   README
                 </p>
               </div>
@@ -253,7 +253,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   className={`p-2 rounded-lg transition-colors ${
                     showToc 
                       ? 'bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet' 
-                      : 'text-gray-400 hover:text-text-secondarydark:hover:text-text-primary hover:bg-light-surfacedark:hover:bg-white/10'
+                      : 'text-gray-400 hover:text-text-secondary dark:hover:text-text-primary hover:bg-light-surface dark:hover:bg-white/10'
                   }`}
                   title={t('目录', 'Table of Contents')}
                 >
@@ -262,7 +262,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               <button
                 onClick={cycleFontSize}
-                className="p-2 rounded-lg text-gray-400 hover:text-text-secondarydark:hover:text-text-primary hover:bg-light-surfacedark:hover:bg-white/10 transition-colors"
+                className="p-2 rounded-lg text-gray-400 hover:text-text-secondary dark:hover:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
               >
                 <Type className="w-4 h-4" />
@@ -271,7 +271,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 href={repository.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-text-secondarydark:text-text-secondary hover:text-text-primarydark:hover:text-text-primary hover:bg-light-surfacedark:hover:bg-white/10 rounded-lg transition-colors"
+                className="flex items-center space-x-1 px-3 py-2 text-sm text-text-secondary dark:text-text-secondary hover:text-text-primary dark:hover:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
                 title={t('在 GitHub 上查看', 'View on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
@@ -279,7 +279,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </a>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg text-gray-400 hover:text-text-secondarydark:hover:text-text-primary hover:bg-light-surfacedark:hover:bg-white/10 transition-colors"
+                className="p-2 rounded-lg text-gray-400 hover:text-text-secondary dark:hover:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -299,8 +299,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           <div className="flex-1 flex overflow-hidden">
             {/* TOC Sidebar */}
             {showToc && tocItems.length > 0 && (
-              <div className="w-56 border-r border-light-border dark:border-white/12 overflow-y-auto p-4 flex-shrink-0">
-                <h4 className="text-sm font-semibold text-text-primarydark:text-text-primary mb-3">
+              <div className="w-56 border-r border-light-border dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0">
+                <h4 className="text-sm font-semibold text-text-primary dark:text-text-primary mb-3">
                   {t('目录', 'Contents')}
                 </h4>
                 <nav className="space-y-1">
@@ -310,11 +310,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                       onClick={() => scrollToHeading(item.id)}
                       className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors ${
                         item.level === 1 
-                          ? 'font-semibold text-text-primarydark:text-text-primary' 
+                          ? 'font-semibold text-text-primary dark:text-text-primary' 
                           : item.level === 2 
-                            ? 'pl-4 text-text-primarydark:text-text-secondary'
-                            : 'pl-6 text-text-tertiarydark:text-text-tertiary'
-                      } hover:bg-light-surfacedark:hover:bg-white/5`}
+                            ? 'pl-4 text-text-primary dark:text-text-secondary'
+                            : 'pl-6 text-text-tertiary dark:text-text-tertiary'
+                      } hover:bg-light-surface dark:hover:bg-white/5`}
                     >
                       {item.text}
                     </button>
@@ -332,14 +332,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 text-brand-violet dark:text-brand-violet animate-spin mb-4" />
-                <p className="text-text-tertiarydark:text-text-secondary">
+                <p className="text-text-tertiary dark:text-text-secondary">
                   {language === 'zh' ? '正在加载 README...' : 'Loading README...'}
                 </p>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-                <p className="text-text-primarydark:text-text-secondary text-center mb-4">
+                <p className="text-text-primary dark:text-text-secondary text-center mb-4">
                   {error}
                 </p>
                 <button
@@ -359,7 +359,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
                 <FileText className="w-12 h-12 text-gray-400 mb-4" />
-                <p className="text-text-tertiarydark:text-text-secondary">
+                <p className="text-text-tertiary dark:text-text-secondary">
                   {language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file'}
                 </p>
               </div>

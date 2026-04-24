@@ -196,7 +196,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Server className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-          <h3 className="text-lg font-semibold text-text-primarydark:text-text-primary">
+          <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary">
             {t('后端服务器', 'Backend Server')}
           </h3>
         </div>
@@ -220,8 +220,8 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </div>
       )}
 
-      <div className="p-4 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
-        <label className="block text-sm font-medium text-text-primarydark:text-text-secondary mb-2">
+      <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
+        <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-2">
           {t('API 密钥', 'API Secret')}
         </label>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
@@ -229,7 +229,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-light-border dark:border-white/12 rounded-lg bg-white dark:bg-panel-dark text-text-primarydark:text-text-primary"
+            className="flex-1 px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
             placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
           />
           <button
@@ -245,7 +245,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <span>{t('测试连接', 'Test Connection')}</span>
           </button>
         </div>
-        <p className="text-xs text-text-tertiarydark:text-text-tertiary mt-2">
+        <p className="text-xs text-text-tertiary dark:text-text-tertiary mt-2">
           {t(
             '如果后端设置了 API_SECRET 环境变量，在此输入相同的值。未设置则留空。',
             'If the backend has API_SECRET env var set, enter the same value here. Leave empty if not set.'
@@ -255,14 +255,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
       {backend.isAvailable && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-6 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
+          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
               <Upload className="w-8 h-8 text-status-emerald dark:text-green-400" />
               <div>
-                <h4 className="font-medium text-text-primarydark:text-text-primary">
+                <h4 className="font-medium text-text-primary dark:text-text-primary">
                   {t('同步到后端', 'Sync to Backend')}
                 </h4>
-                <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+                <p className="text-sm text-text-tertiary dark:text-text-tertiary">
                   {t('将本地数据上传到后端', 'Upload local data to backend')}
                 </p>
               </div>
@@ -281,14 +281,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             </button>
           </div>
 
-          <div className="p-6 bg-light-bgdark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/12">
+          <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
               <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
               <div>
-                <h4 className="font-medium text-text-primarydark:text-text-primary">
+                <h4 className="font-medium text-text-primary dark:text-text-primary">
                   {t('从后端同步', 'Sync from Backend')}
                 </h4>
-                <p className="text-sm text-text-tertiarydark:text-text-tertiary">
+                <p className="text-sm text-text-tertiary dark:text-text-tertiary">
                   {t('从后端下载数据到本地', 'Download data from backend to local')}
                 </p>
               </div>
@@ -309,11 +309,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </div>
       )}
 
-      <div className="p-4 bg-light-bgdark:bg-white/[0.04] rounded-lg">
-        <h4 className="font-medium text-text-primarydark:text-text-primary mb-2">
+      <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg">
+        <h4 className="font-medium text-text-primary dark:text-text-primary mb-2">
           {t('同步内容包括：', 'Sync includes:')}
         </h4>
-        <ul className="text-sm text-text-secondarydark:text-text-tertiary space-y-1">
+        <ul className="text-sm text-text-secondary dark:text-text-tertiary space-y-1">
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('AI 服务配置', 'AI service configurations')}</li>
