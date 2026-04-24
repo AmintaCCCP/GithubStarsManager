@@ -96,19 +96,19 @@ export class ErrorBoundary extends Component<Props, State> {
               
               {/* 错误信息显示 */}
               {error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded text-left">
+                <div className="mb-4 p-3 bg-gray-100 dark:bg-white/[0.04] rounded text-left">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-text-secondary ">
                       {strings.errorDetails}
                     </span>
                     <button
                       onClick={this.handleCopyError}
-                      className="text-xs px-2 py-1 bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
                     >
                       {strings.copyError}
                     </button>
                   </div>
-                  <p className="text-sm text-red-600 dark:text-red-400 font-mono break-words">
+                  <p className="text-sm text-gray-700 dark:text-text-secondary font-mono break-words">
                     {error?.message || error?.toString() || String(error)}
                   </p>
                 </div>
@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="mb-4">
                 <button
                   onClick={this.handleToggleDetails}
-                  className="text-sm text-brand-violet dark:text-brand-violet hover:text-blue-800 dark:hover:text-blue-300 underline"
+                  className="text-sm text-brand-violet dark:text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary underline"
                 >
                   {strings.toggleDetails}
                 </button>

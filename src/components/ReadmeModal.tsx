@@ -262,7 +262,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               <button
                 onClick={cycleFontSize}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+                className="p-2 rounded-lg text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-900 dark:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
               >
                 <Type className="w-4 h-4" />
@@ -279,7 +279,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </a>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+                className="p-2 rounded-lg text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-900 dark:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -338,7 +338,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                <AlertCircle className="w-12 h-12 text-gray-700 dark:text-text-secondary mb-4" />
                 <p className="text-gray-900 dark:text-text-secondary text-center mb-4">
                   {error}
                 </p>
@@ -358,7 +358,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="w-12 h-12 text-gray-400 mb-4" />
+                <FileText className="w-12 h-12 text-gray-400 dark:text-text-quaternary mb-4" />
                 <p className="text-gray-500 dark:text-text-secondary">
                   {language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file'}
                 </p>

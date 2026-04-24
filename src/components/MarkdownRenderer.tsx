@@ -97,9 +97,9 @@ const CodeBlock: React.FC<{
   return (
     <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
       isBashLike
-        ? 'border-green-500/30 dark:border-green-400/30'
+        ? 'border-light-border dark:border-white/[0.04]/30 dark:border-light-border dark:border-white/[0.04]/30'
         : isPowerShell
-          ? 'border-brand-violet/30 dark:border-blue-400/30'
+          ? 'border-brand-violet/30 dark:border-light-border dark:border-white/[0.04]/30'
           : isCmdLike
             ? 'border-cyan-500/30 dark:border-cyan-400/30'
             : 'border-light-border dark:border-white/[0.04]'
@@ -107,16 +107,16 @@ const CodeBlock: React.FC<{
       <div className="flex items-center justify-between px-4 py-2.5 bg-light-surface dark:bg-panel-dark/90 border-b border-light-border dark:border-white/[0.04]">
         <div className="flex items-center gap-2.5">
           <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-500/80 dark:bg-red-500/70" />
-            <span className="w-3 h-3 rounded-full bg-yellow-500/80 dark:bg-yellow-500/70" />
+            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
+            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
             <span className="w-3 h-3 rounded-full bg-status-emerald0/80 dark:bg-status-emerald0/70" />
           </div>
           {language && (
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
               isBashLike
-                ? 'bg-status-emerald dark:bg-green-900/40 text-status-emerald dark:text-green-300 border border-green-200 dark:border-green-800'
+                ? 'bg-status-emerald text-status-emerald border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
                 : isPowerShell
-                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/20/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/20/40 text-gray-700 dark:text-text-secondary border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
                   : isCmdLike
                     ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
                     : 'bg-gray-200 dark:bg-white/[0.04] text-gray-700 dark:text-text-tertiary border border-light-border dark:border-white/[0.04]'
@@ -144,9 +144,9 @@ const CodeBlock: React.FC<{
             onClick={handleCopy}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copyError
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
                 : copied
-                  ? 'bg-status-emerald dark:bg-green-900/30 text-status-emerald dark:text-green-400 border border-green-200 dark:border-green-800'
+                  ? 'bg-status-emerald text-status-emerald border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
                   : 'bg-white dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-light-border dark:border-white/[0.04]'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
@@ -168,7 +168,7 @@ const CodeBlock: React.FC<{
         </div>
       </div>
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-red-200 dark:border-red-800">
+        <div className="absolute top-14 right-4 max-w-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
           {copyError}
         </div>
       )}
@@ -185,9 +185,9 @@ const CodeBlock: React.FC<{
           <div className="flex">
             <div className={`flex-shrink-0 py-3 px-3 text-right select-none border-r ${
               isBashLike
-                ? 'border-green-200 dark:border-green-800 bg-status-emerald/30 dark:bg-green-900/10'
+                ? 'border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] bg-status-emerald/30 '
                 : isPowerShell
-                  ? 'border-blue-200 dark:border-blue-800 bg-blue-50/20 dark:bg-brand-indigo/20/10'
+                  ? 'border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/10'
                   : isCmdLike
                     ? 'border-cyan-200 dark:border-cyan-800 bg-cyan-50/20 dark:bg-cyan-900/10'
                     : 'border-light-border dark:border-white/[0.04] bg-light-surface50 dark:bg-panel-dark/30'
@@ -248,7 +248,7 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
       href={resolvedHref}
       target={isHashLink ? undefined : "_blank"}
       rel={isHashLink ? undefined : "noopener noreferrer"}
-      className="text-brand-violet dark:text-brand-violet hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
+      className="text-brand-violet dark:text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
       onClick={(e) => e.stopPropagation()}
     >
       {children}
@@ -376,19 +376,19 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <div className="my-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-3">
-        <svg className="w-5 h-5 text-red-400 dark:text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="my-4 p-4 bg-gray-100 dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] flex items-center gap-3">
+        <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+          <p className="text-sm text-gray-700 dark:text-text-secondary font-medium">
             {language === 'zh' ? '图片加载失败' : 'Image failed to load'}
           </p>
-          {alt && <p className="text-xs text-red-500 dark:text-red-500 truncate">{alt}</p>}
+          {alt && <p className="text-xs text-gray-700 dark:text-text-secondary truncate">{alt}</p>}
         </div>
         <button
           onClick={() => { setHasError(false); setIsLoading(true); }}
-          className="px-2 py-1 text-xs bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex-shrink-0"
+          className="px-2 py-1 text-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] transition-colors flex-shrink-0"
         >
           {language === 'zh' ? '重试' : 'Retry'}
         </button>
@@ -685,7 +685,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   headingIds
 }) => {
   if (!shouldRender) {
-    return <div className="h-32 flex items-center justify-center text-gray-400">Loading...</div>;
+    return <div className="h-32 flex items-center justify-center text-gray-400 dark:text-text-quaternary">Loading...</div>;
   }
 
   const remarkPlugins = [remarkGfm, remarkBreaks];
@@ -762,7 +762,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           },
           pre: ({ children }) => <>{children}</>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
+            <blockquote className="border-l-4 border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
               {children}
             </blockquote>
           ),

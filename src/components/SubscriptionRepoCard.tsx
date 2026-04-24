@@ -72,9 +72,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   };
 
   const rankBadgeClass = useMemo(() => {
-    if (repo.rank === 1) return 'bg-yellow-400 text-yellow-900 dark:bg-yellow-500 dark:text-yellow-900';
+    if (repo.rank === 1) return 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary ';
     if (repo.rank === 2) return 'bg-gray-300 text-gray-900 dark:bg-gray-400 dark:text-text-primary';
-    if (repo.rank === 3) return 'bg-amber-600 text-white dark:bg-amber-700 dark:text-text-primary';
+    if (repo.rank === 3) return 'bg-gray-100 dark:bg-white/[0.04] text-white dark:text-text-primary';
     return 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
   }, [repo.rank]);
 
@@ -283,8 +283,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       onClick={handleCardClick}
       className={`bg-white dark:bg-panel-dark border border-light-border dark:border-white/[0.04] p-5 transition-all duration-200 ${
         desktopSafeMode
-          ? 'rounded-lg hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 hover:-translate-y-0.5 cursor-pointer'
-          : 'rounded-xl hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 hover:-translate-y-0.5 cursor-pointer'
+          ? 'rounded-lg hover:shadow-md hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
+          : 'rounded-xl hover:shadow-lg hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
       }`}
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
@@ -322,10 +322,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 disabled={!githubToken || isAnalyzing}
                 className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isAnalyzed
-                    ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
+                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     : isFailed
-                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800'
-                    : 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
+                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                    : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                 }`}
                 title={
                   isAnalyzed 
@@ -347,7 +347,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {/* ZRead button */}
               <button
                 onClick={handleOpenInZRead}
-                className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                 title={t('在ZRead打开', 'Open in ZRead')}
               >
                 <BookOpen className="w-4 h-4" />
@@ -370,8 +370,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 disabled={!githubToken || isStarring}
                 className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
-                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800'
-                    : 'bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
+                    ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
+                    : 'bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-100 dark:bg-white/[0.04] hover:text-gray-700 dark:text-text-secondary dark:hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:text-gray-700 dark:text-text-secondary'
                 }`}
                 title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
               >
@@ -396,8 +396,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           {/* AI Summary */}
           {repo.ai_summary && (
             <div className="flex items-start gap-1.5 mb-3">
-              <Bot className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-purple-600 dark:text-purple-400 line-clamp-2">
+              <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2">
                 {repo.ai_summary}
               </p>
             </div>
@@ -409,7 +409,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50/50 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300"
+                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 "
                 >
                   {tag}
                 </span>
@@ -468,7 +468,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       maxWidth="max-w-sm"
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-3 text-gray-700 dark:text-text-secondary ">
           <AlertTriangle className="w-8 h-8 flex-shrink-0" />
           <p className="text-sm text-gray-700 dark:text-text-tertiary">
             {language === 'zh' 
@@ -493,7 +493,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 pendingUnstarAction();
               }
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
           >
             {t('确认取消', 'Confirm Unstar')}
           </button>

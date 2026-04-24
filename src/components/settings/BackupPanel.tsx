@@ -256,21 +256,21 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Cloud className="w-6 h-6 text-status-emerald dark:text-green-400" />
+        <Cloud className="w-6 h-6 text-status-emerald " />
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('备份与恢复', 'Backup & Restore')}
         </h3>
       </div>
 
       {!activeConfig && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
           <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary mt-0.5" />
             <div>
-              <p className="text-sm text-amber-800 dark:text-amber-200">
+              <p className="text-sm text-gray-700 dark:text-text-secondary ">
                 {t('请先配置并激活WebDAV服务', 'Please configure and activate WebDAV service first')}
               </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              <p className="text-xs text-gray-700 dark:text-text-secondary mt-1">
                 {t('备份和恢复功能需要WebDAV服务支持', 'Backup and restore features require WebDAV service')}
               </p>
             </div>
@@ -279,8 +279,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       )}
 
       {lastBackup && (
-        <div className="p-4 bg-blue-50 dark:bg-brand-indigo/20/20 rounded-lg">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg">
+          <p className="text-sm text-gray-700 dark:text-text-secondary ">
             <span className="font-medium">{t('上次备份:', 'Last backup:')}</span>{' '}
             {new Date(lastBackup).toLocaleString()}
           </p>
@@ -290,7 +290,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
-            <Upload className="w-8 h-8 text-status-emerald dark:text-green-400" />
+            <Upload className="w-8 h-8 text-status-emerald " />
             <div>
               <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('备份数据', 'Backup Data')}

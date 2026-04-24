@@ -89,7 +89,7 @@ export const LoginScreen: React.FC = () => {
           title={t('切换主题', 'Toggle theme')}
         >
           {theme === 'light' ? (
-            <Moon className="w-5 h-5 text-gray-900" />
+            <Moon className="w-5 h-5 text-gray-900 dark:text-text-primary" />
           ) : (
             <Sun className="w-5 h-5 text-gray-300" />
           )}
@@ -126,14 +126,14 @@ export const LoginScreen: React.FC = () => {
 
           {/* 显示缓存状态 */}
           {repositories.length > 0 && lastSync && (
-            <div className="mb-4 p-3 bg-status-emerald dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="flex items-center space-x-2 text-status-emerald dark:text-green-400">
+            <div className="mb-4 p-3 bg-status-emerald border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] rounded-lg">
+              <div className="flex items-center space-x-2 text-status-emerald ">
                 <div className="w-2 h-2 bg-status-emerald0 rounded-full"></div>
                 <span className="text-sm font-medium">
                   {t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}
                 </span>
               </div>
-              <p className="text-xs text-status-emerald dark:text-green-500 mt-1">
+              <p className="text-xs text-status-emerald mt-1">
                 {t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}
               </p>
             </div>
@@ -145,7 +145,7 @@ export const LoginScreen: React.FC = () => {
                 GitHub Personal Access Token
               </label>
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
                 <input
                   type="password"
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
@@ -162,16 +162,16 @@ export const LoginScreen: React.FC = () => {
             </div>
 
             {error && (
-              <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+              <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-white/[0.04] border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] rounded-lg">
+                <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
+                <p className="text-sm text-gray-700 dark:text-text-secondary ">{error}</p>
               </div>
             )}
 
             <button 
               onClick={handleConnect}
               disabled={isLoading || !token.trim()}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-brand-indigo hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-brand-indigo hover:bg-gray-100 dark:bg-white/[0.04] disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
               {isLoading ? (
                 <>
@@ -202,7 +202,7 @@ export const LoginScreen: React.FC = () => {
                 href="https://github.com/settings/tokens"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-violet hover:text-blue-700 dark:text-brand-violet dark:hover:text-blue-300 text-sm font-medium hover:underline"
+                className="text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary text-sm font-medium hover:underline"
               >
                 {t('在GitHub上创建token →', 'Create token on GitHub →')}
               </a>

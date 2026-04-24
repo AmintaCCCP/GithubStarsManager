@@ -34,7 +34,7 @@ export const SearchShortcutsHelp: React.FC = () => {
           </div>
           <button
             onClick={() => setShowHelp(false)}
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            className="text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

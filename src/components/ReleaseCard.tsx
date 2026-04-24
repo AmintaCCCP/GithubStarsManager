@@ -64,42 +64,44 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       }`}
     >
       {/* 头部区域 - 仅显示元信息，不可点击展开 */}
-      <div className="p-1.5 sm:p-2">
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+      <div className="p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center min-w-0 flex-1">
             {isUnread && (
-              <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse"></div>
+              <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse mr-2"></div>
             )}
-            <div className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 bg-brand-indigo/20 rounded flex-shrink-0">
-              <GitBranch className="w-3 h-3 text-brand-violet" />
+            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 dark:bg-white/[0.04] rounded-lg flex-shrink-0 border border-transparent dark:border-white/[0.04]">
+              <GitBranch className="w-4 h-4 text-gray-500 dark:text-text-tertiary" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h4 className="font-semibold text-gray-900 text-sm truncate">
+            <div className="min-w-0 flex-1 ml-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-medium text-gray-900 dark:text-text-primary text-sm truncate">
                   {release.repository.name}
                 </h4>
-                <span className="text-brand-violet text-sm font-semibold">{release.tag_name}</span>
+                <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-[11px] font-medium rounded-md border border-transparent dark:border-white/[0.04]">
+                  {release.tag_name}
+                </span>
                 {release.name && release.name !== release.tag_name && (
-                  <span className="text-xs text-gray-500 dark:text-text-tertiary truncate max-w-[200px]">
+                  <span className="text-[11px] text-gray-500 dark:text-text-tertiary truncate max-w-[200px]">
                     {release.name}
                   </span>
                 )}
-                <div className="flex items-center space-x-0.5 text-gray-400">
+                <div className="flex items-center space-x-1 text-[11px] text-gray-500 dark:text-text-tertiary ml-auto">
                   <Calendar className="w-3 h-3" />
                   <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
                 </div>
                 {downloadLinks.length > 0 && (
-                <div className="flex items-center space-x-0.5 text-gray-400">
-                  <Download className="w-3 h-3" />
-                  <span>
-                    {selectedFilters.length > 0
-                      ? `${downloadLinks.filter(link => matchesActiveFilters(link.name)).length}/${downloadLinks.length}`
-                      : downloadLinks.length}
-                  </span>
+                  <div className="flex items-center space-x-1 text-[11px] text-gray-500 dark:text-text-tertiary">
+                    <Download className="w-3 h-3" />
+                    <span>
+                      {selectedFilters.length > 0
+                        ? `${downloadLinks.filter(link => matchesActiveFilters(link.name)).length}/${downloadLinks.length}`
+                        : downloadLinks.length}
+                    </span>
                   </div>
                 )}
               </div>
-              <p className="text-xs text-gray-400 dark:text-text-tertiarytruncate">
+              <p className="text-xs text-gray-400 dark:text-text-quaternary truncate mt-0.5">
                 {release.repository.full_name}
               </p>
             </div>
@@ -114,7 +116,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 }}
                 className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isAssetsExpanded
-                    ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                    ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
                     : 'bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
                 title={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}
@@ -135,7 +137,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 }}
                 className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isReleaseNotesExpanded
-                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                    ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                     : 'bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
                 title={isReleaseNotesExpanded ? t('隐藏更新日志', 'Hide Changelog') : t('显示更新日志', 'Show Changelog')}
@@ -153,7 +155,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 e.stopPropagation();
                 onUnsubscribe();
               }}
-              className="p-1 rounded bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="p-1 rounded bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
               title={t('取消订阅 Release', 'Unsubscribe from releases')}
               aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
             >
@@ -163,7 +165,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               href={release.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="p-1 rounded bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
               title={t('在GitHub上查看', 'View on GitHub')}
               aria-label={t('在GitHub上查看', 'View on GitHub')}
               onClick={(e) => {
@@ -183,11 +185,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-1.5 sm:px-2 pb-1.5 sm:pb-2 border-t border-gray-100 dark:border-white/[0.04]">
+          <div className="px-1.5 sm:px-2 pb-1.5 sm:pb-2 border-t border-light-border dark:border-white/[0.04]">
           {isAssetsExpanded && downloadLinks.length > 0 && (
             <div className="py-1.5">
               <div className="flex items-center space-x-1.5 mb-1.5">
-                <FileArchive className="w-3.5 h-3.5 text-brand-violet dark:text-brand-violet" />
+                <FileArchive className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
                 <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
                   {t('下载文件', 'Download Files')}
                 </span>
@@ -203,18 +205,18 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex items-center justify-between px-2 py-1.5 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-light-border dark:border-white/[0.04] last:border-b-0 ${
-                      link.isSourceCode ? 'bg-status-emerald/50 dark:bg-green-900/20' : ''
+                    className={`flex items-center justify-between px-3 py-2.5 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-light-border dark:border-white/[0.04] last:border-b-0 ${
+                      link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
                     }`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                       {link.isSourceCode ? (
-                        <Code2 className="w-3.5 h-3.5 text-status-emerald dark:text-green-400 flex-shrink-0" />
+                        <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
                       ) : (
-                        <Download className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
                       )}
-                      <span className={`text-xs truncate ${link.isSourceCode ? 'text-status-emerald dark:text-green-300 font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                      <span className={`text-xs truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
                         {link.name}
                       </span>
                     </div>
@@ -235,7 +237,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           {isReleaseNotesExpanded && release.body && (
             <div className="py-1.5">
               <div className="flex items-center space-x-1.5 mb-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <BookOpen className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
                 <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
                   {t('Release 说明', 'Release Notes')}
                 </span>
@@ -254,7 +256,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         e.stopPropagation();
                         onToggleFullContent(e);
                       }}
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-brand-indigo text-white rounded hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-xs font-medium min-w-[120px]"
+                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-brand-indigo text-white rounded hover:bg-gray-100 dark:bg-white/[0.04] active:bg-gray-100 dark:bg-white/[0.04] transition-all duration-200 text-xs font-medium min-w-[120px]"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>{isFullContent ? t('收起', 'Collapse') : t('查看完整', 'View Full')}</span>

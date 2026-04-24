@@ -226,7 +226,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeWebDAVConfig
-                ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-brand-indigo/20/20'
+                ? 'border-brand-violet bg-brand-indigo/10 dark:border-brand-violet/50 dark:bg-brand-indigo/20'
                 : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:hover:border-gray-500'
             }`}
           >
@@ -245,7 +245,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                     {config.url} • {config.path}
                   </p>
                   {config.passwordStatus === 'decrypt_failed' && (
-                    <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                    <p className="mt-1 text-sm text-gray-700 dark:text-text-secondary ">
                       {t(
                         '存储的 WebDAV 密码无法解密，请重新输入并保存该配置。',
                         'The stored WebDAV password could not be decrypted. Please re-enter and save this configuration.'
@@ -259,7 +259,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -270,7 +270,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 </button>
                 <button
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -281,7 +281,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                       deleteWebDAVConfig(config.id);
                     }
                   }}
-                  className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

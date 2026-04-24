@@ -316,7 +316,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
             </h3>
             <button
               onClick={handleAddCategory}
-              className="p-1.5 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-brand-indigo/30 transition-colors"
+              className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
               title={t('添加分类', 'Add Category')}
               aria-label={t('添加分类', 'Add Category')}
             >
@@ -350,10 +350,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     onClick={() => handleCategoryClick(category.id)}
                     className={`relative flex min-w-[140px] items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
                       isSelected
-                        ? 'bg-brand-indigo/20 text-blue-700 dark:bg-white/[0.04] dark:text-text-primary'
+                        ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
                         : isDragTarget
-                          ? 'bg-status-emerald text-status-emerald ring-2 ring-green-400 dark:bg-status-emerald/20 dark:text-status-emerald'
-                          : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                          ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
+                          : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                     aria-pressed={isSelected}
@@ -366,10 +366,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     <span
                       className={`text-xs px-2 py-1 rounded-full shrink-0 ${
                         isSelected
-                          ? 'bg-blue-200 text-blue-800 dark:bg-white/10 dark:text-text-primary'
+                          ? 'bg-gray-200 text-gray-900 dark:bg-white/10 dark:text-text-primary'
                           : isDragTarget
-                            ? 'bg-green-200 text-status-emerald dark:bg-status-emerald/30 dark:text-status-emerald'
-                            : 'bg-gray-200 text-gray-700 dark:bg-transparent dark:border dark:border-white/10 dark:text-text-tertiary'
+                            ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald dark:bg-status-emerald/30 dark:text-status-emerald'
+                            : 'bg-gray-100 text-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary'
                       }`}
                     >
                       {count}
@@ -445,10 +445,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             onClick={() => handleCategoryClick(category.id)}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
                               isSelected
-                                ? 'bg-brand-indigo/20 text-blue-700 dark:bg-white/[0.04] dark:text-text-primary ring-1 ring-blue-400 dark:ring-white/10'
+                                ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
                                 : isDragTarget
-                                  ? 'bg-status-emerald text-status-emerald ring-2 ring-green-400 dark:bg-status-emerald/20 dark:text-status-emerald'
-                                  : 'hover:bg-light-surface dark:hover:bg-white/5 dark:text-text-secondary'
+                                  ? 'bg-gray-100 dark:bg-white/[0.04] text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
+                                  : 'hover:bg-gray-100 dark:hover:bg-white/[0.04] text-gray-700 dark:text-text-secondary'
                             }`}
                             title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
                             aria-label={category.name}
@@ -464,7 +464,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 添加分类按钮 */}
                 <button
                   onClick={handleAddCategory}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-brand-indigo/30 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                   title={t('添加分类', 'Add Category')}
                   aria-label={t('添加分类', 'Add Category')}
                 >
@@ -486,7 +486,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={handleAddCategory}
-                      className="p-1.5 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-brand-indigo/30 transition-colors"
+                      className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                       title={t('添加分类', 'Add Category')}
                       aria-label={t('添加分类', 'Add Category')}
                     >
@@ -539,10 +539,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ease-out ${
                             isSelected
-                              ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                              ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
                               : isDragTarget
-                                ? 'bg-status-emerald text-status-emerald ring-2 ring-green-400 dark:bg-green-900 dark:text-green-300'
-                                : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
+                                ? 'bg-green-50 text-status-emerald ring-1 ring-status-emerald dark:bg-status-emerald/10 dark:text-status-emerald dark:ring-status-emerald/30'
+                                : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                           } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
                           title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                         >
@@ -561,10 +561,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           <span
                             className={`text-xs px-2 py-1 rounded-full shrink-0 transition-all duration-200 ease-out ${
                               isSelected
-                                ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                                ? 'bg-gray-200 text-gray-900 dark:bg-white/10 dark:text-text-primary'
                                 : isDragTarget
-                                  ? 'bg-green-200 text-status-emerald dark:bg-green-800 dark:text-green-200'
-                                  : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-text-tertiary'
+                                  ? 'bg-status-emerald/20 text-status-emerald dark:bg-status-emerald/30 dark:text-status-emerald'
+                                  : 'bg-gray-100 text-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary'
                             } ${showText ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
@@ -591,7 +591,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   e.stopPropagation();
                                   void handleDeleteCategory(category);
                                 }}
-                                className="p-1 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20"
+                                className="p-1 rounded-md text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]"
                                 title={t('删除分类', 'Delete category')}
                                 aria-label={t('删除分类', 'Delete category')}
                               >

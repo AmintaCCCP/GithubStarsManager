@@ -163,9 +163,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             </span>
           )}
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" aria-hidden="true" />
+            <ChevronUp className="w-4 h-4 text-gray-500 dark:text-text-tertiary" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" aria-hidden="true" />
+            <ChevronDown className="w-4 h-4 text-gray-500 dark:text-text-tertiary" aria-hidden="true" />
           )}
         </button>
 
@@ -211,7 +211,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 </p>
                 <button
                   onClick={handleResetPresets}
-                  className="flex items-center space-x-1 text-xs text-gray-500 dark:text-text-tertiary hover:text-brand-violet dark:hover:text-blue-400 transition-colors"
+                  className="flex items-center space-x-1 text-xs text-gray-500 dark:text-text-tertiary hover:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary transition-colors"
                   title={t('重置预设筛选器', 'Reset preset filters')}
                   type="button"
                   aria-label={t('重置预设筛选器', 'Reset preset filters')}
@@ -229,8 +229,8 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       key={preset.id}
                       className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                         isSelected
-                          ? 'bg-indigo-100 border-indigo-300 text-indigo-700 dark:bg-indigo-900 dark:border-indigo-700 dark:text-indigo-300'
-                          : 'bg-light-bgborder-light-border text-gray-700 dark:bg-panel-dark dark:border-white/[0.04] dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
+                          ? 'bg-brand-indigo border-transparent text-white dark:bg-white/[0.08] dark:border-white/[0.12] dark:text-text-primary'
+                          : 'bg-light-bg border-light-border text-gray-700 dark:bg-panel-dark dark:border-white/[0.04] dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
                       }`}
                     >
                       <button
@@ -247,7 +247,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
                         <button
                           onClick={() => handleEditFilter(preset)}
-                          className="p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                          className="p-0.5 rounded hover:bg-white/20 dark:hover:bg-white/20 transition-colors"
                           title={t('编辑', 'Edit')}
                           type="button"
                           aria-label={t('编辑', 'Edit')}
@@ -274,7 +274,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     key={filter.id}
                     className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
                       selectedFilters.includes(filter.id)
-                        ? 'bg-brand-indigo/20 border-blue-300 text-blue-700 dark:bg-brand-indigo/20 dark:border-blue-700 dark:text-blue-300'
+                        ? 'bg-brand-indigo border-transparent text-white dark:bg-white/[0.08] dark:border-white/[0.12] dark:text-text-primary'
                         : 'bg-light-surfaceborder-light-border text-gray-900 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -304,7 +304,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       </button>
                       <button
                         onClick={() => handleDeleteFilter(filter.id)}
-                        className="p-1 rounded hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-400 transition-colors"
+                        className="p-1 rounded hover:bg-gray-100 dark:bg-white/[0.04] hover:text-gray-700 dark:text-text-secondary dark:hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:text-gray-700 dark:text-text-secondary transition-colors"
                         title={t('删除', 'Delete')}
                         type="button"
                         aria-label={t('删除', 'Delete')}

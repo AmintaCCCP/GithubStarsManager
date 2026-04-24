@@ -239,7 +239,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Package className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          <Package className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('分类管理', 'Category Management')}
           </h3>
@@ -254,7 +254,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       </div>
 
       {/* 折叠侧边栏显示设置 */}
-      <div className="p-4 bg-blue-50 dark:bg-brand-indigo/20/20 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <LayoutGrid className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
@@ -357,7 +357,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <button
               onClick={handleAddCategory}
               disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-brand-indigo text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-text-tertiary cursor-not-allowed'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04]' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-text-tertiary cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -394,7 +394,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 onClick={() => setIsReordering(!isReordering)}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   isReordering
-                    ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
                     : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
@@ -412,8 +412,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           </div>
 
           {isReordering && (
-            <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm text-yellow-800 dark:text-yellow-300">
+            <div className="mb-3 p-3 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+              <p className="text-sm text-gray-700 dark:text-text-secondary ">
                 {t('提示：拖拽分类可快速调整顺序，或使用按钮进行置顶/置底操作', 'Tip: Drag categories to quickly reorder, or use buttons to move to top/bottom')}
               </p>
             </div>
@@ -448,13 +448,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   onDrop={(e) => handleDrop(e, index)}
                   className={`flex flex-col p-3 rounded-lg border transition-all ${
                     category.isCustom
-                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                      ? 'bg-light-surface dark:bg-white/[0.04] border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]'
                       : 'bg-white dark:bg-panel-dark border-light-border dark:border-white/[0.04]'
                   } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-brand-violet' : ''} ${
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
                     dragOverId === category.id && draggingId !== category.id
-                      ? 'border-blue-400 dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      ? 'border-light-border dark:border-white/[0.04] dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
                       : ''
                   } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >
@@ -472,8 +472,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                       </div>
                       
                       {isDefault && isModified && originalCategory && (
-                        <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/30 rounded border border-yellow-200 dark:border-yellow-800">
-                          <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                        <div className="mb-2 p-2 bg-light-surface dark:bg-white/[0.04] rounded border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
+                          <p className="text-xs text-gray-700 dark:text-text-secondary ">
                             {t(
                               `已修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
                               `Modified. Original: ${originalCategory.icon} ${originalCategory.name}`
@@ -516,7 +516,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800' : 'bg-light-surfacetext-gray-400 dark:bg-white/[0.04] dark:text-text-tertiarycursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${hasChanges ? 'bg-status-emerald text-status-emerald hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]' : 'bg-light-surfacetext-gray-400 dark:bg-white/[0.04] dark:text-text-tertiarycursor-not-allowed'}`}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />
@@ -541,7 +541,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditIcon(originalCategory.icon);
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                               >
                                 {t('名字/图标', 'Name/Icon')}
                               </button>
@@ -554,14 +554,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditKeywords(originalCategory.keywords?.join(', ') || '');
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                               >
                                 {t('关键词', 'Keywords')}
                               </button>
                             )}
                             <button
                               onClick={() => handleResetDefault(category.id, originalCategory)}
-                              className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
+                              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                             >
                               {t('全部', 'All')}
                             </button>
@@ -580,12 +580,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           {category.name}
                         </span>
                         {category.isCustom && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
                             {t('自定义', 'Custom')}
                           </span>
                         )}
                         {!category.isCustom && isModified && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
                             {t('已修改', 'Modified')}
                           </span>
                         )}
@@ -596,7 +596,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('置顶', 'Move to top')}
                           >
                             <ArrowUpToLine className="w-4 h-4" />
@@ -620,7 +620,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('置底', 'Move to bottom')}
                           >
                             <ArrowDownToLine className="w-4 h-4" />
@@ -632,14 +632,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             <>
                               <button
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
+                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="p-1.5 rounded bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800"
+                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                                 title={t('删除', 'Delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -649,7 +649,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             <>
                               <button
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800"
+                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />

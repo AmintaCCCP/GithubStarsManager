@@ -161,11 +161,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusIcon = () => {
     switch (status) {
       case 'connected':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary" />;
       case 'checking':
-        return <RefreshCw className="w-5 h-5 text-yellow-500 animate-spin" />;
+        return <RefreshCw className="w-5 h-5 text-gray-700 dark:text-text-secondary animate-spin" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary" />;
     }
   };
 
@@ -183,11 +183,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusClass = () => {
     switch (status) {
       case 'connected':
-        return 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-200';
+        return 'bg-status-emerald text-status-emerald ';
       case 'checking':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        return 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
       default:
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+        return 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
     }
   };
 
@@ -195,7 +195,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Server className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+          <Server className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('后端服务器', 'Backend Server')}
           </h3>
@@ -207,14 +207,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       </div>
 
       {health && (
-        <div className="p-4 bg-status-emerald dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+        <div className="p-4 bg-status-emerald rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
           <div className="flex items-center space-x-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-status-emerald dark:text-green-400" />
-            <span className="font-medium text-status-emerald dark:text-green-200">
+            <CheckCircle className="w-5 h-5 text-status-emerald " />
+            <span className="font-medium text-status-emerald ">
               {t('连接正常', 'Connection OK')}
             </span>
           </div>
-          <p className="text-sm text-status-emerald dark:text-green-300">
+          <p className="text-sm text-status-emerald ">
             {t('版本', 'Version')}: {health.version}
           </p>
         </div>
@@ -235,7 +235,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           <button
             onClick={handleTestConnection}
             disabled={status === 'checking'}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-white/[0.04] text-white rounded-lg hover:bg-gray-100 dark:bg-white/[0.04] transition-colors disabled:opacity-50"
           >
             {status === 'checking' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -257,7 +257,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
-              <Upload className="w-8 h-8 text-status-emerald dark:text-green-400" />
+              <Upload className="w-8 h-8 text-status-emerald " />
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-text-primary">
                   {t('同步到后端', 'Sync to Backend')}

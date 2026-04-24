@@ -63,7 +63,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
           <button
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            className="p-1.5 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={t('刷新全部', 'Refresh All')}
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
@@ -81,8 +81,8 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 onClick={() => onChannelSelect(channel.id)}
                 className={`flex w-full items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-brand-indigo/20 text-blue-700 dark:bg-white/[0.04] dark:text-text-primary ring-1 ring-blue-400 dark:ring-white/10'
-                    : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                    ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-text-primary font-medium'
+                    : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center gap-2">

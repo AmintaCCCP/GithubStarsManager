@@ -90,8 +90,8 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
 
       {/* 错误提示 */}
       {error && (
-        <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="mt-2 p-3 bg-gray-100 dark:bg-white/[0.04] border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] rounded-lg">
+          <p className="text-sm text-gray-700 dark:text-text-secondary ">{error}</p>
         </div>
       )}
 

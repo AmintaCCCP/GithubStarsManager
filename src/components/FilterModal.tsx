@@ -118,12 +118,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center space-x-1 px-3 py-1 bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-brand-violet rounded-lg text-sm"
+                    className="flex items-center space-x-1 px-3 py-1 bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary rounded-lg text-sm"
                   >
                     <span>{keyword}</span>
                     <button
                       onClick={() => handleRemoveKeyword(index)}
-                      className="text-brand-violet dark:text-brand-violet/70 hover:text-blue-800 dark:hover:text-brand-violet transition-colors"
+                      className="text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary transition-colors"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -141,8 +141,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         </div>
 
         {/* Help text */}
-        <div className="bg-blue-50 dark:bg-brand-indigo/10 border border-blue-200 dark:border-brand-violet/20 rounded-lg p-3">
-          <p className="text-sm text-blue-700 dark:text-brand-violet">
+        <div className="bg-light-surface dark:bg-white/[0.04] border border-light-border dark:border-white/[0.04] rounded-lg p-3">
+          <p className="text-sm text-gray-700 dark:text-text-secondary">
             <strong>提示:</strong> 关键词将用于匹配 GitHub Release 中的文件名。例如，添加 "mac" 和 "dmg" 关键词可以匹配包含这些字符的文件。
           </p>
         </div>
@@ -158,7 +158,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           <button
             onClick={handleSave}
             disabled={!name.trim() || keywords.length === 0}
-            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-gray-500 dark:bg-white/5 dark:text-text-tertiary cursor-not-allowed' : 'bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald'}`}
+            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-gray-500 dark:bg-white/5 dark:text-text-tertiary cursor-not-allowed' : 'bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald'}`}
           >
             {filter ? '保存' : '创建'}
           </button>

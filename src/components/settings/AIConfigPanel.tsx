@@ -311,14 +311,14 @@ Focus on practicality and accurate categorization to help users quickly understa
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Bot className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          <Bot className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('AI服务配置', 'AI Service Configuration')}
           </h3>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加AI配置', 'Add AI Config')}</span>
@@ -476,10 +476,10 @@ Focus on practicality and accurate categorization to help users quickly understa
               <div 
                 className={`mb-3 p-3 rounded-lg flex items-center space-x-2 ${
                   notification.type === 'success' 
-                    ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-200' 
+                    ? 'bg-status-emerald text-status-emerald ' 
                     : notification.type === 'error'
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      : 'bg-brand-indigo/20 text-blue-800 dark:bg-brand-indigo/20 dark:text-blue-200'
+                      ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
+                      : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
                 }`}
               >
                 {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
@@ -518,7 +518,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   type="button"
                   onClick={handleRestoreDefaultPrompt}
-                  className="text-sm text-brand-violet hover:text-blue-700 dark:text-brand-violet dark:hover:text-blue-300"
+                  className="text-sm text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
                 </button>
@@ -542,17 +542,17 @@ Focus on practicality and accurate categorization to help users quickly understa
                   <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary">
                     {t('自定义提示词', 'Custom Prompt')}
                     {isCustomPromptModified && (
-                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                      <span className="ml-2 text-gray-700 dark:text-text-secondary ">
                         ({t('已修改', 'Modified')})
                       </span>
                     )}
                     {isCustomPromptSameAsDefault && (
-                      <span className="ml-2 text-status-emerald dark:text-green-400">
+                      <span className="ml-2 text-status-emerald ">
                         ({t('默认值', 'Default')})
                       </span>
                     )}
                   </label>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-text-quaternary">
                     {form.customPrompt.length} {t('字符', 'characters')}
                   </span>
                 </div>
@@ -604,7 +604,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-purple-300 bg-purple-50 dark:border-purple-600 dark:bg-purple-900/20'
+                ? 'border-brand-violet bg-brand-indigo/10 dark:border-brand-violet/50 dark:bg-brand-indigo/20'
                 : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:hover:border-gray-500'
             }`}
           >
@@ -615,13 +615,13 @@ Focus on practicality and accurate categorization to help users quickly understa
                   name="activeAI"
                   checked={config.id === activeAIConfig}
                   onChange={() => setActiveAIConfig(config.id)}
-                  className="w-4 h-4 text-purple-600 bg-light-surfaceborder-light-border focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+                  className="w-4 h-4 text-gray-700 dark:text-text-secondary bg-light-surfaceborder-light-border focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                 />
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
                     {config.name}
                     {config.useCustomPrompt && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-indigo/20 text-blue-800 dark:bg-brand-indigo/20 dark:text-blue-200">
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
                         <MessageSquare className="w-3 h-3 mr-1" />
                         {t('自定义提示词', 'Custom Prompt')}
                       </span>
@@ -632,7 +632,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
                   {config.apiKeyStatus === 'decrypt_failed' && (
-                    <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                    <p className="mt-1 text-sm text-gray-700 dark:text-text-secondary ">
                       {t(
                         '存储的 API Key 无法解密，请重新输入并保存该配置。',
                         'The stored API key could not be decrypted. Please re-enter and save this configuration.'
@@ -646,7 +646,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -657,7 +657,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 </button>
                 <button
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -672,7 +672,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

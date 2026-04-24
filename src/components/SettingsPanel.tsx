@@ -174,7 +174,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       
       {/* 底部活动指示器 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-brand-indigo dark:bg-blue-400 rounded-full transition-all duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-brand-indigo rounded-full transition-all duration-200 ease-out will-change-transform"
         style={{
           transform: `translateX(${indicatorStyle.translateX}px)`,
           width: indicatorStyle.width,
@@ -363,7 +363,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     aria-controls={`settings-tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
-                        ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
+                        ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
                         : 'text-gray-900 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
                     }`}
                   >
@@ -420,7 +420,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   aria-controls={`settings-tabpanel-${tab.id}`}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
-                      ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
+                      ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
                       : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
                   }`}
                 >

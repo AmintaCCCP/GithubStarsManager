@@ -732,7 +732,7 @@ export const SearchBar: React.FC = () => {
     <div className="bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04] p-4 sm:p-6 mb-6">
       {/* Search Input */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
         <input
           ref={searchInputRef}
           type="text"
@@ -759,7 +759,7 @@ export const SearchBar: React.FC = () => {
               </span>
               <button
                 onClick={clearSearchHistory}
-                className="text-xs text-gray-500 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className="text-xs text-gray-500 dark:text-text-tertiary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary transition-colors"
               >
                 {t('清除', 'Clear')}
               </button>
@@ -770,7 +770,7 @@ export const SearchBar: React.FC = () => {
                 onClick={() => handleHistoryItemClick(historyQuery)}
                 className="w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors flex items-center space-x-2"
               >
-                <Search className="w-4 h-4 text-gray-400" />
+                <Search className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
                 <span className="truncate">{historyQuery}</span>
               </button>
             ))}
@@ -798,7 +798,7 @@ export const SearchBar: React.FC = () => {
                   className="w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors flex items-center space-x-2"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-gray-100 dark:bg-white/[0.04] rounded-full"></div>
                   </div>
                   <span className="truncate">{suggestion}</span>
                 </button>
@@ -809,7 +809,7 @@ export const SearchBar: React.FC = () => {
           {searchQuery && (
             <button
               onClick={handleClearSearch}
-              className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              className="p-1.5 text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300 transition-colors"
               title={t('清除搜索', 'Clear search')}
             >
               <X className="w-4 h-4" />
@@ -827,7 +827,7 @@ export const SearchBar: React.FC = () => {
             <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
           </button>
           <div className="group relative">
-            <AlertCircle className="w-4 h-4 text-gray-400 cursor-help" />
+            <AlertCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
             <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <p className="font-medium mb-1">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="text-gray-300">
@@ -857,7 +857,7 @@ export const SearchBar: React.FC = () => {
                 <span>{t('实时搜索模式 - 匹配仓库名称', 'Real-time search mode - matching repository names')}</span>
               </div>
             ) : searchFilters.query ? (
-              <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+              <div className="flex items-center space-x-2 text-gray-700 dark:text-text-secondary ">
                 <Bot className="w-4 h-4" />
                 <span>{t('AI语义搜索模式 - 智能匹配和排序', 'AI semantic search mode - intelligent matching and ranking')}</span>
               </div>
@@ -878,7 +878,7 @@ export const SearchBar: React.FC = () => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
               showFilters || activeFiltersCount > 0
-                ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
                 : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
@@ -946,7 +946,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === true
-                      ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-300'
+                      ? 'bg-status-emerald text-status-emerald '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -964,7 +964,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isAnalyzed === false
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -982,7 +982,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.analysisFailed === true
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -1000,7 +1000,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === true
-                      ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                      ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -1018,7 +1018,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isSubscribed === false
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -1036,7 +1036,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isEdited === true
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -1072,7 +1072,7 @@ export const SearchBar: React.FC = () => {
                   title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     searchFilters.isCategoryLocked === false
-                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                      ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                       : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -1097,7 +1097,7 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handleLanguageToggle(language)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.languages.includes(language)
-                        ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300'
+                        ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
                         : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -1121,7 +1121,7 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handlePlatformToggle(platform)}
                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.platforms.includes(platform)
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+                        ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary '
                         : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -1146,7 +1146,7 @@ export const SearchBar: React.FC = () => {
                     onClick={() => handleTagToggle(tag)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       searchFilters.tags.includes(tag)
-                        ? 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-300'
+                        ? 'bg-status-emerald text-status-emerald '
                         : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >

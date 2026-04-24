@@ -15,7 +15,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Package className="w-6 h-6 text-status-emerald dark:text-green-400" />
+        <Package className="w-6 h-6 text-status-emerald " />
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('通用设置', 'General Settings')}
         </h3>
@@ -71,7 +71,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
 
       <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04]">
         <div className="flex items-center space-x-3 mb-4">
-          <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <Package className="w-5 h-5 text-gray-700 dark:text-text-secondary " />
           <h4 className="font-medium text-gray-900 dark:text-text-primary">
             {t('检查更新', 'Check for Updates')}
           </h4>
@@ -92,7 +92,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
 
       <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-light-border dark:border-white/[0.04]">
         <div className="flex items-center space-x-3 mb-4">
-          <Mail className="w-5 h-5 text-status-emerald dark:text-green-400" />
+          <Mail className="w-5 h-5 text-status-emerald " />
           <h4 className="font-medium text-gray-900 dark:text-text-primary">
             {t('联系方式', 'Contact Information')}
           </h4>
@@ -127,7 +127,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary border border-light-border dark:border-white/[0.04] rounded-lg transition-colors"
           >
             <Github className="w-5 h-5" />
-            <span>{t('链接到GitHub', 'Link to GitHub')}</span>
+            <span>{t('GitHub', 'GitHub')}</span>
             <ExternalLink className="w-4 h-4" />
           </button>
         </div>

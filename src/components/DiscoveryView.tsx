@@ -193,7 +193,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               transition-all duration-200 ease-out
               focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet focus-visible:ring-offset-2
               ${selectedChannel === channel.id
-                ? 'text-blue-700 dark:text-blue-300'
+                ? 'text-gray-700 dark:text-text-secondary '
                 : 'text-gray-700 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-200 hover:bg-light-surface dark:hover:bg-white/10'
               }
             `}
@@ -271,7 +271,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
               }}
               className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 platform === p.id
-                  ? 'bg-blue-50 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
                   : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
               }`}
             >
@@ -921,7 +921,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <button
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
-                    className="p-2 rounded-xl bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-brand-indigo/20 dark:hover:bg-blue-900/40 hover:text-brand-violet dark:hover:text-blue-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 rounded-xl bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-brand-indigo/20 dark:hover:bg-gray-100 dark:bg-white/[0.04] hover:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('刷新', 'Refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
@@ -983,7 +983,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   {isAnalyzingThisChannel ? (
                     <div className="flex items-center gap-1">
                       <div className="relative">
-                        <div className="px-2 py-1.5 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 flex items-center gap-1.5 overflow-hidden">
+                        <div className="px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary flex items-center gap-1.5 overflow-hidden">
                           <div 
                             className="absolute left-0 top-0 h-full bg-gradient-to-r from-purple-300/70 via-purple-400/70 to-purple-300/70 dark:from-purple-700/70 dark:via-purple-600/70 dark:to-purple-700/70 transition-all duration-400 ease-out"
                             style={{
@@ -1002,7 +1002,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       </div>
                       <button
                         onClick={handleAbortAnalysis}
-                        className="p-1.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
                         title={t('停止', 'Stop')}
                       >
                         <X className="w-4 h-4" />
@@ -1012,7 +1012,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <button
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title={t('AI分析', 'Analyze with AI')}
                     >
                       <Bot className="w-4 h-4" />
@@ -1055,7 +1055,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className={isDesktopSafeMode
-                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
+                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
                       : 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
@@ -1184,7 +1184,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                       disabled={currentIsLoading}
                       className={isDesktopSafeMode
-                        ? 'px-6 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-blue-700 dark:bg-status-emerald/80 dark:hover:bg-status-emerald transition-colors flex items-center gap-2 text-sm font-medium'
+                        ? 'px-6 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald transition-colors flex items-center gap-2 text-sm font-medium'
                         : 'px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -1214,7 +1214,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {currentLoadMoreError && (
               <div className="flex flex-col items-center gap-3 py-4">
-                <div className="flex items-center gap-2 text-red-500 dark:text-red-400">
+                <div className="flex items-center gap-2 text-gray-700 dark:text-text-secondary ">
                   <X className="w-4 h-4" />
                   <span className="text-sm">{currentLoadMoreError}</span>
                 </div>
@@ -1225,7 +1225,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       refreshChannel(selectedDiscoveryChannel, nextPage, true);
                     }
                   }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   {t('重试', 'Retry')}

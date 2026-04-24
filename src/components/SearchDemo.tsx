@@ -63,7 +63,7 @@ export const SearchDemo: React.FC = () => {
 
   if (!showDemo) {
     return (
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200 dark:border-blue-700 p-4 mb-6">
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-brand-indigo/20 dark:bg-brand-indigo/20 rounded-lg">
@@ -108,7 +108,7 @@ export const SearchDemo: React.FC = () => {
         </div>
         <button
           onClick={() => setShowDemo(false)}
-          className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          className="text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300 transition-colors"
         >
           ×
         </button>
@@ -131,8 +131,8 @@ export const SearchDemo: React.FC = () => {
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
-                    ? 'border-brand-violet bg-blue-50 dark:bg-brand-indigo/20/20'
-                    : 'border-light-border dark:border-white/[0.04] hover:border-blue-300 dark:hover:border-blue-600'
+                    ? 'border-brand-violet bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/20'
+                    : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center space-x-2 mb-1">
@@ -151,7 +151,7 @@ export const SearchDemo: React.FC = () => {
         {/* AI搜索示例 */}
         <div className="space-y-3">
           <div className="flex items-center space-x-2 mb-3">
-            <Bot className="w-4 h-4 text-purple-500" />
+            <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
             <h4 className="font-medium text-gray-900 dark:text-text-primary">
               {t('AI语义搜索', 'AI Semantic Search')}
             </h4>
@@ -164,12 +164,12 @@ export const SearchDemo: React.FC = () => {
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
-                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                    : 'border-light-border dark:border-white/[0.04] hover:border-purple-300 dark:hover:border-purple-600'
+                    ? 'border-light-border dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] '
+                    : 'border-light-border dark:border-white/[0.04] hover:border-light-border dark:border-white/[0.04] dark:hover:border-light-border dark:border-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center space-x-2 mb-1">
-                  <Bot className="w-4 h-4 text-purple-500" />
+                  <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
                   <code className="text-sm font-mono bg-light-surface dark:bg-white/[0.04] px-2 py-1 rounded">
                     {example.query}
                   </code>
@@ -189,7 +189,7 @@ export const SearchDemo: React.FC = () => {
             {selectedExample.type === 'realtime' ? (
               <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
             ) : (
-              <Bot className="w-4 h-4 text-purple-500" />
+              <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
             )}
             <h5 className="font-medium text-gray-900 dark:text-text-primary">
               {selectedExample.description}
@@ -203,15 +203,15 @@ export const SearchDemo: React.FC = () => {
             <ul className="space-y-1">
               {selectedExample.expectedResults.map((result, index) => (
                 <li key={index} className="flex items-center space-x-2 text-sm text-gray-900 dark:text-text-secondary">
-                  <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="w-3 h-3 text-gray-700 dark:text-text-secondary flex-shrink-0" />
                   <span>{result}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-brand-indigo/20/20 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+          <div className="mt-4 p-3 bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/20 rounded-lg">
+            <p className="text-sm text-gray-700 dark:text-text-secondary ">
               {selectedExample.type === 'realtime' ? (
                 t(
                   '💡 实时搜索会在您输入时立即显示匹配的仓库名称，响应速度极快。',
@@ -250,7 +250,7 @@ export const SearchDemo: React.FC = () => {
           </div>
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
-              <Bot className="w-4 h-4 text-purple-500" />
+              <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
               <span className="font-medium text-gray-900 dark:text-text-secondary">
                 {t('AI语义搜索', 'AI Semantic Search')}
               </span>

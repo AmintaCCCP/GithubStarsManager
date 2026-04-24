@@ -211,8 +211,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unstar'
-                  ? 'bg-red-700 text-white hover:bg-red-800'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unstar' ? (
@@ -227,8 +227,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'categorize'
-                  ? 'bg-blue-700 text-white hover:bg-blue-800'
-                  : 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'categorize' ? (
@@ -243,8 +243,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'ai-summary'
-                  ? 'bg-purple-700 text-white hover:bg-purple-800'
-                  : 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'ai-summary' ? (
@@ -259,8 +259,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'subscribe'
-                  ? 'bg-green-700 text-white hover:bg-green-800'
-                  : 'bg-status-emerald text-status-emerald dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-status-emerald text-status-emerald hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'subscribe' ? (
@@ -275,8 +275,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'unsubscribe'
-                  ? 'bg-orange-700 text-white hover:bg-orange-800'
-                  : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unsubscribe' ? (
@@ -291,8 +291,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'lock-category'
-                  ? 'bg-amber-700 text-white hover:bg-amber-800'
-                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
+                  ? 'bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04]'
+                  : 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'lock-category' ? (

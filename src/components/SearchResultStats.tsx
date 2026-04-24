@@ -44,7 +44,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-blue-200 dark:border-blue-800 p-4 mb-4">
+    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04] p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (
@@ -56,7 +56,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
               </span>
             </div>
           ) : (
-            <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+            <div className="flex items-center space-x-2 text-gray-700 dark:text-text-secondary ">
               <Bot className="w-4 h-4" />
               <span className="font-medium text-sm">
                 {t('AI语义搜索结果', 'AI Semantic Search Results')}
@@ -126,7 +126,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       </div>
 
       {/* 搜索查询显示 */}
-      <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+      <div className="mt-3 pt-3 border-t border-light-border dark:border-white/[0.04] dark:border-light-border dark:border-white/[0.04]">
         <div className="flex items-center space-x-2 text-sm">
           <span className="text-gray-700 dark:text-text-tertiary">
             {t('搜索查询:', 'Search Query:')}
@@ -135,7 +135,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
             "{searchQuery}"
           </code>
           {stats.aiAnalyzed > 0 && (
-            <span className="text-xs text-status-emerald dark:text-green-400 ml-2">
+            <span className="text-xs text-status-emerald ml-2">
               {stats.aiAnalyzed} {t('个已AI分析', 'AI analyzed')}
             </span>
           )}
