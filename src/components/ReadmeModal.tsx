@@ -315,7 +315,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       case 3: return 'pl-6';
       case 4: return 'pl-9';
       case 5: return 'pl-12';
-      case 6: return 'pl-15';
+      case 6: return 'pl-16';
       default: return '';
     }
   };
