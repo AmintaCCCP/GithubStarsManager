@@ -115,13 +115,13 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Cloud className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-          <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('WebDAV配置', 'WebDAV Configuration')}
           </h3>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加WebDAV', 'Add WebDAV')}</span>
@@ -130,72 +130,72 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
 
       {showForm && (
         <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-light-border dark:border-white/[0.04]">
-          <h4 className="font-medium text-text-primary dark:text-text-primary mb-4">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
             {editingId ? t('编辑WebDAV配置', 'Edit WebDAV Configuration') : t('添加WebDAV配置', 'Add WebDAV Configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('例如: 坚果云', 'e.g., Nutstore')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('WebDAV URL', 'WebDAV URL')} *
               </label>
               <input
                 type="url"
                 value={form.url}
                 onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="https://dav.jianguoyun.com/dav/"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('用户名', 'Username')} *
               </label>
               <input
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('WebDAV用户名', 'WebDAV username')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('密码', 'Password')} *
               </label>
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('WebDAV密码', 'WebDAV password')}
               />
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-text-primary dark:text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('路径', 'Path')} *
               </label>
               <input
                 type="text"
                 value={form.path}
                 onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
-                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-text-primary dark:text-text-primary"
+                className="w-full px-3 py-2 border border-light-border dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="/github-stars-manager/"
               />
             </div>
@@ -204,14 +204,14 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
           <div className="flex space-x-3">
             <button
               onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
             </button>
             <button
               onClick={resetForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-light-border dark:border-white/[0.04] transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('取消', 'Cancel')}</span>
@@ -240,8 +240,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   className="w-4 h-4 text-brand-violet bg-light-surfaceborder-light-border focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                 />
                 <div>
-                  <h4 className="font-medium text-text-primary dark:text-text-primary">{config.name}</h4>
-                  <p className="text-sm text-text-tertiary dark:text-text-tertiary">
+                  <h4 className="font-medium text-gray-900 dark:text-text-primary">{config.name}</h4>
+                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
                     {config.url} • {config.path}
                   </p>
                   {config.passwordStatus === 'decrypt_failed' && (
@@ -292,7 +292,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         ))}
         
         {webdavConfigs.length === 0 && (
-          <div className="text-center py-8 text-text-tertiary dark:text-text-tertiary">
+          <div className="text-center py-8 text-gray-500 dark:text-text-tertiary">
             <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('还没有配置WebDAV服务', 'No WebDAV services configured yet')}</p>
             <p className="text-sm">{t('点击上方按钮添加WebDAV配置', 'Click the button above to add WebDAV configuration')}</p>

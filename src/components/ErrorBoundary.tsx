@@ -87,10 +87,10 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-lg w-full bg-white dark:bg-panel-dark rounded-lg shadow-lg p-6">
             <div className="text-center">
               <div className="text-5xl mb-4">😵</div>
-              <h1 className="text-xl font-bold text-text-primary dark:text-text-primary mb-2">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-text-primary mb-2">
                 {strings.title}
               </h1>
-              <p className="text-text-secondary dark:text-text-tertiary mb-4">
+              <p className="text-gray-700 dark:text-text-tertiary mb-4">
                 {strings.description}
               </p>
               
@@ -124,18 +124,18 @@ export class ErrorBoundary extends Component<Props, State> {
                 </button>
                 {showDetails && errorInfo && (
                   <div className="mt-2 p-3 bg-light-surface dark:bg-white/[0.04] rounded text-left overflow-auto max-h-64">
-                    <p className="text-xs font-semibold text-text-primary dark:text-text-secondary mb-2">
+                    <p className="text-xs font-semibold text-gray-900 dark:text-text-secondary mb-2">
                       {strings.stackTrace}:
                     </p>
-                    <pre className="text-xs text-text-secondary dark:text-text-tertiary font-mono whitespace-pre-wrap">
+                    <pre className="text-xs text-gray-700 dark:text-text-tertiary font-mono whitespace-pre-wrap">
                       {error?.stack || 'No stack trace available'}
                     </pre>
                     {errorInfo?.componentStack && (
                       <>
-                        <p className="text-xs font-semibold text-text-primary dark:text-text-secondary mt-3 mb-2">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-text-secondary mt-3 mb-2">
                           Component Stack:
                         </p>
-                        <pre className="text-xs text-text-secondary dark:text-text-tertiary font-mono whitespace-pre-wrap">
+                        <pre className="text-xs text-gray-700 dark:text-text-tertiary font-mono whitespace-pre-wrap">
                           {errorInfo.componentStack}
                         </pre>
                       </>
@@ -148,20 +148,20 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="space-y-2">
                 <button
                   onClick={this.handleReload}
-                  className="w-full px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
                 >
                   {strings.reload}
                 </button>
                 <button
                   onClick={this.handleReportIssue}
-                  className="w-full px-4 py-2 bg-light-surfacetext-text-primary dark:bg-white/[0.04] dark:text-text-secondary rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="w-full px-4 py-2 bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   {strings.reportIssue}
                 </button>
               </div>
 
               {/* 浏览器提示 */}
-              <div className="mt-4 text-xs text-text-tertiary dark:text-text-tertiary">
+              <div className="mt-4 text-xs text-gray-500 dark:text-text-tertiary">
                 <p>{strings.browserHint}</p>
                 <p>Chrome 80+ / Firefox 75+ / Safari 13+ / Edge 80+</p>
               </div>

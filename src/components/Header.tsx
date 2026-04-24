@@ -153,15 +153,15 @@ export const Header: React.FC = () => {
               />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="truncate text-xl font-[510] text-text-primary">
+              <h1 className="truncate text-xl font-[510] text-gray-900">
                 GitHub Stars Manager
               </h1>
-              <p className="truncate text-sm text-text-tertiary">
+              <p className="truncate text-sm text-gray-500">
                 AI-powered repository management
               </p>
             </div>
             <div className="min-w-0 sm:hidden">
-              <h1 className="truncate text-base font-bold text-text-primary">
+              <h1 className="truncate text-base font-bold text-gray-900">
                 GitHub Stars
               </h1>
             </div>
@@ -176,7 +176,7 @@ export const Header: React.FC = () => {
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'repositories'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Search className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -198,7 +198,7 @@ export const Header: React.FC = () => {
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'releases'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Calendar className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -209,7 +209,7 @@ export const Header: React.FC = () => {
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'subscription'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <TrendingUp className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -222,7 +222,7 @@ export const Header: React.FC = () => {
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'settings'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Settings className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -237,7 +237,7 @@ export const Header: React.FC = () => {
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'repositories'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('仓库', 'Repositories')}
             >
@@ -248,7 +248,7 @@ export const Header: React.FC = () => {
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'releases'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('发布', 'Releases')}
             >
@@ -259,7 +259,7 @@ export const Header: React.FC = () => {
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'subscription'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('趋势', 'Trending')}
             >
@@ -270,7 +270,7 @@ export const Header: React.FC = () => {
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'settings'
                   ? 'bg-brand-indigo/20 text-brand-violet'
-                  : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('设置', 'Settings')}
             >
@@ -290,7 +290,7 @@ export const Header: React.FC = () => {
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'repositories'
                       ? 'bg-brand-indigo/20 text-brand-violet'
-                      : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -311,7 +311,7 @@ export const Header: React.FC = () => {
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'releases'
                       ? 'bg-brand-indigo/20 text-brand-violet'
-                      : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -327,7 +327,7 @@ export const Header: React.FC = () => {
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'subscription'
                       ? 'bg-brand-indigo/20 text-brand-violet'
-                      : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -343,7 +343,7 @@ export const Header: React.FC = () => {
                   className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'settings'
                       ? 'bg-brand-indigo/20 text-brand-violet'
-                      : 'text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      : 'text-gray-700 hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -358,7 +358,7 @@ export const Header: React.FC = () => {
           {/* User Actions */}
           <div className="flex items-center gap-2 sm:gap-3 hd-btns lg:hd-btns">
             {/* Sync Status */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-text-tertiary">
+            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
               <button
                 onClick={handleSync}
@@ -377,9 +377,9 @@ export const Header: React.FC = () => {
               title={t('切换主题', 'Toggle theme')}
             >
               {theme === 'light' ? (
-                <Moon className="w-5 h-5 text-text-secondary" />
+                <Moon className="w-5 h-5 text-gray-700" />
               ) : (
-                <Sun className="w-5 h-5 text-text-secondary" />
+                <Sun className="w-5 h-5 text-gray-700" />
               )}
             </button>
 
@@ -392,7 +392,7 @@ export const Header: React.FC = () => {
                   className="w-8 h-8 rounded-full"
                 />
                 <div className="min-w-0 hidden sm:block">
-                  <p className="truncate text-sm font-medium text-text-primary">
+                  <p className="truncate text-sm font-medium text-gray-900">
                     {user.name || user.login}
                   </p>
                 </div>
@@ -410,7 +410,7 @@ export const Header: React.FC = () => {
                     className="p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
                   title={t('退出登录', 'Logout')}
                 >
-                  <LogOut className="w-4 h-4 text-text-secondary" />
+                  <LogOut className="w-4 h-4 text-gray-700" />
                 </button>
               </div>
             )}

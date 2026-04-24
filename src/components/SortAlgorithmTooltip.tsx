@@ -90,7 +90,7 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
               <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-gray-800" />
             </div>
 
-            <h4 className="font-semibold text-text-primary dark:text-text-primary mb-2 text-sm">
+            <h4 className="font-semibold text-gray-900 dark:text-text-primary mb-2 text-sm">
               {info.title}
             </h4>
             {info.highlight && (
@@ -98,7 +98,7 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
                 {info.highlight}
               </p>
             )}
-            <p className="text-xs text-text-secondary dark:text-text-tertiary whitespace-pre-line leading-relaxed">
+            <p className="text-xs text-gray-700 dark:text-text-tertiary whitespace-pre-line leading-relaxed">
               {info.description}
             </p>
           </div>

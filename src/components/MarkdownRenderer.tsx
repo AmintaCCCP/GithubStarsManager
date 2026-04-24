@@ -119,7 +119,7 @@ const CodeBlock: React.FC<{
                   ? 'bg-brand-indigo/20 dark:bg-brand-indigo/20/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                   : isCmdLike
                     ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
-                    : 'bg-gray-200 dark:bg-white/[0.04] text-text-secondary dark:text-text-tertiary border border-light-border dark:border-white/[0.04]'
+                    : 'bg-gray-200 dark:bg-white/[0.04] text-gray-700 dark:text-text-tertiary border border-light-border dark:border-white/[0.04]'
             }`}>
               {isBashLike && (
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-status-emerald0 animate-pulse" />
@@ -147,7 +147,7 @@ const CodeBlock: React.FC<{
                 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
                 : copied
                   ? 'bg-status-emerald dark:bg-green-900/30 text-status-emerald dark:text-green-400 border border-green-200 dark:border-green-800'
-                  : 'bg-white dark:bg-white/[0.04] text-text-secondary dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-light-border dark:border-white/[0.04]'
+                  : 'bg-white dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-light-border dark:border-white/[0.04]'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
           >
@@ -710,15 +710,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
           h1: ({ children }) => {
             const id = getHeadingId(children);
-            return <h1 id={id} className="text-lg font-bold text-text-primary dark:text-text-primary mt-4 mb-2">{children}</h1>;
+            return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-text-primary mt-4 mb-2">{children}</h1>;
           },
           h2: ({ children }) => {
             const id = getHeadingId(children);
-            return <h2 id={id} className="text-base font-semibold text-text-primary dark:text-gray-200 mt-3 mb-2">{children}</h2>;
+            return <h2 id={id} className="text-base font-semibold text-gray-900 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
           },
           h3: ({ children }) => {
             const id = getHeadingId(children);
-            return <h3 id={id} className="text-sm font-medium text-text-primary dark:text-text-secondary mt-2 mb-1">{children}</h3>;
+            return <h3 id={id} className="text-sm font-medium text-gray-900 dark:text-text-secondary mt-2 mb-1">{children}</h3>;
           },
           p: ({ children }) => {
             const childArray = React.Children.toArray(children);
@@ -733,7 +733,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
               }
             );
             return (
-              <p className={`text-text-primary dark:text-text-secondary mb-2 leading-relaxed ${
+              <p className={`text-gray-900 dark:text-text-secondary mb-2 leading-relaxed ${
                 hasImagesOnly
                   ? 'flex flex-wrap items-center justify-center gap-3'
                   : ''
@@ -742,8 +742,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
               </p>
             );
           },
-          ul: ({ children }) => <ul className="list-disc list-inside text-text-primary dark:text-text-secondary mb-2 space-y-1">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal list-inside text-text-primary dark:text-text-secondary mb-2 space-y-1">{children}</ol>,
+          ul: ({ children }) => <ul className="list-disc list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="ml-2">{children}</li>,
           code: ({ className, children, ...props }) => {
             const isInline = !className;
@@ -751,7 +751,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
             const language = match ? match[1] : '';
             
             return isInline ? (
-              <code className="px-1.5 py-0.5 bg-light-surface dark:bg-white/[0.04] text-text-primary dark:text-gray-200 rounded text-xs font-mono" {...props}>
+              <code className="px-1.5 py-0.5 bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-gray-200 rounded text-xs font-mono" {...props}>
                 {children}
               </code>
             ) : (
@@ -762,7 +762,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           },
           pre: ({ children }) => <>{children}</>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-text-secondary dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
+            <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
               {children}
             </blockquote>
           ),
@@ -776,12 +776,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           ),
           thead: ({ children }) => <thead className="bg-light-surface dark:bg-panel-dark">{children}</thead>,
           th: ({ children }) => (
-            <th className="border border-light-border dark:border-white/[0.04] px-3 py-2 text-left font-semibold text-text-primary dark:text-gray-200">
+            <th className="border border-light-border dark:border-white/[0.04] px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-200">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="border border-light-border dark:border-white/[0.04] px-3 py-2 text-text-primary dark:text-text-secondary">
+            <td className="border border-light-border dark:border-white/[0.04] px-3 py-2 text-gray-900 dark:text-text-secondary">
               {children}
             </td>
           ),

@@ -159,7 +159,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
               min-h-[36px] touch-manipulation
               ${activeTab === tab.id
                 ? 'text-brand-violet dark:text-brand-violet'
-                : 'text-text-secondary dark:text-text-tertiary hover:text-text-primary dark:hover:text-gray-200 hover:bg-light-surface dark:hover:bg-white/10/50'
+                : 'text-gray-700 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-200 hover:bg-light-surface dark:hover:bg-white/10/50'
               }
             `}
             style={{
@@ -336,7 +336,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="flex items-center justify-between px-6 py-4 border-b border-light-border dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark">
             <div className="flex items-center space-x-3">
               <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-              <h2 id="settings-modal-title" className="text-xl font-semibold text-text-primary dark:text-text-primary">
+              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-text-primary">
                 {t('设置', 'Settings')}
               </h2>
             </div>
@@ -345,7 +345,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-150"
               aria-label={t('关闭设置', 'Close settings')}
             >
-              <X className="w-5 h-5 text-text-tertiary dark:text-text-tertiary" />
+              <X className="w-5 h-5 text-gray-500 dark:text-text-tertiary" />
             </button>
           </div>
 
@@ -364,7 +364,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
                         ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
-                        : 'text-text-primary dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
+                        : 'text-gray-900 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
                     }`}
                   >
                     {tab.icon}
@@ -400,7 +400,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center space-x-3 mb-6">
         <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-        <h2 className="text-xl font-semibold text-text-primary dark:text-text-primary">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary">
           {t('设置', 'Settings')}
         </h2>
       </div>
@@ -421,7 +421,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
                       ? 'bg-brand-indigo/20 text-blue-700 dark:bg-brand-indigo/20/30 dark:text-blue-300'
-                      : 'text-text-primary dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
+                      : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
                   }`}
                 >
                   {tab.icon}

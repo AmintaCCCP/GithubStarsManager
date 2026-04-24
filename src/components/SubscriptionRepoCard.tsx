@@ -73,9 +73,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   const rankBadgeClass = useMemo(() => {
     if (repo.rank === 1) return 'bg-yellow-400 text-yellow-900 dark:bg-yellow-500 dark:text-yellow-900';
-    if (repo.rank === 2) return 'bg-gray-300 text-text-primary dark:bg-gray-400 dark:text-text-primary';
+    if (repo.rank === 2) return 'bg-gray-300 text-gray-900 dark:bg-gray-400 dark:text-text-primary';
     if (repo.rank === 3) return 'bg-amber-600 text-white dark:bg-amber-700 dark:text-text-primary';
-    return 'bg-light-surface text-text-secondary dark:bg-white/[0.04] dark:text-text-secondary';
+    return 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
   }, [repo.rank]);
 
   const platformIconMap = useMemo(() => ({
@@ -309,7 +309,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   className="w-6 h-6 rounded-full flex-shrink-0"
                 />
               )}
-              <span className="font-semibold text-text-primary dark:text-text-primary truncate">
+              <span className="font-semibold text-gray-900 dark:text-text-primary truncate">
                 {cardTitle}
               </span>
             </div>
@@ -358,7 +358,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 rounded-lg bg-light-surfacetext-text-tertiary dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 title={t('在GitHub打开', 'Open on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
@@ -371,7 +371,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
                     ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-800'
-                    : 'bg-light-surfacetext-text-tertiary dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
+                    : 'bg-light-surfacetext-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-yellow-100 hover:text-yellow-600 dark:hover:bg-yellow-900 dark:hover:text-yellow-400'
                 }`}
                 title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
               >
@@ -388,7 +388,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Description */}
           {repo.description && (
-            <p className="text-sm text-text-secondary dark:text-text-tertiary mb-3 line-clamp-2">
+            <p className="text-sm text-gray-700 dark:text-text-tertiary mb-3 line-clamp-2">
               {repo.description}
             </p>
           )}
@@ -425,7 +425,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               </span>
               <div className="flex items-center gap-1">
                 {repo.ai_platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="text-text-tertiary dark:text-text-tertiary" title={platform}>
+                  <span key={platform} className="text-gray-500 dark:text-text-tertiary" title={platform}>
                     {getPlatformIcon(platform)}
                   </span>
                 ))}
@@ -434,7 +434,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm text-text-tertiary dark:text-text-tertiary">
+          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-text-tertiary">
             {repo.language && (
               <div className="flex items-center gap-1">
                 <div
@@ -470,7 +470,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       <div className="space-y-4">
         <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
           <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <p className="text-sm text-text-secondary dark:text-text-tertiary">
+          <p className="text-sm text-gray-700 dark:text-text-tertiary">
             {language === 'zh' 
               ? `确定要取消 Star "${repo.full_name}" 吗？这将会从您的 GitHub 收藏中移除该仓库。`
               : `Are you sure you want to unstar "${repo.full_name}"? This will remove the repository from your GitHub stars.`}
@@ -482,7 +482,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               setUnstarConfirmOpen(false);
               setPendingUnstarAction(null);
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
           >
             {t('取消', 'Cancel')}
           </button>

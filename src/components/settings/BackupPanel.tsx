@@ -257,7 +257,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
         <Cloud className="w-6 h-6 text-status-emerald dark:text-green-400" />
-        <h3 className="text-lg font-semibold text-text-primary dark:text-text-primary">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('备份与恢复', 'Backup & Restore')}
         </h3>
       </div>
@@ -292,10 +292,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <div className="flex items-center space-x-3 mb-4">
             <Upload className="w-8 h-8 text-status-emerald dark:text-green-400" />
             <div>
-              <h4 className="font-medium text-text-primary dark:text-text-primary">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('备份数据', 'Backup Data')}
               </h4>
-              <p className="text-sm text-text-tertiary dark:text-text-tertiary">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('将数据备份到WebDAV', 'Backup data to WebDAV')}
               </p>
             </div>
@@ -303,7 +303,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <button
             onClick={handleBackup}
             disabled={isBackingUp || !activeConfig}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isBackingUp ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -318,10 +318,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <div className="flex items-center space-x-3 mb-4">
             <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
             <div>
-              <h4 className="font-medium text-text-primary dark:text-text-primary">
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('恢复数据', 'Restore Data')}
               </h4>
-              <p className="text-sm text-text-tertiary dark:text-text-tertiary">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('从WebDAV恢复数据', 'Restore data from WebDAV')}
               </p>
             </div>
@@ -329,7 +329,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <button
             onClick={handleRestore}
             disabled={isRestoring || !activeConfig}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRestoring ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -342,10 +342,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       </div>
 
       <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg">
-        <h4 className="font-medium text-text-primary dark:text-text-primary mb-2">
+        <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
           {t('备份内容包括：', 'Backup includes:')}
         </h4>
-        <ul className="text-sm text-text-secondary dark:text-text-tertiary space-y-1">
+        <ul className="text-sm text-gray-700 dark:text-text-tertiary space-y-1">
           <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
           <li>• {t('Release 发布信息', 'Release information')}</li>
           <li>• {t('自定义分类', 'Custom categories')}</li>
