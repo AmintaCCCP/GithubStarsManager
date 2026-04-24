@@ -666,3 +666,192 @@
 .hljs-strong {
   font-weight: bold;
 }
+
+
+/* ========== 终端专用视觉效果增强 ========== */
+
+/* 终端代码块 - 等宽字体优化 */
+.prose pre code[class*="language-"] {
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Shell 终端代码块特殊背景 */
+.prose pre:has(code.language-bash),
+.prose pre:has(code.language-sh),
+.prose pre:has(code.language-shell),
+.prose pre:has(code.language-zsh) {
+  background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%) !important;
+}
+
+.dark .prose pre:has(code.language-bash),
+.dark .prose pre:has(code.language-sh),
+.dark .prose pre:has(code.language-shell),
+.dark .prose pre:has(code.language-zsh) {
+  background: linear-gradient(135deg, #0d1117 0%, #161b22 100%) !important;
+}
+
+/* CMD 终端代码块特殊背景 */
+.prose pre:has(code.language-cmd),
+.prose pre:has(code.language-bat) {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+}
+
+.dark .prose pre:has(code.language-cmd),
+.dark .prose pre:has(code.language-bat) {
+  background: linear-gradient(135deg, #0c1222 0%, #1a2332 100%) !important;
+}
+
+/* PowerShell 终端代码块特殊背景 */
+.prose pre:has(code.language-powershell),
+.prose pre:has(code.language-ps1) {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+}
+
+.dark .prose pre:has(code.language-powershell),
+.dark .prose pre:has(code.language-ps1) {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+}
+
+/* 终端行高调整 */
+.prose pre:has(code[class*="language-bash"]) code,
+.prose pre:has(code[class*="language-cmd"]) code,
+.prose pre:has(code[class*="language-powershell"]) code {
+  line-height: 1.6;
+}
+
+/* 代码块滚动条美化 */
+.prose pre::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.prose pre::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.dark .prose pre::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.prose pre::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.dark .prose pre::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.prose pre::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark .prose pre::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* 行号悬停效果 */
+.prose pre div[class*="border-r"] > div:hover {
+  background-color: rgba(156, 163, 175, 0.1);
+  border-radius: 2px;
+}
+
+.dark .prose pre div[class*="border-r"] > div:hover {
+  background-color: rgba(75, 85, 99, 0.3);
+}
+
+/* ========== Image Display Enhancement ========== */
+
+/* 小图片（徽章）悬停效果 */
+.prose p > span > span > img:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+/* 大图片容器 */
+.prose p > div.group\/img {
+  position: relative;
+}
+
+/* 大图片圆角阴影 */
+.prose p > div > div > img {
+  border-radius: 0.75rem;
+}
+
+/* 响应式：小屏幕时图片自适应 */
+@media (max-width: 640px) {
+  .prose p > span > span > img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  .linear-bg-base {
+    @apply bg-marketing-black text-text-primary;
+  }
+  .linear-bg-panel {
+    @apply bg-panel-dark text-text-primary;
+  }
+  
+   .btn-ghost {
+    @apply bg-white/[0.02] text-text-primary border border-white/[0.04] rounded-md px-3 py-1.5 transition-colors duration-200;
+  }
+  .btn-ghost:hover {
+    @apply bg-white/5 border-white/[0.04];
+  }
+  .btn-ghost:focus {
+    @apply shadow-focus outline-none;
+  }
+
+  .btn-subtle {
+    @apply bg-white/[0.04] text-text-secondary rounded-md px-[6px] py-0 transition-colors duration-200;
+  }
+  .btn-subtle:hover {
+    @apply bg-white/10 text-text-primary;
+  }
+
+  .btn-primary {
+    @apply bg-brand-indigo text-white px-4 py-2 rounded-md transition-colors duration-200 border border-transparent;
+  }
+  .btn-primary:hover {
+    @apply bg-brand-hover;
+  }
+
+  .btn-icon {
+    @apply bg-white/[0.03] text-text-primary border border-white/[0.08] rounded-full p-2 flex items-center justify-center transition-colors duration-200;
+  }
+  .btn-icon:hover {
+    @apply bg-white/10;
+  }
+
+  .pill {
+    @apply bg-transparent text-text-secondary px-[10px] py-0 rounded-full border border-border-primary text-[12px] font-medium flex items-center gap-1;
+  }
+  .pill-success {
+    @apply bg-status-emerald text-text-primary rounded-full text-[10px] font-medium;
+  }
+  .badge-subtle {
+    @apply bg-white/5 text-text-primary px-2 py-0 rounded-sm border border-white/[0.04] text-[10px] font-medium;
+  }
+
+  .input-base {
+    @apply bg-white/[0.02] text-text-secondary border border-white/[0.08] rounded-md px-[14px] py-[12px] focus:outline-none focus:border-white/20 focus:shadow-focus transition-all duration-200;
+  }
+  .input-search {
+    @apply bg-transparent text-text-primary focus:outline-none placeholder:text-text-tertiary;
+  }
+  
+  .linear-card {
+    @apply bg-white/[0.03] border border-white/[0.08] rounded-lg shadow-subtle hover:bg-white/[0.05] transition-colors duration-200;
+  }
+  .linear-panel {
+    @apply bg-white/[0.03] border border-white/[0.08] rounded-xl shadow-elevated;
+  }
+}
+
+option {
+  @apply bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary;
+}

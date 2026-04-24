@@ -13,7 +13,7 @@ export const SearchShortcutsHelp: React.FC = () => {
     return (
       <button
         onClick={() => setShowHelp(true)}
-        className="flex items-center space-x-1 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded"
+        className="flex items-center space-x-1 px-2 py-1 text-xs text-gray-500 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-300 transition-colors rounded"
         title={t('查看搜索快捷键', 'View search shortcuts')}
       >
         <Keyboard className="w-3 h-3" />
@@ -24,17 +24,17 @@ export const SearchShortcutsHelp: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4 shadow-xl">
+      <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 max-w-md w-full mx-4 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Keyboard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <Keyboard className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
               {t('搜索快捷键', 'Search Shortcuts')}
             </h3>
           </div>
           <button
             onClick={() => setShowHelp(false)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -42,12 +42,12 @@ export const SearchShortcutsHelp: React.FC = () => {
 
         <div className="space-y-3">
           {searchShortcuts.map((shortcut, index) => (
-            <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div key={index} className="flex items-center justify-between py-2 px-3 bg-light-bg dark:bg-white/[0.04] rounded-lg">
               <div className="flex items-center space-x-3">
-                <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-xs font-mono text-gray-700 dark:text-gray-300">
+                <kbd className="px-2 py-1 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded text-xs font-mono text-gray-900 dark:text-text-secondary">
                   {shortcut.key}
                 </kbd>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-sm text-gray-900 dark:text-text-secondary">
                   {language === 'zh' ? shortcut.description : shortcut.descriptionEn}
                 </span>
               </div>
@@ -55,8 +55,8 @@ export const SearchShortcutsHelp: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-start space-x-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="mt-6 pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
+          <div className="flex items-start space-x-2 text-sm text-gray-700 dark:text-text-tertiary">
             <HelpCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div>
               <p className="mb-1">
@@ -74,7 +74,7 @@ export const SearchShortcutsHelp: React.FC = () => {
         <div className="mt-4 flex justify-end">
           <button
             onClick={() => setShowHelp(false)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm font-medium"
           >
             {t('知道了', 'Got it')}
           </button>

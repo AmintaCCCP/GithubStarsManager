@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, Menu, X, TrendingUp } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 
@@ -52,7 +52,7 @@ export const Header: React.FC = () => {
     if (navRef.current) {
       resizeObserver.observe(navRef.current);
     }
-
+    
     window.addEventListener('resize', checkIfTextWrapped);
     
     return () => {
@@ -70,17 +70,13 @@ export const Header: React.FC = () => {
     setLoading(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      
-      // 1. 获取所有starred仓库
-      console.log('Fetching starred repositories...');
+       
       const newRepositories = await githubApi.getAllStarredRepositories();
-      
-      // 2. 合并现有仓库数据（保留AI分析结果）
+        
       const existingRepoMap = new Map(repositories.map(repo => [repo.id, repo]));
       const mergedRepositories = newRepositories.map(newRepo => {
         const existing = existingRepoMap.get(newRepo.id);
         if (existing) {
-          // 保留AI分析结果，更新其他信息
           return {
             ...newRepo,
             ai_summary: existing.ai_summary,
@@ -134,7 +130,7 @@ export const Header: React.FC = () => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
+     
     if (diffHours < 1) return 'Just now';
     if (diffHours < 24) return `${diffHours}h ago`;
     return date.toLocaleDateString();
@@ -142,10 +138,9 @@ export const Header: React.FC = () => {
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-
-
+   
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 hd-drag lg:hd-drag relative">
+    <header className="bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo and Title */}
@@ -158,15 +153,15 @@ export const Header: React.FC = () => {
               />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="truncate text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="truncate text-xl font-medium text-gray-900 dark:text-text-primary tracking-tight">
                 GitHub Stars Manager
               </h1>
-              <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+              <p className="truncate text-sm text-gray-500 dark:text-text-tertiary">
                 AI-powered repository management
               </p>
             </div>
             <div className="min-w-0 sm:hidden">
-              <h1 className="truncate text-base font-bold text-gray-900 dark:text-white">
+              <h1 className="truncate text-base font-bold text-gray-900 dark:text-text-primary tracking-tight">
                 GitHub Stars
               </h1>
             </div>
@@ -180,8 +175,8 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('仓库', 'Repositories') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'repositories'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Search className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -189,7 +184,7 @@ export const Header: React.FC = () => {
                 <>
                   {t('仓库', 'Repositories')}
                   {currentView === 'repositories' && repositories.length > 0 && (
-                    <span className="ml-1.5 text-sm text-blue-600 dark:text-blue-400">
+                    <span className="ml-1.5 text-sm text-brand-violet">
                       {repositories.length}
                     </span>
                   )}
@@ -202,8 +197,8 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('发布', 'Releases') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'releases'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Calendar className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -213,8 +208,8 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('subscription')}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'subscription'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <TrendingUp className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -226,8 +221,8 @@ export const Header: React.FC = () => {
               title={isTextWrapped ? t('设置', 'Settings') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'settings'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
             >
               <Settings className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
@@ -241,8 +236,8 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('repositories')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'repositories'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('仓库', 'Repositories')}
             >
@@ -252,8 +247,8 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('releases')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'releases'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('发布', 'Releases')}
             >
@@ -263,8 +258,8 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('subscription')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'subscription'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('趋势', 'Trending')}
             >
@@ -274,8 +269,8 @@ export const Header: React.FC = () => {
               onClick={() => setCurrentView('settings')}
               className={`p-2.5 rounded-lg transition-colors ${
                 currentView === 'settings'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
               }`}
               title={t('设置', 'Settings')}
             >
@@ -285,7 +280,7 @@ export const Header: React.FC = () => {
 
           {/* Mobile Dropdown Menu (<768px) */}
           {mobileMenuOpen && (
-            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-lg animate-expand-fade z-[100]">
+            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-black/[0.06] dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
               <nav className="flex flex-col p-2 space-y-1">
                 <button
                   onClick={() => {
@@ -294,8 +289,8 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'repositories'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -303,7 +298,7 @@ export const Header: React.FC = () => {
                     {t('仓库', 'Repositories')}
                   </div>
                   {currentView === 'repositories' && repositories.length > 0 && (
-                    <span className="text-sm text-blue-600 dark:text-blue-400">
+                    <span className="text-sm text-brand-violet">
                       {repositories.length}
                     </span>
                   )}
@@ -315,8 +310,8 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'releases'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -331,8 +326,8 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'subscription'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center">
@@ -347,12 +342,14 @@ export const Header: React.FC = () => {
                   }}
                   className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
                     currentView === 'settings'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
                   }`}
                 >
-                  <Settings className="w-5 h-5 mr-3" />
-                  {t('设置', 'Settings')}
+                  <div className="flex items-center">
+                    <Settings className="w-5 h-5 mr-3" />
+                    {t('设置', 'Settings')}
+                  </div>
                 </button>
               </nav>
             </div>
@@ -360,26 +357,13 @@ export const Header: React.FC = () => {
 
           {/* User Actions */}
           <div className="flex items-center gap-2 sm:gap-3 hd-btns lg:hd-btns">
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title={t('菜单', 'Menu')}
-            >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-              ) : (
-                <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-              )}
-            </button>
-
             {/* Sync Status */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary">
               <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
               <button
                 onClick={handleSync}
                 disabled={isLoading}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                className="p-1 rounded hover:bg-light-surface dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                 title={t('同步仓库', 'Sync repositories')}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -389,13 +373,13 @@ export const Header: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
               title={t('切换主题', 'Toggle theme')}
             >
               {theme === 'light' ? (
-                <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                <Moon className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
               ) : (
-                <Sun className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                <Sun className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
               )}
             </button>
 
@@ -408,7 +392,7 @@ export const Header: React.FC = () => {
                   className="w-8 h-8 rounded-full"
                 />
                 <div className="min-w-0 hidden sm:block">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">
                     {user.name || user.login}
                   </p>
                 </div>
@@ -423,10 +407,10 @@ export const Header: React.FC = () => {
                       logout();
                     }
                   }}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
                   title={t('退出登录', 'Logout')}
                 >
-                  <LogOut className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                  <LogOut className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
                 </button>
               </div>
             )}

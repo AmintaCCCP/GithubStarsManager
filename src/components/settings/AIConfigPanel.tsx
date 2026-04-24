@@ -312,14 +312,14 @@ Focus on practicality and accurate categorization to help users quickly understa
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Bot className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <Bot className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('AI服务配置', 'AI Service Configuration')}
           </h3>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加AI配置', 'Add AI Config')}</span>
@@ -327,33 +327,33 @@ Focus on practicality and accurate categorization to help users quickly understa
       </div>
 
       {showForm && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-4">
+        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
+          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
             {editingId ? t('编辑AI配置', 'Edit AI Configuration') : t('添加AI配置', 'Add AI Configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('接口格式', 'API Format')} *
               </label>
               <select
                 value={form.apiType}
                 onChange={(e) => setForm(prev => ({ ...prev, apiType: e.target.value as AIApiType }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               >
                 <option value="openai">OpenAI (Chat Completions)</option>
                 <option value="openai-responses">OpenAI (Responses)</option>
@@ -364,14 +364,14 @@ Focus on practicality and accurate categorization to help users quickly understa
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('API端点', 'API Endpoint')} *
               </label>
               <input
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={
                   form.apiType === 'openai' || form.apiType === 'openai-responses'
                     ? 'https://api.openai.com/v1'
@@ -382,7 +382,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                         : 'https://generativelanguage.googleapis.com/v1beta'
                 }
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {form.apiType === 'openai-compatible'
                   ? t(
                       '填写完整的API调用地址，包含完整路径',
@@ -394,7 +394,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     )}
               </p>
               {form.baseUrl && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                <p className="text-xs text-brand-violet dark:text-brand-violet mt-1">
                   {t('最终请求地址: ', 'Final request URL: ')}
                   <span className="font-mono break-all">
                     {buildFinalApiUrl(form.baseUrl, form.apiType)}
@@ -404,33 +404,33 @@ Focus on practicality and accurate categorization to help users quickly understa
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('API密钥', 'API Key')} *
               </label>
               <input
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder={t('输入API密钥', 'Enter API key')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('模型名称', 'Model Name')} *
               </label>
               <input
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
                 placeholder="gpt-4"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('并发数', 'Concurrency')}
               </label>
               <SliderInput
@@ -440,19 +440,19 @@ Focus on practicality and accurate categorization to help users quickly understa
                 max={10}
                 marks={[1, 3, 5, 7, 10]}
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('推理强度', 'Reasoning Effort')}
               </label>
               <select
                 value={form.reasoningEffort}
                 onChange={(e) => setForm(prev => ({ ...prev, reasoningEffort: e.target.value as '' | AIReasoningEffort }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               >
                 <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
                 <option value="none">{t('none — 不推理', 'none — No reasoning')}</option>
@@ -461,7 +461,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <option value="high">{t('high — 深度推理', 'high — Deep reasoning')}</option>
                 <option value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</option>
               </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t(
                   '仅对 OpenAI 兼容接口生效。留空时保持旧模式兼容，不额外传 reasoning。',
                   'Only applies to OpenAI-compatible APIs. Leave empty to preserve legacy behavior and omit reasoning.'
@@ -475,10 +475,10 @@ Focus on practicality and accurate categorization to help users quickly understa
               <div 
                 className={`mb-3 p-3 rounded-lg flex items-center space-x-2 ${
                   notification.type === 'success' 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                    ? 'bg-status-emerald text-status-emerald ' 
                     : notification.type === 'error'
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                      ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
+                      : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
                 }`}
               >
                 {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
@@ -493,9 +493,9 @@ Focus on practicality and accurate categorization to help users quickly understa
                     type="checkbox"
                     checked={form.useCustomPrompt}
                     onChange={(e) => handleUseCustomPromptChange(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="w-4 h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] rounded focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('使用自定义提示词', 'Use Custom Prompt')}
                   </span>
                 </label>
@@ -505,8 +505,8 @@ Focus on practicality and accurate categorization to help users quickly understa
                   disabled={showCustomPrompt}
                   className={`flex items-center space-x-1 text-sm ${
                     showCustomPrompt 
-                      ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                      : 'text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      ? 'text-gray-400 dark:text-text-tertiarycursor-not-allowed' 
+                      : 'text-gray-700hover:text-gray-900 dark:text-text-tertiary dark:hover:text-gray-300'
                   }`}
                 >
                   {showDefaultPrompt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -517,7 +517,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   type="button"
                   onClick={handleRestoreDefaultPrompt}
-                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="text-sm text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
                 </button>
@@ -526,10 +526,10 @@ Focus on practicality and accurate categorization to help users quickly understa
             
             {showDefaultPrompt && !showCustomPrompt && (
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary mb-1">
                   {t('默认提示词（只读）', 'Default Prompt (Read-only)')}
                 </label>
-                <pre className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                <pre className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-light-bg dark:bg-panel-dark text-gray-900 dark:text-text-secondary font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
                   {defaultPrompt}
                 </pre>
               </div>
@@ -538,20 +538,20 @@ Focus on practicality and accurate categorization to help users quickly understa
             {showCustomPrompt && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary">
                     {t('自定义提示词', 'Custom Prompt')}
                     {isCustomPromptModified && (
-                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                      <span className="ml-2 text-gray-700 dark:text-text-secondary ">
                         ({t('已修改', 'Modified')})
                       </span>
                     )}
                     {isCustomPromptSameAsDefault && (
-                      <span className="ml-2 text-green-600 dark:text-green-400">
+                      <span className="ml-2 text-status-emerald ">
                         ({t('默认值', 'Default')})
                       </span>
                     )}
                   </label>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-text-quaternary">
                     {form.customPrompt.length} {t('字符', 'characters')}
                   </span>
                 </div>
@@ -559,7 +559,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary font-mono text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent"
                   placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
                 />
               </div>
@@ -569,7 +569,7 @@ Focus on practicality and accurate categorization to help users quickly understa
           <div className="flex space-x-3">
             <button
               onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -577,7 +577,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             <button
               onClick={handleTestForm}
               disabled={testingForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
             >
               {testingForm ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -588,7 +588,7 @@ Focus on practicality and accurate categorization to help users quickly understa
             </button>
             <button
               onClick={resetForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-black/[0.06] dark:border-white/[0.04] transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('取消', 'Cancel')}</span>
@@ -603,8 +603,8 @@ Focus on practicality and accurate categorization to help users quickly understa
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-purple-300 bg-purple-50 dark:border-purple-600 dark:bg-purple-900/20'
-                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                ? 'border-brand-violet bg-brand-indigo/10 dark:border-brand-violet/50 dark:bg-brand-indigo/20'
+                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-gray-500'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -614,24 +614,24 @@ Focus on practicality and accurate categorization to help users quickly understa
                   name="activeAI"
                   checked={config.id === activeAIConfig}
                   onChange={() => setActiveAIConfig(config.id)}
-                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  className="w-4 h-4 text-gray-700 dark:text-text-secondary bg-light-surfaceborder-black/[0.06] focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                 />
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
+                  <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
                     {config.name}
                     {config.useCustomPrompt && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
                         <MessageSquare className="w-3 h-3 mr-1" />
                         {t('自定义提示词', 'Custom Prompt')}
                       </span>
                     )}
                   </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
                     {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
                   {config.apiKeyStatus === 'decrypt_failed' && (
-                    <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                    <p className="mt-1 text-sm text-gray-700 dark:text-text-secondary ">
                       {t(
                         '存储的 API Key 无法解密，请重新输入并保存该配置。',
                         'The stored API key could not be decrypted. Please re-enter and save this configuration.'
@@ -645,7 +645,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -656,7 +656,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 </button>
                 <button
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -671,7 +671,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -682,7 +682,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         ))}
         
         {aiConfigs.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-gray-500 dark:text-text-tertiary">
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('还没有配置AI服务', 'No AI services configured yet')}</p>
             <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>

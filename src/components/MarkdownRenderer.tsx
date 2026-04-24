@@ -103,35 +103,35 @@ const CodeBlock: React.FC<{
   return (
     <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
       isBashLike
-        ? 'border-green-500/30 dark:border-green-400/30'
+        ? 'border-black/[0.06] dark:border-white/[0.04]/30 dark:border-black/[0.06] dark:border-white/[0.04]/30'
         : isPowerShell
-          ? 'border-blue-500/30 dark:border-blue-400/30'
+          ? 'border-brand-violet/30 dark:border-black/[0.06] dark:border-white/[0.04]/30'
           : isCmdLike
             ? 'border-cyan-500/30 dark:border-cyan-400/30'
-            : 'border-gray-200 dark:border-gray-700'
+            : 'border-black/[0.06] dark:border-white/[0.04]'
     }`}>
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100 dark:bg-gray-800/90 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-light-surface dark:bg-panel-dark/90 border-b border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center gap-2.5">
           <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-500/80 dark:bg-red-500/70" />
-            <span className="w-3 h-3 rounded-full bg-yellow-500/80 dark:bg-yellow-500/70" />
-            <span className="w-3 h-3 rounded-full bg-green-500/80 dark:bg-green-500/70" />
+            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
+            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
+            <span className="w-3 h-3 rounded-full bg-status-emerald0/80 dark:bg-status-emerald0/70" />
           </div>
           {language && (
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
               isBashLike
-                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                ? 'bg-status-emerald text-status-emerald border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
                 : isPowerShell
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/20/40 text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
                   : isCmdLike
                     ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600'
+                    : 'bg-gray-200 dark:bg-white/[0.04] text-gray-700 dark:text-text-tertiary border border-black/[0.06] dark:border-white/[0.04]'
             }`}>
               {isBashLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-status-emerald0 animate-pulse" />
               )}
               {isPowerShell && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-brand-violet animate-pulse" />
               )}
               {isCmdLike && (
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
@@ -142,7 +142,7 @@ const CodeBlock: React.FC<{
         </div>
         <div className="flex items-center gap-2">
           {showLineNumbers && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+            <span className="text-xs text-gray-400 dark:text-text-tertiaryfont-mono">
               {lineCount} {uiLanguage === 'zh' ? '行' : 'lines'}
             </span>
           )}
@@ -150,10 +150,10 @@ const CodeBlock: React.FC<{
             onClick={handleCopy}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copyError
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
                 : copied
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
-                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+                  ? 'bg-status-emerald text-status-emerald border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                  : 'bg-white dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-black/[0.06] dark:border-white/[0.04]'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
           >
@@ -174,7 +174,7 @@ const CodeBlock: React.FC<{
         </div>
       </div>
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-red-200 dark:border-red-800">
+        <div className="absolute top-14 right-4 max-w-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
           {copyError}
         </div>
       )}
@@ -185,21 +185,21 @@ const CodeBlock: React.FC<{
             ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/20 dark:to-slate-900/20'
             : isCmdLike
               ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-cyan-950/15 dark:to-slate-900/10'
-              : 'bg-gray-50 dark:bg-[#1e1e1e]'
+              : 'bg-light-bg dark:bg-[#1e1e1e]'
       }`}>
         {showLineNumbers ? (
           <div className="flex">
             <div className={`flex-shrink-0 py-3 px-3 text-right select-none border-r ${
               isBashLike
-                ? 'border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-900/10'
+                ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] bg-status-emerald/30 '
                 : isPowerShell
-                  ? 'border-blue-200 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-900/10'
+                  ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/10'
                   : isCmdLike
                     ? 'border-cyan-200 dark:border-cyan-800 bg-cyan-50/20 dark:bg-cyan-900/10'
-                    : 'border-gray-200 dark:border-gray-700 bg-gray-100/50 dark:bg-gray-800/30'
+                    : 'border-black/[0.06] dark:border-white/[0.04] bg-light-surface50 dark:bg-panel-dark/30'
             }`}>
               {codeLines.map((_, i) => (
-                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-gray-500 font-mono tabular-nums">
+                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-text-tertiaryfont-mono tabular-nums">
                   {i + 1}
                 </div>
               ))}
@@ -282,7 +282,7 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
       href={resolvedHref}
       target={isHashLink || isSpecialLink ? undefined : "_blank"}
       rel={isHashLink || isSpecialLink ? undefined : "noopener noreferrer"}
-      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
+      className="text-brand-violet dark:text-brand-violet hover:text-gray-700 dark:hover:text-text-secondary underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
       onClick={handleAnchorClick}
     >
       {children}
@@ -493,19 +493,19 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <div className="my-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-3">
-        <svg className="w-5 h-5 text-red-400 dark:text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="my-4 p-4 bg-gray-100 dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] flex items-center gap-3">
+        <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+          <p className="text-sm text-gray-700 dark:text-text-secondary font-medium">
             {language === 'zh' ? '图片加载失败' : 'Image failed to load'}
           </p>
-          {alt && <p className="text-xs text-red-500 dark:text-red-500 truncate">{alt}</p>}
+          {alt && <p className="text-xs text-gray-700 dark:text-text-secondary truncate">{alt}</p>}
         </div>
         <button
           onClick={handleRetry}
-          className="px-2 py-1 text-xs bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex-shrink-0"
+          className="px-2 py-1 text-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary rounded hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors flex-shrink-0"
         >
           {language === 'zh' ? '重试' : 'Retry'}
         </button>
@@ -518,7 +518,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       {isSmallImage ? (
         <span className="inline-flex items-center my-1">
           {isLoading && (
-            <span className="w-20 h-7 bg-gray-100 dark:bg-gray-700 rounded animate-pulse inline-block" />
+            <span className="w-20 h-7 bg-light-surface dark:bg-white/[0.04] rounded animate-pulse inline-block" />
           )}
           <span className="relative inline-block">
             <img
@@ -548,11 +548,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       ) : (
         <div className="my-4 flex flex-col items-center group/img">
           {isLoading && (
-            <div className="w-full max-w-md h-48 bg-gray-100 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center animate-pulse gap-2">
-              <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-full max-w-md h-48 bg-light-surface dark:bg-panel-dark rounded-xl flex flex-col items-center justify-center animate-pulse gap-2">
+              <svg className="w-8 h-8 text-gray-300 dark:text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
+              <span className="text-xs text-gray-400 dark:text-text-tertiary">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
             </div>
           )}
 
@@ -582,7 +582,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </div>
 
           {!isLoading && !hasError && (
-            <div className="text-center mt-2 text-xs text-gray-400 dark:text-gray-500 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
+            <div className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiaryopacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
               <span>
                 {isInsideLink
                   ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')
@@ -590,7 +590,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 }
               </span>
               {naturalWidth > 0 && (
-                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span className="text-gray-300 dark:text-text-secondary">|</span>
               )}
               {naturalWidth > 0 && (
                 <span>{naturalWidth} × {naturalHeight}</span>
@@ -600,7 +600,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
           {!isLoading && !hasError && isInsideLink && parentLinkHref && (
             <div
-              className="text-center mt-1 text-xs text-blue-500 dark:text-blue-400 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
+              className="text-center mt-1 text-xs text-brand-violet dark:text-brand-violet opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -815,27 +815,27 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
     h1: ({ children }) => {
       const id = getHeadingId(children);
-      return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2">{children}</h1>;
+      return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-text-primary mt-4 mb-2">{children}</h1>;
     },
     h2: ({ children }) => {
       const id = getHeadingId(children);
-      return <h2 id={id} className="text-base font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
+      return <h2 id={id} className="text-base font-semibold text-gray-900 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
     },
     h3: ({ children }) => {
       const id = getHeadingId(children);
-      return <h3 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h3>;
+      return <h3 id={id} className="text-sm font-medium text-gray-900 dark:text-text-secondary mt-2 mb-1">{children}</h3>;
     },
     h4: ({ children }) => {
       const id = getHeadingId(children);
-      return <h4 id={id} className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1">{children}</h4>;
+      return <h4 id={id} className="text-sm font-medium text-gray-900 dark:text-text-secondary mt-2 mb-1">{children}</h4>;
     },
     h5: ({ children }) => {
       const id = getHeadingId(children);
-      return <h5 id={id} className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1 mb-1">{children}</h5>;
+      return <h5 id={id} className="text-sm font-medium text-gray-500 dark:text-text-tertiary mt-1 mb-1">{children}</h5>;
     },
     h6: ({ children }) => {
       const id = getHeadingId(children);
-      return <h6 id={id} className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1 mb-1">{children}</h6>;
+      return <h6 id={id} className="text-sm font-medium text-gray-500 dark:text-text-tertiary mt-1 mb-1">{children}</h6>;
     },
     p: ({ children }) => {
       const childArray = React.Children.toArray(children);
@@ -850,7 +850,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         }
       );
       return (
-        <p className={`text-gray-700 dark:text-gray-300 mb-2 leading-relaxed ${
+        <p className={`text-gray-900 dark:text-text-secondary mb-2 leading-relaxed ${
           hasImagesOnly
             ? 'flex flex-wrap items-center justify-center gap-3'
             : ''
@@ -859,8 +859,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         </p>
       );
     },
-    ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ul>,
-    ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-2 space-y-1">{children}</ol>,
+    ul: ({ children }) => <ul className="list-disc list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ol>,
     li: ({ children, className, ...props }) => (
       <li className={`ml-2 ${className || ''}`} {...props}>
         {children}
@@ -870,10 +870,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
     ),
     em: ({ children }) => (
-      <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
+      <em className="italic text-gray-900 dark:text-text-secondary">{children}</em>
     ),
     del: ({ children }) => (
-      <del className="line-through text-gray-500 dark:text-gray-400">{children}</del>
+      <del className="line-through text-gray-500 dark:text-text-tertiary">{children}</del>
     ),
     code: ({ className, children, ...props }) => {
       const isInline = !className;
@@ -881,7 +881,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       const language = match ? match[1] : '';
 
       return isInline ? (
-        <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
+        <code className="px-1.5 py-0.5 bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-gray-200 rounded text-xs font-mono" {...props}>
           {children}
         </code>
       ) : (
@@ -892,27 +892,27 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     },
     pre: ({ children }) => <>{children}</>,
     blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-r">
+      <blockquote className="border-l-4 border-black/[0.06] dark:border-white/[0.04] pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
         {children}
       </blockquote>
     ),
-    hr: () => <hr className="my-4 border-gray-200 dark:border-gray-700" />,
+    hr: () => <hr className="my-4 border-black/[0.06] dark:border-white/[0.04]" />,
     table: ({ children }) => (
       <div className="overflow-x-auto my-3">
-        <table className="min-w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm">
+        <table className="min-w-full border-collapse border border-black/[0.06] dark:border-white/[0.04] text-sm">
           {children}
         </table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>,
-    tbody: ({ children }) => <tbody className="text-gray-700 dark:text-gray-300">{children}</tbody>,
+    thead: ({ children }) => <thead className="bg-light-surface dark:bg-panel-dark">{children}</thead>,
+    tbody: ({ children }) => <tbody className="text-gray-900 dark:text-text-secondary">{children}</tbody>,
     th: ({ children }) => (
-      <th className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">
+      <th className="border border-black/[0.06] dark:border-white/[0.04] px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-200">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="border border-gray-200 dark:border-gray-700 px-3 py-2 text-gray-700 dark:text-gray-300">
+      <td className="border border-black/[0.06] dark:border-white/[0.04] px-3 py-2 text-gray-900 dark:text-text-secondary">
         {children}
       </td>
     ),
@@ -922,7 +922,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           <input
             {...props}
             readOnly
-            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-brand-violet focus:ring-brand-violet dark:border-white/[0.08] dark:bg-white/[0.04]"
           />
         );
       }
@@ -931,7 +931,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   }), [baseUrl, headingIds, getHeadingId]);
 
   if (!shouldRender) {
-    return <div className="h-32 flex items-center justify-center text-gray-400">Loading...</div>;
+    return <div className="h-32 flex items-center justify-center text-gray-400 dark:text-text-quaternary">Loading...</div>;
   }
 
   return (
