@@ -1017,7 +1017,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 {t('自定义', 'Custom')}
               </span>
             )}
-            <span className="ml-auto text-xs text-gray-400 dark:text-text-tertiary>
+            <span className="ml-auto text-xs text-gray-400 dark:text-text-tertiary">
               {formData.tags.length > 0 ? `${formData.tags.length} ${t('个标签', 'tags')}` : t('无标签', 'No tags')}
             </span>
           </div>
@@ -1043,7 +1043,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           ) : (
             <div className="mb-4">
-              <span className="text-sm text-gray-400 dark:text-text-tertiary>{t('暂无标签', 'No tags')}</span>
+              <span className="text-sm text-gray-400 dark:text-text-tertiary">{t('暂无标签', 'No tags')}</span>
             </div>
           )}
 

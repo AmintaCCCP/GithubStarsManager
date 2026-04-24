@@ -73,9 +73,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   const rankBadgeClass = useMemo(() => {
     if (repo.rank === 1) return 'bg-yellow-400 text-yellow-900 dark:bg-yellow-500 dark:text-yellow-900';
-    if (repo.rank === 2) return 'bg-gray-300 text-text-primarydark:bg-gray-400 dark:text-text-primary;
+    if (repo.rank === 2) return 'bg-gray-300 text-text-primary dark:bg-gray-400 dark:text-text-primary';
     if (repo.rank === 3) return 'bg-amber-600 text-white dark:bg-amber-700 dark:text-text-primary';
-    return 'bg-light-surfacetext-text-secondarydark:bg-white/[0.04] dark:text-text-secondary';
+    return 'bg-light-surface text-text-secondary dark:bg-white/[0.04] dark:text-text-secondary';
   }, [repo.rank]);
 
   const platformIconMap = useMemo(() => ({
@@ -420,7 +420,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           {/* Platform icons */}
           {repo.ai_platforms && repo.ai_platforms.length > 0 && (
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-gray-400 dark:text-text-tertiary>
+              <span className="text-xs text-gray-400 dark:text-text-tertiary">
                 {t('平台:', 'Platforms:')}
               </span>
               <div className="flex items-center gap-1">

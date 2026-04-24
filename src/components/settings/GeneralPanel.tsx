@@ -82,7 +82,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
             <p className="text-sm text-text-secondarydark:text-text-tertiary mb-1">
               {t(`当前版本: v${version}`, `Current Version: v${version}`)}
             </p>
-            <p className="text-xs text-text-tertiarydark:text-text-tertiary>
+            <p className="text-xs text-text-tertiarydark:text-text-tertiary">
               {t('检查是否有新版本可用', 'Check if a new version is available')}
             </p>
           </div>

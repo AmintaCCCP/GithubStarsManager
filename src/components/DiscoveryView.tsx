@@ -312,7 +312,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
           <span className="text-sm">{t('已加载全部', 'All loaded')}</span>
           <div className="w-8 h-px bg-gray-300 dark:bg-gray-600" />
         </div>
-        <span className="text-xs text-gray-400 dark:text-text-tertiary>
+        <span className="text-xs text-gray-400 dark:text-text-tertiary">
           {t(`共 ${totalCount} 个项目`, `Total ${totalCount} items`)}
         </span>
       </div>
@@ -378,7 +378,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, languag
       <span>
         {t('共', 'Total')} <strong className="text-text-primarydark:text-text-primary">{currentCount}</strong> {t('个项目', 'items')}
         {totalCount > 0 && currentCount < totalCount && (
-          <span className="text-gray-400 dark:text-text-tertiary>
+          <span className="text-gray-400 dark:text-text-tertiary">
             {' '}{t('（总计', '(total')} {totalCount} {t('个）', 'items)')}
           </span>
         )}
@@ -941,7 +941,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-gray-400 dark:text-text-tertiary />
+              <Calendar className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
               <select
                 value={trendingTimeRange}
                 onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
@@ -1041,7 +1041,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 : 'bg-white/80 dark:bg-panel-dark/80 backdrop-blur-xl rounded-2xl border border-light-border/60 dark:border-white/12/60 p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-tertiary />
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-tertiary" />
                     <input
                       type="text"
                       value={searchInput}
@@ -1049,7 +1049,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       placeholder={t('搜索仓库...', 'Search repositories...')}
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-light-border dark:border-white/12 bg-light-bgdark:bg-white/[0.04]/80 text-text-primarydark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-text-tertiary
-                    />
+                   " />
                   </div>
                   <button
                     onClick={handleSearch}
@@ -1132,7 +1132,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <p className="text-text-primarydark:text-text-secondary font-medium text-sm">
                     {t('正在获取数据...', 'Fetching data...')}
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-text-tertiary>
+                  <p className="text-xs text-gray-400 dark:text-text-tertiary">
                     {t('GitHub API 响应中', 'Waiting for GitHub API response')}
                   </p>
                 </div>

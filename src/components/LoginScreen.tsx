@@ -89,7 +89,7 @@ export const LoginScreen: React.FC = () => {
           title={t('切换主题', 'Toggle theme')}
         >
           {theme === 'light' ? (
-            <Moon className="w-5 h-5 text-text-primary />
+            <Moon className="w-5 h-5 text-text-primary" />
           ) : (
             <Sun className="w-5 h-5 text-gray-300" />
           )}

@@ -81,7 +81,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           <div className="text-text-secondarydark:text-text-tertiary">
             {t('找到仓库', 'Found Repos')}
           </div>
-          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary">
             {filterRate}% {t('匹配率', 'Match Rate')}
           </div>
         </div>
@@ -93,7 +93,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           <div className="text-text-secondarydark:text-text-tertiary">
             {t('编程语言', 'Languages')}
           </div>
-          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary">
             {stats.languages.slice(0, 2).join(', ')}
             {stats.languages.length > 2 && '...'}
           </div>
@@ -106,7 +106,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           <div className="text-text-secondarydark:text-text-tertiary">
             {t('平均星标', 'Avg Stars')}
           </div>
-          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary">
             <TrendingUp className="w-3 h-3 inline mr-1" />
             {t('热度指标', 'Popularity')}
           </div>
@@ -119,7 +119,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           <div className="text-text-secondarydark:text-text-tertiary">
             {t('近期更新', 'Recent Updates')}
           </div>
-          <div className="text-xs text-text-tertiarydark:text-text-tertiary>
+          <div className="text-xs text-text-tertiarydark:text-text-tertiary">
             {t('30天内', 'Within 30 days')}
           </div>
         </div>

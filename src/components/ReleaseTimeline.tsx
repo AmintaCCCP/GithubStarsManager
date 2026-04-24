@@ -890,13 +890,13 @@ export const ReleaseTimeline: React.FC = () => {
                         {releases.length} {t('个版本', 'releases')}
                       </p>
                       {latestRelease && (
-                        <p className="text-xs text-gray-400 dark:text-text-tertiary>
+                        <p className="text-xs text-gray-400 dark:text-text-tertiary">
                           {t('最新:', 'Latest:')} {latestRelease.tag_name}
                         </p>
                       )}
                     </div>
                     <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <ChevronDown className="w-4 h-4 text-text-quaternary" />
                     </div>
                   </div>
                 </button>

@@ -884,7 +884,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
         </p>
         {searchFilters.query && (
-          <div className="text-sm text-gray-400 dark:text-text-tertiary>
+          <div className="text-sm text-gray-400 dark:text-text-tertiary">
             <p className="mb-2">
               {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
             </p>

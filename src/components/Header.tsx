@@ -93,46 +93,17 @@ export const Header: React.FC = () => {
         }
         return newRepo;
       });
-       
+      
       setRepositories(mergedRepositories);
-       
-      const releases = await githubApi.getMultipleRepositoryReleases(mergedRepositories.slice(0, 20));
-      setReleases(releases);
-       
-      setLastSync(new Date().toISOString());
-       
-      const newRepoCount = newRepositories.length - repositories.length;
-      if (newRepoCount > 0) {
-        alert(`同步完成！发现 ${newRepoCount} 个新仓库。`);
-      } else {
-        alert('同步完成！所有仓库都是最新的。');
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-      if (error instanceof Error && error.message.includes('token')) {
-        alert('GitHub token 已过期或无效，请重新登录。');
-        logout();
-      } else {
-        alert('同步失败，请检查网络连接。');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-        }
-        return newRepo;
-      });
-       
-      setRepositories(mergedRepositories);
-       
+      
       // 3. 获取Release信息
       console.log('Fetching releases...');
       const releases = await githubApi.getMultipleRepositoryReleases(mergedRepositories.slice(0, 20));
       setReleases(releases);
-       
+      
       setLastSync(new Date().toISOString());
       console.log('Sync completed successfully');
-       
+      
       // 显示同步结果
       const newRepoCount = newRepositories.length - repositories.length;
       if (newRepoCount > 0) {

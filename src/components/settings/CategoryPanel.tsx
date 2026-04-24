@@ -573,7 +573,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         {isReordering && (
-                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary />
+                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
                         )}
                         <span className="text-xl w-6 text-center inline-block">{category.icon}</span>
                         <span className="font-medium text-text-primarydark:text-text-primary">

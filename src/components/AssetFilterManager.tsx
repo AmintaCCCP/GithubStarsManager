@@ -163,9 +163,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             </span>
           )}
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-text-tertiary aria-hidden="true" />
+            <ChevronUp className="w-4 h-4 text-text-tertiary" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-text-tertiary aria-hidden="true" />
+            <ChevronDown className="w-4 h-4 text-text-tertiary" aria-hidden="true" />
           )}
         </button>
 
