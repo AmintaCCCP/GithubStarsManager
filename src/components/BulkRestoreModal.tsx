@@ -65,6 +65,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
     let hasAiSummary = 0;
     let hasAiTags = 0;
     let hasAiCategory = 0;
+    let hasAnyAiData = 0;
 
     for (const repo of repositories) {
       if (repo.custom_description !== undefined && repo.custom_description !== null) hasCustomDesc++;
@@ -73,9 +74,12 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
       if (repo.ai_summary && repo.ai_summary.trim() !== '') hasAiSummary++;
       if (repo.ai_tags && repo.ai_tags.length > 0) hasAiTags++;
       if (getAICategory(repo, allCategories) !== '') hasAiCategory++;
+      if ((repo.ai_summary && repo.ai_summary.trim() !== '') ||
+          (repo.ai_tags && repo.ai_tags.length > 0) ||
+          (repo.analyzed_at && !repo.analysis_failed)) hasAnyAiData++;
     }
 
-    return { hasCustomDesc, hasCustomTags, hasCustomCategory, hasAiSummary, hasAiTags, hasAiCategory };
+    return { hasCustomDesc, hasCustomTags, hasCustomCategory, hasAiSummary, hasAiTags, hasAiCategory, hasAnyAiData };
   }, [repositories, allCategories]);
 
   const hasAnyCustom = stats.hasCustomDesc > 0 || stats.hasCustomTags > 0 || stats.hasCustomCategory > 0;
@@ -86,6 +90,15 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
     if (config.tags.enabled && config.tags.target === 'ai' && stats.hasAiTags === 0) return true;
     if (config.category.enabled && config.category.target === 'ai' && stats.hasAiCategory === 0) return true;
     return false;
+  }, [config, stats]);
+
+  const hasOriginalTargetAiLoss = useMemo(() => {
+    if (stats.hasAnyAiData === 0) return false;
+    const anyOriginalTarget =
+      (config.description.enabled && config.description.target === 'original') ||
+      (config.tags.enabled && config.tags.target === 'original') ||
+      (config.category.enabled && config.category.target === 'original');
+    return anyOriginalTarget;
   }, [config, stats]);
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
@@ -326,6 +339,21 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
                 {t(
                   '部分选中仓库尚未进行AI分析，还原到AI来源后将回退到默认来源。',
                   'Some selected repositories have not been AI-analyzed. They will fall back to the default source after restoring to AI.'
+                )}
+              </span>
+            </p>
+          </div>
+        )}
+
+        {/* AI Data Loss Warning */}
+        {hasOriginalTargetAiLoss && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <p className="text-sm text-red-700 dark:text-red-300 flex items-start">
+              <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>
+                {t(
+                  `⚠️ 还原到默认来源将清除 ${stats.hasAnyAiData} 个仓库的AI分析数据（AI总结、AI标签等），此操作不可撤销。清除后需重新运行AI分析才能恢复这些数据。如需保留AI数据，请选择还原到AI来源。`,
+                  `⚠️ Restoring to default will clear AI analysis data (AI summary, AI tags, etc.) for ${stats.hasAnyAiData} repositories. This action cannot be undone. You will need to re-run AI analysis to recover this data. To keep AI data, choose "Restore to AI" instead.`
                 )}
               </span>
             </p>
