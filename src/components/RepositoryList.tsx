@@ -277,6 +277,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       return;
     }
 
+    if (activeConfig.apiKeyStatus === 'decrypt_failed') {
+      alert(language === 'zh' ? 'AI服务的API密钥无法解密，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted. Please re-enter and save the configuration in settings.');
+      return;
+    }
+
+    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
+      alert(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.');
+      return;
+    }
+
     const targetRepos = analyzeFailedOnly
       ? filteredRepositories.filter(repo => repo.analysis_failed)
       : analyzeUnanalyzedOnly 
@@ -343,7 +353,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           );
 
           const wasCategoryLocked = !!result.repo.category_locked;
-          const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
 
           updateRepository({
             ...result.repo,
@@ -351,7 +360,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ai_tags: result.tags,
             ai_platforms: result.platforms,
             custom_category: resolvedCategory,
-            category_locked: shouldKeepLocked || wasCategoryLocked,
+            category_locked: wasCategoryLocked,
             analyzed_at: new Date().toISOString(),
             analysis_failed: false,
           });

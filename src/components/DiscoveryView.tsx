@@ -22,6 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
@@ -717,14 +718,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
     setIsAnalyzing(true);
     setAnalysisState({ paused: false, aborted: false });
-    const allCategories = useAppStore
-      .getState()
+    const storeState = useAppStore.getState();
+    const allCategoriesForResolution = [
+      ...storeState.customCategories,
+    ];
+    const allCategoryNames = storeState
       .customCategories.map(c => c.name);
     const categoryNames = [
-      ...allCategories,
-      '全部分类', 'Web应用', '移动应用', '桌面应用', '数据库',
-      'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具',
-      '效率工具', '教育学习', '社交网络', '数据分析',
+      ...allCategoryNames,
+      ...(language === 'zh'
+        ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
+        : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
     ];
 
     const githubApi = new GitHubApiService(githubToken);
@@ -750,6 +754,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
         },
         (result) => {
           if (result.success && result.repo) {
+            const resolvedCategory = resolveCategoryAssignment(
+              result.repo,
+              result.tags || [],
+              allCategoriesForResolution
+            );
+
+            const wasCategoryLocked = !!result.repo.category_locked;
+
             const updatedRepo: DiscoveryRepo = {
               ...result.repo,
               rank: 0,
@@ -758,6 +770,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
               ai_summary: result.summary,
               ai_tags: result.tags,
               ai_platforms: result.platforms,
+              custom_category: resolvedCategory,
+              category_locked: wasCategoryLocked,
               analyzed_at: new Date().toISOString(),
               analysis_failed: false,
             };
