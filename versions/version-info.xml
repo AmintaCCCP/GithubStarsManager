@@ -232,4 +232,20 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.0</downloadUrl>
   </version>
+  <version>
+    <number>0.5.2</number>
+    <releaseDate>2026-04-24</releaseDate>
+    <changelog>
+      <item>Discovery View Refactor: Replaced subscription view with a new Discovery view featuring channel-based browsing, multi-filter sorting, search, pagination, and a "Load more" button. (PR #90)</item>
+      <item>Enhanced Markdown renderer with syntax highlighting, copyable code blocks, image zoom/modal, in-modal TOC, heading navigation, and adjustable font size. (PR #90)</item>
+      <item>Added in-page AI analysis controls for repository cards with star/unstar support and safer clipboard helpers. (PR #90)</item>
+      <item>Improved responsive layout with Inter font family, refined breakpoints, and lucide-react icons throughout. (PR #90)</item>
+      <item>Switched Trending data source from GitHub Search API to GitHubTrendingRSS for more reliable results, with daily/weekly/monthly time-range filter. (PR #96)</item>
+      <item>Added RSS description parsing with HTML entity decoding, and supplemented RSS data with GitHub API for missing repository fields. (PR #96)</item>
+      <item>Fixed macOS desktop white-screen crash by removing Inter/CDN stylesheet loading and hardening discovery state rehydration. (PR #95)</item>
+      <item>Removed auto-loading pagination from Discovery view and fixed null/empty description handling in RepositoryEditModal. (PR #97)</item>
+      <item>Special thanks to @SummerRay160 for their outstanding contributions to this release (PR #90, #97)!</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.2</downloadUrl>
+  </version>
 </versions>
