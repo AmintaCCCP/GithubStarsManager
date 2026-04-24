@@ -79,7 +79,7 @@ export class AIService {
             messages,
             max_tokens: options.maxTokens,
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
-            ...(!isDeepSeekReasoner && reasoning ? { reasoning } : {}),
+            ...(!isDeepSeekReasoner && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
           };
 
       let data: Record<string, unknown>;

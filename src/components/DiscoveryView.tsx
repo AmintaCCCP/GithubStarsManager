@@ -689,6 +689,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
       return;
     }
 
+    if (activeConfig.apiKeyStatus === 'decrypt_failed') {
+      alert(t('AI服务的API密钥无法解密，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted. Please re-enter and save the configuration in settings.'));
+      return;
+    }
+
+    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
+      alert(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'));
+      return;
+    }
+
     const pageRepos = allRepos;
     
     if (pageRepos.length === 0) {
@@ -853,7 +863,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [safeDiscoveryChannels]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Mobile Tab Navigation */}
       <MobileTabNav
         channels={mobileChannels}
@@ -872,7 +882,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         language={language}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0">
         <div className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
@@ -896,7 +906,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           />
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
             className={`flex-shrink-0 transition-transform duration-300 ease-in-out z-10 ${
@@ -1039,13 +1049,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
           <div 
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-gray-900' : ''}`}
+            className={`flex-1 overflow-y-auto overflow-x-hidden space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-gray-900' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode
                 ? 'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4'
                 : 'bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                     <input
