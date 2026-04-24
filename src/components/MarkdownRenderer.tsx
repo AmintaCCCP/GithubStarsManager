@@ -690,7 +690,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   const remarkPlugins = [remarkGfm, remarkBreaks];
   const rehypePlugins = enableHtml ? [rehypeRaw, rehypeSanitize] : [];
 
-  let headingCounter = 0;
+  let headingCounter = headingIds?.size ?? 0;
   const headingTextCountMap = new Map<string, number>();
 
   const extractTextFromChildren = (children: React.ReactNode): string => {
@@ -712,7 +712,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       const id = headingIds.get(mapKey);
       if (id) return id;
     }
-    return `heading-${headingCounter++}`;
+    return `heading-extra-${headingCounter++}`;
   };
 
   const markdownComponents: Components = {
@@ -780,11 +780,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     del: ({ children }) => (
       <del className="line-through text-gray-500 dark:text-gray-400">{children}</del>
     ),
-    code: ({ className, children, node, ...props }) => {
+    code: ({ className, children, ...props }) => {
       const isInline = !className;
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';
-      
+
       return isInline ? (
         <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono" {...props}>
           {children}

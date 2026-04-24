@@ -229,7 +229,7 @@
   }
 
   .prose pre code[class*="language-"] {
-    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
     font-feature-settings: "liga" 1, "calt" 1;
   }
 
