@@ -584,10 +584,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 切换频道时恢复滚动位置，并自动加载空数据
   useEffect(() => {
     // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
-    if (scrollContainerRef.current) {
-      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
-      scrollContainerRef.current.scrollTop = savedPosition;
-    }
+    const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
+    window.scrollTo({ top: savedPosition, behavior: 'auto' });
     
     // 取消持久化后，首次打开或切换到空频道时自动加载
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
@@ -874,11 +872,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
           if (channel === selectedDiscoveryChannel) {
             return;
           }
-          if (scrollContainerRef.current) {
-            const scrollTop = scrollContainerRef.current.scrollTop;
-            discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-            setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-          }
+          const scrollTop = window.scrollY;
+          discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+          setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
           setSelectedDiscoveryChannel(channel);
         }}
         language={language}
@@ -899,11 +895,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
               if (channel === selectedDiscoveryChannel) {
                 return;
               }
-              if (scrollContainerRef.current) {
-                const scrollTop = scrollContainerRef.current.scrollTop;
-                discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-              }
+              const scrollTop = window.scrollY;
+              discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+              setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
               setSelectedDiscoveryChannel(channel);
             }}
             onRefreshAll={refreshAll}
@@ -1056,7 +1050,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
           {/* 内容区域 */}
           <div 
             ref={scrollContainerRef}
-            onScroll={handleScroll}
             className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-panel-dark' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
