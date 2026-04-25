@@ -142,7 +142,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
-  const [searchHistoryVersion, setSearchHistoryVersion] = useState(0);
+  const [, setSearchHistoryVersion] = useState(0);
   const [showErrorMessage, setShowErrorMessage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -1022,7 +1022,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     return Object.values(subscriptionRepos || {}).flat().length;
   }, [subscriptionRepos]);
 
-  const searchHistoryCount = useMemo(() => {
+  const searchHistoryCount = (() => {
     try {
       const saved = localStorage.getItem('github-stars-search-history');
       if (saved) {
@@ -1031,7 +1031,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
     } catch { /* ignore */ }
     return 0;
-  }, [searchHistoryVersion]);
+  })();
 
   const dataStats = [
     {

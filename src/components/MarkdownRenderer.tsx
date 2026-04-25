@@ -196,7 +196,7 @@ const CodeBlock: React.FC<{
                   ? 'border-black/[0.06] dark:border-[#30363d] bg-gray-100 dark:bg-[#161b22]'
                   : isCmdLike
                     ? 'border-cyan-200 dark:border-[#30363d] bg-cyan-50/20 dark:bg-[#161b22]'
-                    : 'border-black/[0.06] dark:border-[#30363d] bg-light-surface50 dark:bg-[#161b22]'
+                    : 'border-black/[0.06] dark:border-[#30363d] bg-light-surface/50 dark:bg-[#161b22]'
             }`}>
               {codeLines.map((_, i) => (
                 <div key={i} className="text-xs leading-6 text-gray-400 dark:text-[#6e7681] font-mono tabular-nums">
