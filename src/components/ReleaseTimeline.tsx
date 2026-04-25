@@ -539,7 +539,7 @@ export const ReleaseTimeline: React.FC = () => {
         )}
 
         {subscribedRepoCount === 0 && (
-          <div className="bg-light-surface border border-black/[0.06] rounded-xl p-6 max-w-lg mx-auto">
+          <div className="bg-light-surface dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.04] rounded-xl p-6 max-w-lg mx-auto">
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0 w-12 h-12 bg-brand-indigo/20 rounded-full flex items-center justify-center">
                 <Bell className="w-6 h-6 text-brand-violet " />
