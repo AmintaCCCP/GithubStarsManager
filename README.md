@@ -58,8 +58,8 @@ Deploy an Express + SQLite backend for:
 - **Subscription Indicators** — Shows which repos have Release update subscriptions
 - **AI Analysis Status** — Shows analyzed / not analyzed / analysis failed; filter by analysis status
 
-**Screenshot placeholder:**
-![Repository Management Interface](upload/repo.jpg)
+**Screenshot:**
+![Repository Management Interface](upload/repo.png)
 
 ---
 
@@ -76,8 +76,8 @@ Deploy an Express + SQLite backend for:
 - **Paginated Loading** — Load historical release records page by page
 - **Refresh Status Indicator** — Shows last refresh time
 
-**Screenshot placeholder:**
-![Release Timeline Interface](upload/release.jpg)
+**Screenshot:**
+![Release Timeline Interface](upload/release.png)
 
 ---
 
@@ -96,8 +96,8 @@ Deploy an Express + SQLite backend for:
 **About Trending:**
 > Trending data is sourced from GitHub's trending RSS feed, auto-updated every 30 minutes. Perfect for discovering emerging hot projects, tracking tech trends, and finding learning directions.
 
-**Screenshot placeholder:**
-![Discovery Trending Interface](upload/discovery.jpg)
+**Screenshot:**
+![Discovery Trending Interface](upload/discovery.png)
 
 ---
 
@@ -112,8 +112,8 @@ Deploy an Express + SQLite backend for:
 - **Search Statistics** — Shows result count and filter conditions
 - **Search Demo Mode** — Demonstrates semantic search capabilities
 
-**Screenshot placeholder:**
-![Search Interface](upload/search.jpg)
+**Screenshot:**
+![Search Interface](upload/search.png)
 
 ---
 
@@ -131,8 +131,8 @@ Deploy an Express + SQLite backend for:
 | **Category** | Category management, category sorting, default category override rules |
 | **Data Management** | Data import/export, clear local data, reset all data |
 
-**Screenshot placeholder:**
-![Settings Panel Interface](upload/settings.jpg)
+**Screenshot:**
+![Settings Panel Interface](upload/settings.png)
 
 ---
 
@@ -144,8 +144,8 @@ Deploy an Express + SQLite backend for:
 - **Connection Testing** — Test API connection after configuration
 - **AI Model Selection** — Choose the specific model to use
 
-**Screenshot placeholder:**
-![AI Configuration Interface](upload/SCR-20250629-qldc.png)
+**Screenshot:**
+![AI Configuration Interface](upload/ai.png)
 
 ## 🛠 Tech Stack
 
