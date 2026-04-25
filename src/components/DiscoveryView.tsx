@@ -420,8 +420,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
+  // 侧栏固定状态
+  const [isSidebarFixed, setIsSidebarFixed] = useState(false);
   const lastScrollY = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 用于在频道切换时直接读取最新滚动位置，避免订阅整个 map 导致 effect 重跑
@@ -622,15 +625,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
     return date.toLocaleDateString();
   }, [t]);
 
-  // 处理滚动事件：保存滚动位置并控制工具栏显示
+  // 处理滚动事件：保存滚动位置、控制工具栏显示、控制侧栏固定
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current) return;
+    // 获取页面滚动位置（支持window滚动和元素滚动）
+    const currentScrollY = window.scrollY || window.pageYOffset || 0;
 
-    const currentScrollY = scrollContainerRef.current.scrollTop;
-
-    // 同时更新 ref 和 state，保证频道切换 effect 读取到最新值，且 UI 仍保持响应
-    discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = currentScrollY;
-    setDiscoveryScrollPosition(selectedDiscoveryChannel, currentScrollY);
+    // 控制侧栏固定：当滚动超过一定距离后固定
+    const STICKY_THRESHOLD = 150; // 滚动超过150px后固定侧栏
+    if (currentScrollY > STICKY_THRESHOLD) {
+      setIsSidebarFixed(true);
+    } else {
+      setIsSidebarFixed(false);
+    }
 
     // 控制工具栏显示/隐藏
     if (scrollTimeoutRef.current) {
@@ -650,16 +656,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
     scrollTimeoutRef.current = setTimeout(() => {
       setIsToolbarVisible(true);
     }, 1500);
-  }, [selectedDiscoveryChannel, setDiscoveryScrollPosition]);
+  }, []);
 
-  // 清理滚动定时器
+  // 监听 window 滚动事件
   useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
+      window.removeEventListener('scroll', handleScroll);
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
     };
-  }, []);
+  }, [handleScroll]);
 
   const handleAnalyzePage = useCallback(async () => {
     if (!githubToken) return;
@@ -857,7 +865,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [safeDiscoveryChannels]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="flex flex-col">
       {/* Mobile Tab Navigation */}
       <MobileTabNav
         channels={mobileChannels}
@@ -876,12 +884,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
         language={language}
       />
 
-      <div 
+      <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 items-start"
       >
-        <div className="hidden lg:block w-64 shrink-0 lg:sticky lg:top-4">
+        <div
+          ref={sidebarRef}
+          className="hidden lg:block w-64 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
