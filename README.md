@@ -18,36 +18,134 @@ An app for managing github starred repositories.
 
 ## ✨ Features
 
-Tired of starring everything and finding nothing? GitHub Stars Manager automatically syncs your starred repos, uses AI to summarize and categorize them, and lets you find anything with semantic search. Track releases, filter assets, and one‑click download—smarter than manual tags, simpler than GitHub.
+> Tired of starring everything and finding nothing?
 
-- Auto-sync stars: connect your GitHub token to pull all starred repos
-- AI summaries & categories: generate tags, topics, and short README overviews
-- Semantic search: find repos by intent, not exact names
-- Release tracking: subscribe to repos and see new versions in one place
-- One‑click downloads: expand release assets and download instantly
-- Smart filters: match assets by keywords (e.g., dmg/mac/arm64/aarch64)
-- Bilingual wiki jump: deepwiki (EN) or zread (ZH) based on language
-- Packaged client: no environment setup required
-- Optional backend: cross-device sync, CORS-free API proxying, and encrypted token storage via Express + SQLite
+GitHub Stars Manager automatically syncs your starred repos, uses AI to summarize and categorize them, and lets you find anything with semantic search. Track releases, filter assets, and one‑click download—smarter than manual tags, simpler than GitHub.
 
-### Starred Repo Manager
+### Core Features
 
-1. Automatically pull the starred repositories under your github account. You can use AI to automatically analyze the repository and automatically generate repository descriptions, labels, and classifications.
-2. through the filter, keyword search, you can quickly find the repository.
+| Feature | Description |
+|---------|-------------|
+| **Auto-sync Stars** | Connect your GitHub token to automatically pull all starred repositories |
+| **AI Summaries & Categories** | Generate tags, topics, and short README overviews using AI |
+| **Semantic Search** | Find repos by intent, not exact names |
+| **Release Tracking** | Subscribe to repos and see new versions in one unified timeline |
+| **One‑click Downloads** | Expand release assets and download instantly |
+| **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
+| **Bilingual Wiki Jump** | Deepwiki (EN) or zread (ZH) based on repository language |
+| **Packaged Client** | No environment setup required—download and run |
 
-![SCR-20250629-qkjk](upload/repo.jpg)
+### Optional Backend Server
 
-### Releases view
+Deploy an Express + SQLite backend for:
 
-Subscribe to release notifications in your starred repositories to quickly view and download the released files when they become available.
+- **Cross-device Sync** — Share data between browsers and devices
+- **CORS-free API Proxying** — AI and WebDAV calls route through the server
+- **Encrypted Token Storage** — API keys stored securely, never exposed to browser
 
-![SCR-20250629-qkea](upload/release.jpg)
+---
 
-### Using Custom AI Models
+## 🔍 Interface Preview
 
-Use your own AI model API that supports OpenAI-compatible interfaces.
+### 1. Repository Management (`Stars` View)
 
-![SCR-20250629-qldc](upload/SCR-20250629-qldc.png)
+**Features:**
+- **AI Batch Analysis** — Select multiple repos and use AI to auto-generate descriptions, tags, and categories; supports pause/resume
+- **Repo Card Display** — Shows stars, forks, language, default branch status; supports expanding README preview
+- **Category Sidebar** — Drag to reorder categories, custom category colors, collapse/expand sidebar; supports locking categories to prevent AI overrides
+- **Bulk Action Toolbar** — Bulk categorize to a specified category, bulk restore AI analysis results
+- **Multi-layout Support** — Adapts layout for desktop and tablet
+- **Subscription Indicators** — Shows which repos have Release update subscriptions
+- **AI Analysis Status** — Shows analyzed / not analyzed / analysis failed; filter by analysis status
+
+**Screenshot placeholder:**
+![Repository Management Interface](upload/repo.jpg)
+
+---
+
+### 2. Release Timeline (`Releases` View)
+
+**Features:**
+- **Release Subscription Management** — Subscribe/unsubscribe to repo releases; supports bulk unsubscribe
+- **Timeline Display** — Lists all new releases in reverse chronological order; shows read/unread status
+- **Smart Asset Filtering** — Filter by platform (macOS / Windows / Linux / ARM); filter by file type (dmg / zip / deb / rpm / apk)
+- **Custom Filter Rules** — Save custom keyword filter rules
+- **Expand & Download** — Expand release assets list, one-click copy download links; shows file size
+- **Release Details** — Displays version number, release name, time since release
+- **Multi-view Modes** — List view / Grid view toggle
+- **Paginated Loading** — Load historical release records page by page
+- **Refresh Status Indicator** — Shows last refresh time
+
+**Screenshot placeholder:**
+![Release Timeline Interface](upload/release.jpg)
+
+---
+
+### 3. Discovery / Trending (`Discover` View)
+
+**Features:**
+- **Five Discovery Channels** — Trending / Hot Release / Most Popular / Topic / Search
+- **Trending Time Range** — Three time dimensions: Today / This Week / This Month
+- **Trending Filtering Rules** — Updated within 30 days, 50+ stars, sorted by stars descending
+- **Platform Filtering** — Filter by OS (All / macOS / Windows / Linux / Browser)
+- **Programming Language Filtering** — Filter by language (JavaScript / TypeScript / Python / Go / Rust, etc.)
+- **AI Repo Analysis** — One-click AI analysis for trending repos
+- **Subscribe to Trending Repos** — Add interesting trending repos to subscription list
+- **Mobile Tab Navigation** — Channel switching adapted for mobile devices
+
+**About Trending:**
+> Trending data is sourced from GitHub's trending RSS feed, auto-updated every 30 minutes. Perfect for discovering emerging hot projects, tracking tech trends, and finding learning directions.
+
+**Screenshot placeholder:**
+![Discovery Trending Interface](upload/discovery.jpg)
+
+---
+
+### 4. Search & Filters
+
+**Features:**
+- **Multi-dimensional Search** — Keyword search, repo status filter, tag filter, language filter, platform filter
+- **AI Analysis Status Filter** — Analyzed / Not Analyzed / Analysis Failed / Edited
+- **Release Subscription Filter** — Subscribed / Not Subscribed to Release
+- **Category Status Filter** — Category Locked / Not Locked
+- **Shortcut Keys Support** — Displays search shortcut hints
+- **Search Statistics** — Shows result count and filter conditions
+- **Search Demo Mode** — Demonstrates semantic search capabilities
+
+**Screenshot placeholder:**
+![Search Interface](upload/search.jpg)
+
+---
+
+### 5. Settings Panel
+
+**Settings Groups:**
+
+| Group | Features |
+|-------|----------|
+| **General** | Language toggle (ZH/EN), theme settings |
+| **AI Config** | Configure OpenAI / Anthropic / Ollama / compatible APIs; supports custom endpoints and keys |
+| **WebDAV** | Backup config for Jianguoyun, Nextcloud, ownCloud, and standard WebDAV services |
+| **Backup** | Backup history, manual backup/restore, incremental backup |
+| **Backend Server** | Connect to self-hosted backend, API key authentication, sync status indicator |
+| **Category** | Category management, category sorting, default category override rules |
+| **Data Management** | Data import/export, clear local data, reset all data |
+
+**Screenshot placeholder:**
+![Settings Panel Interface](upload/settings.jpg)
+
+---
+
+### 6. Custom AI Models
+
+**Features:**
+- **Multi AI Provider Support** — OpenAI (GPT-3.5/GPT-4), Anthropic (Claude), Ollama (local models), any OpenAI-compatible API
+- **Custom Endpoints** — Supports privately deployed AI services
+- **Connection Testing** — Test API connection after configuration
+- **AI Model Selection** — Choose the specific model to use
+
+**Screenshot placeholder:**
+![AI Configuration Interface](upload/SCR-20250629-qldc.png)
 
 ## 🛠 Tech Stack
 
