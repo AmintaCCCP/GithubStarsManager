@@ -41,11 +41,11 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4" />,
-  rocket: <Rocket className="w-4 h-4" />,
-  star: <Crown className="w-4 h-4" />,
-  tag: <Tag className="w-4 h-4" />,
-  search: <Search className="w-4 h-4" />,
+  trending: <TrendingUp className="w-4 h-4 text-white" />,
+  rocket: <Rocket className="w-4 h-4 text-white" />,
+  star: <Crown className="w-4 h-4 text-slate-900" />,
+  tag: <Tag className="w-4 h-4 text-slate-900" />,
+  search: <Search className="w-4 h-4 text-white" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
@@ -881,7 +881,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         onScroll={handleScroll}
         className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
       >
-        <div className="hidden lg:block w-64 shrink-0 lg:sticky lg:top-4 self-start">
+        <div className="hidden lg:block w-64 shrink-0 lg:sticky lg:top-4">
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}

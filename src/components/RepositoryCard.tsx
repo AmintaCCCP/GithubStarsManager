@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2 } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -1001,19 +1002,25 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
       </div>
 
-      {/* Repository Edit Modal */}
-      <RepositoryEditModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        repository={repository}
-      />
+      {/* Repository Edit Modal - Using portal to render outside card container */}
+      {editModalOpen && createPortal(
+        <RepositoryEditModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          repository={repository}
+        />,
+        document.body
+      )}
 
-      {/* README Modal */}
-      <ReadmeModal
-        isOpen={readmeModalOpen}
-        onClose={() => setReadmeModalOpen(false)}
-        repository={repository}
-      />
+      {/* README Modal - Using portal to render outside card container */}
+      {readmeModalOpen && createPortal(
+        <ReadmeModal
+          isOpen={readmeModalOpen}
+          onClose={() => setReadmeModalOpen(false)}
+          repository={repository}
+        />,
+        document.body
+      )}
     </div>
   );
 };
