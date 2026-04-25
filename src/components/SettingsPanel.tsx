@@ -335,7 +335,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark">
             <div className="flex items-center space-x-3">
-              <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+              <Settings className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
               <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-text-primary">
                 {t('设置', 'Settings')}
               </h2>
@@ -363,8 +363,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     aria-controls={`settings-tabpanel-${tab.id}`}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                       activeTab === tab.id
-                        ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
-                        : 'text-gray-900 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10'
+                        ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
+                        : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                     }`}
                   >
                     {tab.icon}
@@ -399,7 +399,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center space-x-3 mb-6">
-        <Settings className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+        <Settings className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary">
           {t('设置', 'Settings')}
         </h2>
@@ -420,8 +420,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   aria-controls={`settings-tabpanel-${tab.id}`}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
                     activeTab === tab.id
-                      ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
-                      : 'text-gray-900 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'
+                      ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/[0.04]'
                   }`}
                 >
                   {tab.icon}

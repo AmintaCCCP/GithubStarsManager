@@ -41,38 +41,38 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-white" />,
-  rocket: <Rocket className="w-4 h-4 text-white" />,
-  star: <Crown className="w-4 h-4 text-slate-900" />,
-  tag: <Tag className="w-4 h-4 text-slate-900" />,
-  search: <Search className="w-4 h-4 text-white" />,
+  trending: <TrendingUp className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  rocket: <Rocket className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  star: <Crown className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  tag: <Tag className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  search: <Search className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
   trending: {
-    gradient: 'from-blue-500 to-indigo-600',
-    shadow: 'shadow-blue-500/25',
-    largeIcon: <TrendingUp className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <TrendingUp className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   rocket: {
-    gradient: 'from-orange-500 to-red-600',
-    shadow: 'shadow-orange-500/25',
-    largeIcon: <Rocket className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Rocket className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   star: {
-    gradient: 'from-amber-400 to-yellow-600',
-    shadow: 'shadow-amber-500/25',
-    largeIcon: <Crown className="w-9 h-9 text-slate-900" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Crown className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   tag: {
-    gradient: 'from-emerald-500 to-teal-600',
-    shadow: 'shadow-emerald-500/25',
-    largeIcon: <Tag className="w-9 h-9 text-slate-900" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Tag className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   search: {
-    gradient: 'from-violet-500 to-purple-600',
-    shadow: 'shadow-violet-500/25',
-    largeIcon: <Search className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Search className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
 };
 

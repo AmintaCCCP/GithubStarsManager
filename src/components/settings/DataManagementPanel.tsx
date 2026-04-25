@@ -1106,7 +1106,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-status-emerald text-status-emerald rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-white/[0.08] text-white dark:text-text-secondary rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -1123,7 +1123,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Statistics */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2 text-brand-violet dark:text-brand-violet" />
+          <Database className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
           {t('数据概览', 'Data Overview')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1153,7 +1153,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Export/Import */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <HardDrive className="w-5 h-5 mr-2 text-status-emerald " />
+          <HardDrive className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1270,7 +1270,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between"
+                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
@@ -1313,7 +1313,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/10/50 transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
@@ -1397,14 +1397,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </thead>
                 <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/10/50">
+                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/[0.06]">
                       <td className="px-4 py-2 text-gray-500 dark:text-text-tertiary">
                         {log.timestamp}
                       </td>
                       <td className="px-4 py-2 text-gray-900 dark:text-text-primary">{log.operation}</td>
                       <td className="px-4 py-2">
                         {log.success ? (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-status-emerald bg-status-emerald rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] rounded-full">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             {t('成功', 'Success')}
                           </span>
@@ -1451,7 +1451,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
                     )}
-                    <span className="ml-2 font-mono text-brand-violet dark:text-brand-violet">
+                    <span className="ml-2 font-mono text-gray-700 dark:text-text-secondary">
                       {user.login}
                     </span>
                   </label>
@@ -1509,9 +1509,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {importPreview.isOpen && importPreview.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-status-emerald border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+            <div className="px-6 py-4 bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04]">
               <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-status-emerald " />
+                <Upload className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
                 <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
                   {t('导入数据预览', 'Import Data Preview')}
                 </h3>

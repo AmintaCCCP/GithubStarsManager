@@ -394,7 +394,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     )}
               </p>
               {form.baseUrl && (
-                <p className="text-xs text-brand-violet dark:text-brand-violet mt-1">
+                <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                   {t('最终请求地址: ', 'Final request URL: ')}
                   <span className="font-mono break-all">
                     {buildFinalApiUrl(form.baseUrl, form.apiType)}
@@ -438,7 +438,6 @@ Focus on practicality and accurate categorization to help users quickly understa
                 onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
                 min={1}
                 max={10}
-                marks={[1, 3, 5, 7, 10]}
               />
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
@@ -475,7 +474,7 @@ Focus on practicality and accurate categorization to help users quickly understa
               <div 
                 className={`mb-3 p-3 rounded-lg flex items-center space-x-2 ${
                   notification.type === 'success' 
-                    ? 'bg-status-emerald text-status-emerald ' 
+                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary' 
                     : notification.type === 'error'
                       ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
                       : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
@@ -517,7 +516,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 <button
                   type="button"
                   onClick={handleRestoreDefaultPrompt}
-                  className="text-sm text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary"
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-text-secondary"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
                 </button>
@@ -546,7 +545,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                       </span>
                     )}
                     {isCustomPromptSameAsDefault && (
-                      <span className="ml-2 text-status-emerald ">
+                      <span className="ml-2 text-gray-500 dark:text-text-tertiary">
                         ({t('默认值', 'Default')})
                       </span>
                     )}
@@ -603,8 +602,8 @@ Focus on practicality and accurate categorization to help users quickly understa
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-brand-violet bg-brand-indigo/10 dark:border-brand-violet/50 dark:bg-brand-indigo/20'
-                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-gray-500'
+                ? 'border-gray-300 bg-gray-50 dark:border-white/[0.12] dark:bg-white/[0.06]'
+                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-white/[0.08]'
             }`}
           >
             <div className="flex items-center justify-between">

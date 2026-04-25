@@ -48,7 +48,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
         </span>
       </div>
       {markItems.length > 0 && (
-        <div className="relative h-4 mt-1" style={{ marginLeft: 0, marginRight: 0 }}>
+        <div className="relative h-4 mt-1 -mx-[10px] px-[10px]">
           {markItems.map((mark) => {
             const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
             return (
