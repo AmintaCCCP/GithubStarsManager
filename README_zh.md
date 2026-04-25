@@ -55,8 +55,8 @@
 - **订阅指示器** — 直观显示哪些仓库已订阅 Release 更新
 - **AI 分析状态** — 显示已分析/未分析/分析失败状态；支持按分析状态筛选
 
-**截图占位：**
-![Repository Management Interface](upload/repo.jpg)
+**截图：**
+![Repository Management Interface](upload/repo.png)
 
 ---
 
@@ -72,8 +72,8 @@
 - **分页加载** — 支持分页加载历史发布记录
 - **刷新状态指示** — 显示最后刷新时间
 
-**截图占位：**
-![Release Timeline Interface](upload/release.jpg)
+**截图：**
+![Release Timeline Interface](upload/release.png)
 
 ---
 
@@ -91,8 +91,8 @@
 
 > 趋势数据来源于 GitHub 趋势 RSS 源，每 30 分钟自动更新。适合发现新兴热门项目、追踪技术趋势、寻找学习方向。
 
-**截图占位：**
-![Discovery Trending Interface](upload/discovery.jpg)
+**截图：**
+![Discovery Trending Interface](upload/discovery.png)
 
 ---
 
@@ -107,8 +107,8 @@
 - **搜索统计** — 显示搜索结果数量和筛选条件
 - **搜索演示模式** — 展示语义搜索能力
 
-**截图占位：**
-![Search Interface](upload/search.jpg)
+**截图：**
+![Search Interface](upload/search.png)
 
 ---
 
@@ -126,8 +126,8 @@
 | **Category** | 分类管理、分类排序、默认分类覆盖规则 |
 | **Data Management** | 数据导入/导出、清除本地数据、重置所有数据 |
 
-**截图占位：**
-![Settings Panel Interface](upload/settings.jpg)
+**截图：**
+![Settings Panel Interface](upload/settings.png)
 
 ---
 
@@ -139,8 +139,8 @@
 - **连接测试** — 配置后测试 API 连接是否可用
 - **AI 模型选择** — 选择要使用的具体模型
 
-**截图占位：**
-![AI Configuration Interface](upload/SCR-20250629-qldc.png)
+**截图：**
+![AI Configuration Interface](upload/ai.png)
 
 ## 技术栈
 
