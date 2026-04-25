@@ -3,6 +3,7 @@ import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
+import { BulkRestoreModal, RestoreConfig } from './BulkRestoreModal';
 
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
@@ -58,6 +59,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<number>>(new Set());
   const [showBulkToolbar, setShowBulkToolbar] = useState(false);
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [isExitingSelection, setIsExitingSelection] = useState(false);
 
   const allCategories = useMemo(
@@ -275,6 +277,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       return;
     }
 
+    if (activeConfig.apiKeyStatus === 'decrypt_failed') {
+      alert(language === 'zh' ? 'AI服务的API密钥无法解密，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted. Please re-enter and save the configuration in settings.');
+      return;
+    }
+
+    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
+      alert(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.');
+      return;
+    }
+
     const targetRepos = analyzeFailedOnly
       ? filteredRepositories.filter(repo => repo.analysis_failed)
       : analyzeUnanalyzedOnly 
@@ -341,7 +353,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           );
 
           const wasCategoryLocked = !!result.repo.category_locked;
-          const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
 
           updateRepository({
             ...result.repo,
@@ -349,7 +360,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ai_tags: result.tags,
             ai_platforms: result.platforms,
             custom_category: resolvedCategory,
-            category_locked: shouldKeepLocked || wasCategoryLocked,
+            category_locked: wasCategoryLocked,
             analyzed_at: new Date().toISOString(),
             analysis_failed: false,
           });
@@ -470,18 +481,91 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   }, [filteredRepositories]);
 
   const handleDeselectAll = useCallback(() => {
-    // 先触发动画，然后清除选择
     setIsExitingSelection(true);
-    // 延长动画时间，让视觉效果更平滑
     setTimeout(() => {
       setSelectedRepoIds(new Set());
       setShowBulkToolbar(false);
-      // 动画结束后再重置状态
       requestAnimationFrame(() => {
         setIsExitingSelection(false);
       });
     }, 250);
   }, []);
+
+  const handleBulkRestore = useCallback(async (config: RestoreConfig) => {
+    const selectedRepos = repositories.filter(repo => selectedRepoIds.has(repo.id));
+    if (selectedRepos.length === 0) return;
+
+    let successCount = 0;
+    const failedRepos: string[] = [];
+
+    for (const repo of selectedRepos) {
+      try {
+        const updatedRepo = { ...repo };
+
+        if (config.description.enabled) {
+          updatedRepo.custom_description = undefined;
+          if (config.description.target === 'original') {
+            updatedRepo.ai_summary = undefined;
+            updatedRepo.analyzed_at = undefined;
+            updatedRepo.analysis_failed = undefined;
+          }
+        }
+
+        if (config.tags.enabled) {
+          updatedRepo.custom_tags = undefined;
+          if (config.tags.target === 'original') {
+            updatedRepo.ai_tags = undefined;
+            updatedRepo.ai_platforms = undefined;
+            updatedRepo.analyzed_at = undefined;
+            updatedRepo.analysis_failed = undefined;
+          }
+        }
+
+        if (config.category.enabled) {
+          updatedRepo.custom_category = undefined;
+          updatedRepo.category_locked = false;
+          if (config.category.target === 'original') {
+            updatedRepo.ai_tags = undefined;
+            updatedRepo.ai_platforms = undefined;
+            updatedRepo.analyzed_at = undefined;
+            updatedRepo.analysis_failed = undefined;
+          }
+        }
+
+        const hasChanges = updatedRepo.custom_description !== repo.custom_description ||
+          updatedRepo.custom_tags !== repo.custom_tags ||
+          updatedRepo.custom_category !== repo.custom_category ||
+          updatedRepo.category_locked !== repo.category_locked ||
+          updatedRepo.ai_summary !== repo.ai_summary ||
+          updatedRepo.ai_tags !== repo.ai_tags ||
+          updatedRepo.ai_platforms !== repo.ai_platforms ||
+          updatedRepo.analyzed_at !== repo.analyzed_at ||
+          updatedRepo.analysis_failed !== repo.analysis_failed;
+
+        if (hasChanges) {
+          updatedRepo.last_edited = new Date().toISOString();
+          updateRepository(updatedRepo);
+        }
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to restore ${repo.full_name}:`, error);
+        failedRepos.push(repo.full_name);
+      }
+    }
+
+    await forceSyncToBackend();
+
+    const skipMsg = failedRepos.length > 0
+      ? (language === 'zh'
+        ? `\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
+        : `\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`)
+      : '';
+
+    alert(language === 'zh'
+      ? `成功还原 ${successCount} 个仓库${skipMsg}`
+      : `Successfully restored ${successCount} repositories${skipMsg}`
+    );
+  }, [repositories, selectedRepoIds, updateRepository, language]);
 
   // 处理单击空白处 - 触发回到顶部按钮跳跃动画
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -543,6 +627,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         case 'categorize': {
           setShowCategorizeModal(true);
+          return;
+        }
+
+        case 'restore': {
+          setShowRestoreModal(true);
           return;
         }
 
@@ -1130,6 +1219,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         onClose={() => setShowCategorizeModal(false)}
         repositories={selectedRepositories}
         onCategorize={handleBulkCategorize}
+      />
+
+      <BulkRestoreModal
+        isOpen={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        repositories={selectedRepositories}
+        onRestore={handleBulkRestore}
       />
     </div>
   );

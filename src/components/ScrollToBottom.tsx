@@ -11,6 +11,8 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const language = useAppStore(state => state.language);
+  // 当 README 模态框打开时隐藏按钮，避免遮挡模态框内容
+  const readmeModalOpen = useAppStore(state => state.readmeModalOpen);
   const containerRef = useRef<HTMLElement | null>(null);
 
   const checkVisibility = useCallback(() => {
@@ -87,7 +89,7 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         hover:scale-110
         focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
-        ${isVisible
+        ${isVisible && !readmeModalOpen
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'
         }
@@ -96,8 +98,8 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         lg:bottom-24 lg:left-10
       `}
       aria-label={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
-      aria-hidden={!isVisible}
-      tabIndex={isVisible ? 0 : -1}
+      aria-hidden={!isVisible || readmeModalOpen}
+      tabIndex={isVisible && !readmeModalOpen ? 0 : -1}
       title={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
     >
       <ArrowDown className="w-5 h-5 sm:w-6 sm:h-6" />

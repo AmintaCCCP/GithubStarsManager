@@ -51,6 +51,7 @@ export class AIAnalysisOptimizer {
   private paused = false;
   private activeWorkers = 0;
   private shouldExitWorkers = false;
+  private abortController: AbortController | null = null;
 
   constructor(config: Partial<OptimizerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -60,6 +61,8 @@ export class AIAnalysisOptimizer {
   abort(): void {
     this.aborted = true;
     this.shouldExitWorkers = true;
+    this.abortController?.abort();
+    this.abortController = null;
   }
 
   pause(): void {
@@ -223,9 +226,12 @@ export class AIAnalysisOptimizer {
         };
       }
 
+      const controller = new AbortController();
+      this.abortController = controller;
+
       try {
         const analysisStart = Date.now();
-        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames);
+        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, controller.signal);
         const analysisDuration = Date.now() - analysisStart;
 
         this.recordResponseTime(analysisDuration);
@@ -241,9 +247,22 @@ export class AIAnalysisOptimizer {
       } catch (error) {
         lastError = error as Error;
 
+        if (this.aborted) {
+          return {
+            repo: task.repo,
+            success: false,
+            error: new Error('Analysis aborted'),
+            duration: Date.now() - startTime,
+          };
+        }
+
         if (attempt < this.config.maxRetries) {
           const delayMs = this.calculateRetryDelay(attempt);
           await this.delay(delayMs);
+        }
+      } finally {
+        if (this.abortController === controller) {
+          this.abortController = null;
         }
       }
     }
@@ -269,6 +288,7 @@ export class AIAnalysisOptimizer {
     const completedCount = { value: 0 };
     const total = repos.length;
     const workerPromises: Promise<void>[] = [];
+    let totalWorkersStarted = 0;
 
     const runTask = async (repo: Repository): Promise<AnalysisResult> => {
       const readmeContent = readmeCache.get(repo.id) || '';
@@ -310,13 +330,11 @@ export class AIAnalysisOptimizer {
       }
     };
 
-    // 启动初始 worker
     const initialWorkers = Math.min(this.currentConcurrency, repos.length);
     for (let i = 0; i < initialWorkers; i++) {
-      workerPromises.push(worker(i));
+      workerPromises.push(worker(totalWorkersStarted++));
     }
 
-    // 监控并发调整并动态增减 worker
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
         await this.delay(1000);
@@ -326,10 +344,8 @@ export class AIAnalysisOptimizer {
           continue;
         }
         
-        // 如果并发数增加，启动新 worker
-        if (this.activeWorkers < this.currentConcurrency && workerPromises.length < this.currentConcurrency) {
-          const newWorkerId = workerPromises.length;
-          workerPromises.push(worker(newWorkerId));
+        if (this.activeWorkers < this.currentConcurrency) {
+          workerPromises.push(worker(totalWorkersStarted++));
         }
       }
     };
@@ -353,6 +369,7 @@ export class AIAnalysisOptimizer {
     const completedCount = { value: 0 };
     const total = repos.length;
     const workerPromises: Promise<void>[] = [];
+    let totalWorkersStarted = 0;
 
     const readmeCache = new Map<number, string>();
     const readmeFetching = new Map<number, Promise<string>>();
@@ -396,7 +413,6 @@ export class AIAnalysisOptimizer {
           try {
             const readmeContent = await prefetchReadme(repo);
 
-            // 动态计算预取数量
             const readmePrefetchCount = Math.min(this.currentConcurrency * 2, pendingRepos.length);
             if (pendingRepos.length > 0) {
               for (let i = 0; i < Math.min(readmePrefetchCount, pendingRepos.length); i++) {
@@ -425,13 +441,11 @@ export class AIAnalysisOptimizer {
       }
     };
 
-    // 启动初始 worker
     const initialWorkers = Math.min(this.currentConcurrency, repos.length);
     for (let i = 0; i < initialWorkers; i++) {
-      workerPromises.push(worker(i));
+      workerPromises.push(worker(totalWorkersStarted++));
     }
 
-    // 监控并发调整并动态增减 worker
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
         await this.delay(1000);
@@ -441,10 +455,8 @@ export class AIAnalysisOptimizer {
           continue;
         }
         
-        // 如果并发数增加，启动新 worker
-        if (this.activeWorkers < this.currentConcurrency && workerPromises.length < this.currentConcurrency) {
-          const newWorkerId = workerPromises.length;
-          workerPromises.push(worker(newWorkerId));
+        if (this.activeWorkers < this.currentConcurrency) {
+          workerPromises.push(worker(totalWorkersStarted++));
         }
       }
     };

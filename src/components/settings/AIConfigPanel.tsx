@@ -4,6 +4,7 @@ import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
+import { SliderInput } from '../ui/SliderInput';
 
 interface AIConfigPanelProps {
   t: (zh: string, en: string) => string;
@@ -432,14 +433,12 @@ Focus on practicality and accurate categorization to help users quickly understa
               <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
                 {t('并发数', 'Concurrency')}
               </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
+              <SliderInput
                 value={form.concurrency}
-                onChange={(e) => setForm(prev => ({ ...prev, concurrency: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
-                placeholder="1"
+                onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
+                min={1}
+                max={10}
+                marks={[1, 3, 5, 7, 10]}
               />
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
@@ -456,11 +455,11 @@ Focus on practicality and accurate categorization to help users quickly understa
                 className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
               >
                 <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
-                <option value="none">none</option>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="xhigh">xhigh</option>
+                <option value="none">{t('none — 不推理', 'none — No reasoning')}</option>
+                <option value="low">{t('low — 快速响应', 'low — Quick response')}</option>
+                <option value="medium">{t('medium — 均衡模式', 'medium — Balanced')}</option>
+                <option value="high">{t('high — 深度推理', 'high — Deep reasoning')}</option>
+                <option value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</option>
               </select>
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t(

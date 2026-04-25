@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock } from 'lucide-react';
+import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock, RotateCcw } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -118,6 +118,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           unsubscribe: { zh: '取消订阅发布', en: 'Unsubscribe Releases' },
           'lock-category': { zh: '批量锁定分类', en: 'Lock Categories' },
           'unlock-category': { zh: '批量解锁分类', en: 'Unlock Categories' },
+          'restore': { zh: '批量还原', en: 'Bulk Restore' },
         };
         const label = actionLabels[action];
         const message = language === 'zh'
@@ -315,6 +316,23 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                 <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               ) : (
                 <Unlock className="w-4 h-4 sm:w-5 sm:h-5" />
+              )}
+            </button>
+
+            <button
+              onClick={(e) => handleAction('restore', e)}
+              disabled={isProcessing}
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+                showConfirm === 'restore'
+                  ? 'bg-teal-700 text-white hover:bg-teal-800'
+                  : 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-800'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={t('批量还原', 'Bulk Restore')}
+            >
+              {isProcessing && showConfirm === 'restore' ? (
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
             </button>
 

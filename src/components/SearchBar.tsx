@@ -5,6 +5,7 @@ import { AIService } from '../services/aiService';
 import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
+import { NumberInput } from './ui/NumberInput';
 
 
 export const SearchBar: React.FC = () => {
@@ -1167,30 +1168,54 @@ export const SearchBar: React.FC = () => {
                 <label className="text-sm text-gray-700 dark:text-text-tertiary">
                   {t('最小:', 'Min:')}
                 </label>
-                <input
-                  type="number"
+                <NumberInput
+                  value={searchFilters.minStars}
+                  onChange={(v) => setSearchFilters({ minStars: v })}
+                  min={0}
+                  step={1}
                   placeholder="0"
-                  value={searchFilters.minStars !== undefined ? searchFilters.minStars : ''}
-                  onChange={(e) => setSearchFilters({ 
-                    minStars: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                  allowUndefined
+                  className="w-24 text-sm py-1.5 dark:bg-white/[0.04]"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <label className="text-sm text-gray-700 dark:text-text-tertiary">
                   {t('最大:', 'Max:')}
                 </label>
-                <input
-                  type="number"
+                <NumberInput
+                  value={searchFilters.maxStars}
+                  onChange={(v) => setSearchFilters({ maxStars: v })}
+                  min={0}
+                  step={1}
                   placeholder="∞"
-                  value={searchFilters.maxStars !== undefined ? searchFilters.maxStars : ''}
-                  onChange={(e) => setSearchFilters({ 
-                    maxStars: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                  className="w-24 px-3 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                  allowUndefined
+                  className="w-24 text-sm py-1.5 dark:bg-white/[0.04]"
                 />
               </div>
+            </div>
+            {searchFilters.minStars !== undefined && searchFilters.maxStars !== undefined && searchFilters.minStars > searchFilters.maxStars && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {t('最小值不能大于最大值', 'Min cannot be greater than max')}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {[
+                { label: '1K', value: 1000 },
+                { label: '5K', value: 5000 },
+                { label: '10K', value: 10000 },
+                { label: '50K', value: 50000 },
+                { label: '100K', value: 100000 },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setSearchFilters({ minStars: preset.value })}
+                  className="px-2 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  ≥{preset.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

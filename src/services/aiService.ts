@@ -79,7 +79,7 @@ export class AIService {
             messages,
             max_tokens: options.maxTokens,
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
-            ...(!isDeepSeekReasoner && reasoning ? { reasoning } : {}),
+            ...(!isDeepSeekReasoner && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
           };
 
       let data: Record<string, unknown>;
@@ -620,13 +620,12 @@ Reply in JSON format:
 
   private parseSearchResponse(content: string): string[] {
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = this.extractAndParseAIJson(content);
+      if (parsed) {
         const allTerms = [
-          ...(parsed.keywords || []),
-          ...(parsed.categories || []),
-          ...(parsed.synonyms || [])
+          ...(Array.isArray(parsed.keywords) ? parsed.keywords : []),
+          ...(Array.isArray(parsed.categories) ? parsed.categories : []),
+          ...(Array.isArray(parsed.synonyms) ? parsed.synonyms : []),
         ];
         return allTerms.filter(term => typeof term === 'string' && term.length > 0);
       }

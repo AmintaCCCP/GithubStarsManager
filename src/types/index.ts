@@ -177,6 +177,7 @@ export interface AppState {
   selectedCategory: string;
   language: 'zh' | 'en';
   isSidebarCollapsed: boolean;
+  readmeModalOpen: boolean;
   
   // Update
   updateNotification: UpdateNotification | null;
