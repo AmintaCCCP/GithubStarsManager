@@ -279,7 +279,10 @@ const normalizePersistedState = (
   return {
     ...currentState,
     ...safePersisted,
-    theme: safePersisted.theme || 'dark',
+    theme:
+      safePersisted.theme === 'light' || safePersisted.theme === 'dark'
+        ? safePersisted.theme
+        : 'dark',
     repositories,
     releases,
     searchResults: repositories,
