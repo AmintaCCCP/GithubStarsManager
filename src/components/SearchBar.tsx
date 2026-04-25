@@ -163,7 +163,7 @@ export const SearchBar: React.FC = () => {
         performBasicFilter();
       } else {
         const textResults = performBasicTextSearch(repositories, searchFilters.query);
-        const finalFiltered = applyFilters(textResults, allCategories);
+        const finalFiltered = applyFilters(textResults);
         setSearchResults(finalFiltered);
       }
     };
@@ -215,7 +215,7 @@ export const SearchBar: React.FC = () => {
     });
 
     // Apply other filters
-    const finalFiltered = applyFilters(filtered, allCategories);
+    const finalFiltered = applyFilters(filtered);
     setSearchResults(finalFiltered);
     
     const endTime = performance.now();
@@ -223,7 +223,7 @@ export const SearchBar: React.FC = () => {
   };
 
   const performBasicFilter = () => {
-    const filtered = applyFilters(repositories, allCategories);
+    const filtered = applyFilters(repositories);
     setSearchResults(filtered);
   };
 
@@ -249,7 +249,7 @@ export const SearchBar: React.FC = () => {
     });
   };
 
-  const applyFilters = (repos: typeof repositories, categories: typeof allCategories) => {
+  const applyFilters = (repos: typeof repositories) => {
     let filtered = repos;
 
     // Language filter
@@ -519,7 +519,7 @@ export const SearchBar: React.FC = () => {
       }
       
       // Apply other filters and update results
-      const finalFiltered = applyFilters(filtered, allCategories);
+      const finalFiltered = applyFilters(filtered);
       console.log('🎯 Final filtered results:', finalFiltered.length);
       console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
       setSearchResults(finalFiltered);
@@ -594,7 +594,7 @@ export const SearchBar: React.FC = () => {
     setShowSearchHistory(false);
 
     const textResults = performBasicTextSearch(repositories, historyQuery);
-    const finalFiltered = applyFilters(textResults, allCategories);
+    const finalFiltered = applyFilters(textResults);
     setSearchResults(finalFiltered);
   };
 

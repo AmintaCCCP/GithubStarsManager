@@ -290,7 +290,6 @@ interface LoadMoreButtonProps {
   onLoadMore: () => void;
   isLoading: boolean;
   hasMore: boolean;
-  currentCount: number;
   totalCount: number;
   language: 'zh' | 'en';
 }
@@ -299,7 +298,6 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   onLoadMore,
   isLoading,
   hasMore,
-  currentCount,
   totalCount,
   language
 }) => {
@@ -423,8 +421,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
-  // 侧栏固定状态
-  const [isSidebarFixed, setIsSidebarFixed] = useState(false);
   const lastScrollY = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 用于在频道切换时直接读取最新滚动位置，避免订阅整个 map 导致 effect 重跑
@@ -627,14 +623,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const handleScroll = useCallback(() => {
     // 获取页面滚动位置（支持window滚动和元素滚动）
     const currentScrollY = window.scrollY || window.pageYOffset || 0;
-
-    // 控制侧栏固定：当滚动超过一定距离后固定
-    const STICKY_THRESHOLD = 150; // 滚动超过150px后固定侧栏
-    if (currentScrollY > STICKY_THRESHOLD) {
-      setIsSidebarFixed(true);
-    } else {
-      setIsSidebarFixed(false);
-    }
 
     // 控制工具栏显示/隐藏
     if (scrollTimeoutRef.current) {
@@ -1072,8 +1060,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className={isDesktopSafeMode
-                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
-                      : 'px-5 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
+                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
+                      : 'px-5 py-2.5 rounded-xl bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-indigo/25 hover:shadow-lg hover:shadow-brand-indigo/30 transition-all duration-200 flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -1271,7 +1259,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 onLoadMore={handleLoadMore}
                 isLoading={false}
                 hasMore={discoveryHasMore[selectedDiscoveryChannel] ?? false}
-                currentCount={allRepos.length}
                 totalCount={currentTotalCount}
                 language={language}
               />

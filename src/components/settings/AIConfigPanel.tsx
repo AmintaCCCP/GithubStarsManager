@@ -438,6 +438,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
                 min={1}
                 max={10}
+                showMarks={false}
               />
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}

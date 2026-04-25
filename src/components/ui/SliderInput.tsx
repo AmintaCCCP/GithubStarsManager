@@ -9,6 +9,7 @@ interface SliderInputProps {
   label?: string;
   marks?: number[];
   formatValue?: (value: number) => string;
+  showMarks?: boolean;
 }
 
 export const SliderInput: React.FC<SliderInputProps> = ({
@@ -19,6 +20,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
   step = 1,
   marks,
   formatValue,
+  showMarks = true,
 }) => {
   const isInteger = step % 1 === 0;
 
@@ -47,7 +49,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
           {displayValue}
         </span>
       </div>
-      {markItems.length > 0 && (
+      {showMarks && markItems.length > 0 && (
         <div className="relative h-4 mt-1 -mx-[10px] px-[10px]">
           {markItems.map((mark) => {
             const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
