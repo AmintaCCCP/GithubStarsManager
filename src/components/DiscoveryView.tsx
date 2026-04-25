@@ -41,11 +41,11 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4" />,
-  rocket: <Rocket className="w-4 h-4" />,
-  star: <Crown className="w-4 h-4" />,
-  tag: <Tag className="w-4 h-4" />,
-  search: <Search className="w-4 h-4" />,
+  trending: <TrendingUp className="w-4 h-4 text-white" />,
+  rocket: <Rocket className="w-4 h-4 text-white" />,
+  star: <Crown className="w-4 h-4 text-slate-900" />,
+  tag: <Tag className="w-4 h-4 text-slate-900" />,
+  search: <Search className="w-4 h-4 text-white" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
@@ -62,12 +62,12 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
   star: {
     gradient: 'from-amber-400 to-yellow-600',
     shadow: 'shadow-amber-500/25',
-    largeIcon: <Crown className="w-9 h-9 text-white" />,
+    largeIcon: <Crown className="w-9 h-9 text-slate-900" />,
   },
   tag: {
     gradient: 'from-emerald-500 to-teal-600',
     shadow: 'shadow-emerald-500/25',
-    largeIcon: <Tag className="w-9 h-9 text-white" />,
+    largeIcon: <Tag className="w-9 h-9 text-slate-900" />,
   },
   search: {
     gradient: 'from-violet-500 to-purple-600',
@@ -254,7 +254,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-light-surface text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
       >
         <Filter className="w-4 h-4" />
         <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
@@ -270,9 +270,9 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
                 onPlatformChange(p.id);
                 setIsOpen(false);
               }}
-              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 platform === p.id
-                  ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 '
+                  ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
                   : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
               }`}
             >
@@ -876,36 +876,32 @@ export const DiscoveryView: React.FC = React.memo(() => {
         language={language}
       />
 
-      <div className="hidden lg:block fixed left-4 top-20 w-64 z-40">
-        <DiscoverySidebar
-          channels={safeDiscoveryChannels}
-          selectedChannel={selectedDiscoveryChannel}
-          onChannelSelect={(channel) => {
-            if (channel === selectedDiscoveryChannel) {
-              return;
-            }
-            if (scrollContainerRef.current) {
-              const scrollTop = scrollContainerRef.current.scrollTop;
-              discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-              setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-            }
-            setSelectedDiscoveryChannel(channel);
-          }}
-          onRefreshAll={refreshAll}
-          isLoading={discoveryIsLoading}
-          lastRefresh={discoveryLastRefresh}
-          isAnalyzing={isAnalyzing}
-          language={language}
-        />
-      </div>
-
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
       >
-        <div className="hidden lg:block w-64 shrink-0">
-          {/* 占位元素，保持布局 */}
+        <div className="hidden lg:block w-64 shrink-0 lg:sticky lg:top-4">
+          <DiscoverySidebar
+            channels={safeDiscoveryChannels}
+            selectedChannel={selectedDiscoveryChannel}
+            onChannelSelect={(channel) => {
+              if (channel === selectedDiscoveryChannel) {
+                return;
+              }
+              if (scrollContainerRef.current) {
+                const scrollTop = scrollContainerRef.current.scrollTop;
+                discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
+              }
+              setSelectedDiscoveryChannel(channel);
+            }}
+            onRefreshAll={refreshAll}
+            isLoading={discoveryIsLoading}
+            lastRefresh={discoveryLastRefresh}
+            isAnalyzing={isAnalyzing}
+            language={language}
+          />
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
@@ -929,7 +925,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : currentChannel?.nameEn}
                     </h2>
                     {currentLastRefresh && (
-                      <p className="text-[11px] text-gray-400 dark:text-text-tertiaryhidden sm:block">
+                      <p className="hidden sm:block text-[11px] text-gray-400 dark:text-text-tertiary">
                         {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
                       </p>
                     )}

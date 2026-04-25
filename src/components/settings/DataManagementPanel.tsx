@@ -747,7 +747,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         count: oldReadReleases,
         icon: <Eye className="w-4 h-4" />,
         color: 'text-gray-700 dark:text-text-secondary',
-        bgColor: 'bg-status-emerald '
+        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
       });
     }
 
@@ -1160,7 +1160,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {/* Export */}
           <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-brand-violet dark:text-brand-violet">
+              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
                 <Download className="w-5 h-5" />
               </div>
               <div>
@@ -1223,7 +1223,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {/* Import */}
           <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-status-emerald text-status-emerald ">
+              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
                 <Upload className="w-5 h-5" />
               </div>
               <div>

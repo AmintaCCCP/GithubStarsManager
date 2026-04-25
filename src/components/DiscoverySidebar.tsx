@@ -3,11 +3,11 @@ import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'luci
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 opacity-70" />,
-  rocket: <Rocket className="w-4 h-4 opacity-70" />,
-  star: <Crown className="w-4 h-4 opacity-70" />,
-  tag: <Tag className="w-4 h-4 opacity-70" />,
-  search: <Search className="w-4 h-4 opacity-70" />,
+  trending: <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+  rocket: <Rocket className="w-4 h-4 text-orange-600 dark:text-orange-400" />,
+  star: <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+  tag: <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />,
+  search: <Search className="w-4 h-4 text-violet-600 dark:text-violet-400" />,
 };
 
 interface DiscoverySidebarProps {
