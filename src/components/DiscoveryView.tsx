@@ -22,6 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
@@ -261,7 +262,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
           {platforms.map((p) => (
             <button
               key={p.id}
@@ -669,6 +670,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
       return;
     }
 
+    if (activeConfig.apiKeyStatus === 'decrypt_failed') {
+      alert(t('AI服务的API密钥无法解密，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted. Please re-enter and save the configuration in settings.'));
+      return;
+    }
+
+    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
+      alert(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'));
+      return;
+    }
+
     const pageRepos = allRepos;
     
     if (pageRepos.length === 0) {
@@ -681,20 +692,23 @@ export const DiscoveryView: React.FC = React.memo(() => {
     );
     
     if (unanalyzed.length === 0) {
-      alert(t('当前页面所有项目已完成AI分析。', 'All projects on current page have been analyzed.'));
+      alert(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'));
       return;
     }
 
     setIsAnalyzing(true);
     setAnalysisState({ paused: false, aborted: false });
-    const allCategories = useAppStore
-      .getState()
+    const storeState = useAppStore.getState();
+    const allCategoriesForResolution = [
+      ...storeState.customCategories,
+    ];
+    const allCategoryNames = storeState
       .customCategories.map(c => c.name);
     const categoryNames = [
-      ...allCategories,
-      '全部分类', 'Web应用', '移动应用', '桌面应用', '数据库',
-      'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具',
-      '效率工具', '教育学习', '社交网络', '数据分析',
+      ...allCategoryNames,
+      ...(language === 'zh'
+        ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
+        : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
     ];
 
     const githubApi = new GitHubApiService(githubToken);
@@ -720,6 +734,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
         },
         (result) => {
           if (result.success && result.repo) {
+            const resolvedCategory = resolveCategoryAssignment(
+              result.repo,
+              result.tags || [],
+              allCategoriesForResolution
+            );
+
+            const wasCategoryLocked = !!result.repo.category_locked;
+
             const updatedRepo: DiscoveryRepo = {
               ...result.repo,
               rank: 0,
@@ -728,6 +750,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
               ai_summary: result.summary,
               ai_tags: result.tags,
               ai_platforms: result.platforms,
+              custom_category: resolvedCategory,
+              category_locked: wasCategoryLocked,
               analyzed_at: new Date().toISOString(),
               analysis_failed: false,
             };
@@ -833,12 +857,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [safeDiscoveryChannels]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Mobile Tab Navigation */}
       <MobileTabNav
         channels={mobileChannels}
         selectedChannel={selectedDiscoveryChannel}
         onChannelSelect={(channel) => {
+          if (channel === selectedDiscoveryChannel) {
+            return;
+          }
           if (scrollContainerRef.current) {
             const scrollTop = scrollContainerRef.current.scrollTop;
             discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
@@ -849,28 +876,39 @@ export const DiscoveryView: React.FC = React.memo(() => {
         language={language}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0">
-        <div className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <DiscoverySidebar
-            channels={safeDiscoveryChannels}
-            selectedChannel={selectedDiscoveryChannel}
-            onChannelSelect={(channel) => {
-              if (scrollContainerRef.current) {
-                const scrollTop = scrollContainerRef.current.scrollTop;
-                discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-              }
-              setSelectedDiscoveryChannel(channel);
-            }}
-            onRefreshAll={refreshAll}
-            isLoading={discoveryIsLoading}
-            lastRefresh={discoveryLastRefresh}
-            isAnalyzing={isAnalyzing}
-            language={language}
-          />
+      <div className="hidden lg:block fixed left-4 top-20 w-64 z-40">
+        <DiscoverySidebar
+          channels={safeDiscoveryChannels}
+          selectedChannel={selectedDiscoveryChannel}
+          onChannelSelect={(channel) => {
+            if (channel === selectedDiscoveryChannel) {
+              return;
+            }
+            if (scrollContainerRef.current) {
+              const scrollTop = scrollContainerRef.current.scrollTop;
+              discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+              setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
+            }
+            setSelectedDiscoveryChannel(channel);
+          }}
+          onRefreshAll={refreshAll}
+          isLoading={discoveryIsLoading}
+          lastRefresh={discoveryLastRefresh}
+          isAnalyzing={isAnalyzing}
+          language={language}
+        />
+      </div>
+
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+      >
+        <div className="hidden lg:block w-64 shrink-0">
+          {/* 占位元素，保持布局 */}
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
             className={`flex-shrink-0 transition-transform duration-300 ease-in-out z-10 ${
@@ -1009,7 +1047,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             </div>
           </div>
 
-          {/* 可滚动内容区域 */}
+          {/* 内容区域 */}
           <div 
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -1018,8 +1056,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode
                 ? 'bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 space-y-4'
-                : 'bg-white dark:bg-panel-dark/80 backdrop-blur-xl rounded-2xl border border-black/[0.06] dark:border-white/[0.04] p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
-                <div className="flex gap-3">
+                : 'bg-white/80 dark:bg-panel-dark/80 backdrop-blur-xl rounded-2xl border border-black/[0.06] dark:border-white/[0.04] p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-tertiary" />
                     <input

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
+import { StepperInput } from '../ui/StepperInput';
 
 interface CategoryPanelProps {
   t: (zh: string, en: string) => string;
@@ -130,6 +131,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
   const handleResetDefault = (categoryId: string, originalCategory: { name: string; icon: string; keywords?: string[] } | undefined) => {
     resetDefaultCategory(categoryId);
+      if (originalCategory) {
+      setEditName(originalCategory.name);
+      setEditIcon(originalCategory.icon);
+      setEditKeywords(originalCategory.keywords?.join(', ') || '');
+    }
     setEditingId(null);
     setEditName('');
     setEditIcon('');
@@ -274,29 +280,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <input
-              type="number"
-              min="1"
+            <StepperInput
               value={collapsedSidebarCategoryCount}
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                if (inputValue === '') return;
-                const value = parseInt(inputValue);
-                if (!isNaN(value) && value >= 1) {
-                  setCollapsedSidebarCategoryCount(value);
-                }
-              }}
-              onBlur={(e) => {
-                const value = parseInt(e.target.value);
-                if (isNaN(value) || value < 1) {
-                  setCollapsedSidebarCategoryCount(1);
-                }
-              }}
-              className="w-20 px-3 py-1.5 text-center border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
-              placeholder="≥1"
+              onChange={setCollapsedSidebarCategoryCount}
+              min={1}
+              step={1}
             />
-            <span className="text-sm text-gray-500 dark:text-text-tertiary">
-            </span>
           </div>
         </div>
       </div>

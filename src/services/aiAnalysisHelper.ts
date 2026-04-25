@@ -49,14 +49,13 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   const resolvedCategory = resolveCategoryAssignment(repository as Repository, analysis.tags, categories);
 
   const wasCategoryLocked = !!(repository as Repository).category_locked;
-  const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
 
   return {
     summary: analysis.summary,
     tags: analysis.tags,
     platforms: analysis.platforms,
     custom_category: resolvedCategory,
-    category_locked: shouldKeepLocked || wasCategoryLocked,
+    category_locked: wasCategoryLocked,
     analyzed_at: new Date().toISOString(),
     analysis_failed: false,
   };
@@ -70,12 +69,20 @@ export const createFailedAnalysisResult = (): AIAnalysisResult => ({
   analysis_failed: true,
 });
 
-export const getDefaultCategoryNames = (customCategories: Category[]): string[] => {
+export const getDefaultCategoryNames = (customCategories: Category[], language: string = 'zh'): string[] => {
   const customNames = customCategories.map(c => c.name);
+  if (language === 'zh') {
+    return [
+      ...customNames,
+      '全部分类', 'Web应用', '移动应用', '桌面应用', '数据库',
+      'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具',
+      '效率工具', '教育学习', '社交网络', '数据分析',
+    ];
+  }
   return [
     ...customNames,
-    '全部分类', 'Web应用', '移动应用', '桌面应用', '数据库',
-    'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具',
-    '效率工具', '教育学习', '社交网络', '数据分析',
+    'All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database',
+    'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools',
+    'Productivity', 'Education', 'Social Networks', 'Data Analysis',
   ];
 };

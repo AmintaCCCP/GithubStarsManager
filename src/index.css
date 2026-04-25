@@ -13,7 +13,6 @@
     overflow: hidden;
   }
 
-  /* 隐藏滚动条但保持滚动功能 */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -23,7 +22,6 @@
     display: none;
   }
 
-  /* 滚动时显示滚动条，默认隐藏 - macOS 风格 */
   .scrollbar-auto {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
@@ -48,7 +46,6 @@
     min-height: 40px;
   }
 
-  /* 悬停、滚动中、聚焦时显示滚动条 */
   .scrollbar-auto:hover::-webkit-scrollbar-thumb,
   .scrollbar-auto.scrolling::-webkit-scrollbar-thumb,
   .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
@@ -61,7 +58,6 @@
     background: rgba(255, 255, 255, 0.25);
   }
 
-  /* 滚动条悬停时加粗 */
   .scrollbar-auto::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.4) !important;
     border: 1px solid transparent;
@@ -72,12 +68,10 @@
     border: 1px solid transparent;
   }
 
-  /* 滚动时添加 scrolling 类的动画 */
   .scrollbar-auto.scrolling::-webkit-scrollbar-thumb {
     transition: background 0.3s ease;
   }
 
-  /* 触摸优化 */
   .touch-manipulation {
     touch-action: manipulation;
   }
@@ -105,17 +99,14 @@
   transition: none !important;
 }
 
-/* 防止多选时选中卡片导致页面滚动 */
 .repository-card {
   scroll-margin: 20px;
 }
 
-/* 多选模式下防止焦点导致的滚动 */
 .repository-card[data-selection-mode="true"] {
   scroll-margin: 0;
 }
 
-/* 分类侧栏自定义滚动条样式 */
 .category-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
@@ -154,11 +145,196 @@
   background: rgba(75, 85, 99, 0.8);
 }
 
-/* ========== Markdown Code Block Enhancement ========== */
+.readme-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
 
-/* highlight.js 主题作用域隔离 */
-/* 亮色主题（github.css）后导入，默认生效 */
-/* 暗色主题（github-dark.css）先导入，在 .dark 下通过覆盖恢复 */
+.readme-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.readme-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.readme-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.readme-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+.readme-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+.dark .readme-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.4) transparent;
+}
+
+.dark .readme-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.4);
+}
+
+.dark .readme-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.7);
+}
+
+.dark .readme-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+/* ========== Markdown Prose Component Styles ========== */
+@layer components {
+  .prose pre code {
+    display: block;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    tab-size: 2;
+    -moz-tab-size: 2;
+  }
+
+  .prose :not(pre) > code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+  }
+
+  .dark .prose :not(pre) > code {
+    background-color: #374151;
+    color: #f9fafb;
+    border-color: #4b5563;
+  }
+
+  .prose pre:has(code.language-bash),
+  .prose pre:has(code.language-sh),
+  .prose pre:has(code.language-shell),
+  .prose pre:has(code.language-zsh),
+  .prose pre:has(code.language-cmd),
+  .prose pre:has(code.language-bat),
+  .prose pre:has(code.language-powershell),
+  .prose pre:has(code.language-ps1) {
+    position: relative;
+  }
+
+  .prose pre code[class*="language-"] {
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-feature-settings: "liga" 1, "calt" 1;
+  }
+
+  .prose pre:has(code.language-bash),
+  .prose pre:has(code.language-sh),
+  .prose pre:has(code.language-shell),
+  .prose pre:has(code.language-zsh) {
+    background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%) !important;
+  }
+
+  .dark .prose pre:has(code.language-bash),
+  .dark .prose pre:has(code.language-sh),
+  .dark .prose pre:has(code.language-shell),
+  .dark .prose pre:has(code.language-zsh) {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%) !important;
+  }
+
+  .prose pre:has(code.language-cmd),
+  .prose pre:has(code.language-bat) {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+  }
+
+  .dark .prose pre:has(code.language-cmd),
+  .dark .prose pre:has(code.language-bat) {
+    background: linear-gradient(135deg, #0c1222 0%, #1a2332 100%) !important;
+  }
+
+  .prose pre:has(code.language-powershell),
+  .prose pre:has(code.language-ps1) {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  }
+
+  .dark .prose pre:has(code.language-powershell),
+  .dark .prose pre:has(code.language-ps1) {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+  }
+
+  .prose pre:has(code[class*="language-bash"]) code,
+  .prose pre:has(code[class*="language-cmd"]) code,
+  .prose pre:has(code[class*="language-powershell"]) code {
+    line-height: 1.6;
+  }
+
+  .prose pre::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .prose pre::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+  }
+
+  .dark .prose pre::-webkit-scrollbar-track {
+    background: #374151;
+  }
+
+  .prose pre::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+  }
+
+  .dark .prose pre::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+
+  .prose pre::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  .dark .prose pre::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+
+  .prose pre div[class*="border-r"] > div:hover {
+    background-color: rgba(156, 163, 175, 0.1);
+    border-radius: 2px;
+  }
+
+  .dark .prose pre div[class*="border-r"] > div:hover {
+    background-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .prose p > span > span > img:hover {
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+  }
+
+  .prose p > div.group\/img {
+    position: relative;
+  }
+
+  .prose p > div > div > img {
+    border-radius: 0.75rem;
+  }
+
+  @media (max-width: 640px) {
+    .prose p > span > span > img {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+}
+
+/* ========== highlight.js Dark Mode Scope Isolation ========== */
 
 .dark .hljs {
   color: #c9d1d9;
@@ -242,55 +418,55 @@
   background-color: #67060c;
 }
 
-/* 基础代码块容器 */
+.dark .hljs-params {
+  color: #c9d1d9;
+}
+
+.dark .hljs-property {
+  color: #79c0ff;
+}
+
+.dark .hljs-punctuation {
+  color: #c9d1d9;
+}
+
+.dark .hljs-tag {
+  color: #7ee787;
+}
+
+.dark .hljs-title {
+  color: #d2a8ff;
+}
+
+/* ========== Base Code Block Reset ========== */
+
 .hljs {
   background: transparent !important;
   padding: 0 !important;
 }
 
-/* 浅色模式 - 灰色背景 */
-.prose pre code {
-  display: block;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.5rem;
-  tab-size: 2;
-  -moz-tab-size: 2;
+.prose pre code,
+.prose pre code.hljs {
+  background: transparent !important;
 }
 
-/* 浅色模式代码高亮颜色 */
-.prose :not(pre) > code {
-  background-color: #f3f4f6;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  font-size: 0.875em;
-  font-weight: 500;
-  color: #1f2937;
-  border: 1px solid #e5e7eb;
+.dark .prose pre code,
+.dark .prose pre code.hljs {
+  background: transparent !important;
 }
 
-.dark .prose :not(pre) > code {
-  background-color: #374151;
-  color: #f9fafb;
-  border-color: #4b5563;
+/* ========== Generic Code Block Background ========== */
+
+.prose pre:not(:has(code.language-bash)):not(:has(code.language-sh)):not(:has(code.language-shell)):not(:has(code.language-zsh)):not(:has(code.language-cmd)):not(:has(code.language-bat)):not(:has(code.language-powershell)):not(:has(code.language-ps1)) {
+  background-color: #f8fafc;
+}
+
+.dark .prose pre:not(:has(code.language-bash)):not(:has(code.language-sh)):not(:has(code.language-shell)):not(:has(code.language-zsh)):not(:has(code.language-cmd)):not(:has(code.language-bat)):not(:has(code.language-powershell)):not(:has(code.language-ps1)) {
+  background-color: #1e293b;
 }
 
 /* ========== Terminal / Shell Code Block Enhancement ========== */
 
-/* 终端代码块容器 */
-.prose pre:has(code.language-bash),
-.prose pre:has(code.language-sh),
-.prose pre:has(code.language-shell),
-.prose pre:has(code.language-zsh),
-.prose pre:has(code.language-cmd),
-.prose pre:has(code.language-bat),
-.prose pre:has(code.language-powershell),
-.prose pre:has(code.language-ps1) {
-  position: relative;
-}
-
-/* Shell/Bash 特殊样式 - Unix 风格 */
 .language-bash,
 .language-sh,
 .language-shell,
@@ -298,7 +474,6 @@
   position: relative;
 }
 
-/* Bash 提示符 - 每行前面添加 $ 符号 */
 .language-bash::before,
 .language-sh::before,
 .language-shell::before,
@@ -320,7 +495,6 @@
   text-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
 }
 
-/* PowerShell 特殊样式 */
 .language-powershell::before,
 .language-ps1::before {
   content: 'PS>';
@@ -338,7 +512,6 @@
   text-shadow: 0 0 8px rgba(96, 165, 250, 0.3);
 }
 
-/* CMD 特殊样式 - Windows 命令提示符风格 */
 .language-cmd::before,
 .language-bat::before {
   content: '>';
@@ -356,9 +529,8 @@
   text-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
 }
 
-/* ========== 终端代码高亮颜色增强 ========== */
+/* ========== Terminal Code Highlight Color Enhancement ========== */
 
-/* 关键字 - 紫色系 */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-literal,
@@ -376,7 +548,6 @@
   color: #c084fc !important;
 }
 
-/* 字符串 - 绿色系 */
 .hljs-string {
   color: #059669 !important;
 }
@@ -385,7 +556,6 @@
   color: #4ade80 !important;
 }
 
-/* 注释 - 灰色斜体 */
 .hljs-comment {
   color: #6b7280 !important;
   font-style: italic;
@@ -395,7 +565,6 @@
   color: #6b7280 !important;
 }
 
-/* 数字 - 橙色/金色 */
 .hljs-number {
   color: #d97706 !important;
 }
@@ -404,7 +573,6 @@
   color: #fbbf24 !important;
 }
 
-/* 函数名 - 蓝色系 */
 .hljs-title.function_,
 .hljs-title.class_ {
   color: #2563eb !important;
@@ -416,7 +584,6 @@
   color: #60a5fa !important;
 }
 
-/* 变量 - 红色系 */
 .hljs-variable,
 .hljs-template-variable {
   color: #dc2626 !important;
@@ -427,7 +594,6 @@
   color: #f87171 !important;
 }
 
-/* 内建函数/命令 (Shell 命令高亮) - 青色系 */
 .hljs-built_in,
 .hljs-type {
   color: #0891b2 !important;
@@ -439,7 +605,6 @@
   color: #22d3ee !important;
 }
 
-/* 属性名/参数名 - 紫色系 */
 .hljs-attr {
   color: #7c3aed !important;
 }
@@ -448,7 +613,6 @@
   color: #a78bfa !important;
 }
 
-/* 正则表达式 - 橙红色 */
 .hljs-regexp {
   color: #ea580c !important;
 }
@@ -457,7 +621,6 @@
   color: #fb923c !important;
 }
 
-/* 符号/标点 - 中性灰 */
 .hljs-symbol,
 .hljs-bullet {
   color: #64748b !important;
@@ -468,7 +631,6 @@
   color: #94a3b8 !important;
 }
 
-/* 元数据/标签 - 靛蓝色 */
 .hljs-meta {
   color: #6366f1 !important;
 }
@@ -477,7 +639,6 @@
   color: #818cf8 !important;
 }
 
-/* 删除线 */
 .hljs-deletion {
   background-color: #fecaca !important;
   color: #991b1b !important;
@@ -488,7 +649,6 @@
   color: #fecaca !important;
 }
 
-/* 新增标记 */
 .hljs-addition {
   background-color: #bbf7d0 !important;
   color: #166534 !important;
@@ -499,7 +659,6 @@
   color: #86efac !important;
 }
 
-/* 强调文本 */
 .hljs-emphasis {
   font-style: italic;
 }
@@ -507,6 +666,7 @@
 .hljs-strong {
   font-weight: bold;
 }
+
 
 /* ========== 终端专用视觉效果增强 ========== */
 
