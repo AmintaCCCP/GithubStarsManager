@@ -235,7 +235,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           <button
             onClick={handleTestConnection}
             disabled={status === 'checking'}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-white/[0.04] text-white rounded-lg hover:bg-gray-100 dark:bg-white/[0.04] transition-colors disabled:opacity-50"
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
           >
             {status === 'checking' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
