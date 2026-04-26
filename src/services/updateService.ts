@@ -6,6 +6,7 @@ export interface VersionInfo {
 }
 
 import { PROJECT_REPO_URL } from '../constants/project';
+import { version } from '../../package.json';
 
 const REPO_OWNER = PROJECT_REPO_URL.split('/').slice(-2).join('/');
 const VERSION_INFO_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/main/versions/version-info.xml`;
@@ -20,9 +21,7 @@ export class UpdateService {
   private static readonly REPO_URL = VERSION_INFO_URL;
 
   private static getCurrentVersion(): string {
-    // 在实际应用中，这个版本号应该在构建时注入
-    // 这里暂时硬编码，你可以通过构建脚本或环境变量来动态设置
-    return '0.5.3';
+    return version;
   }
 
   static async checkForUpdates(): Promise<UpdateCheckResult> {
