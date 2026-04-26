@@ -402,7 +402,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 href={repository.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:text-gray-900 dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
+                className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
                 title={t('在 GitHub 上查看', 'View on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
