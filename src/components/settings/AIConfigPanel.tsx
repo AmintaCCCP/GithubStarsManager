@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
-import { AIService, ConnectionTestResult } from '../../services/aiService';
+import { AIService } from '../../services/aiService';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 
