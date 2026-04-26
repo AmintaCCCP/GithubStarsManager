@@ -183,7 +183,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusClass = () => {
     switch (status) {
       case 'connected':
-        return 'bg-status-emerald text-status-emerald ';
+        return 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
       case 'checking':
         return 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
       default:
@@ -207,14 +207,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       </div>
 
       {health && (
-        <div className="p-4 bg-status-emerald rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-status-emerald " />
-            <span className="font-medium text-status-emerald ">
+            <CheckCircle className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
+            <span className="font-medium text-gray-900 dark:text-text-primary">
               {t('连接正常', 'Connection OK')}
             </span>
           </div>
-          <p className="text-sm text-status-emerald ">
+          <p className="text-sm text-gray-500 dark:text-text-tertiary">
             {t('版本', 'Version')}: {health.version}
           </p>
         </div>
@@ -257,7 +257,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
-              <Upload className="w-8 h-8 text-status-emerald " />
+              <Upload className="w-8 h-8 text-gray-700 dark:text-text-secondary" />
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-text-primary">
                   {t('同步到后端', 'Sync to Backend')}
@@ -283,7 +283,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
           <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
             <div className="flex items-center space-x-3 mb-4">
-              <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
+              <Download className="w-8 h-8 text-gray-700 dark:text-text-secondary" />
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-text-primary">
                   {t('从后端同步', 'Sync from Backend')}

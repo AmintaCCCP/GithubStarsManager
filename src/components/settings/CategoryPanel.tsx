@@ -263,7 +263,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <LayoutGrid className="w-5 h-5 text-brand-violet dark:text-brand-violet" />
+            <LayoutGrid className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
             <div>
               <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('折叠侧边栏显示设置', 'Collapsed Sidebar Display')}
@@ -271,7 +271,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('设置折叠状态下显示的分类个数', 'Set the number of categories to display when collapsed')}
               </p>
-              <p className="text-xs text-brand-violet dark:text-brand-violet mt-1">
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
                 {t(
                   '提示：折叠侧边栏仅影响显示，所有分类仍可在展开状态下查看。只显示分类顺序前N个分类。',
                   'Tip: The collapsed sidebar only affects display; all categories remain accessible when expanded. Only the first N categories in the order are displayed.'
@@ -505,7 +505,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <button
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-status-emerald text-status-emerald hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04]' : 'bg-light-surfacetext-gray-400 dark:bg-white/[0.04] dark:text-text-tertiarycursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${hasChanges ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] dark:text-text-secondary' : 'bg-light-surface text-gray-400 dark:bg-white/[0.04] dark:text-text-tertiary cursor-not-allowed'}`}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />

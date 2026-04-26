@@ -41,38 +41,38 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-white" />,
-  rocket: <Rocket className="w-4 h-4 text-white" />,
-  star: <Crown className="w-4 h-4 text-slate-900" />,
-  tag: <Tag className="w-4 h-4 text-slate-900" />,
-  search: <Search className="w-4 h-4 text-white" />,
+  trending: <TrendingUp className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  rocket: <Rocket className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  star: <Crown className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  tag: <Tag className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  search: <Search className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
   trending: {
-    gradient: 'from-blue-500 to-indigo-600',
-    shadow: 'shadow-blue-500/25',
-    largeIcon: <TrendingUp className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <TrendingUp className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   rocket: {
-    gradient: 'from-orange-500 to-red-600',
-    shadow: 'shadow-orange-500/25',
-    largeIcon: <Rocket className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Rocket className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   star: {
-    gradient: 'from-amber-400 to-yellow-600',
-    shadow: 'shadow-amber-500/25',
-    largeIcon: <Crown className="w-9 h-9 text-slate-900" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Crown className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   tag: {
-    gradient: 'from-emerald-500 to-teal-600',
-    shadow: 'shadow-emerald-500/25',
-    largeIcon: <Tag className="w-9 h-9 text-slate-900" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Tag className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
   search: {
-    gradient: 'from-violet-500 to-purple-600',
-    shadow: 'shadow-violet-500/25',
-    largeIcon: <Search className="w-9 h-9 text-white" />,
+    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    shadow: 'shadow-black/[0.08]',
+    largeIcon: <Search className="w-9 h-9 text-gray-700 dark:text-white" />,
   },
 };
 
@@ -290,7 +290,6 @@ interface LoadMoreButtonProps {
   onLoadMore: () => void;
   isLoading: boolean;
   hasMore: boolean;
-  currentCount: number;
   totalCount: number;
   language: 'zh' | 'en';
 }
@@ -299,7 +298,6 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   onLoadMore,
   isLoading,
   hasMore,
-  currentCount,
   totalCount,
   language
 }) => {
@@ -420,6 +418,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -581,10 +580,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 切换频道时恢复滚动位置，并自动加载空数据
   useEffect(() => {
     // 恢复当前频道的滚动位置（从 ref 读取最新值，避免订阅整个 map）
-    if (scrollContainerRef.current) {
-      const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
-      scrollContainerRef.current.scrollTop = savedPosition;
-    }
+    const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
+    window.scrollTo({ top: savedPosition, behavior: 'auto' });
     
     // 取消持久化后，首次打开或切换到空频道时自动加载
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
@@ -622,15 +619,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     return date.toLocaleDateString();
   }, [t]);
 
-  // 处理滚动事件：保存滚动位置并控制工具栏显示
+  // 处理滚动事件：保存滚动位置、控制工具栏显示、控制侧栏固定
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current) return;
-
-    const currentScrollY = scrollContainerRef.current.scrollTop;
-
-    // 同时更新 ref 和 state，保证频道切换 effect 读取到最新值，且 UI 仍保持响应
-    discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = currentScrollY;
-    setDiscoveryScrollPosition(selectedDiscoveryChannel, currentScrollY);
+    // 获取页面滚动位置（支持window滚动和元素滚动）
+    const currentScrollY = window.scrollY || window.pageYOffset || 0;
 
     // 控制工具栏显示/隐藏
     if (scrollTimeoutRef.current) {
@@ -650,16 +642,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
     scrollTimeoutRef.current = setTimeout(() => {
       setIsToolbarVisible(true);
     }, 1500);
-  }, [selectedDiscoveryChannel, setDiscoveryScrollPosition]);
+  }, []);
 
-  // 清理滚动定时器
+  // 监听 window 滚动事件
   useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
+      window.removeEventListener('scroll', handleScroll);
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
     };
-  }, []);
+  }, [handleScroll]);
 
   const handleAnalyzePage = useCallback(async () => {
     if (!githubToken) return;
@@ -857,7 +851,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, [safeDiscoveryChannels]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="flex flex-col">
       {/* Mobile Tab Navigation */}
       <MobileTabNav
         channels={mobileChannels}
@@ -866,22 +860,22 @@ export const DiscoveryView: React.FC = React.memo(() => {
           if (channel === selectedDiscoveryChannel) {
             return;
           }
-          if (scrollContainerRef.current) {
-            const scrollTop = scrollContainerRef.current.scrollTop;
-            discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-            setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-          }
+          const scrollTop = window.scrollY;
+          discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+          setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
           setSelectedDiscoveryChannel(channel);
         }}
         language={language}
       />
 
-      <div 
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+      <div
+        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 items-start"
       >
-        <div className="hidden lg:block w-64 shrink-0 lg:sticky lg:top-4">
+        <div
+          ref={sidebarRef}
+          className="hidden lg:block w-64 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
             selectedChannel={selectedDiscoveryChannel}
@@ -889,11 +883,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
               if (channel === selectedDiscoveryChannel) {
                 return;
               }
-              if (scrollContainerRef.current) {
-                const scrollTop = scrollContainerRef.current.scrollTop;
-                discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
-                setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
-              }
+              const scrollTop = window.scrollY;
+              discoveryScrollPositionsRef.current[selectedDiscoveryChannel] = scrollTop;
+              setDiscoveryScrollPosition(selectedDiscoveryChannel, scrollTop);
               setSelectedDiscoveryChannel(channel);
             }}
             onRefreshAll={refreshAll}
@@ -1046,7 +1038,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
           {/* 内容区域 */}
           <div 
             ref={scrollContainerRef}
-            onScroll={handleScroll}
             className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-panel-dark' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
@@ -1069,8 +1060,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className={isDesktopSafeMode
-                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
-                      : 'px-5 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2 font-medium'}
+                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
+                      : 'px-5 py-2.5 rounded-xl bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-indigo/25 hover:shadow-lg hover:shadow-brand-indigo/30 transition-all duration-200 flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -1268,7 +1259,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 onLoadMore={handleLoadMore}
                 isLoading={false}
                 hasMore={discoveryHasMore[selectedDiscoveryChannel] ?? false}
-                currentCount={allRepos.length}
                 totalCount={currentTotalCount}
                 language={language}
               />

@@ -72,10 +72,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   };
 
   const rankBadgeClass = useMemo(() => {
-    if (repo.rank === 1) return 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary ';
-    if (repo.rank === 2) return 'bg-gray-300 text-gray-900 dark:bg-gray-400 dark:text-text-primary';
-    if (repo.rank === 3) return 'bg-gray-100 dark:bg-white/[0.04] text-white dark:text-text-primary';
-    return 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary';
+    return 'bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary';
   }, [repo.rank]);
 
   const platformIconMap = useMemo(() => ({

@@ -114,7 +114,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Cloud className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+          <Cloud className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
             {t('WebDAV配置', 'WebDAV Configuration')}
           </h3>
@@ -226,8 +226,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeWebDAVConfig
-                ? 'border-brand-violet bg-brand-indigo/10 dark:border-brand-violet/50 dark:bg-brand-indigo/20'
-                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-gray-500'
+                ? 'border-gray-300 bg-gray-50 dark:border-white/[0.12] dark:bg-white/[0.06]'
+                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-white/[0.08]'
             }`}
           >
             <div className="flex items-center justify-between">
