@@ -32,6 +32,8 @@ import type {
   Category, 
   AssetFilter,
   DiscoveryRepo,
+  SubscriptionRepo,
+  SubscriptionChannel,
   SearchFilters 
 } from '../../types';
 
@@ -81,9 +83,9 @@ interface ExportData {
     discoveryTotalCount?: Record<string, number>;
     discoveryHasMore?: Record<string, boolean>;
     discoveryNextPage?: Record<string, number>;
-    subscriptionRepos?: Record<string, DiscoveryRepo[]>;
+    subscriptionRepos?: Record<string, SubscriptionRepo[]>;
     subscriptionLastRefresh?: Record<string, string | null>;
-    subscriptionChannels?: Array<{ id: string; name: string; nameEn: string }>;
+    subscriptionChannels?: SubscriptionChannel[];
     releaseSubscriptions?: number[];
     readReleases?: number[];
     searchFilters?: SearchFilters;
@@ -127,12 +129,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     subscriptionRepos,
     releaseSubscriptions,
     readReleases,
-    searchFilters,
     language,
     setRepositories,
     setReleases,
-    deleteCustomCategory,
-    setAssetFilters,
   } = useAppStore();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
@@ -143,6 +142,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
+  const [, setSearchHistoryVersion] = useState(0);
   const [showErrorMessage, setShowErrorMessage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -217,11 +217,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteRepositories = async () => {
     try {
       setRepositories([]);
-      addLog(t('删除GitHub Stars仓库数据', 'Delete GitHub Stars repositories'), true);
-      showSuccess(t('GitHub Stars仓库数据已删除', 'GitHub Stars repositories deleted'));
+      addLog(t('删除 Stars 仓库数据', 'Delete Stars repositories'), true);
+      showSuccess(t('Stars 仓库数据已删除', 'Stars repositories deleted'));
     } catch (error) {
       addLog(
-        t('删除GitHub Stars仓库数据', 'Delete GitHub Stars repositories'),
+        t('删除 Stars 仓库数据', 'Delete Stars repositories'),
         false,
         String(error)
       );
@@ -233,11 +233,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteReleases = async () => {
     try {
       setReleases([]);
-      addLog(t('删除Release发布信息数据', 'Delete Release information'), true);
-      showSuccess(t('Release发布信息数据已删除', 'Release information deleted'));
+      addLog(t('删除 Release 发布记录', 'Delete Release records'), true);
+      showSuccess(t('Release 发布记录已删除', 'Release records deleted'));
     } catch (error) {
       addLog(
-        t('删除Release发布信息数据', 'Delete Release information'),
+        t('删除 Release 发布记录', 'Delete Release records'),
         false,
         String(error)
       );
@@ -251,11 +251,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setAIConfigs([]);
       store.setActiveAIConfig(null);
-      addLog(t('删除AI服务配置数据', 'Delete AI service configurations'), true);
-      showSuccess(t('AI服务配置数据已删除', 'AI service configurations deleted'));
+      addLog(t('删除 AI 服务配置', 'Delete AI service configs'), true);
+      showSuccess(t('AI 服务配置已删除', 'AI service configs deleted'));
     } catch (error) {
       addLog(
-        t('删除AI服务配置数据', 'Delete AI service configurations'),
+        t('删除 AI 服务配置', 'Delete AI service configs'),
         false,
         String(error)
       );
@@ -269,11 +269,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setWebDAVConfigs([]);
       store.setActiveWebDAVConfig(null);
-      addLog(t('删除WebDAV配置数据', 'Delete WebDAV configurations'), true);
-      showSuccess(t('WebDAV配置数据已删除', 'WebDAV configurations deleted'));
+      addLog(t('删除 WebDAV 同步配置', 'Delete WebDAV sync configs'), true);
+      showSuccess(t('WebDAV 同步配置已删除', 'WebDAV sync configs deleted'));
     } catch (error) {
       addLog(
-        t('删除WebDAV配置数据', 'Delete WebDAV configurations'),
+        t('删除 WebDAV 同步配置', 'Delete WebDAV sync configs'),
         false,
         String(error)
       );
@@ -299,11 +299,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         collapsedSidebarCategoryCount: 20,
         isSidebarCollapsed: false
       });
-      addLog(t('删除分类显示设置数据', 'Delete category display settings'), true);
-      showSuccess(t('分类显示设置数据已删除', 'Category display settings deleted'));
+      addLog(t('删除分类与显示设置', 'Delete category & display settings'), true);
+      showSuccess(t('分类与显示设置已删除', 'Category & display settings deleted'));
     } catch (error) {
       addLog(
-        t('删除分类显示设置数据', 'Delete category display settings'),
+        t('删除分类与显示设置', 'Delete category & display settings'),
         false,
         String(error)
       );
@@ -314,12 +314,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteAssetFilters = async () => {
     try {
-      setAssetFilters([]);
-      addLog(t('删除资源过滤器数据', 'Delete asset filters'), true);
-      showSuccess(t('资源过滤器数据已删除', 'Asset filters deleted'));
+      useAppStore.setState({ assetFilters: [] });
+      addLog(t('删除资源过滤器预设', 'Delete asset filter presets'), true);
+      showSuccess(t('资源过滤器预设已删除', 'Asset filter presets deleted'));
     } catch (error) {
       addLog(
-        t('删除资源过滤器数据', 'Delete asset filters'),
+        t('删除资源过滤器预设', 'Delete asset filter presets'),
         false,
         String(error)
       );
@@ -370,11 +370,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'trending': [],
         },
       });
-      addLog(t('删除订阅页数据', 'Delete subscription data'), true);
-      showSuccess(t('订阅页数据已删除', 'Subscription data deleted'));
+      addLog(t('删除订阅源缓存数据', 'Delete subscription feed cache'), true);
+      showSuccess(t('订阅源缓存数据已删除', 'Subscription feed cache deleted'));
     } catch (error) {
       addLog(
-        t('删除订阅页数据', 'Delete subscription data'),
+        t('删除订阅源缓存数据', 'Delete subscription feed cache'),
         false,
         String(error)
       );
@@ -389,11 +389,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         releaseSubscriptions: new Set<number>(),
         readReleases: new Set<number>()
       });
-      addLog(t('删除Release订阅数据', 'Delete release subscriptions'), true);
-      showSuccess(t('Release订阅数据已删除', 'Release subscriptions deleted'));
+      addLog(t('删除 Release 订阅与已读', 'Delete release subscriptions & read'), true);
+      showSuccess(t('Release 订阅与已读已删除', 'Release subscriptions & read deleted'));
     } catch (error) {
       addLog(
-        t('删除Release订阅数据', 'Delete release subscriptions'),
+        t('删除 Release 订阅与已读', 'Delete release subscriptions & read'),
         false,
         String(error)
       );
@@ -418,11 +418,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       });
       localStorage.removeItem('github-stars-search-history');
       localStorage.removeItem('lastSearchTime');
-      addLog(t('删除搜索历史数据', 'Delete search history'), true);
-      showSuccess(t('搜索历史数据已删除', 'Search history deleted'));
+      setSearchHistoryVersion(v => v + 1);
+      addLog(t('删除搜索历史记录', 'Delete search history'), true);
+      showSuccess(t('搜索历史记录已删除', 'Search history deleted'));
     } catch (error) {
       addLog(
-        t('删除搜索历史数据', 'Delete search history'),
+        t('删除搜索历史记录', 'Delete search history'),
         false,
         String(error)
       );
@@ -571,7 +572,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
-          store.setAssetFilters(importedData.assetFilters);
+          useAppStore.setState({ assetFilters: importedData.assetFilters });
         }
         if (selectedTypes.includes('discoveryRepos')) {
           if (importedData.discoveryRepos) {
@@ -663,7 +664,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
           const existingIds = new Set(store.assetFilters.map(f => f.id));
           const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
-          store.setAssetFilters([...store.assetFilters, ...newFilters]);
+          useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
         }
         if (selectedTypes.includes('releaseSubscriptions') && importedData.releaseSubscriptions) {
           const existingSubs = store.releaseSubscriptions;
@@ -686,7 +687,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const cleanupSuggestions = useMemo<DataCleanupSuggestion[]>(() => {
     const suggestions: DataCleanupSuggestion[] = [];
     const now = Date.now();
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
     const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 
     const oldReleases = releases.filter(r => 
@@ -772,6 +772,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         case 'readReleases':
           useAppStore.setState({ readReleases: new Set<number>() });
           break;
+        case 'unanalyzedRepos':
+          showSuccess(t('未分析仓库无法直接清理，请通过 AI 分析功能处理', 'Unanalyzed repos cannot be cleaned directly. Use AI analysis to process them.'));
+          return;
       }
       addLog(t('清理数据', 'Cleanup data'), true);
       showSuccess(t('数据清理成功', 'Data cleanup successful'));
@@ -924,58 +927,58 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     switch (type) {
       case 'repositories':
         return t(
-          '这将删除所有GitHub Stars仓库列表数据，包括仓库信息、AI分析结果和自定义标签。此操作不可恢复。',
-          'This will delete all GitHub Stars repository data, including repository info, AI analysis results, and custom tags. This action cannot be undone.'
+          '将删除所有 Stars 仓库数据，包括仓库信息、AI 摘要、标签和平台信息。删除后需重新同步 GitHub Stars，此操作不可恢复。',
+          'This will delete all Stars repository data, including AI summaries, tags, and platform info. Re-sync required after deletion. This action cannot be undone.'
         );
       case 'releases':
         return t(
-          '这将删除所有Release发布信息数据，包括发布说明和资源文件信息。此操作不可恢复。',
-          'This will delete all Release information data, including release notes and asset information. This action cannot be undone.'
+          '将删除所有 Release 发布记录，包括版本说明和资源文件信息。删除后需重新拉取，此操作不可恢复。',
+          'This will delete all Release records, including release notes and asset info. Re-fetch required after deletion. This action cannot be undone.'
         );
       case 'aiConfigs':
         return t(
-          '这将删除所有AI服务配置数据，包括API密钥和模型设置。此操作不可恢复。',
-          'This will delete all AI service configuration data, including API keys and model settings. This action cannot be undone.'
+          '将删除所有 AI 服务配置，包括 API 密钥、模型和并发设置。删除后 AI 分析功能将不可用，此操作不可恢复。',
+          'This will delete all AI service configs, including API keys, models, and concurrency. AI analysis unavailable after deletion. This action cannot be undone.'
         );
       case 'webdavConfigs':
         return t(
-          '这将删除所有WebDAV配置数据，包括服务器地址和认证信息。此操作不可恢复。',
-          'This will delete all WebDAV configuration data, including server addresses and authentication info. This action cannot be undone.'
+          '将删除所有 WebDAV 同步配置，包括服务器地址和认证信息。删除后云备份与恢复功能将不可用，此操作不可恢复。',
+          'This will delete all WebDAV sync configs, including server addresses and credentials. Cloud backup & restore unavailable after deletion. This action cannot be undone.'
         );
       case 'categorySettings':
         return t(
-          '这将删除所有自定义分类和分类显示设置。此操作不可恢复。',
-          'This will delete all custom categories and category display settings. This action cannot be undone.'
+          '将删除所有分类与显示设置，包括自定义分类、默认分类覆盖和隐藏分类。删除后侧边栏分类将恢复默认，此操作不可恢复。',
+          'This will delete all category & display settings, including custom categories, overrides, and hidden categories. Sidebar resets to defaults. This action cannot be undone.'
         );
       case 'assetFilters':
         return t(
-          '这将删除所有资源过滤器预设数据。此操作不可恢复。',
-          'This will delete all asset filter presets. This action cannot be undone.'
+          '将删除所有资源过滤器预设。删除后需重新创建过滤规则，此操作不可恢复。',
+          'This will delete all asset filter presets. Re-create filter rules after deletion. This action cannot be undone.'
         );
       case 'discoveryData':
         return t(
-          '这将删除发现页缓存的仓库数据。此操作不可恢复。',
-          'This will delete cached repository data from discovery page. This action cannot be undone.'
+          '将删除发现页各频道的仓库缓存数据。下次访问时将自动重新加载，此操作不可恢复。',
+          'This will delete cached repos from discovery channels. Data auto-refreshes on next visit. This action cannot be undone.'
         );
       case 'subscriptionData':
         return t(
-          '这将删除订阅页的所有仓库数据。此操作不可恢复。',
-          'This will delete all repository data from subscription page. This action cannot be undone.'
+          '将删除订阅源各频道的仓库缓存数据。下次访问时将自动重新加载，此操作不可恢复。',
+          'This will delete cached repos from subscription feeds. Data auto-refreshes on next visit. This action cannot be undone.'
         );
       case 'releaseSubscriptions':
         return t(
-          '这将删除所有Release订阅和已读标记数据。此操作不可恢复。',
-          'This will delete all release subscriptions and read marks. This action cannot be undone.'
+          '将删除所有 Release 订阅和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记，此操作不可恢复。',
+          'This will delete all release subscriptions and read marks. Subscription status and read marks lost. This action cannot be undone.'
         );
       case 'searchHistory':
         return t(
-          '这将删除搜索历史和搜索过滤器设置。此操作不可恢复。',
-          'This will delete search history and filter settings. This action cannot be undone.'
+          '将删除搜索历史关键词和当前筛选条件。删除后搜索建议和筛选状态将清空，此操作不可恢复。',
+          'This will delete search history and current filter settings. Search suggestions and filters cleared. This action cannot be undone.'
         );
       case 'all':
         return t(
-          '这将删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。此操作将重置应用程序到初始状态，不可恢复！',
-          'This will delete ALL application data, including all user data, GitHub tokens, configuration files, etc. This will reset the application to its initial state and cannot be undone!'
+          '将删除所有应用程序数据，包括用户数据、GitHub 令牌、所有配置文件等。应用程序将重置为初始状态，此操作不可恢复！',
+          'This will delete ALL application data, including user data, GitHub tokens, and all configs. The app will reset to its initial state. This action cannot be undone!'
         );
       default:
         return '';
@@ -985,25 +988,25 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const getDeleteTitle = (type: DeleteOperation): string => {
     switch (type) {
       case 'repositories':
-        return t('删除GitHub Stars仓库数据', 'Delete GitHub Stars Repositories');
+        return t('删除 Stars 仓库数据', 'Delete Stars Repositories');
       case 'releases':
-        return t('删除Release发布信息数据', 'Delete Release Information');
+        return t('删除 Release 发布记录', 'Delete Release Records');
       case 'aiConfigs':
-        return t('删除AI服务配置数据', 'Delete AI Service Configurations');
+        return t('删除 AI 服务配置', 'Delete AI Service Configs');
       case 'webdavConfigs':
-        return t('删除WebDAV配置数据', 'Delete WebDAV Configurations');
+        return t('删除 WebDAV 同步配置', 'Delete WebDAV Sync Configs');
       case 'categorySettings':
-        return t('删除分类显示设置数据', 'Delete Category Display Settings');
+        return t('删除分类与显示设置', 'Delete Category & Display Settings');
       case 'assetFilters':
-        return t('删除资源过滤器数据', 'Delete Asset Filters');
+        return t('删除资源过滤器预设', 'Delete Asset Filter Presets');
       case 'discoveryData':
         return t('删除发现页缓存数据', 'Delete Discovery Cache');
       case 'subscriptionData':
-        return t('删除订阅页数据', 'Delete Subscription Data');
+        return t('删除订阅源缓存数据', 'Delete Subscription Feed Cache');
       case 'releaseSubscriptions':
-        return t('删除Release订阅数据', 'Delete Release Subscriptions');
+        return t('删除 Release 订阅与已读', 'Delete Release Subscriptions & Read');
       case 'searchHistory':
-        return t('删除搜索历史数据', 'Delete Search History');
+        return t('删除搜索历史记录', 'Delete Search History');
       case 'all':
         return t('删除所有数据', 'Delete All Data');
       default:
@@ -1019,10 +1022,23 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     return Object.values(subscriptionRepos || {}).flat().length;
   }, [subscriptionRepos]);
 
+  const searchHistoryCount = (() => {
+    try {
+      const saved = localStorage.getItem('github-stars-search-history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.length : 0;
+      }
+    } catch { /* ignore */ }
+    return 0;
+  })();
+
   const dataStats = [
     {
       key: 'repositories',
-      label: t('GitHub Stars仓库', 'GitHub Stars Repositories'),
+      label: t('Stars 仓库数据', 'Stars Repositories'),
+      description: t('管理的 GitHub Stars 仓库列表，含 AI 摘要、标签和平台信息。删除后需重新同步。',
+        'GitHub Stars repositories with AI summaries, tags, and platform info. Re-sync required after deletion.'),
       count: repositories.length,
       icon: <Github className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1030,7 +1046,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'releases',
-      label: t('Release发布信息', 'Release Information'),
+      label: t('Release 发布记录', 'Release Records'),
+      description: t('已订阅仓库的 Release 版本信息，含发布说明和资源文件。删除后需重新拉取。',
+        'Release version info for subscribed repos, including notes and assets. Re-fetch required after deletion.'),
       count: releases.length,
       icon: <Tag className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1038,7 +1056,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'aiConfigs',
-      label: t('AI服务配置', 'AI Service Configurations'),
+      label: t('AI 服务配置', 'AI Service Configs'),
+      description: t('AI 分析服务的连接配置，含 API 密钥、模型和并发设置。删除后 AI 分析功能将不可用。',
+        'AI analysis service configs including API keys, models, and concurrency. AI analysis unavailable after deletion.'),
       count: aiConfigs.length,
       icon: <Bot className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1046,7 +1066,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'webdavConfigs',
-      label: t('WebDAV配置', 'WebDAV Configurations'),
+      label: t('WebDAV 同步配置', 'WebDAV Sync Configs'),
+      description: t('WebDAV 云同步的服务器地址和认证信息。删除后云备份与恢复功能将不可用。',
+        'WebDAV server addresses and credentials. Cloud backup & restore unavailable after deletion.'),
       count: webdavConfigs.length,
       icon: <Cloud className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1054,7 +1076,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'categorySettings',
-      label: t('自定义分类', 'Custom Categories'),
+      label: t('分类与显示设置', 'Category & Display Settings'),
+      description: t('自定义分类、默认分类覆盖和隐藏分类设置。删除后侧边栏分类将恢复默认。',
+        'Custom categories, default category overrides, and hidden categories. Sidebar resets to defaults after deletion.'),
       count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1062,7 +1086,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'assetFilters',
-      label: t('资源过滤器', 'Asset Filters'),
+      label: t('资源过滤器预设', 'Asset Filter Presets'),
+      description: t('Release 资源文件的筛选规则预设。删除后需重新创建过滤规则。',
+        'Release asset filtering rule presets. Re-create filter rules after deletion.'),
       count: assetFilters.length,
       icon: <Filter className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1070,7 +1096,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'discoveryData',
-      label: t('发现页缓存', 'Discovery Cache'),
+      label: t('发现页缓存数据', 'Discovery Cache'),
+      description: t('发现页各频道的仓库缓存，可安全清理，下次访问时自动刷新。',
+        'Cached repos from discovery channels. Safe to clean — auto-refreshes on next visit.'),
       count: totalDiscoveryReposCount,
       icon: <Sparkles className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1078,7 +1106,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'subscriptionData',
-      label: t('订阅页数据', 'Subscription Data'),
+      label: t('订阅源缓存数据', 'Subscription Feed Cache'),
+      description: t('订阅页各频道的仓库缓存，可安全清理，下次访问时自动刷新。',
+        'Cached repos from subscription feeds. Safe to clean — auto-refreshes on next visit.'),
       count: totalSubscriptionReposCount,
       icon: <Rss className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1086,7 +1116,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'releaseSubscriptions',
-      label: t('Release订阅', 'Release Subscriptions'),
+      label: t('Release 订阅与已读', 'Release Subscriptions & Read'),
+      description: t('已订阅 Release 的仓库列表和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记。',
+        'Subscribed repo list and read marks for releases. Subscription status and read marks lost after deletion.'),
       count: releaseSubscriptions.size,
       icon: <Eye className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
@@ -1094,8 +1126,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'searchHistory',
-      label: t('搜索历史', 'Search History'),
-      count: searchFilters.query ? 1 : 0,
+      label: t('搜索历史记录', 'Search History'),
+      description: t('搜索栏的历史关键词和当前筛选条件。删除后搜索建议和筛选状态将清空。',
+        'Search bar history and current filter settings. Search suggestions and filters cleared after deletion.'),
+      count: searchHistoryCount,
       icon: <Search className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
       bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
@@ -1106,7 +1140,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-status-emerald text-status-emerald rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-white/[0.08] text-white dark:text-text-secondary rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -1123,7 +1157,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Statistics */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2 text-brand-violet dark:text-brand-violet" />
+          <Database className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
           {t('数据概览', 'Data Overview')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1153,7 +1187,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Export/Import */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <HardDrive className="w-5 h-5 mr-2 text-status-emerald " />
+          <HardDrive className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1270,7 +1304,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between"
+                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
@@ -1291,7 +1325,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   </span>
                   <button
                     onClick={() => handleCleanup(suggestion.key)}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
                   >
                     {t('清理', 'Clean')}
                   </button>
@@ -1313,7 +1347,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/10/50 transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
@@ -1321,7 +1355,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   </div>
                   <div>
                     <p className="font-medium text-gray-900 dark:text-text-primary">{stat.label}</p>
-                    <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                    <p className="text-sm text-gray-500 dark:text-text-tertiary mt-0.5">
+                      {stat.description}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-text-quaternary mt-1">
                       {stat.count} {t('条记录', 'records')}
                     </p>
                   </div>
@@ -1329,7 +1366,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <button
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.count === 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{t('删除', 'Delete')}</span>
@@ -1363,7 +1400,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </p>
               <button
                 onClick={() => openConfirmation('all')}
-                className="mt-4 px-6 py-3 bg-status-red hover:bg-gray-100 dark:bg-white/[0.04] text-white font-semibold rounded-lg transition-colors flex items-center space-x-2"
+                className="mt-4 px-6 py-3 bg-status-red hover:bg-red-600 dark:hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="w-5 h-5" />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>
@@ -1397,14 +1434,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </thead>
                 <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/10/50">
+                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/[0.06]">
                       <td className="px-4 py-2 text-gray-500 dark:text-text-tertiary">
                         {log.timestamp}
                       </td>
                       <td className="px-4 py-2 text-gray-900 dark:text-text-primary">{log.operation}</td>
                       <td className="px-4 py-2">
                         {log.success ? (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-status-emerald bg-status-emerald rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] rounded-full">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             {t('成功', 'Success')}
                           </span>
@@ -1428,7 +1465,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {confirmation.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-light-surface dark:bg-white/[0.04] border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+            <div className="px-6 py-4 bg-light-surface dark:bg-white/[0.04] border-b border-black/[0.06] dark:border-white/[0.04]">
               <div className="flex items-center space-x-3">
                 <AlertTriangle className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
                 <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
@@ -1451,7 +1488,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
                     )}
-                    <span className="ml-2 font-mono text-brand-violet dark:text-brand-violet">
+                    <span className="ml-2 font-mono text-gray-700 dark:text-text-secondary">
                       {user.login}
                     </span>
                   </label>
@@ -1485,7 +1522,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     (confirmation.type === 'all' &&
                       confirmation.githubUsernameInput !== user?.login)
                   }
-                  className="flex-1 px-4 py-2 bg-status-red hover:bg-gray-100 dark:bg-white/[0.04] text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-status-red hover:bg-red-600 dark:hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isDeleting ? (
                     <>
@@ -1509,9 +1546,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {importPreview.isOpen && importPreview.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-status-emerald border-b border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+            <div className="px-6 py-4 bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04]">
               <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-status-emerald " />
+                <Upload className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
                 <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
                   {t('导入数据预览', 'Import Data Preview')}
                 </h3>

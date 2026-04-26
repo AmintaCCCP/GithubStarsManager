@@ -256,7 +256,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Cloud className="w-6 h-6 text-status-emerald " />
+        <Cloud className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
         <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
           {t('备份与恢复', 'Backup & Restore')}
         </h3>
@@ -290,7 +290,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
-            <Upload className="w-8 h-8 text-status-emerald " />
+            <Upload className="w-8 h-8 text-gray-700 dark:text-text-secondary" />
             <div>
               <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('备份数据', 'Backup Data')}
@@ -316,7 +316,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
         <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
           <div className="flex items-center space-x-3 mb-4">
-            <Download className="w-8 h-8 text-brand-violet dark:text-brand-violet" />
+            <Download className="w-8 h-8 text-gray-700 dark:text-text-secondary" />
             <div>
               <h4 className="font-medium text-gray-900 dark:text-text-primary">
                 {t('恢复数据', 'Restore Data')}

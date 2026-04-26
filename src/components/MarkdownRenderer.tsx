@@ -103,9 +103,9 @@ const CodeBlock: React.FC<{
   return (
     <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
       isBashLike
-        ? 'border-black/[0.06] dark:border-white/[0.04]/30 dark:border-black/[0.06] dark:border-white/[0.04]/30'
+        ? 'border-black/[0.06] dark:border-white/[0.04]'
         : isPowerShell
-          ? 'border-brand-violet/30 dark:border-black/[0.06] dark:border-white/[0.04]/30'
+          ? 'border-brand-violet/30 dark:border-brand-violet/30'
           : isCmdLike
             ? 'border-cyan-500/30 dark:border-cyan-400/30'
             : 'border-black/[0.06] dark:border-white/[0.04]'
@@ -113,22 +113,22 @@ const CodeBlock: React.FC<{
       <div className="flex items-center justify-between px-4 py-2.5 bg-light-surface dark:bg-panel-dark/90 border-b border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center gap-2.5">
           <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
-            <span className="w-3 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] " />
-            <span className="w-3 h-3 rounded-full bg-status-emerald0/80 dark:bg-status-emerald0/70" />
+            <span className="w-3 h-3 rounded-full bg-[#ff5f56] dark:bg-[#ff5f56]/90 shadow-sm" />
+            <span className="w-3 h-3 rounded-full bg-[#ffbd2e] dark:bg-[#ffbd2e]/90 shadow-sm" />
+            <span className="w-3 h-3 rounded-full bg-[#27c93f] dark:bg-[#27c93f]/90 shadow-sm" />
           </div>
           {language && (
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
               isBashLike
-                ? 'bg-status-emerald text-status-emerald border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                ? 'bg-status-emerald/20 text-status-emerald border border-status-emerald/30 dark:bg-status-emerald/20 dark:text-status-emerald dark:border-status-emerald/30'
                 : isPowerShell
-                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/20/40 text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/30 text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]'
                   : isCmdLike
                     ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
                     : 'bg-gray-200 dark:bg-white/[0.04] text-gray-700 dark:text-text-tertiary border border-black/[0.06] dark:border-white/[0.04]'
             }`}>
               {isBashLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-status-emerald0 animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-status-emerald animate-pulse" />
               )}
               {isPowerShell && (
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-brand-violet animate-pulse" />
@@ -142,7 +142,7 @@ const CodeBlock: React.FC<{
         </div>
         <div className="flex items-center gap-2">
           {showLineNumbers && (
-            <span className="text-xs text-gray-400 dark:text-text-tertiaryfont-mono">
+            <span className="text-xs text-gray-400 dark:text-text-tertiary font-mono">
               {lineCount} {uiLanguage === 'zh' ? '行' : 'lines'}
             </span>
           )}
@@ -150,9 +150,9 @@ const CodeBlock: React.FC<{
             onClick={handleCopy}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copyError
-                ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]'
                 : copied
-                  ? 'bg-status-emerald text-status-emerald border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
+                  ? 'bg-status-emerald text-white border border-status-emerald'
                   : 'bg-white dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-black/[0.06] dark:border-white/[0.04]'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
@@ -174,45 +174,45 @@ const CodeBlock: React.FC<{
         </div>
       </div>
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+        <div className="absolute top-14 right-4 max-w-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-black/[0.06] dark:border-white/[0.04]">
           {copyError}
         </div>
       )}
       <div className={`overflow-x-auto ${
         isBashLike
-          ? 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/95 dark:to-gray-800/95'
+          ? 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0d1117] dark:to-[#161b22]'
           : isPowerShell
-            ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/20 dark:to-slate-900/20'
+            ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-[#0d1117] dark:to-[#161b22]'
             : isCmdLike
-              ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-cyan-950/15 dark:to-slate-900/10'
-              : 'bg-light-bg dark:bg-[#1e1e1e]'
+              ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-[#0d1117] dark:to-[#161b22]'
+              : 'bg-light-bg dark:bg-[#0d1117]'
       }`}>
         {showLineNumbers ? (
           <div className="flex">
             <div className={`flex-shrink-0 py-3 px-3 text-right select-none border-r ${
               isBashLike
-                ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] bg-status-emerald/30 '
+                ? 'border-black/[0.06] dark:border-[#30363d] bg-status-emerald/10 dark:bg-[#161b22]'
                 : isPowerShell
-                  ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/20/10'
+                  ? 'border-black/[0.06] dark:border-[#30363d] bg-gray-100 dark:bg-[#161b22]'
                   : isCmdLike
-                    ? 'border-cyan-200 dark:border-cyan-800 bg-cyan-50/20 dark:bg-cyan-900/10'
-                    : 'border-black/[0.06] dark:border-white/[0.04] bg-light-surface50 dark:bg-panel-dark/30'
+                    ? 'border-cyan-200 dark:border-[#30363d] bg-cyan-50/20 dark:bg-[#161b22]'
+                    : 'border-black/[0.06] dark:border-[#30363d] bg-light-surface/50 dark:bg-[#161b22]'
             }`}>
               {codeLines.map((_, i) => (
-                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-text-tertiaryfont-mono tabular-nums">
+                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-[#6e7681] font-mono tabular-nums">
                   {i + 1}
                 </div>
               ))}
             </div>
             <pre className={`flex-1 p-4 overflow-x-auto ${className || ''}`}>
-              <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+              <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
                 {codeText}
               </code>
             </pre>
           </div>
         ) : (
           <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-gray-200 ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
               {codeText}
             </code>
           </pre>
@@ -493,7 +493,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <div className="my-4 p-4 bg-gray-100 dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04] flex items-center gap-3">
+      <div className="my-4 p-4 bg-gray-100 dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-3">
         <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
@@ -582,7 +582,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </div>
 
           {!isLoading && !hasError && (
-            <div className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiaryopacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
+            <div className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiary opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
               <span>
                 {isInsideLink
                   ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')

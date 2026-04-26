@@ -324,8 +324,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
                 showConfirm === 'restore'
-                  ? 'bg-teal-700 text-white hover:bg-teal-800'
-                  : 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-800'
+                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
+                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('批量还原', 'Bulk Restore')}
             >

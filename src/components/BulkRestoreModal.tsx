@@ -352,8 +352,8 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
               <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>
                 {t(
-                  `⚠️ 还原到默认来源将清除 ${stats.hasAnyAiData} 个仓库的AI分析数据（AI总结、AI标签等），此操作不可撤销。清除后需重新运行AI分析才能恢复这些数据。如需保留AI数据，请选择还原到AI来源。`,
-                  `⚠️ Restoring to default will clear AI analysis data (AI summary, AI tags, etc.) for ${stats.hasAnyAiData} repositories. This action cannot be undone. You will need to re-run AI analysis to recover this data. To keep AI data, choose "Restore to AI" instead.`
+                  `还原到默认来源将清除 ${stats.hasAnyAiData} 个仓库的AI分析数据（AI总结、AI标签等），此操作不可撤销。清除后需重新运行AI分析才能恢复这些数据。如需保留AI数据，请选择还原到AI来源。`,
+                  `Restoring to default will clear AI analysis data (AI summary, AI tags, etc.) for ${stats.hasAnyAiData} repositories. This action cannot be undone. You will need to re-run AI analysis to recover this data. To keep AI data, choose "Restore to AI" instead.`
                 )}
               </span>
             </p>

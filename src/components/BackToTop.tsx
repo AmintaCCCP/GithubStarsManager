@@ -69,14 +69,14 @@ export const BackToTop: React.FC = () => {
         fixed z-50
         flex items-center justify-center
         w-12 h-12
-        bg-brand-indigo hover:bg-gray-100 dark:bg-white/[0.04]
-        dark:bg-brand-violet dark:hover:bg-brand-violet/90
-        text-white
+        bg-white dark:bg-white/[0.06]
+        text-gray-700 dark:text-text-secondary
         rounded-full
         shadow-lg hover:shadow-xl
-        transform transition-[opacity,transform] duration-300 ease-out
-        hover:scale-110
-        focus:outline-none focus:ring-2 focus:ring-brand-violet focus:ring-offset-2
+        border border-gray-200 dark:border-white/[0.08]
+        transform transition-[opacity,transform,background-color] duration-300 ease-out
+        hover:scale-110 hover:bg-gray-50 dark:hover:bg-white/[0.1]
+        focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
         ${isVisible && !readmeModalOpen
           ? 'opacity-100 translate-y-0 pointer-events-auto'

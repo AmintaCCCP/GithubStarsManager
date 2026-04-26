@@ -279,8 +279,10 @@ const normalizePersistedState = (
   return {
     ...currentState,
     ...safePersisted,
-    // Force dark theme: migrate legacy 'light' users to the new Linear dark-mode-first design
-    theme: 'dark',
+    theme:
+      safePersisted.theme === 'light' || safePersisted.theme === 'dark'
+        ? safePersisted.theme
+        : 'dark',
     repositories,
     releases,
     searchResults: repositories,
