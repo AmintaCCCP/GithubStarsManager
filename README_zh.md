@@ -4,7 +4,7 @@
 
 # GithubStarsManager
 
-![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![全平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white)
+![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![全平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white) [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/AmintaCCCP/GithubStarsManager)
 
 一个基于AI的GitHub星标仓库管理工具，帮助您更好地组织和管理您的GitHub星标项目。
 
@@ -16,56 +16,131 @@
 
 ## 功能特性
 
-### 🤖 AI智能分析
-- 自动分析仓库内容并生成中文摘要
-- 智能提取项目标签和支持平台
-- 基于AI的自然语言搜索功能
+> 星标太多找不到？GitHub Stars Manager 自动同步您的星标仓库，使用 AI 进行摘要和分类，支持语义搜索。追踪 Release、过滤资产、一键下载——比手动标签更智能，比 GitHub 更简单。
 
-### 📂 智能分类管理
-- 预设14个常用应用分类
-- 支持自定义分类创建和管理
-- 基于AI标签的自动分类匹配
+### 核心功能
 
-### ⭐ 星标仓库管理
+| 功能 | 描述 |
+|------|------|
+| **自动同步星标** | 连接 GitHub Token 自动拉取所有星标仓库 |
+| **AI 摘要与分类** | 使用 AI 生成标签、主题和简短 README 概览 |
+| **语义搜索** | 按意图而非精确名称查找仓库 |
+| **Release 追踪** | 订阅仓库并在统一时间线查看新版本 |
+| **一键下载** | 展开 Release 资产并即时下载 |
+| **智能资产过滤** | 按关键词匹配资产 (dmg / mac / arm64 / aarch64) |
+| **发现中心** | 浏览 GitHub 趋势、热门发布、最受欢迎项目 |
+| **双语 Wiki 跳转** | 根据仓库语言跳转到 Deepwiki (EN) 或 zread (ZH) |
+| **客户端打包** | 无需配置环境，下载即用 |
 
-自动拉取您GitHub账户下的星标仓库，通过AI自动分析并生成仓库描述、标签和分类。支持过滤、关键词搜索，快速定位任意仓库。
+### 可选后端服务
 
-![SCR-20250629-qkjk](upload/repo.jpg)
+部署 Express + SQLite 后端以实现：
 
-### 🔔 Release订阅追踪
-- 订阅感兴趣仓库的Release更新
-- 智能解析下载链接和支持平台
-- Release时间线视图和已读状态管理
+- **跨设备同步** — 在不同浏览器和设备间共享数据
+- **无 CORS 代理** — AI 和 WebDAV 请求通过服务器转发，避免浏览器 CORS 限制
+- **加密令牌存储** — API 密钥安全存储，不暴露在浏览器中
 
-订阅星标仓库的发布通知，文件发布后即可快速查看和下载。
+---
 
-![SCR-20250629-qkea](upload/release.jpg)
+## 🔍 界面预览
 
-### 🔍 强大的搜索功能
-- AI驱动的自然语言搜索
-- 多维度过滤（语言、平台、标签、状态）
-- 高级搜索和排序选项
+### 1. 仓库管理 (`Stars` 视图)
 
-### 💾 数据备份同步
-- WebDAV云存储备份支持
-- 跨设备数据同步
-- 本地数据持久化存储
+**功能列表：**
+- **自动同步** — 连接 GitHub Token 自动拉取所有星标仓库
+- **AI 批量分析** — 批量选择仓库，使用 AI 自动生成描述、标签和分类；支持暂停/继续分析进度
+- **仓库卡片展示** — 显示 star 数、fork 数、编程语言、主分支状态；支持展开 README 预览
+- **分类侧边栏** — 拖拽排序分类、自定义分类颜色、折叠/展开侧边栏；支持锁定分类防止 AI 覆盖
+- **批量操作工具栏** — 批量归类到指定分类、批量恢复 AI 分析结果
+- **订阅指示器** — 直观显示哪些仓库已订阅 Release 更新
+- **AI 分析状态** — 显示已分析/未分析/分析失败状态；支持按分析状态筛选
 
-### 🎨 现代化界面
-- 响应式设计，支持移动端
-- 深色/浅色主题切换
-- 中英文双语支持
+**截图：**
+![Repository Management Interface](upload/repo.png)
 
-### 🖥️ 可选后端服务
-- 可选的 Express + SQLite 后端，支持跨设备数据同步
-- AI 和 WebDAV 请求通过服务器代理，避免浏览器 CORS 限制
-- API 密钥加密存储在服务器，增强安全性
+---
 
-### 🤖 自定义AI模型
+### 2. Release 时间线 (`Releases` 视图)
 
-使用您自己的AI模型API，支持OpenAI兼容接口。
+**功能列表：**
+- **订阅管理** — 订阅/取消订阅仓库的 Release 通知；支持批量取消订阅
+- **时间线展示** — 按时间倒序列出所有仓库的新版本发布；显示已读/未读状态
+- **智能资产过滤** — 按平台筛选 (macOS / Windows / Linux / ARM)；按文件类型筛选 (dmg / zip / deb / rpm / apk)
+- **自定义过滤规则** — 保存自定义关键词过滤规则
+- **展开下载** — 展开 Release 资产列表，一键复制下载链接；显示文件大小
+- **多视图模式** — 列表视图 / 网格视图切换
+- **分页加载** — 支持分页加载历史发布记录
+- **刷新状态指示** — 显示最后刷新时间
 
-![SCR-20250629-qldc](upload/SCR-20250629-qldc.png)
+**截图：**
+![Release Timeline Interface](upload/release.png)
+
+---
+
+### 3. 发现中心 (`Discover` 视图)
+
+**功能列表：**
+- **五大发现渠道** — 趋势(Trending) / 热门发布(Hot Release) / 最受欢迎(Most Popular) / 话题(Topic) / 搜索(Search)
+- **趋势时间范围** — 今日 / 本周 / 本月 三个时间维度
+- **趋势筛选规则** — 更新时间 30 天内，Star 数 50+，按 Star 降序排列
+- **平台过滤** — 按操作系统筛选 (All / macOS / Windows / Linux / Browser)
+- **编程语言过滤** — 按语言筛选 (JavaScript / TypeScript / Python / Go / Rust 等)
+- **AI 仓库分析** — 一键对发现频道中的仓库进行 AI 分析
+- **订阅仓库** — 将感兴趣的仓库加入订阅列表
+- **移动端适配** — 移动设备友好的频道切换体验
+
+> 趋势数据来源于 GitHub 趋势 RSS 源，每 30 分钟自动更新。适合发现新兴热门项目、追踪技术趋势、寻找学习方向。
+
+**截图：**
+![Discovery Trending Interface](upload/discovery.png)
+
+---
+
+### 4. 搜索与过滤
+
+**功能列表：**
+- **多维度搜索** — 关键词搜索、仓库状态筛选、标签筛选、语言筛选、平台筛选
+- **AI 分析状态筛选** — 已分析 / 未分析 / 分析失败 / 已编辑
+- **Release 订阅筛选** — 已订阅 / 未订阅 Release
+- **分类状态筛选** — 分类已锁定 / 未锁定
+- **快捷键支持** — 显示搜索快捷键提示
+- **搜索统计** — 显示搜索结果数量和筛选条件
+- **搜索演示模式** — 展示语义搜索能力
+
+**截图：**
+![Search Interface](upload/search.png)
+
+---
+
+### 5. 设置面板
+
+**设置分组：**
+
+| 分组 | 功能 |
+|------|------|
+| **General** | 语言切换 (中/英)、主题设置 |
+| **AI Config** | 配置 OpenAI / Anthropic / Ollama / 兼容 API；支持自定义端点和密钥 |
+| **WebDAV** | 坚果云、Nextcloud、ownCloud 等标准 WebDAV 服务备份配置 |
+| **Backup** | 备份历史记录、手动备份/恢复、增量备份 |
+| **Backend Server** | 连接自建后端服务、API 密钥验证、同步状态指示 |
+| **Category** | 分类管理、分类排序、默认分类覆盖规则 |
+| **Data Management** | 数据导入/导出、清除本地数据、重置所有数据 |
+
+**截图：**
+![Settings Panel Interface](upload/settings.png)
+
+---
+
+### 6. 自定义 AI 模型
+
+**功能列表：**
+- **多 AI 提供商支持** — OpenAI (GPT-3.5/GPT-4)、Anthropic (Claude)、Ollama (本地模型)、任何兼容 OpenAI 接口的 API
+- **自定义端点** — 支持私有部署的 AI 服务
+- **连接测试** — 配置后测试 API 连接是否可用
+- **AI 模型选择** — 选择要使用的具体模型
+
+**截图：**
+![AI Configuration Interface](upload/ai.png)
 
 ## 技术栈
 

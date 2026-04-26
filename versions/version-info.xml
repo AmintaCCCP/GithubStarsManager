@@ -262,8 +262,21 @@
       <item>Unified selected states for repository filters and highlighted subscribed release state on repository cards.</item>
       <item>Added clearer hover feedback for repository cards and replaced unstar icons with a clearer action icon.</item>
       <item>Aligned discovery sidebar/layout, improved discovery channel icon contrast, and normalized data management icons.</item>
-      <item>Fixed discovery filter trigger and last refreshed visibility/styling.</item> <item>Special thanks to @SummerRay160 for their outstanding contributions to this release!</item>
+      <item>Fixed discovery filter trigger and last refreshed visibility/styling.</item>
+      <item>Special thanks to @SummerRay160 for their outstanding contributions to this release!</item>
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.3</downloadUrl>
+  </version>
+  <version>
+    <number>0.5.4</number>
+    <releaseDate>2026-04-26</releaseDate>
+    <changelog>
+      <item>Added visible purple focus ring to all form inputs in AI Configuration, WebDAV, Backend, and Category Management panels. Previously, inputs showed no visual feedback when focused — especially after dismissing an alert dialog — making fields appear unresponsive. (PR #110)</item>
+      <item>Fixed Tailwind class typo: bg-light-surfaceborder-black/[0.06] (missing space) was processed as an invalid class name, breaking background and border styles on multiple form controls. Corrected to bg-light-surface border-black/[0.06]. (PR #110)</item>
+      <item>Removed hardcoded version string from UpdateService.getCurrentVersion() and replaced it with an import from package.json, so the version number stays in sync automatically. (PR #111)</item>
+      <item>Improved sidebar scroll behavior and fixed theme persistence across sessions. (PR #105)</item>
+      <item>Special thanks to @SummerRay160 for contributing to this release!</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.4</downloadUrl>
   </version>
 </versions>

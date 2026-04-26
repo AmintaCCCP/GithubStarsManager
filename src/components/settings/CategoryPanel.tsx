@@ -304,7 +304,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder={t('例如: 我的项目', 'e.g., My Projects')}
               />
             </div>
@@ -322,7 +322,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     setNewCategoryIcon(value);
                   }
                 }}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder="📁"
               />
             </div>
@@ -335,7 +335,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+              className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
               placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
             />
             <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
@@ -483,14 +483,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary"
+                            className="w-14 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                             placeholder="📁"
                           />
                           <input
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                             placeholder={t('分类名称', 'Category name')}
                           />
                         </div>
@@ -499,7 +499,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             type="text"
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary"
+                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                             placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
                           />
                           <button
