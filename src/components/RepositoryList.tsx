@@ -1103,7 +1103,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     checked={showAISummary}
                     onChange={() => hasAnalyzedRepos && setShowAISummary(true)}
                     disabled={!hasAnalyzedRepos}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
                   />
                   <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('AI分析内容', 'AI Analysis')}
@@ -1118,7 +1118,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     name="displayContent"
                     checked={!showAISummary}
                     onChange={() => setShowAISummary(false)}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
                   />
                   <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('原始描述', 'Original')}
