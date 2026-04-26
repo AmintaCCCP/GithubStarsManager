@@ -341,7 +341,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
               />
             </div>
@@ -353,7 +353,7 @@ Focus on practicality and accurate categorization to help users quickly understa
               <select
                 value={form.apiType}
                 onChange={(e) => setForm(prev => ({ ...prev, apiType: e.target.value as AIApiType }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
               >
                 <option value="openai">OpenAI (Chat Completions)</option>
                 <option value="openai-responses">OpenAI (Responses)</option>
@@ -371,7 +371,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder={
                   form.apiType === 'openai' || form.apiType === 'openai-responses'
                     ? 'https://api.openai.com/v1'
@@ -411,7 +411,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder={t('输入API密钥', 'Enter API key')}
               />
             </div>
@@ -424,7 +424,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
                 placeholder="gpt-4"
               />
             </div>
@@ -452,7 +452,7 @@ Focus on practicality and accurate categorization to help users quickly understa
               <select
                 value={form.reasoningEffort}
                 onChange={(e) => setForm(prev => ({ ...prev, reasoningEffort: e.target.value as '' | AIReasoningEffort }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary"
+                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
               >
                 <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
                 <option value="none">{t('none — 不推理', 'none — No reasoning')}</option>
@@ -493,7 +493,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                     type="checkbox"
                     checked={form.useCustomPrompt}
                     onChange={(e) => handleUseCustomPromptChange(e.target.checked)}
-                    className="w-4 h-4 text-brand-violet bg-light-surfaceborder-black/[0.06] rounded focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+                    className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] rounded focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                   />
                   <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
                     {t('使用自定义提示词', 'Use Custom Prompt')}
@@ -614,7 +614,7 @@ Focus on practicality and accurate categorization to help users quickly understa
                   name="activeAI"
                   checked={config.id === activeAIConfig}
                   onChange={() => setActiveAIConfig(config.id)}
-                  className="w-4 h-4 text-gray-700 dark:text-text-secondary bg-light-surfaceborder-black/[0.06] focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+                  className="w-4 h-4 text-gray-700 dark:text-text-secondary bg-light-surface border-black/[0.06] focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
                 />
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
