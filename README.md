@@ -13,7 +13,7 @@ An app for managing github starred repositories.
 
 </div>
 
-**[中文文档](README_zh.md)** | English ｜ 
+**[中文文档](README_zh.md)** | English  
 
 
 ## ✨ Features
