@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { Download, RefreshCw, ExternalLink, Calendar, Package } from 'lucide-react';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { useAppStore } from '../store/useAppStore';
@@ -95,69 +96,75 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
         </div>
       )}
 
-      {/* 更新对话框 */}
-      {showUpdateDialog && updateInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-panel-dark rounded-xl shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              {/* 标题 */}
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-brand-indigo/20 dark:bg-brand-indigo/20 rounded-full flex items-center justify-center">
-                  <Package className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
-                    {t('发现新版本', 'New Version Available')}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
-                    v{updateInfo.number}
-                  </p>
-                </div>
-              </div>
-
-              {/* 版本信息 */}
-              <div className="mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-text-tertiary mb-3">
-                  <Calendar className="w-4 h-4" />
-                  <span>{t('发布日期:', 'Release Date:')} {formatDate(updateInfo.releaseDate)}</span>
+      {/* 更新对话框 - 使用 Portal 渲染到 body 以避免被 overflow 容器遮挡 */}
+      {showUpdateDialog && updateInfo &&
+        ReactDOM.createPortal(
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowUpdateDialog(false); }}
+          >
+            <div className="bg-white dark:bg-panel-dark rounded-xl shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                {/* 标题 */}
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-brand-indigo/20 dark:bg-brand-indigo/20 rounded-full flex items-center justify-center">
+                    <Package className="w-6 h-6 text-brand-violet dark:text-brand-violet" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+                      {t('发现新版本', 'New Version Available')}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                      v{updateInfo.number}
+                    </p>
+                  </div>
                 </div>
 
-                {/* 更新日志 */}
+                {/* 版本信息 */}
                 <div className="mb-4">
-                  <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
-                    {t('更新内容:', 'What\'s New:')}
-                  </h4>
-                  <ul className="space-y-1">
-                    {updateInfo.changelog.map((item, index) => (
-                      <li key={index} className="text-sm text-gray-700 dark:text-text-tertiary flex items-start space-x-2">
-                        <span className="w-1.5 h-1.5 bg-brand-violet rounded-full mt-2 flex-shrink-0"></span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-text-tertiary mb-3">
+                    <Calendar className="w-4 h-4" />
+                    <span>{t('发布日期:', 'Release Date:')} {formatDate(updateInfo.releaseDate)}</span>
+                  </div>
 
-              {/* 按钮 */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>{t('立即下载', 'Download Now')}</span>
-                </button>
-                <button
-                  onClick={() => setShowUpdateDialog(false)}
-                  className="px-4 py-2 bg-gray-200 dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                >
-                  {t('稍后提醒', 'Later')}
-                </button>
+                  {/* 更新日志 */}
+                  <div className="mb-4">
+                    <h4 className="font-medium text-gray-900 dark:text-text-primary mb-2">
+                      {t('更新内容:', 'What\'s New:')}
+                    </h4>
+                    <ul className="space-y-1">
+                      {updateInfo.changelog.map((item, index) => (
+                        <li key={index} className="text-sm text-gray-700 dark:text-text-tertiary flex items-start space-x-2">
+                          <span className="w-1.5 h-1.5 bg-brand-violet rounded-full mt-2 flex-shrink-0"></span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* 按钮 */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>{t('立即下载', 'Download Now')}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowUpdateDialog(false)}
+                    className="px-4 py-2 bg-gray-200 dark:bg-white/[0.04] text-gray-900 dark:text-text-secondary rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    {t('稍后提醒', 'Later')}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )
+      }
     </>
   );
 };
