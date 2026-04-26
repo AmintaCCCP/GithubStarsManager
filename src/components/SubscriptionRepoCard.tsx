@@ -209,8 +209,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       return;
     }
 
-    if (activeConfig.apiKeyStatus === 'decrypt_failed') {
-      alert(t('AI服务的API密钥无法解密，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted. Please re-enter and save the configuration in settings.'));
+    if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
+      alert(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'));
       return;
     }
 

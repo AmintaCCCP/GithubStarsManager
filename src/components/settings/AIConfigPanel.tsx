@@ -152,12 +152,12 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setTestingId(config.id);
     try {
       const aiService = new AIService(config, language);
-      const isConnected = await aiService.testConnection();
-      
-      if (isConnected) {
+      const result = await aiService.testConnection();
+
+      if (result.success) {
         alert(t('AI服务连接成功！', 'AI service connection successful!'));
       } else {
-        alert(t('AI服务连接失败，请检查配置。', 'AI service connection failed. Please check configuration.'));
+        alert(result.message);
       }
     } catch (error) {
       console.error('AI test failed:', error);
@@ -190,12 +190,12 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       };
 
       const aiService = new AIService(tempConfig, language);
-      const isConnected = await aiService.testConnection();
-      
-      if (isConnected) {
-        alert(t('AI服务连接成功！', 'AI service connection successful!'));
+      const result = await aiService.testConnection();
+
+      if (result.success) {
+        alert(t('✅ AI服务连接成功！', '✅ AI service connection successful!'));
       } else {
-        alert(t('AI服务连接失败，请检查配置。', 'AI service connection failed. Please check configuration.'));
+        alert(result.message);
       }
     } catch (error) {
       console.error('AI test failed:', error);
@@ -630,11 +630,11 @@ Focus on practicality and accurate categorization to help users quickly understa
                     {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
-                  {config.apiKeyStatus === 'decrypt_failed' && (
+                  {(config.apiKeyStatus === 'decrypt_failed' || config.apiKeyStatus === 'empty') && (
                     <p className="mt-1 text-sm text-gray-700 dark:text-text-secondary ">
                       {t(
-                        '存储的 API Key 无法解密，请重新输入并保存该配置。',
-                        'The stored API key could not be decrypted. Please re-enter and save this configuration.'
+                        '存储的 API Key 无法解密或为空，请重新输入并保存该配置。',
+                        'The stored API key could not be decrypted or is empty. Please re-enter and save this configuration.'
                       )}
                     </p>
                   )}
