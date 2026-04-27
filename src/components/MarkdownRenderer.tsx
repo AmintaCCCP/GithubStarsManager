@@ -493,19 +493,17 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <div className="my-4 p-4 bg-gray-100 dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-3">
-        <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="my-2 px-3 py-2 bg-gray-100 dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-2 text-xs">
+        <svg className="w-4 h-4 text-gray-500 dark:text-text-tertiary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-700 dark:text-text-secondary font-medium">
-            {language === 'zh' ? '图片加载失败' : 'Image failed to load'}
-          </p>
-          {alt && <p className="text-xs text-gray-700 dark:text-text-secondary truncate">{alt}</p>}
-        </div>
+        <span className="text-gray-500 dark:text-text-tertiary">
+          {language === 'zh' ? '图片加载失败' : 'Image failed'}
+        </span>
+        {alt && <span className="text-gray-400 dark:text-text-quaternary truncate max-w-[120px]">{alt}</span>}
         <button
           onClick={handleRetry}
-          className="px-2 py-1 text-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary rounded hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors flex-shrink-0"
+          className="ml-auto px-2 py-0.5 text-xs text-brand-violet hover:text-brand-violet/80 transition-colors flex-shrink-0"
         >
           {language === 'zh' ? '重试' : 'Retry'}
         </button>
@@ -548,11 +546,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       ) : (
         <div className="my-4 flex flex-col items-center group/img">
           {isLoading && (
-            <div className="w-full max-w-md h-48 bg-light-surface dark:bg-panel-dark rounded-xl flex flex-col items-center justify-center animate-pulse gap-2">
-              <svg className="w-8 h-8 text-gray-300 dark:text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-full max-w-md h-16 bg-light-surface dark:bg-panel-dark rounded-lg flex items-center justify-center animate-pulse gap-2">
+              <svg className="w-5 h-5 text-gray-300 dark:text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-xs text-gray-400 dark:text-text-tertiary">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
+              <span className="text-xs text-gray-400 dark:text-text-quaternary">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
             </div>
           )}
 

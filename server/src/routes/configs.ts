@@ -125,7 +125,6 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     }
 
     const bulkSync = db.transaction(() => {
-      // Read existing keys BEFORE delete
       const existingKeys = new Map<string, string>();
       const existingRows = db.prepare('SELECT id, api_key_encrypted FROM ai_configs').all() as Array<{ id: string; api_key_encrypted: string }>;
       for (const row of existingRows) {
@@ -139,6 +138,8 @@ router.put('/api/configs/ai/bulk', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
+      const skippedConfigs: Array<{ id: string; name: string; reason: string }> = [];
+
       for (const c of configs) {
         let encryptedKey = '';
         if (c.apiKey && !c.apiKey.startsWith('***')) {
@@ -146,11 +147,27 @@ router.put('/api/configs/ai/bulk', (req, res) => {
         } else {
           encryptedKey = existingKeys.get(String(c.id)) ?? '';
         }
+
+        if (!encryptedKey) {
+          skippedConfigs.push({
+            id: c.id,
+            name: c.name ?? '',
+            reason: c.apiKey?.startsWith('***')
+              ? 'API key is masked and no existing key found'
+              : 'API key is empty',
+          });
+          continue;
+        }
+
         stmt.run(
           c.id, c.name ?? '', c.apiType ?? 'openai', c.baseUrl ?? '',
           encryptedKey, c.model ?? '', c.isActive ? 1 : 0,
           c.customPrompt ?? null, c.useCustomPrompt ? 1 : 0, c.concurrency ?? 1, c.reasoningEffort ?? null
         );
+      }
+
+      if (skippedConfigs.length > 0) {
+        console.warn('[configs] Skipped AI configs with missing keys:', skippedConfigs);
       }
     });
 
