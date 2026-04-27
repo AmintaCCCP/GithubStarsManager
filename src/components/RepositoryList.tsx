@@ -12,15 +12,16 @@ import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
 import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
+import { useDialog } from '../hooks/useDialog';
 
 interface RepositoryListProps {
   repositories: Repository[];
   selectedCategory: string;
 }
 
-export const RepositoryList: React.FC<RepositoryListProps> = ({ 
-  repositories, 
-  selectedCategory 
+export const RepositoryList: React.FC<RepositoryListProps> = ({
+  repositories,
+  selectedCategory
 }) => {
   const {
     githubToken,
@@ -41,6 +42,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     batchUnsubscribeReleases,
     releaseSubscriptions
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -267,23 +270,23 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
-      alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
+      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
       return;
     }
 
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
     if (!activeConfig) {
-      alert(language === 'zh' ? '请先在设置中配置AI服务。' : 'Please configure AI service in settings first.');
+      toast(language === 'zh' ? '请先在设置中配置AI服务。' : 'Please configure AI service in settings first.', 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      alert(language === 'zh' ? 'AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.');
+      toast(language === 'zh' ? 'AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.', 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      alert(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.');
+      toast(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.', 'error');
       return;
     }
 
@@ -295,25 +298,29 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     if (targetRepos.length === 0) {
       const message = analyzeFailedOnly
-        ? (language === 'zh' ? '没有分析失败的仓库！' : 'No failed repositories to re-analyze!')
+        ? t('没有分析失败的仓库！', 'No failed repositories to re-analyze!')
         : analyzeUnanalyzedOnly
-          ? (language === 'zh' ? '所有仓库都已经分析过了！' : 'All repositories have been analyzed!')
-          : (language === 'zh' ? '没有可分析的仓库！' : 'No repositories to analyze!');
-      alert(message);
+          ? t('所有仓库都已经分析过了！', 'All repositories have been analyzed!')
+          : t('没有可分析的仓库！', 'No repositories to analyze!');
+      toast(message, 'info');
       return;
     }
 
     const actionText = analyzeFailedOnly
       ? (language === 'zh' ? '失败' : 'failed')
-      : analyzeUnanalyzedOnly 
+      : analyzeUnanalyzedOnly
         ? (language === 'zh' ? '未分析' : 'unanalyzed')
         : (language === 'zh' ? '全部' : 'all');
-    
+
     const confirmMessage = language === 'zh'
       ? `将对 ${targetRepos.length} 个${actionText}仓库进行AI分析，这可能需要几分钟时间。是否继续？`
       : `Will analyze ${targetRepos.length} ${actionText} repositories with AI. This may take several minutes. Continue?`;
-    
-    const confirmed = confirm(confirmMessage);
+
+    const confirmed = await confirm(
+      t('AI分析确认', 'AI Analysis Confirmation'),
+      confirmMessage,
+      { type: 'warning' }
+    );
     if (!confirmed) return;
 
     // 重置状态
@@ -400,13 +407,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ? `AI分析完成！成功: ${successCount}, 失败: ${failedCount} (平均响应: ${stats.averageResponseTime}ms)`
             : `AI analysis completed! Success: ${successCount}, Failed: ${failedCount} (avg: ${stats.averageResponseTime}ms)`);
 
-      alert(completionMessage);
+      toast(completionMessage, 'success');
     } catch (error) {
       console.error('AI analysis failed:', error);
       const errorMessage = language === 'zh'
         ? 'AI分析失败，请检查AI配置和网络连接。'
         : 'AI analysis failed. Please check AI configuration and network connection.';
-      alert(errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       // 清理状态
       optimizerRef.current = null;
@@ -435,14 +442,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (!isAnalyzingRef.current) return;
 
     const confirmMessage = language === 'zh'
       ? '确定要停止 AI 分析吗？已分析的结果将会保存。'
       : 'Are you sure you want to stop AI analysis? Analyzed results will be saved.';
 
-    if (confirm(confirmMessage)) {
+    const confirmed = await confirm(
+      t('停止AI分析', 'Stop AI Analysis'),
+      confirmMessage,
+      { type: 'warning' }
+    );
+    if (confirmed) {
       shouldStopRef.current = true;
       // 中止优化器
       if (optimizerRef.current) {
@@ -561,11 +573,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         : `\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`)
       : '';
 
-    alert(language === 'zh'
+    toast(language === 'zh'
       ? `成功还原 ${successCount} 个仓库${skipMsg}`
-      : `Successfully restored ${successCount} repositories${skipMsg}`
+      : `Successfully restored ${successCount} repositories${skipMsg}`,
+      failedRepos.length > 0 ? 'error' : 'success'
     );
-  }, [repositories, selectedRepoIds, updateRepository, language]);
+  }, [repositories, selectedRepoIds, updateRepository, language, toast]);
 
   // 处理单击空白处 - 触发回到顶部按钮跳跃动画
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -589,7 +602,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       switch (action) {
         case 'unstar': {
           if (!githubToken) {
-            alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
+            toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
             return;
           }
 
@@ -597,7 +610,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ? `确定要取消 ${repos.length} 个仓库的 Star 吗？此操作不可撤销！`
             : `Are you sure you want to unstar ${repos.length} repositories? This action cannot be undone!`;
 
-          if (!confirm(confirmMessage)) return;
+          const confirmed = await confirm(
+            t('取消Star确认', 'Unstar Confirmation'),
+            confirmMessage,
+            { type: 'danger', confirmText: t('取消Star', 'Unstar') }
+          );
+          if (!confirmed) return;
 
           const githubApi = new GitHubApiService(githubToken);
           const successIds: number[] = [];
@@ -618,9 +636,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
 
           await forceSyncToBackend();
-          alert(language === 'zh'
+          toast(language === 'zh'
             ? `成功取消 ${successIds.length} 个仓库的 Star`
-            : `Successfully unstarred ${successIds.length} repositories`
+            : `Successfully unstarred ${successIds.length} repositories`,
+            'success'
           );
           break;
         }
@@ -637,7 +656,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         case 'ai-summary': {
           if (!githubToken) {
-            alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
+            toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
             return;
           }
 
@@ -645,11 +664,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ? `将对 ${repos.length} 个仓库进行 AI 分析，这可能需要几分钟时间。是否继续？`
             : `Will analyze ${repos.length} repositories with AI. This may take several minutes. Continue?`;
 
-          if (!confirm(confirmMessage)) return;
+          if (!await confirm(t('AI分析确认', 'AI Analysis Confirmation'), confirmMessage, { type: 'warning' })) return;
 
           const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
           if (!activeConfig) {
-            alert(language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.');
+            toast(language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.', 'error');
             return;
           }
 
@@ -728,13 +747,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             console.log('Bulk AI Analysis Stats:', stats);
 
             await forceSyncToBackend();
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功分析 ${successCount} 个仓库，失败 ${failedCount} 个 (平均响应: ${stats.averageResponseTime}ms)`
-              : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`
+              : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`,
+              failedCount > 0 ? 'error' : 'success'
             );
           } catch (error) {
             console.error('Bulk AI analysis failed:', error);
-            alert(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed');
+            toast(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed', 'error');
           } finally {
             // 确保状态重置
             optimizerRef.current = null;
@@ -765,21 +785,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
 
           await forceSyncToBackend();
-          alert(language === 'zh'
+          toast(language === 'zh'
             ? `成功订阅 ${successCount} 个仓库的版本发布`
-            : `Successfully subscribed to ${successCount} repositories releases`
+            : `Successfully subscribed to ${successCount} repositories releases`,
+            'success'
           );
           break;
         }
 
         case 'unsubscribe': {
           const subscribedRepos = repos.filter(repo => releaseSubscriptions.has(repo.id));
-          
+
           if (subscribedRepos.length === 0) {
-            alert(language === 'zh'
-              ? '选中的仓库中没有被订阅的'
-              : 'None of the selected repositories are subscribed'
-            );
+            toast(t('选中的仓库中没有被订阅的', 'None of the selected repositories are subscribed'), 'info');
             return;
           }
 
@@ -804,14 +822,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           // 汇总结果显示
           const successCount = subscribedRepos.length - failedRepos.length;
           if (failedRepos.length > 0) {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功取消 ${successCount} 个仓库的版本发布订阅\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-              : `Successfully unsubscribed ${successCount} repositories from releases\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+              : `Successfully unsubscribed ${successCount} repositories from releases\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
+              'error'
             );
           } else {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功取消 ${successCount} 个仓库的版本发布订阅`
-              : `Successfully unsubscribed ${successCount} repositories from releases`
+              : `Successfully unsubscribed ${successCount} repositories from releases`,
+              'success'
             );
           }
           break;
@@ -846,14 +866,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个没有自定义分类的仓库` : `\n\nSkipped ${skippedCount} repositories without custom category`)
             : '';
           if (failedRepos.length > 0) {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功锁定 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}${skipMsg}`
-              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}${skipMsg}`
+              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}${skipMsg}`,
+              'error'
             );
           } else {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功锁定 ${successCount} 个仓库的分类${skipMsg}`
-              : `Successfully locked categories for ${successCount} repositories${skipMsg}`
+              : `Successfully locked categories for ${successCount} repositories${skipMsg}`,
+              'success'
             );
           }
           break;
@@ -879,28 +901,30 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           await forceSyncToBackend();
           if (failedRepos.length > 0) {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功解锁 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-              : `Successfully unlocked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+              : `Successfully unlocked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
+              'error'
             );
           } else {
-            alert(language === 'zh'
+            toast(language === 'zh'
               ? `成功解锁 ${successCount} 个仓库的分类`
-              : `Successfully unlocked categories for ${successCount} repositories`
+              : `Successfully unlocked categories for ${successCount} repositories`,
+              'success'
             );
           }
           break;
         }
 
         default:
-          alert(language === 'zh' ? '未知操作' : 'Unknown action');
+          toast(language === 'zh' ? '未知操作' : 'Unknown action', 'error');
       }
 
       // 清除选择
       handleDeselectAll();
     } catch (error) {
       console.error('Bulk action failed:', error);
-      alert(language === 'zh' ? '批量操作失败' : 'Bulk action failed');
+      toast(language === 'zh' ? '批量操作失败' : 'Bulk action failed', 'error');
     }
   };
 
@@ -939,14 +963,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     // 汇总结果显示
     const successCount = selectedRepos.length - failedRepos.length;
     if (failedRepos.length > 0) {
-      alert(language === 'zh'
+      toast(language === 'zh'
         ? `成功为 ${successCount} 个仓库设置分类：${categoryName}\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-        : `Successfully categorized ${successCount} repositories as: ${categoryName}\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`
+        : `Successfully categorized ${successCount} repositories as: ${categoryName}\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
+        'error'
       );
     } else {
-      alert(language === 'zh'
+      toast(language === 'zh'
         ? `成功为 ${successCount} 个仓库设置分类：${categoryName}`
-        : `Successfully categorized ${successCount} repositories as: ${categoryName}`
+        : `Successfully categorized ${successCount} repositories as: ${categoryName}`,
+        'success'
       );
     }
 

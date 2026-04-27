@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Download, RefreshCw, ExternalLink, Calendar, Package } from 'lucide-react';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { useAppStore } from '../store/useAppStore';
+import { useDialog } from '../hooks/useDialog';
 
 interface UpdateCheckerProps {
   onUpdateAvailable?: (version: VersionInfo) => void;
@@ -10,6 +11,7 @@ interface UpdateCheckerProps {
 
 export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable }) => {
   const { language, setUpdateNotification } = useAppStore();
+  const { toast } = useDialog();
   const [isChecking, setIsChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -39,13 +41,12 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
         });
       } else if (!silent) {
         // 只在手动检查时显示"已是最新版本"的消息
-        alert(t('当前已是最新版本！', 'You are already using the latest version!'));
+        toast(t('当前已是最新版本！', 'You are already using the latest version!'), 'info');
       }
     } catch (error) {
       const errorMessage = t('检查更新失败，请检查网络连接', 'Failed to check for updates. Please check your network connection.');
-      setError(errorMessage);
       if (!silent) {
-        alert(errorMessage);
+        toast(errorMessage, 'error');
       }
       console.error('Update check failed:', error);
     } finally {

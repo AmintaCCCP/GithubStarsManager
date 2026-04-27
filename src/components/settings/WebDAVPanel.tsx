@@ -3,6 +3,7 @@ import { Cloud, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw } from 'lucide
 import { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { WebDAVService } from '../../services/webdavService';
+import { useDialog } from '../../hooks/useDialog';
 
 interface WebDAVPanelProps {
   t: (zh: string, en: string) => string;
@@ -17,6 +18,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     deleteWebDAVConfig,
     setActiveWebDAVConfig,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         if (err === '路径必须以 / 开头') return t('路径必须以 / 开头', 'Path must start with /');
         return err;
       });
-      alert(translated.join('\n'));
+      toast(translated.join('\n'), 'error');
       return;
     }
 
@@ -96,15 +99,15 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     try {
       const webdavService = new WebDAVService(config);
       const isConnected = await webdavService.testConnection();
-      
+
       if (isConnected) {
-        alert(t('WebDAV连接成功！', 'WebDAV connection successful!'));
+        toast(t('WebDAV连接成功！', 'WebDAV connection successful!'), 'success');
       } else {
-        alert(t('WebDAV连接失败，请检查配置。', 'WebDAV connection failed. Please check configuration.'));
+        toast(t('WebDAV连接失败，请检查配置。', 'WebDAV connection failed. Please check configuration.'), 'error');
       }
     } catch (error) {
       console.error('WebDAV test failed:', error);
-      alert(`${t('WebDAV测试失败', 'WebDAV test failed')}: ${(error as Error).message}`);
+      toast(`${t('WebDAV测试失败', 'WebDAV test failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setTestingId(null);
     }
@@ -276,8 +279,13 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   <Edit3 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(t('确定要删除这个WebDAV配置吗？', 'Are you sure you want to delete this WebDAV configuration?'))) {
+                  onClick={async () => {
+                    const confirmed = await confirm(
+                      t('确定要删除这个WebDAV配置吗？', 'Delete WebDAV Configuration?'),
+                      t('此操作无法撤销。', 'This action cannot be undone.'),
+                      { type: 'danger', confirmText: t('删除', 'Delete') }
+                    );
+                    if (confirmed) {
                       deleteWebDAVConfig(config.id);
                     }
                   }}

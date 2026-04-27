@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { 
-  RefreshCw, 
-  TrendingUp, 
-  Bot, 
-  Loader2, 
-  Rocket, 
-  Tag, 
+import {
+  RefreshCw,
+  TrendingUp,
+  Bot,
+  Loader2,
+  Rocket,
+  Tag,
   Search,
   Crown,
   Filter,
@@ -28,11 +28,12 @@ import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
-import type { 
-  DiscoveryChannelId, 
+import { useDialog } from '../hooks/useDialog';
+import type {
+  DiscoveryChannelId,
   DiscoveryChannelIcon,
-  DiscoveryRepo, 
-  DiscoveryPlatform, 
+  DiscoveryRepo,
+  DiscoveryPlatform,
   ProgrammingLanguage,
   SortBy,
   SortOrder,
@@ -286,6 +287,81 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
   );
 };
 
+interface CustomSelectOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: CustomSelectOption[];
+  className?: string;
+  dropdownClassName?: string;
+}
+
+const CustomSelect: React.FC<CustomSelectProps> = ({
+  value,
+  onChange,
+  options,
+  className = '',
+  dropdownClassName = '',
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find(o => o.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] text-gray-900 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors ${className}`}
+      >
+        {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
+        <span>{selectedOption?.label}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                value === option.value
+                  ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
+                  : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
+              }`}
+            >
+              {option.icon && <span className="w-4 h-4">{option.icon}</span>}
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface LoadMoreButtonProps {
   onLoadMore: () => void;
   isLoading: boolean;
@@ -412,6 +488,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setTrendingTimeRange,
   } = useAppStore();
 
+  const { toast } = useDialog();
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
   const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
@@ -460,7 +538,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
     if (!githubToken) {
-      alert(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'));
+      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
@@ -566,7 +644,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       if (append) {
         setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
       } else {
-        alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+        toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
       }
     } finally {
       if (append) {
@@ -660,33 +738,33 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
     const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
     if (!activeConfig) {
-      alert(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'));
+      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      alert(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'));
+      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      alert(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'));
+      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
       return;
     }
 
     const pageRepos = allRepos;
-    
+
     if (pageRepos.length === 0) {
-      alert(t('当前没有项目。', 'No projects available.'));
+      toast(t('当前没有项目。', 'No projects available.'), 'error');
       return;
     }
 
     const unanalyzed = pageRepos.filter(
       (r: DiscoveryRepo) => !r.analyzed_at || r.analysis_failed
     );
-    
+
     if (unanalyzed.length === 0) {
-      alert(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'));
+      toast(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'), 'info');
       return;
     }
 
@@ -777,15 +855,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
-      alert(
+      toast(
         t(
           `AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`,
           `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`
-        )
+        ),
+        successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success'
       );
     } catch (err) {
       console.error('AI analysis error:', err);
-      alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+      toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
     } finally {
       setIsAnalyzing(false);
       setAnalysisOptimizer(null);
@@ -1091,36 +1170,24 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <option value="PHP">PHP</option>
                   </select>
                   
-                  <select
+                  <CustomSelect
                     value={discoverySortBy}
-                    onChange={(e) => setDiscoverySortBy(e.target.value as SortBy)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
-                  >
-                    <option value="BestMatch">{t('最佳匹配', 'Best Match')}</option>
-                    <option value="MostStars">{t('最多Star', 'Most Stars')}</option>
-                    <option value="MostForks">{t('最多Fork', 'Most Forks')}</option>
-                  </select>
-                  
-                  <select
+                    onChange={(value) => setDiscoverySortBy(value as SortBy)}
+                    options={[
+                      { value: 'BestMatch', label: t('最佳匹配', 'Best Match') },
+                      { value: 'MostStars', label: t('最多Star', 'Most Stars') },
+                      { value: 'MostForks', label: t('最多Fork', 'Most Forks') },
+                    ]}
+                  />
+
+                  <CustomSelect
                     value={discoverySortOrder}
-                    onChange={(e) => setDiscoverySortOrder(e.target.value as SortOrder)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
-                  >
-                    <option value="Descending">{t('降序', 'Descending')}</option>
-                    <option value="Ascending">{t('升序', 'Ascending')}</option>
-                  </select>
-                  
-                  <select
-                    value={discoveryPlatform}
-                    onChange={(e) => setDiscoveryPlatform(e.target.value as DiscoveryPlatform)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
-                  >
-                    <option value="All">{t('所有平台', 'All Platforms')}</option>
-                    <option value="Android">Android</option>
-                    <option value="Macos">macOS</option>
-                    <option value="Windows">Windows</option>
-                    <option value="Linux">Linux</option>
-                  </select>
+                    onChange={(value) => setDiscoverySortOrder(value as SortOrder)}
+                    options={[
+                      { value: 'Descending', label: t('降序', 'Descending') },
+                      { value: 'Ascending', label: t('升序', 'Ascending') },
+                    ]}
+                  />
                 </div>
               </div>
             )}
