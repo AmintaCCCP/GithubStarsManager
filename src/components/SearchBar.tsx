@@ -50,7 +50,7 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) =
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50">
+        <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 overflow-hidden">
           {sortOptions.map((option) => (
             <button
               key={option.value}
