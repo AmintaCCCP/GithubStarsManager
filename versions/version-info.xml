@@ -279,4 +279,19 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.4</downloadUrl>
   </version>
+  <version>
+    <number>0.5.5</number>
+    <releaseDate>2026-04-27</releaseDate>
+    <changelog>
+      <item>Update Dialog Portal Fix: Fixed the update dialog backdrop mask being trapped inside the overflow container. The dialog now renders via React Portal at the document body level with proper z-index stacking. Added click-on-mask-to-dismiss behavior for better UX. (PR #112)</item>
+      <item>Banner Layout Improvements: Fixed banner button wrapping on narrow viewports. Removed invalid Tailwind classes and improved responsive layout with proper flex behavior. (PR #112)</item>
+      <item>Electron Focus Hijacking Fix: Replaced native alert()/confirm() dialogs with custom React components (Toast and ConfirmDialog), resolving focus trapping issues in Electron. (PR #117)</item>
+      <item>Category Lock Toggle Visibility: Improved the category lock toggle color differentiation in dark mode. Unlocked state now uses gray-600, locked state uses amber. Both states are clearly distinguishable. (PR #118)</item>
+      <item>AI Connection Test Enhancements: AI connection test now returns detailed, user-facing results including status and guidance messages. (PR #114)</item>
+      <item>AI Configuration Error Handling: AI analysis now properly blocks execution when API keys are empty or cannot be decrypted. Bulk AI config import now skips entries without usable keys and logs reasons. (PR #114)</item>
+      <item>Unified Error Messages and UI Polish: Consolidated AI configuration error messages and improved markdown image/GitHub link dark-mode styling. (PR #114)</item>
+      <item>Special thanks to @SummerRay160 for their outstanding contributions to this release!</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.5</downloadUrl>
+  </version>
 </versions>
