@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown } from 'lucide-react';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { Repository } from '../types';
@@ -7,6 +7,72 @@ import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { NumberInput } from './ui/NumberInput';
 
+type SortBy = 'stars' | 'updated' | 'name' | 'starred';
+
+const sortOptions: { value: SortBy; labelZh: string; labelEn: string }[] = [
+  { value: 'stars', labelZh: '按星标排序', labelEn: 'Sort by Stars' },
+  { value: 'updated', labelZh: '按更新排序', labelEn: 'Sort by Updated' },
+  { value: 'name', labelZh: '按名称排序', labelEn: 'Sort by Name' },
+  { value: 'starred', labelZh: '按加星时间排序', labelEn: 'Sort by Starred Time' },
+];
+
+interface SortByDropdownProps {
+  value: SortBy;
+  onChange: (value: SortBy) => void;
+  t: (zh: string, en: string) => string;
+}
+
+const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const selected = sortOptions.find(o => o.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
+      >
+        <span>{t(selected?.labelZh ?? '', selected?.labelEn ?? '')}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50">
+          {sortOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`flex w-full items-center px-4 py-2 text-sm transition-colors ${
+                value === option.value
+                  ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
+                  : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
+              }`}
+            >
+              {t(option.labelZh, option.labelEn)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SearchBar: React.FC = () => {
   const {
@@ -910,21 +976,14 @@ export const SearchBar: React.FC = () => {
 
         {/* Sort Controls */}
         <div className="flex items-center gap-2 overflow-x-auto">
-          <select
+          <SortByDropdown
             value={searchFilters.sortBy}
-            onChange={(e) => setSearchFilters({ 
-              sortBy: e.target.value as 'stars' | 'updated' | 'name' | 'starred'
-            })}
-            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
-          >
-            <option value="stars">{t('按星标排序', 'Sort by Stars')}</option>
-            <option value="updated">{t('按更新排序', 'Sort by Updated')}</option>
-            <option value="name">{t('按名称排序', 'Sort by Name')}</option>
-            <option value="starred">{t('按加星时间排序', 'Sort by Starred Time')}</option>
-          </select>
+            onChange={(value) => setSearchFilters({ sortBy: value as 'stars' | 'updated' | 'name' | 'starred' })}
+            t={t}
+          />
           <button
-            onClick={() => setSearchFilters({ 
-              sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc' 
+            onClick={() => setSearchFilters({
+              sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
             className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
           >
