@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
 import { StepperInput } from '../ui/StepperInput';
+import { useDialog } from '../../hooks/useDialog';
 
 interface CategoryPanelProps {
   t: (zh: string, en: string) => string;
@@ -25,6 +26,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const showDefaultCategory = useAppStore(state => state.showDefaultCategory);
   const setCategoryOrder = useAppStore(state => state.setCategoryOrder);
   const setCollapsedSidebarCategoryCount = useAppStore(state => state.setCollapsedSidebarCategoryCount);
+
+  const { toast, confirm } = useDialog();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) {
-      alert(t('请输入分类名称', 'Please enter category name'));
+      toast(t('请输入分类名称', 'Please enter category name'), 'error');
       return;
     }
 
@@ -96,7 +99,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
   const handleSaveEdit = () => {
     if (!editName.trim()) {
-      alert(t('分类名称不能为空', 'Category name cannot be empty'));
+      toast(t('分类名称不能为空', 'Category name cannot be empty'), 'error');
       return;
     }
 
@@ -142,8 +145,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     setEditKeywords('');
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    if (confirm(t('确定要删除这个自定义分类吗？', 'Are you sure you want to delete this custom category?'))) {
+  const handleDeleteCategory = async (categoryId: string) => {
+    const confirmed = await confirm(
+      t('确定要删除这个自定义分类吗？', 'Delete Custom Category?'),
+      t('此操作无法撤销。', 'This action cannot be undone.'),
+      { type: 'danger', confirmText: t('删除', 'Delete') }
+    );
+    if (confirmed) {
       deleteCustomCategory(categoryId);
     }
   };
@@ -182,8 +190,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   };
 
   // 重置分类排序
-  const handleResetOrder = () => {
-    if (confirm(t('确定要重置分类排序吗？这将恢复默认顺序。', 'Are you sure you want to reset category order? This will restore the default order.'))) {
+  const handleResetOrder = async () => {
+    const confirmed = await confirm(
+      t('确定要重置分类排序吗？', 'Reset Category Order?'),
+      t('这将恢复默认顺序。', 'This will restore the default order.'),
+      { type: 'warning' }
+    );
+    if (confirmed) {
       setCategoryOrder([]);
     }
   };

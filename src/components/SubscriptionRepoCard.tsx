@@ -7,6 +7,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
+import { useDialog } from '../hooks/useDialog';
 
 interface SubscriptionRepoCardProps {
   repo: DiscoveryRepo;
@@ -25,7 +26,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const repositories = useAppStore(state => state.repositories);
   const addRepository = useAppStore(state => state.addRepository);
   const deleteRepository = useAppStore(state => state.deleteRepository);
-  
+
+  const { toast } = useDialog();
+
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const [isStarring, setIsStarring] = useState(false);
@@ -122,7 +125,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       setOptimisticStarred(null);
       console.error('Failed to unstar repository:', error);
       const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
-      alert(errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
       setPendingUnstarAction(null);
@@ -174,14 +177,14 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       
       // 操作成功，清除乐观状态
       setOptimisticStarred(null);
-      
-      alert(t('已成功添加 Star', 'Successfully starred'));
+
+      toast(t('已成功添加 Star', 'Successfully starred'), 'success');
     } catch (error) {
       // 操作失败，回滚乐观状态
       setOptimisticStarred(null);
       console.error('Failed to star repository:', error);
       const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
-      alert(errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
     }
@@ -197,25 +200,25 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 处理单个项目AI分析
   const handleAnalyze = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!githubToken) {
-      alert(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'));
+      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
     const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
     if (!activeConfig) {
-      alert(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'));
+      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      alert(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'));
+      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      alert(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'));
+      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
       return;
     }
 
@@ -264,7 +267,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           analysis_failed: failedResult.analysis_failed,
         };
         updateDiscoveryRepo(failedRepo);
-        alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+        toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
       }
     } finally {
       if (!controller.signal.aborted) {

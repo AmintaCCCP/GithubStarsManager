@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { DialogProvider } from './hooks/useDialog';
 
 console.log('Main.tsx loading...');
 
@@ -21,7 +22,9 @@ try {
   root.render(
     <StrictMode>
       <ErrorBoundary>
-        <App />
+        <DialogProvider>
+          <App />
+        </DialogProvider>
       </ErrorBoundary>
     </StrictMode>
   );

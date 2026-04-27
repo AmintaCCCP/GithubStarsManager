@@ -3,6 +3,7 @@ import { Save, X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
 import { Category } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useDialog } from '../hooks/useDialog';
 
 // Complete emoji collection for categories
 const availableIcons = [
@@ -794,6 +795,8 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 }) => {
   const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore();
 
+  const { toast } = useDialog();
+
   const originalDefaultCategories = getAllCategories([], language, [], {});
   const isDefaultCategoryModified = category && !category.isCustom && category.id in defaultCategoryOverrides;
   const originalCategory = category && !category.isCustom ? originalDefaultCategories.find(c => c.id === category.id) : null;
@@ -838,7 +841,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
   const handleSave = () => {
     if (!formData.name.trim()) {
-      alert(language === 'zh' ? '请输入分类名称' : 'Please enter category name');
+      toast(language === 'zh' ? '请输入分类名称' : 'Please enter category name', 'error');
       return;
     }
 

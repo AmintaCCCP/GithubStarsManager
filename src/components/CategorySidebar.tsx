@@ -12,6 +12,7 @@ import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/u
 import { CategoryEditModal } from './CategoryEditModal';
 import { forceSyncToBackend } from '../services/autoSync';
 import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
+import { useDialog } from '../hooks/useDialog';
 
 interface CategorySidebarProps {
   repositories: Repository[];
@@ -38,6 +39,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     isSidebarCollapsed,
     setSidebarCollapsed,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -195,11 +198,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   };
 
   const handleDeleteCategory = async (category: Category) => {
-    const confirmed = confirm(
+    const confirmed = await confirm(
+      t('删除分类确认', 'Delete Category Confirmation'),
       t(
         `确定删除自定义分类"${category.name}"吗？\n\n仓库会保留，Star 不会取消，只会清空它们的手动分类归属。`,
         `Delete custom category "${category.name}"?\n\nRepositories will stay starred. Only their manual category assignment will be cleared.`
-      )
+      ),
+      { type: 'danger', confirmText: t('删除', 'Delete') }
     );
 
     if (!confirmed) return;
@@ -208,17 +213,18 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     try {
       await forceSyncToBackend();
     } catch {
-      // Revert local change on failure
-      alert(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'));
+      toast(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'), 'error');
     }
   };
 
   const handleHideDefaultCategory = async (category: Category) => {
-    const confirmed = confirm(
+    const confirmed = await confirm(
+      t('隐藏分类确认', 'Hide Category Confirmation'),
       t(
         `隐藏默认分类"${category.name}"？\n\n这不会删除任何仓库，只是在左侧隐藏这个预设分类。`,
         `Hide default category "${category.name}"?\n\nThis will not delete any repositories. It only hides this built-in category from the sidebar.`
-      )
+      ),
+      { type: 'warning' }
     );
 
     if (!confirmed) return;
@@ -227,9 +233,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     try {
       await forceSyncToBackend();
     } catch {
-      // Revert local change on failure - 回滚时调用 showDefaultCategory 恢复显示
       showDefaultCategory(category.id);
-      alert(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'));
+      toast(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'), 'error');
     }
   };
 
@@ -242,10 +247,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const handleSyncError = (originalRepo: Repository) => {
     updateRepository(originalRepo);
     setDragOverCategoryId(null);
-    alert(
+    toast(
       language === 'zh'
         ? `同步到后端失败，已恢复分类更改。`
-        : `Failed to sync to backend. Category change has been reverted.`
+        : `Failed to sync to backend. Category change has been reverted.`,
+      'error'
     );
   };
 
@@ -382,16 +388,16 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         </div>
       ) : (
         /* 桌面端：可折叠侧栏 - sticky定位，滚动时保持可见 */
-        <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start">
+        <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start z-10">
           {/* 侧栏容器 */}
           <div
-            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden transition-all duration-250 ease-out ${
+            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-visible transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
             }`}
             style={{
-              maxHeight: isSidebarCollapsed ? 'auto' : 'calc(100vh - 8rem)',
+              maxHeight: isSidebarCollapsed ? 'calc(100vh - 8rem)' : 'calc(100vh - 8rem)',
               transitionProperty: 'width, padding, max-height',
             }}
           >
@@ -603,7 +609,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   e.stopPropagation();
                                   void handleHideDefaultCategory(category);
                                 }}
-                                className="p-1 rounded-md text-gray-500hover:bg-gray-200 dark:text-text-tertiary dark:hover:bg-white/10"
+                                className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:text-text-tertiary dark:hover:bg-white/10"
                                 title={t('隐藏默认分类', 'Hide default category')}
                                 aria-label={t('隐藏默认分类', 'Hide default category')}
                               >
