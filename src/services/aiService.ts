@@ -25,6 +25,38 @@ interface OpenAIResponse {
   choices?: OpenAIResponseChoice[];
 }
 
+export interface ConnectionTestResult {
+  success: boolean;
+  statusCode?: number;
+  statusText?: string;
+  errorType?: 'network' | 'auth' | 'timeout' | 'server' | 'unknown';
+  message: string;
+}
+
+function getStatusCodeMeaning(statusCode: number, language: string): string {
+  const meanings: Record<number, { zh: string; en: string }> = {
+    400: { zh: '请求参数错误', en: 'Bad Request' },
+    401: { zh: 'API密钥无效或已过期', en: 'Invalid or expired API key' },
+    403: { zh: '没有权限访问该资源', en: 'Forbidden - no permission' },
+    404: { zh: 'API端点或模型不存在', en: 'API endpoint or model not found' },
+    408: { zh: '请求超时', en: 'Request timeout' },
+    429: { zh: '请求过于频繁，已达到速率限制', en: 'Rate limit exceeded' },
+    500: { zh: '服务器内部错误', en: 'Internal server error' },
+    502: { zh: '网关错误，服务器暂时不可用', en: 'Bad Gateway' },
+    503: { zh: '服务暂时不可用，请稍后重试', en: 'Service unavailable' },
+    504: { zh: '网关超时', en: 'Gateway timeout' },
+  };
+  return meanings[statusCode]?.[language as 'zh' | 'en'] || (language === 'zh' ? '未知错误' : 'Unknown error');
+}
+
+function getErrorTypeFromStatus(statusCode: number): ConnectionTestResult['errorType'] {
+  if (statusCode === 401 || statusCode === 403) return 'auth';
+  if (statusCode === 408 || statusCode === 504) return 'timeout';
+  if (statusCode >= 500) return 'server';
+  if (statusCode >= 400) return 'unknown';
+  return 'unknown';
+}
+
 export class AIService {
   private config: AIConfig;
   private language: string;
@@ -442,14 +474,23 @@ Focus on practicality and accurate categorization to help users quickly understa
     }
   }
 
-  async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<ConnectionTestResult> {
+    const apiType = this.getApiType();
+    const timeoutMs = apiType === 'openai-responses' || this.config.reasoningEffort ? 30000 : 10000;
+
     try {
       const base = new URL(this.config.baseUrl);
-      if (base.protocol !== 'http:' && base.protocol !== 'https:') return false;
+      if (base.protocol !== 'http:' && base.protocol !== 'https:') {
+        return {
+          success: false,
+          errorType: 'unknown',
+          message: this.language === 'zh'
+            ? '无效的协议，请使用 http:// 或 https://'
+            : 'Invalid protocol, please use http:// or https://',
+        };
+      }
 
       const controller = new AbortController();
-      const apiType = this.getApiType();
-      const timeoutMs = apiType === 'openai-responses' || this.config.reasoningEffort ? 30000 : 10000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const content = await this.requestText({
@@ -459,12 +500,92 @@ Focus on practicality and accurate categorization to help users quickly understa
           maxTokens: 50,
           signal: controller.signal,
         });
-        return !!content;
+        if (content) {
+          return {
+            success: true,
+            message: this.language === 'zh' ? '连接成功' : 'Connection successful',
+          };
+        }
+        return {
+          success: false,
+          errorType: 'unknown',
+          message: this.language === 'zh' ? '未收到响应内容' : 'No content received',
+        };
       } finally {
         clearTimeout(timeoutId);
       }
-    } catch {
-      return false;
+    } catch (error) {
+      const err = error as Error;
+      const errorMessage = err.message || '';
+
+      // 解析状态码
+      const statusMatch = errorMessage.match(/(\d{3})/);
+      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+
+      // 处理超时错误
+      if (errorMessage.includes('timeout') || errorMessage.includes('abort') || err.name === 'AbortError') {
+        return {
+          success: false,
+          errorType: 'timeout',
+          message: this.language === 'zh'
+            ? `连接超时（${timeoutMs / 1000}秒）。请检查：1. 网络连接是否正常 2. API端点是否正确 3. 服务器是否响应缓慢`
+            : `Connection timeout (${timeoutMs / 1000}s). Please check: 1. Network connection 2. API endpoint 3. Server response time`,
+        };
+      }
+
+      // 处理网络错误
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+        return {
+          success: false,
+          errorType: 'network',
+          message: this.language === 'zh'
+            ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
+            : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
+        };
+      }
+
+      // 如果有状态码，提供详细的错误信息
+      if (statusCode) {
+        const meaning = getStatusCodeMeaning(statusCode, this.language);
+        const errorType = getErrorTypeFromStatus(statusCode) ?? 'unknown';
+        const suggestions: Record<string, { zh: string; en: string }> = {
+          auth: {
+            zh: '请检查 API 密钥是否正确，或密钥是否已过期',
+            en: 'Please check if the API key is correct or expired',
+          },
+          timeout: {
+            zh: '请求超时，请稍后重试或检查网络连接',
+            en: 'Request timeout, please retry later or check network',
+          },
+          server: {
+            zh: '服务器端错误，请稍后重试或联系服务提供商',
+            en: 'Server error, please retry later or contact provider',
+          },
+          unknown: {
+            zh: '请检查 API 端点、模型名称和请求参数是否正确',
+            en: 'Please check API endpoint, model name and request parameters',
+          },
+        };
+
+        return {
+          success: false,
+          statusCode,
+          statusText: meaning,
+          errorType,
+          message: this.language === 'zh'
+            ? `HTTP ${statusCode} - ${meaning}\n建议：${suggestions[errorType].zh}`
+            : `HTTP ${statusCode} - ${meaning}\nSuggestion: ${suggestions[errorType].en}`,
+        };
+      }
+
+      // 默认错误
+      return {
+        success: false,
+        errorType: 'unknown',
+        message: this.language === 'zh'
+          ? `连接失败：${errorMessage || '未知错误'}\n请检查 API 端点、API 密钥和模型名称是否正确`
+          : `Connection failed: ${errorMessage || 'Unknown error'}\nPlease check API endpoint, API key and model name`,
+      };
     }
   }
 
