@@ -45,7 +45,6 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
       }
     } catch (error) {
       const errorMessage = t('检查更新失败，请检查网络连接', 'Failed to check for updates. Please check your network connection.');
-      setError(errorMessage);
       if (!silent) {
         toast(errorMessage, 'error');
       }

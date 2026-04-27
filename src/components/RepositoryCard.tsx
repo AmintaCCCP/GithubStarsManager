@@ -272,7 +272,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const handleAIAnalyze = async () => {
     if (!githubToken) {
-      toast(t('GitHub token not found. Please login again.', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
@@ -574,6 +574,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     event.dataTransfer.setData('application/x-gsm-repository-id', String(repository.id));
     event.dataTransfer.effectAllowed = 'move';
+
+    // 设置拖拽图片为整个卡片
+    const cardElement = event.currentTarget.closest('.repository-card') as HTMLElement;
+    if (cardElement) {
+      const rect = cardElement.getBoundingClientRect();
+      // offsetX/Y 使拖拽图片中心对准鼠标位置
+      event.dataTransfer.setDragImage(cardElement, event.clientX - rect.left, event.clientY - rect.top);
+    }
+
     event.stopPropagation();
     isDraggingRef.current = true;
     // 标记正在拖拽，防止触发卡片点击
@@ -880,7 +889,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
           {/* Tooltip - Only show when text is actually truncated */}
           {isTextTruncated && showTooltip && (
-            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-black/[0.06] dark:border-white/[0.04] max-h-48 overflow-y-auto">
+            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-black/[0.06] dark:border-white/[0.04]">
               <div className="whitespace-pre-wrap break-words">
                 {highlightSearchTerm(displayContent.content, searchQuery)}
               </div>

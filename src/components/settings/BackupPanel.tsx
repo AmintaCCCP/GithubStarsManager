@@ -114,7 +114,6 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       const backupContent = await webdavService.downloadFile(latestBackup);
 
       if (!backupContent) {
-        setIsRestoring(false);
         toast(t('备份文件内容为空，无法恢复。', 'Backup file is empty, cannot restore.'), 'error');
         return;
       }
@@ -251,6 +250,9 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         console.error('Restore failed:', error);
         toast(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`, 'error');
       }
+    } catch (error) {
+      console.error('Restore failed:', error);
+      toast(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsRestoring(false);
     }

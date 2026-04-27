@@ -413,7 +413,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setTrendingTimeRange,
   } = useAppStore();
 
-  const { toast, confirm } = useDialog();
+  const { toast } = useDialog();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
@@ -785,7 +785,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           `AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`,
           `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`
         ),
-        failCount > 0 ? 'error' : 'success'
+        successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success'
       );
     } catch (err) {
       console.error('AI analysis error:', err);

@@ -34,3 +34,9 @@ server/dist/
 
  # Orchestrator internal files
 .sisyphus/
+
+# Claude Code local (per-developer) settings
+.claude/settings.local.json
+
+# Landing page (separate static site)
+LandingPage/

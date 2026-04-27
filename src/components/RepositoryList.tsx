@@ -298,11 +298,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     if (targetRepos.length === 0) {
       const message = analyzeFailedOnly
-        ? (language === 'zh' ? '没有分析失败的仓库！' : 'No failed repositories to re-analyze!')
+        ? t('没有分析失败的仓库！', 'No failed repositories to re-analyze!')
         : analyzeUnanalyzedOnly
-          ? (language === 'zh' ? '所有仓库都已经分析过了！' : 'All repositories have been analyzed!')
-          : (language === 'zh' ? '没有可分析的仓库！' : 'No repositories to analyze!');
-      toast(message, 'error');
+          ? t('所有仓库都已经分析过了！', 'All repositories have been analyzed!')
+          : t('没有可分析的仓库！', 'No repositories to analyze!');
+      toast(message, 'info');
       return;
     }
 
@@ -797,11 +797,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           const subscribedRepos = repos.filter(repo => releaseSubscriptions.has(repo.id));
 
           if (subscribedRepos.length === 0) {
-            toast(language === 'zh'
-              ? '选中的仓库中没有被订阅的'
-              : 'None of the selected repositories are subscribed',
-              'error'
-            );
+            toast(t('选中的仓库中没有被订阅的', 'None of the selected repositories are subscribed'), 'info');
             return;
           }
 

@@ -66,7 +66,7 @@ export const Header: React.FC = () => {
 
   const handleSync = async () => {
     if (!githubToken) {
-      toast('GitHub token not found. Please login again.', 'error');
+      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
@@ -110,17 +110,17 @@ export const Header: React.FC = () => {
       // 显示同步结果
       const newRepoCount = newRepositories.length - repositories.length;
       if (newRepoCount > 0) {
-        toast(`同步完成！发现 ${newRepoCount} 个新仓库。`, 'success');
+        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
       } else {
-        toast('同步完成！所有仓库都是最新的。', 'info');
+        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
       }
     } catch (error) {
       console.error('Sync failed:', error);
       if (error instanceof Error && error.message.includes('token')) {
-        toast('GitHub token 已过期或无效，请重新登录。', 'error');
+        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
         logout();
       } else {
-        toast('同步失败，请检查网络连接。', 'error');
+        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
       }
     } finally {
       setLoading(false);
@@ -402,7 +402,7 @@ export const Header: React.FC = () => {
                 <button
                   onClick={async () => {
                     const confirmed = await confirm(
-                      t('确定要退出登录吗？', 'Logout Confirmation'),
+                      t('退出登录确认', 'Logout Confirmation'),
                       language === 'zh'
                         ? '退出后您的 AI 配置、WebDAV 设置、自定义分类等数据仍会保留。如需完全清除所有数据，请前往「设置 → 数据管理」。'
                         : 'Your AI configs, WebDAV settings, custom categories and other data will be preserved. To completely clear all data, please go to "Settings → Data Management".',

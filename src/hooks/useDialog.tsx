@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useCallback, createContext, useContext, ReactNode, useMemo, useRef } from 'react';
 import { Toast, ToastType } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
@@ -15,7 +15,6 @@ interface ConfirmState {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
-  resolve: ((value: boolean) => void) | null;
 }
 
 interface DialogContextValue {
@@ -47,8 +46,12 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
     isOpen: false,
     title: '',
     message: '',
-    resolve: null,
+    confirmText: undefined,
+    cancelText: undefined,
+    type: 'warning',
   });
+
+  const pendingResolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const toast = useCallback((message: string, type: ToastType = 'info') => {
     setToastState({ message, type, key: Date.now() });
@@ -67,7 +70,12 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
       type?: 'danger' | 'warning' | 'info';
     }
   ): Promise<boolean> => {
+    // Cancel any pending confirm so its awaiter does not hang.
+    pendingResolveRef.current?.(false);
+    pendingResolveRef.current = null;
+
     return new Promise((resolve) => {
+      pendingResolveRef.current = resolve;
       setConfirmState({
         isOpen: true,
         title,
@@ -75,25 +83,26 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
         confirmText: options?.confirmText,
         cancelText: options?.cancelText,
         type: options?.type || 'warning',
-        resolve,
       });
     });
   }, []);
 
   const handleConfirm = useCallback(() => {
-    confirmState.resolve?.(true);
-    setConfirmState((prev) => ({ ...prev, isOpen: false, resolve: null }));
-  }, [confirmState.resolve]);
+    pendingResolveRef.current?.(true);
+    pendingResolveRef.current = null;
+    setConfirmState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
 
   const handleCancel = useCallback(() => {
-    confirmState.resolve?.(false);
-    setConfirmState((prev) => ({ ...prev, isOpen: false, resolve: null }));
-  }, [confirmState.resolve]);
+    pendingResolveRef.current?.(false);
+    pendingResolveRef.current = null;
+    setConfirmState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
 
-  const value: DialogContextValue = {
+  const value = useMemo<DialogContextValue>(() => ({
     toast,
     confirm,
-  };
+  }), [toast, confirm]);
 
   return (
     <DialogContext.Provider value={value}>

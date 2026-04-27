@@ -114,8 +114,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     const addedFilterIds: string[] = [];
 
     try {
+      const store = useAppStore.getState();
       presetFilters.forEach(filter => {
-        if (assetFilters.find(f => f.id === filter.id)) {
+        if (store.assetFilters.find(f => f.id === filter.id)) {
           deleteAssetFilter(filter.id);
         }
         if (selectedFilters.includes(filter.id)) {
@@ -123,22 +124,29 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
         }
       });
       DEFAULT_PRESET_FILTERS.forEach(filter => {
-        if (!assetFilters.find(f => f.id === filter.id)) {
+        if (!store.assetFilters.find(f => f.id === filter.id)) {
           addAssetFilter(filter);
           addedFilterIds.push(filter.id);
         }
       });
+      // Restore previously active preset selections that still map to a known preset id.
+      previousSelected.forEach(id => {
+        if (DEFAULT_PRESET_FILTERS.some(f => f.id === id) && !selectedFilters.includes(id)) {
+          onFilterToggle(id);
+        }
+      });
     } catch (error) {
       console.error('Failed to reset presets:', error);
+      const store = useAppStore.getState();
 
       addedFilterIds.forEach(id => {
-        if (assetFilters.find(f => f.id === id)) {
+        if (store.assetFilters.find(f => f.id === id)) {
           deleteAssetFilter(id);
         }
       });
 
       previousFilters.forEach(filter => {
-        if (!assetFilters.find(f => f.id === filter.id)) {
+        if (!store.assetFilters.find(f => f.id === filter.id)) {
           addAssetFilter(filter);
         }
       });

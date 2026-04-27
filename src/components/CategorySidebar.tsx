@@ -388,16 +388,16 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         </div>
       ) : (
         /* 桌面端：可折叠侧栏 - sticky定位，滚动时保持可见 */
-        <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start">
+        <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start z-10">
           {/* 侧栏容器 */}
           <div
-            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden transition-all duration-250 ease-out ${
+            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-visible transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
             }`}
             style={{
-              maxHeight: isSidebarCollapsed ? 'auto' : 'calc(100vh - 8rem)',
+              maxHeight: isSidebarCollapsed ? 'calc(100vh - 8rem)' : 'calc(100vh - 8rem)',
               transitionProperty: 'width, padding, max-height',
             }}
           >
@@ -609,7 +609,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   e.stopPropagation();
                                   void handleHideDefaultCategory(category);
                                 }}
-                                className="p-1 rounded-md text-gray-500hover:bg-gray-200 dark:text-text-tertiary dark:hover:bg-white/10"
+                                className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:text-text-tertiary dark:hover:bg-white/10"
                                 title={t('隐藏默认分类', 'Hide default category')}
                                 aria-label={t('隐藏默认分类', 'Hide default category')}
                               >

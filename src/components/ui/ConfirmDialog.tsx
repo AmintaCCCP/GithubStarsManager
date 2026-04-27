@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 
@@ -26,13 +26,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+  const titleId = useId();
 
   useEffect(() => {
     if (isOpen) {
       previousActiveElement.current = document.activeElement as HTMLElement;
       document.body.style.overflow = 'hidden';
 
-      // Focus cancel button by default for safety
       setTimeout(() => {
         cancelButtonRef.current?.focus();
       }, 0);
@@ -49,7 +51,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
-        onCancel();
+        onCancelRef.current();
       }
     };
 
@@ -60,7 +62,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     return () => {
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onCancel]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -72,12 +74,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     onCancel();
   };
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onCancel();
-    }
-  };
-
   const buttonClass = type === 'danger'
     ? 'bg-status-red hover:bg-status-red/90 dark:bg-status-red/80 dark:hover:bg-status-red'
     : 'bg-brand-indigo hover:bg-brand-hover dark:bg-brand-indigo dark:hover:bg-brand-hover';
@@ -85,17 +81,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const dialogContent = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center"
-      onClick={handleBackdropClick}
     >
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50" />
+      <div
+        className="fixed inset-0 bg-black/50"
+        onClick={onCancel}
+      />
 
       {/* Dialog */}
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
+        aria-labelledby={titleId}
         className="relative w-full max-w-md mx-4 bg-white dark:bg-panel-dark dark:border dark:border-white/[0.04] rounded-xl shadow-xl"
       >
         <div className="p-6">
@@ -108,7 +106,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               }`} />
             </div>
             <div className="flex-1">
-              <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+              <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-text-primary">
                 {title}
               </h3>
               <p className="mt-2 text-sm text-gray-600 dark:text-text-secondary">
