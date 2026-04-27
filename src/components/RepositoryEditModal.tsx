@@ -991,7 +991,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                       disabled={!formData.category}
                       className="sr-only peer"
                     />
-                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-violet rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-black/[0.06] after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-white/[0.04] peer-checked:bg-status-amber peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-violet rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-black/[0.06] after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-white/[0.04] peer-checked:bg-brand-violet peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
                   </label>
                 </div>
                 <p className="text-xs text-gray-700 dark:text-text-secondary">
