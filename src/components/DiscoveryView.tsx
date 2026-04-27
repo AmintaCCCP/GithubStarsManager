@@ -245,8 +245,9 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Use mouseup instead of mousedown to avoid interfering with native select dropdowns
+    document.addEventListener('mouseup', handleClickOutside);
+    return () => document.removeEventListener('mouseup', handleClickOutside);
   }, []);
 
   const selectedPlatform = platforms.find(p => p.id === platform);
