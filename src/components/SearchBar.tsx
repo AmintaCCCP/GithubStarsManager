@@ -975,7 +975,7 @@ export const SearchBar: React.FC = () => {
         </div>
 
         {/* Sort Controls */}
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2">
           <SortByDropdown
             value={searchFilters.sortBy}
             onChange={(value) => setSearchFilters({ sortBy: value as 'stars' | 'updated' | 'name' | 'starred' })}
