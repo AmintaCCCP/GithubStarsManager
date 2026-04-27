@@ -3,6 +3,7 @@ import { Download, Upload, RefreshCw, Cloud, AlertCircle } from 'lucide-react';
 import { AIConfig, WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { WebDAVService } from '../../services/webdavService';
+import { useDialog } from '../../hooks/useDialog';
 
 interface BackupPanelProps {
   t: (zh: string, en: string) => string;
@@ -33,6 +34,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     deleteWebDAVConfig,
   } = useAppStore();
 
+  const { toast, confirm } = useDialog();
+
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -40,14 +43,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
   const handleBackup = async () => {
     if (!activeConfig) {
-      alert(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'));
+      toast(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'), 'error');
       return;
     }
 
     setIsBackingUp(true);
     try {
       const webdavService = new WebDAVService(activeConfig);
-      
+
       const backupData = {
         repositories,
         releases,
@@ -70,14 +73,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
       if (success) {
         setLastBackup(new Date().toISOString());
-        alert(t('数据备份成功！', 'Data backup successful!'));
+        toast(t('数据备份成功！', 'Data backup successful!'), 'success');
       } else {
         console.error('Backup failed: uploadFile returned falsy');
-        alert(t('数据备份失败！', 'Data backup failed!'));
+        toast(t('数据备份失败！', 'Data backup failed!'), 'error');
       }
     } catch (error) {
       console.error('Backup failed:', error);
-      alert(`${t('备份失败', 'Backup failed')}: ${(error as Error).message}`);
+      toast(`${t('备份失败', 'Backup failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsBackingUp(false);
     }
@@ -85,37 +88,37 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
   const handleRestore = async () => {
     if (!activeConfig) {
-      alert(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'));
+      toast(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'), 'error');
       return;
     }
 
-    const confirmMessage = t(
-      '恢复数据将覆盖当前所有数据，是否继续？',
-      'Restoring data will overwrite all current data. Continue?'
+    const confirmed = await confirm(
+      t('恢复数据', 'Restore Data'),
+      t('恢复数据将覆盖当前所有数据，是否继续？', 'Restoring data will overwrite all current data. Continue?'),
+      { type: 'warning' }
     );
-    
-    if (!confirm(confirmMessage)) return;
+    if (!confirmed) return;
 
     setIsRestoring(true);
     try {
       const webdavService = new WebDAVService(activeConfig);
       const files = await webdavService.listFiles();
-      
+
       const backupFiles = files.filter(file => file.startsWith('github-stars-backup-'));
       if (backupFiles.length === 0) {
-        alert(t('未找到备份文件。', 'No backup files found.'));
+        toast(t('未找到备份文件。', 'No backup files found.'), 'error');
         return;
       }
 
       const latestBackup = backupFiles.sort().reverse()[0];
       const backupContent = await webdavService.downloadFile(latestBackup);
-      
+
       if (!backupContent) {
         setIsRestoring(false);
-        alert(t('备份文件内容为空，无法恢复。', 'Backup file is empty, cannot restore.'));
+        toast(t('备份文件内容为空，无法恢复。', 'Backup file is empty, cannot restore.'), 'error');
         return;
       }
-      
+
       try {
         const backupData = JSON.parse(backupContent);
 
@@ -240,13 +243,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           console.warn('恢复 WebDAV 配置时发生问题：', e);
         }
 
-        alert(t(
+        toast(t(
           `已从备份恢复数据：仓库 ${backupData.repositories?.length ?? 0}，发布 ${backupData.releases?.length ?? 0}，自定义分类 ${backupData.customCategories?.length ?? 0}。`,
           `Data restored from backup: repositories ${backupData.repositories?.length ?? 0}, releases ${backupData.releases?.length ?? 0}, custom categories ${backupData.customCategories?.length ?? 0}.`
-        ));
+        ), 'success');
       } catch (error) {
         console.error('Restore failed:', error);
-        alert(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`);
+        toast(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`, 'error');
       }
     } finally {
       setIsRestoring(false);

@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
+import { useDialog } from '../hooks/useDialog';
 
 export const ReleaseTimeline: React.FC = () => {
   const {
@@ -36,6 +37,8 @@ export const ReleaseTimeline: React.FC = () => {
     toggleReleaseExpandedRepository,
     setReleaseIsRefreshing,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -291,7 +294,7 @@ export const ReleaseTimeline: React.FC = () => {
 
   const handleRefresh = async () => {
     if (!githubToken) {
-      alert(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.');
+      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
       return;
     }
 
@@ -299,9 +302,9 @@ export const ReleaseTimeline: React.FC = () => {
     try {
       const githubApi = new GitHubApiService(githubToken);
       const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
-      
+
       if (subscribedRepos.length === 0) {
-        alert(language === 'zh' ? '没有订阅的仓库。' : 'No subscribed repositories.');
+        toast(language === 'zh' ? '没有订阅的仓库。' : 'No subscribed repositories.', 'error');
         return;
       }
 
@@ -346,14 +349,14 @@ export const ReleaseTimeline: React.FC = () => {
       const message = language === 'zh'
         ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
         : `Refresh completed! Found ${actuallyNewCount} new releases.`;
-      
-      alert(message);
+
+      toast(message, 'success');
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
         ? 'Release刷新失败，请检查网络连接。'
         : 'Release refresh failed. Please check your network connection.';
-      alert(errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       setReleaseIsRefreshing(false);
     }
@@ -465,7 +468,7 @@ export const ReleaseTimeline: React.FC = () => {
   const handleUnsubscribeRelease = async (repoId: number) => {
     const repo = repositories.find((item) => item.id === repoId);
     if (!repo) {
-      alert(t('仓库信息不完整，无法取消订阅。', 'Repository information missing. Cannot unsubscribe.'));
+      toast(t('仓库信息不完整，无法取消订阅。', 'Repository information missing. Cannot unsubscribe.'), 'error');
       return;
     }
 
@@ -473,7 +476,12 @@ export const ReleaseTimeline: React.FC = () => {
       ? `确定取消订阅 "${repo.full_name}" 的 Release 吗？`
       : `Unsubscribe from releases for "${repo.full_name}"?`;
 
-    if (!confirm(confirmMessage)) {
+    const confirmed = await confirm(
+      t('取消订阅确认', 'Unsubscribe Confirmation'),
+      confirmMessage,
+      { type: 'warning' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -496,11 +504,11 @@ export const ReleaseTimeline: React.FC = () => {
         releases: [...state.releases, ...removedReleases],
         readReleases: new Set([...state.readReleases, ...removedReadIds]),
       });
-      alert(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'));
+      toast(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'), 'error');
       return;
     }
 
-    alert(t('已取消订阅该仓库的 Release。', 'Unsubscribed from repository releases.'));
+    toast(t('已取消订阅该仓库的 Release。', 'Unsubscribed from repository releases.'), 'success');
   };
 
   if (subscribedReleases.length === 0) {

@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
+import { useDialog } from '../../hooks/useDialog';
 
 interface AIConfigPanelProps {
   t: (zh: string, en: string) => string;
@@ -32,6 +33,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     deleteAIConfig,
     setActiveAIConfig,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,7 +93,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const handleSave = () => {
     if (!form.name || !form.baseUrl || !form.apiKey || !form.model) {
-      alert(t('请填写所有必填字段', 'Please fill in all required fields'));
+      toast(t('请填写所有必填字段', 'Please fill in all required fields'), 'error');
       return;
     }
 
@@ -155,13 +158,13 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       const result = await aiService.testConnection();
 
       if (result.success) {
-        alert(t('AI服务连接成功！', 'AI service connection successful!'));
+        toast(t('AI服务连接成功！', 'AI service connection successful!'), 'success');
       } else {
-        alert(result.message);
+        toast(result.message, 'error');
       }
     } catch (error) {
       console.error('AI test failed:', error);
-      alert(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'));
+      toast(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'), 'error');
     } finally {
       setTestingId(null);
     }
@@ -169,7 +172,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const handleTestForm = async () => {
     if (!form.baseUrl || !form.apiKey || !form.model) {
-      alert(t('请先填写API端点、API密钥和模型名称', 'Please fill in API Endpoint, API Key and Model Name first'));
+      toast(t('请先填写API端点、API密钥和模型名称', 'Please fill in API Endpoint, API Key and Model Name first'), 'error');
       return;
     }
 
@@ -193,13 +196,13 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       const result = await aiService.testConnection();
 
       if (result.success) {
-        alert(t('✅ AI服务连接成功！', '✅ AI service connection successful!'));
+        toast(t('✅ AI服务连接成功！', '✅ AI service connection successful!'), 'success');
       } else {
-        alert(result.message);
+        toast(result.message, 'error');
       }
     } catch (error) {
       console.error('AI test failed:', error);
-      alert(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'));
+      toast(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'), 'error');
     } finally {
       setTestingForm(false);
     }
@@ -288,25 +291,24 @@ Focus on practicality and accurate categorization to help users quickly understa
     setShowDefaultPrompt(prev => !prev);
   }, [showCustomPrompt, showNotification, t]);
 
-  const handleRestoreDefaultPrompt = useCallback(() => {
+  const handleRestoreDefaultPrompt = useCallback(async () => {
     if (isCustomPromptSameAsDefault) {
       showNotification('info', t('当前提示词已是默认值', 'Current prompt is already the default'));
       return;
     }
-    
+
     if (isCustomPromptModified) {
-      const confirmed = window.confirm(
-        t(
-          '确定要恢复默认提示词吗？这将覆盖您当前的修改。',
-          'Are you sure you want to restore the default prompt? This will overwrite your current changes.'
-        )
+      const confirmed = await confirm(
+        t('确定要恢复默认提示词吗？', 'Restore Default Prompt?'),
+        t('这将覆盖您当前的修改。', 'This will overwrite your current changes.'),
+        { type: 'warning' }
       );
       if (!confirmed) return;
     }
-    
+
     setForm(prev => ({ ...prev, customPrompt: defaultPrompt }));
     showNotification('success', t('已恢复默认提示词', 'Default prompt restored'));
-  }, [defaultPrompt, isCustomPromptModified, isCustomPromptSameAsDefault, showNotification, t]);
+  }, [defaultPrompt, isCustomPromptModified, isCustomPromptSameAsDefault, showNotification, t, confirm]);
 
   return (
     <div className="space-y-6">
@@ -662,12 +664,17 @@ Focus on practicality and accurate categorization to help users quickly understa
                   <Edit3 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(t('确定要删除这个AI配置吗？', 'Are you sure you want to delete this AI configuration?'))) {
+                  onClick={async () => {
+                    const confirmed = await confirm(
+                      t('确定要删除这个AI配置吗？', 'Delete AI Configuration?'),
+                      t('此操作无法撤销。', 'This action cannot be undone.'),
+                      { type: 'danger', confirmText: t('删除', 'Delete') }
+                    );
+                    if (confirmed) {
                       if (config.id) {
                         deleteAIConfig(config.id);
                       } else {
-                        alert(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'));
+                        toast(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'), 'error');
                       }
                     }
                   }}

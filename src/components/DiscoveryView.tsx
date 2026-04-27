@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { 
-  RefreshCw, 
-  TrendingUp, 
-  Bot, 
-  Loader2, 
-  Rocket, 
-  Tag, 
+import {
+  RefreshCw,
+  TrendingUp,
+  Bot,
+  Loader2,
+  Rocket,
+  Tag,
   Search,
   Crown,
   Filter,
@@ -28,11 +28,12 @@ import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
-import type { 
-  DiscoveryChannelId, 
+import { useDialog } from '../hooks/useDialog';
+import type {
+  DiscoveryChannelId,
   DiscoveryChannelIcon,
-  DiscoveryRepo, 
-  DiscoveryPlatform, 
+  DiscoveryRepo,
+  DiscoveryPlatform,
   ProgrammingLanguage,
   SortBy,
   SortOrder,
@@ -412,6 +413,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setTrendingTimeRange,
   } = useAppStore();
 
+  const { toast, confirm } = useDialog();
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
   const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
@@ -460,7 +463,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
     if (!githubToken) {
-      alert(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'));
+      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
@@ -566,7 +569,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       if (append) {
         setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
       } else {
-        alert(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'));
+        toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
       }
     } finally {
       if (append) {
@@ -660,33 +663,33 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
     const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
     if (!activeConfig) {
-      alert(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'));
+      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      alert(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'));
+      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      alert(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'));
+      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
       return;
     }
 
     const pageRepos = allRepos;
-    
+
     if (pageRepos.length === 0) {
-      alert(t('当前没有项目。', 'No projects available.'));
+      toast(t('当前没有项目。', 'No projects available.'), 'error');
       return;
     }
 
     const unanalyzed = pageRepos.filter(
       (r: DiscoveryRepo) => !r.analyzed_at || r.analysis_failed
     );
-    
+
     if (unanalyzed.length === 0) {
-      alert(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'));
+      toast(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'), 'info');
       return;
     }
 
@@ -777,15 +780,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
-      alert(
+      toast(
         t(
           `AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`,
           `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`
-        )
+        ),
+        failCount > 0 ? 'error' : 'success'
       );
     } catch (err) {
       console.error('AI analysis error:', err);
-      alert(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'));
+      toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
     } finally {
       setIsAnalyzing(false);
       setAnalysisOptimizer(null);

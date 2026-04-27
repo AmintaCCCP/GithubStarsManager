@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
 import { PRESET_FILTERS } from '../constants/presetFilters';
+import { useDialog } from '../hooks/useDialog';
 
 // 图标映射
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -42,6 +43,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   onClearFilters
 }) => {
   const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore();
+
+  const { toast, confirm } = useDialog();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<AssetFilter | undefined>();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -69,13 +73,18 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleDeleteFilter = (filterId: string) => {
-    if (confirm(language === 'zh' ? '确定要删除这个过滤器吗？' : 'Are you sure you want to delete this filter?')) {
-      deleteAssetFilter(filterId);
-      // Remove from selected filters if it was selected
-      if (selectedFilters.includes(filterId)) {
-        onFilterToggle(filterId);
-      }
+  const handleDeleteFilter = async (filterId: string) => {
+    const confirmed = await confirm(
+      t('删除过滤器', 'Delete Filter'),
+      language === 'zh' ? '确定要删除这个过滤器吗？' : 'Are you sure you want to delete this filter?',
+      { type: 'danger', confirmText: t('删除', 'Delete') }
+    );
+
+    if (!confirmed) return;
+
+    deleteAssetFilter(filterId);
+    if (selectedFilters.includes(filterId)) {
+      onFilterToggle(filterId);
     }
   };
 
@@ -91,49 +100,55 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     onFilterToggle(presetId);
   };
 
-  const handleResetPresets = () => {
-    if (confirm(language === 'zh' ? '确定要重置所有预设筛选器吗？这将恢复默认设置。' : 'Are you sure you want to reset all preset filters? This will restore default settings.')) {
-      const previousFilters = assetFilters.map(f => ({ ...f }));
-      const previousSelected = [...selectedFilters];
-      const addedFilterIds: string[] = [];
-      
-      try {
-        presetFilters.forEach(filter => {
-          if (assetFilters.find(f => f.id === filter.id)) {
-            deleteAssetFilter(filter.id);
-          }
-          if (selectedFilters.includes(filter.id)) {
-            onFilterToggle(filter.id);
-          }
-        });
-        DEFAULT_PRESET_FILTERS.forEach(filter => {
-          if (!assetFilters.find(f => f.id === filter.id)) {
-            addAssetFilter(filter);
-            addedFilterIds.push(filter.id);
-          }
-        });
-      } catch (error) {
-        console.error('Failed to reset presets:', error);
-        
-        addedFilterIds.forEach(id => {
-          if (assetFilters.find(f => f.id === id)) {
-            deleteAssetFilter(id);
-          }
-        });
-        
-        previousFilters.forEach(filter => {
-          if (!assetFilters.find(f => f.id === filter.id)) {
-            addAssetFilter(filter);
-          }
-        });
-        
-        // 清除当前所有选择
-        selectedFilters.forEach(id => onFilterToggle(id));
-        // 恢复之前的选择
-        previousSelected.forEach(id => onFilterToggle(id));
-        
-        alert(language === 'zh' ? '重置预设筛选器失败，已恢复之前的状态。' : 'Failed to reset preset filters. Previous state has been restored.');
-      }
+  const handleResetPresets = async () => {
+    const confirmed = await confirm(
+      t('重置预设', 'Reset Presets'),
+      language === 'zh' ? '确定要重置所有预设筛选器吗？这将恢复默认设置。' : 'Are you sure you want to reset all preset filters? This will restore default settings.',
+      { type: 'warning' }
+    );
+
+    if (!confirmed) return;
+
+    const previousFilters = assetFilters.map(f => ({ ...f }));
+    const previousSelected = [...selectedFilters];
+    const addedFilterIds: string[] = [];
+
+    try {
+      presetFilters.forEach(filter => {
+        if (assetFilters.find(f => f.id === filter.id)) {
+          deleteAssetFilter(filter.id);
+        }
+        if (selectedFilters.includes(filter.id)) {
+          onFilterToggle(filter.id);
+        }
+      });
+      DEFAULT_PRESET_FILTERS.forEach(filter => {
+        if (!assetFilters.find(f => f.id === filter.id)) {
+          addAssetFilter(filter);
+          addedFilterIds.push(filter.id);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to reset presets:', error);
+
+      addedFilterIds.forEach(id => {
+        if (assetFilters.find(f => f.id === id)) {
+          deleteAssetFilter(id);
+        }
+      });
+
+      previousFilters.forEach(filter => {
+        if (!assetFilters.find(f => f.id === filter.id)) {
+          addAssetFilter(filter);
+        }
+      });
+
+      // 清除当前所有选择
+      selectedFilters.forEach(id => onFilterToggle(id));
+      // 恢复之前的选择
+      previousSelected.forEach(id => onFilterToggle(id));
+
+      toast(language === 'zh' ? '重置预设筛选器失败，已恢复之前的状态。' : 'Failed to reset preset filters. Previous state has been restored.', 'error');
     }
   };
 

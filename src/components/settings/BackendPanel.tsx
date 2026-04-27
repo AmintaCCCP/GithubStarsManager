@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { backend } from '../../services/backendAdapter';
+import { useDialog } from '../../hooks/useDialog';
 
 interface BackendPanelProps {
   t: (zh: string, en: string) => string;
@@ -23,6 +24,8 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     showDefaultCategory,
     hideDefaultCategory,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'checking'>('disconnected');
   const [health, setHealth] = useState<{ version: string; timestamp: string } | null>(null);
@@ -61,28 +64,28 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       if (healthData && authOk) {
         setStatus('connected');
         setHealth({ version: healthData.version, timestamp: healthData.timestamp });
-        alert(t('后端连接成功！', 'Backend connection successful!'));
+        toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
       } else {
         setStatus('disconnected');
         setHealth(null);
-        alert(t(
+        toast(t(
           '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
           'Backend connection failed. Please check the server status or whether the API Secret is correct.'
-        ));
+        ), 'error');
       }
     } catch {
       setStatus('disconnected');
       setHealth(null);
-      alert(t(
+      toast(t(
         '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
         'Backend connection failed. Please check the server status or whether the API Secret is correct.'
-      ));
+      ), 'error');
     }
   };
 
   const handleSyncToBackend = async () => {
     if (!backend.isAvailable) {
-      alert(t('后端不可用', 'Backend not available'));
+      toast(t('后端不可用', 'Backend not available'), 'error');
       return;
     }
     setIsSyncingToBackend(true);
@@ -92,13 +95,13 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       await backend.syncAIConfigs(aiConfigs);
       await backend.syncWebDAVConfigs(webdavConfigs);
       await backend.syncSettings({ hiddenDefaultCategoryIds });
-      alert(t(
+      toast(t(
         `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
         `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
-      ));
+      ), 'success');
     } catch (error) {
       console.error('Sync to backend failed:', error);
-      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
+      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsSyncingToBackend(false);
     }
@@ -106,14 +109,16 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
   const handleSyncFromBackend = async () => {
     if (!backend.isAvailable) {
-      alert(t('后端不可用', 'Backend not available'));
+      toast(t('后端不可用', 'Backend not available'), 'error');
       return;
     }
-    
-    if (!confirm(t(
-      '从后端同步将覆盖本地数据，是否继续？',
-      'Syncing from backend will overwrite local data. Continue?'
-    ))) return;
+
+    const confirmed = await confirm(
+      t('从后端同步', 'Sync from Backend'),
+      t('从后端同步将覆盖本地数据，是否继续？', 'Syncing from backend will overwrite local data. Continue?'),
+      { type: 'warning' }
+    );
+    if (!confirmed) return;
 
     setIsSyncingFromBackend(true);
     try {
@@ -122,7 +127,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       const aiConfigData = await backend.fetchAIConfigs();
       const webdavConfigData = await backend.fetchWebDAVConfigs();
       const settingsData = await backend.fetchSettings();
-      
+
       // Always apply backend snapshot to state (empty array allowed)
       setRepositories(repoData.repositories);
       setReleases(releaseData.releases);
@@ -136,8 +141,8 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       }
       // 显示本地隐藏列表中但服务端没有隐藏的分类（即本地手动显示的）
       if (Array.isArray(hiddenDefaultCategoryIds)) {
-        const hiddenIdsFromServer = Array.isArray(settingsData.hiddenDefaultCategoryIds) 
-          ? settingsData.hiddenDefaultCategoryIds 
+        const hiddenIdsFromServer = Array.isArray(settingsData.hiddenDefaultCategoryIds)
+          ? settingsData.hiddenDefaultCategoryIds
           : [];
         for (const categoryId of hiddenDefaultCategoryIds) {
           if (typeof categoryId === 'string' && !hiddenIdsFromServer.includes(categoryId)) {
@@ -145,14 +150,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           }
         }
       }
-      
-      alert(t(
+
+      toast(t(
         `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}，AI配置 ${aiConfigData.length}，WebDAV配置 ${webdavConfigData.length}`,
         `Synced from backend: repos ${repoData.repositories.length}, releases ${releaseData.releases.length}, AI configs ${aiConfigData.length}, WebDAV configs ${webdavConfigData.length}`
-      ));
+      ), 'success');
     } catch (error) {
       console.error('Sync from backend failed:', error);
-      alert(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`);
+      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsSyncingFromBackend(false);
     }

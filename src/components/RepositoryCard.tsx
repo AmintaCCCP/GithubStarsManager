@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
 import { shallow } from 'zustand/shallow';
+import { useDialog } from '../hooks/useDialog';
 
 // Selection-aware button component to centralize selectionMode disable logic
 interface SelectionAwareButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -128,6 +129,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, [repoId, setAnalyzingRepository]);
 
   const aiConfigs = useAppStore(state => state.aiConfigs);
+
+  const { toast, confirm } = useDialog();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
@@ -269,23 +272,23 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const handleAIAnalyze = async () => {
     if (!githubToken) {
-      alert('GitHub token not found. Please login again.');
+      toast(t('GitHub token not found. Please login again.', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
     if (!activeConfig) {
-      alert(language === 'zh' ? '请先在设置中配置AI服务。' : 'Please configure AI service in settings first.');
+      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      alert(language === 'zh' ? 'AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.');
+      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      alert(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.');
+      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
       return;
     }
 
@@ -294,7 +297,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         ? `此仓库已于 ${new Date(repository.analyzed_at).toLocaleString()} 进行过AI分析。\n\n是否要重新分析？这将覆盖现有的分析结果。`
         : `This repository was analyzed on ${new Date(repository.analyzed_at).toLocaleString()}.\n\nDo you want to re-analyze? This will overwrite the existing analysis results.`;
 
-      if (!confirm(confirmMessage)) {
+      if (!await confirm(t('重新分析确认', 'Re-analyze Confirmation'), confirmMessage, { type: 'warning' })) {
         return;
       }
     }
@@ -333,7 +336,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         ? (language === 'zh' ? 'AI重新分析完成！' : 'AI re-analysis completed!')
         : (language === 'zh' ? 'AI分析完成！' : 'AI analysis completed!');
 
-      alert(successMessage);
+      toast(successMessage, 'success');
     } catch (error) {
       if (!controller.signal.aborted) {
         console.error('AI analysis failed:', error);
@@ -347,7 +350,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
         updateRepository(failedRepo);
 
-        alert(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.');
+        toast(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.', 'error');
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -528,7 +531,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const handleUnstar = async () => {
     if (!githubToken) {
-      alert(t('未找到 GitHub Token，请重新登录。', 'GitHub token not found. Please login again.'));
+      toast(t('未找到 GitHub Token，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
 
@@ -536,7 +539,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       ? `确定要取消 Star "${repository.full_name}" 吗？\n\n这将会从您的 GitHub 收藏中移除该仓库。`
       : `Are you sure you want to unstar "${repository.full_name}"?\n\nThis will remove the repository from your GitHub stars.`;
 
-    if (!confirm(confirmMessage)) {
+    if (!await confirm(t('取消Star确认', 'Unstar Confirmation'), confirmMessage, { type: 'danger', confirmText: t('取消Star', 'Unstar') })) {
       return;
     }
 
@@ -550,13 +553,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       const successMessage = language === 'zh'
         ? '已成功取消 Star'
         : 'Successfully unstarred';
-      alert(successMessage);
+      toast(successMessage, 'success');
     } catch (error) {
       console.error('Failed to unstar repository:', error);
       const errorMessage = language === 'zh'
         ? '取消 Star 失败，请检查网络连接或重新登录。'
         : 'Failed to unstar repository. Please check your network connection or login again.';
-      alert(errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       setUnstarring(false);
     }
