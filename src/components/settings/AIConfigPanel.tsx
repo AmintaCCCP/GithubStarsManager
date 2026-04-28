@@ -81,12 +81,24 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     'openai-compatible': '',
   };
 
+  // Auto-fill baseUrl when API type changes
+  const prevApiTypeRef = useRef<AIApiType>('openai');
+  useEffect(() => {
+    if (form.apiType !== prevApiTypeRef.current) {
+      const nextDefault = defaultApiEndpoints[form.apiType];
+      const prevDefault = defaultApiEndpoints[prevApiTypeRef.current];
+      if (nextDefault && (form.baseUrl === '' || form.baseUrl === prevDefault)) {
+        setForm(prev => ({ ...prev, baseUrl: nextDefault }));
+      }
+      prevApiTypeRef.current = form.apiType;
+    }
+  }, [form.apiType, form.baseUrl]);
+
   const resetForm = () => {
-    const defaultUrl = defaultApiEndpoints[form.apiType] || '';
     setForm({
       name: '',
       apiType: 'openai',
-      baseUrl: defaultUrl,
+      baseUrl: defaultApiEndpoints.openai,
       apiKey: '',
       model: '',
       customPrompt: '',
@@ -98,6 +110,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setEditingId(null);
     setShowCustomPrompt(false);
     setShowDefaultPrompt(false);
+    prevApiTypeRef.current = 'openai';
   };
 
   const handleSave = () => {
