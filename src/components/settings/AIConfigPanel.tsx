@@ -64,7 +64,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const [form, setForm] = useState<AIFormState>({
     name: '',
     apiType: 'openai',
-    baseUrl: '',
+    baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: '',
     customPrompt: '',
@@ -73,11 +73,20 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     reasoningEffort: '',
   });
 
+  const defaultApiEndpoints: Record<AIApiType, string> = {
+    openai: 'https://api.openai.com/v1',
+    'openai-responses': 'https://api.openai.com/v1',
+    claude: 'https://api.anthropic.com/v1',
+    gemini: 'https://generativelanguage.googleapis.com/v1beta',
+    'openai-compatible': '',
+  };
+
   const resetForm = () => {
+    const defaultUrl = defaultApiEndpoints[form.apiType] || '';
     setForm({
       name: '',
       apiType: 'openai',
-      baseUrl: '',
+      baseUrl: defaultUrl,
       apiKey: '',
       model: '',
       customPrompt: '',
@@ -390,10 +399,15 @@ Focus on practicality and accurate categorization to help users quickly understa
                       '填写完整的API调用地址，包含完整路径',
                       'Enter the full API endpoint URL including the complete path'
                     )
-                  : t(
-                      '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
-                      'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
-                    )}
+                  : form.apiType === 'gemini'
+                    ? t(
+                        '只填到 v1beta 即可，路径会自动生成',
+                        'Only include the version prefix v1beta, the path will be generated automatically'
+                      )
+                    : t(
+                        '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages',
+                        'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.'
+                      )}
               </p>
               {form.baseUrl && (
                 <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
