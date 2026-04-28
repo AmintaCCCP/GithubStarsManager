@@ -40,6 +40,10 @@ export function buildFinalApiUrl(baseUrl: string, apiType: AIApiType): string {
     return baseUrl.replace(/\/$/, '');
   }
 
+  if (apiType === 'gemini') {
+    return buildApiUrl(baseUrl, 'v1beta/models/{model}:generateContent');
+  }
+
   const pathWithVersion = apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions';
   return buildApiUrl(baseUrl, pathWithVersion);
 }
