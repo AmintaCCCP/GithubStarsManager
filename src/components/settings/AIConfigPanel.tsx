@@ -87,8 +87,13 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     if (form.apiType !== prevApiTypeRef.current) {
       const nextDefault = defaultApiEndpoints[form.apiType];
       const prevDefault = defaultApiEndpoints[prevApiTypeRef.current];
-      if (nextDefault && (form.baseUrl === '' || form.baseUrl === prevDefault)) {
-        setForm(prev => ({ ...prev, baseUrl: nextDefault }));
+      if (nextDefault) {
+        if (form.baseUrl === '' || form.baseUrl === prevDefault) {
+          setForm(prev => ({ ...prev, baseUrl: nextDefault }));
+        }
+      } else if (form.baseUrl === prevDefault) {
+        // Clear baseUrl when switching to a type with no default (e.g., openai-compatible)
+        setForm(prev => ({ ...prev, baseUrl: '' }));
       }
       prevApiTypeRef.current = form.apiType;
     }
