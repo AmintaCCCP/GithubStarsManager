@@ -162,6 +162,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   };
 
   const handleEdit = (config: AIConfig) => {
+    // Sync ref to prevent auto-fill effect from overwriting loaded config
+    prevApiTypeRef.current = config.apiType || 'openai';
     setForm({
       name: config.name,
       apiType: config.apiType || 'openai',
