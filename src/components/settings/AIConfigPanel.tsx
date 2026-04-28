@@ -23,6 +23,14 @@ type AIFormState = {
   reasoningEffort: '' | AIReasoningEffort;
 };
 
+const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
+  openai: 'https://api.openai.com/v1',
+  'openai-responses': 'https://api.openai.com/v1',
+  claude: 'https://api.anthropic.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  'openai-compatible': '',
+};
+
 export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const {
     aiConfigs,
@@ -64,7 +72,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const [form, setForm] = useState<AIFormState>({
     name: '',
     apiType: 'openai',
-    baseUrl: '',
+    baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: '',
     customPrompt: '',
@@ -73,11 +81,29 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     reasoningEffort: '',
   });
 
+  // Auto-fill baseUrl when API type changes
+  const prevApiTypeRef = useRef<AIApiType>('openai');
+  useEffect(() => {
+    if (form.apiType !== prevApiTypeRef.current) {
+      const nextDefault = DEFAULT_API_ENDPOINTS[form.apiType];
+      const prevDefault = DEFAULT_API_ENDPOINTS[prevApiTypeRef.current];
+      if (nextDefault) {
+        if (form.baseUrl === '' || form.baseUrl === prevDefault) {
+          setForm(prev => ({ ...prev, baseUrl: nextDefault }));
+        }
+      } else if (form.baseUrl === prevDefault) {
+        // Clear baseUrl when switching to a type with no default (e.g., openai-compatible)
+        setForm(prev => ({ ...prev, baseUrl: '' }));
+      }
+      prevApiTypeRef.current = form.apiType;
+    }
+  }, [form.apiType, form.baseUrl]);
+
   const resetForm = () => {
     setForm({
       name: '',
       apiType: 'openai',
-      baseUrl: '',
+      baseUrl: DEFAULT_API_ENDPOINTS.openai,
       apiKey: '',
       model: '',
       customPrompt: '',
@@ -89,6 +115,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setEditingId(null);
     setShowCustomPrompt(false);
     setShowDefaultPrompt(false);
+    prevApiTypeRef.current = 'openai';
   };
 
   const handleSave = () => {
@@ -135,6 +162,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   };
 
   const handleEdit = (config: AIConfig) => {
+    // Sync ref to prevent auto-fill effect from overwriting loaded config
+    prevApiTypeRef.current = config.apiType || 'openai';
     setForm({
       name: config.name,
       apiType: config.apiType || 'openai',
@@ -390,10 +419,15 @@ Focus on practicality and accurate categorization to help users quickly understa
                       '填写完整的API调用地址，包含完整路径',
                       'Enter the full API endpoint URL including the complete path'
                     )
-                  : t(
-                      '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages 或 :generateContent',
-                      'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, /messages, or :generateContent.'
-                    )}
+                  : form.apiType === 'gemini'
+                    ? t(
+                        '只填到 v1beta 即可，路径会自动生成',
+                        'Only include the version prefix v1beta, the path will be generated automatically'
+                      )
+                    : t(
+                        '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages',
+                        'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.'
+                      )}
               </p>
               {form.baseUrl && (
                 <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
