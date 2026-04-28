@@ -23,6 +23,14 @@ type AIFormState = {
   reasoningEffort: '' | AIReasoningEffort;
 };
 
+const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
+  openai: 'https://api.openai.com/v1',
+  'openai-responses': 'https://api.openai.com/v1',
+  claude: 'https://api.anthropic.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  'openai-compatible': '',
+};
+
 export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const {
     aiConfigs,
@@ -73,20 +81,12 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     reasoningEffort: '',
   });
 
-  const defaultApiEndpoints: Record<AIApiType, string> = {
-    openai: 'https://api.openai.com/v1',
-    'openai-responses': 'https://api.openai.com/v1',
-    claude: 'https://api.anthropic.com/v1',
-    gemini: 'https://generativelanguage.googleapis.com/v1beta',
-    'openai-compatible': '',
-  };
-
   // Auto-fill baseUrl when API type changes
   const prevApiTypeRef = useRef<AIApiType>('openai');
   useEffect(() => {
     if (form.apiType !== prevApiTypeRef.current) {
-      const nextDefault = defaultApiEndpoints[form.apiType];
-      const prevDefault = defaultApiEndpoints[prevApiTypeRef.current];
+      const nextDefault = DEFAULT_API_ENDPOINTS[form.apiType];
+      const prevDefault = DEFAULT_API_ENDPOINTS[prevApiTypeRef.current];
       if (nextDefault) {
         if (form.baseUrl === '' || form.baseUrl === prevDefault) {
           setForm(prev => ({ ...prev, baseUrl: nextDefault }));
@@ -103,7 +103,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setForm({
       name: '',
       apiType: 'openai',
-      baseUrl: defaultApiEndpoints.openai,
+      baseUrl: DEFAULT_API_ENDPOINTS.openai,
       apiKey: '',
       model: '',
       customPrompt: '',
