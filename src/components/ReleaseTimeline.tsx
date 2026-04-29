@@ -669,7 +669,8 @@ export const ReleaseTimeline: React.FC = () => {
                 onClearFilters={handleClearFilters}
               />
 
-              <button disabled>
+              <button
+                disabled
                 className="flex items-center gap-1 px-3 py-1.5 text-sm bg-brand-indigo/20 text-brand-indigo rounded-lg cursor-not-allowed"
                 title={t('新建过滤器（即将推出）', 'New Filter (Coming Soon)')}
               >
