@@ -873,28 +873,28 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
       </div>
 
-      {/* Description with Tooltip */}
+      {/* Description with Tooltip - Enhanced for Light Mode */}
       <div className="mb-4 flex-1">
         <div
-          className="relative"
+          className="relative group"
           onMouseEnter={() => isTextTruncated && setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
           <p
             ref={descriptionRef}
-            className="text-gray-900 dark:text-text-secondary text-sm leading-relaxed line-clamp-3 mb-2"
+            className="text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
 
-          {/* Tooltip - Only show when text is actually truncated */}
+          {/* Enhanced Tooltip - Optimized for Light Mode Readability */}
           {isTextTruncated && showTooltip && (
-            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-3 bg-gray-900 dark:bg-surface-3 text-white dark:text-text-primary text-sm rounded-lg shadow-dialog border border-black/[0.06] dark:border-white/[0.04]">
-              <div className="whitespace-pre-wrap break-words">
+            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[280px] overflow-y-auto scrollbar-auto">
+              <div className="whitespace-pre-wrap break-words pr-2">
                 {highlightSearchTerm(displayContent.content, searchQuery)}
               </div>
-              {/* Arrow */}
-              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900 dark:border-t-surface-3"></div>
+              {/* Arrow with Light Mode Optimization */}
+              <div className="absolute top-full left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white dark:border-t-surface-3 drop-shadow-sm"></div>
             </div>
           )}
         </div>
