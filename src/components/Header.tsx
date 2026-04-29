@@ -98,14 +98,7 @@ export const Header: React.FC = () => {
       });
 
       setRepositories(mergedRepositories);
-
-      // 3. 获取Release信息
-      console.log('Fetching releases...');
-      const releases = await githubApi.getMultipleRepositoryReleases(mergedRepositories.slice(0, 20));
-      setReleases(releases);
-
       setLastSync(new Date().toISOString());
-      console.log('Sync completed successfully');
 
       // 显示同步结果
       const newRepoCount = newRepositories.length - repositories.length;
@@ -360,18 +353,18 @@ export const Header: React.FC = () => {
 
           {/* User Actions */}
           <div className="flex items-center gap-2 sm:gap-3 hd-btns lg:hd-btns">
-            {/* Sync Status */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary">
-              <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
-              <button
-                onClick={handleSync}
-                disabled={isLoading}
-                className="p-1 rounded hover:bg-light-surface dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                title={t('同步仓库', 'Sync repositories')}
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
+              {/* Sync Status */}
+              <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary">
+                <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
+                <button
+                  onClick={handleSync}
+                  disabled={isLoading}
+                  className="p-1 rounded hover:bg-light-surface dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  title={t('同步 Star 仓库列表（仅更新仓库信息，不含 Release）', 'Sync starred repositories (metadata only, excludes releases)')}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
 
             {/* Theme Toggle */}
             <button

@@ -44,7 +44,45 @@ export class GitHubApiService {
     this.token = token;
   }
 
+  private rateLimitRemaining: number | null = null;
+  private rateLimitReset: number | null = null;
+  lastFetchFailures: { repoId: number; full_name: string; error: string }[] = [];
+
+  private async controlledConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<R>
+  ): Promise<{ results: (R | null)[]; errors: { item: T; error: any }[] }> {
+    let index = 0;
+    const results: (R | null)[] = new Array(items.length).fill(null);
+    const errors: { item: T; error: any }[] = [];
+
+    const worker = async () => {
+      while (true) {
+        const currentIndex = index++;
+        if (currentIndex >= items.length) break;
+
+        try {
+          results[currentIndex] = await fn(items[currentIndex]);
+        } catch (error) {
+          errors.push({ item: items[currentIndex], error });
+        }
+      }
+    };
+
+    const workerCount = Math.min(concurrency, items.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return { results, errors };
+  }
+
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+    if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 3 && this.rateLimitReset !== null) {
+      const waitMs = (this.rateLimitReset * 1000) - Date.now();
+      if (waitMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, waitMs + 1000));
+      }
+    }
+
     const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
       ...options,
       signal,
@@ -56,19 +94,32 @@ export class GitHubApiService {
       },
     });
 
+    const remaining = response.headers.get('X-RateLimit-Remaining');
+    const reset = response.headers.get('X-RateLimit-Reset');
+    if (remaining !== null) {
+      this.rateLimitRemaining = parseInt(remaining, 10);
+    }
+    if (reset !== null) {
+      this.rateLimitReset = parseInt(reset, 10);
+    }
+
     if (!response.ok) {
       if (response.status === 401) {
         throw new Error('GitHub token expired or invalid');
+      }
+      if (response.status === 403 && this.rateLimitRemaining === 0) {
+        const resetDate = this.rateLimitReset
+          ? new Date(this.rateLimitReset * 1000).toLocaleString()
+          : 'unknown';
+        throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
       }
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
     const data = response.status === 204 ? null : await response.json();
 
-    // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
       return data.map((item: GitHubStarredItem) => {
-        // 如果使用了star+json格式，数据结构会不同
         if (item.starred_at && item.repo) {
           return {
             ...item.repo,
@@ -144,11 +195,86 @@ export class GitHubApiService {
   }
 
   async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Release[]> {
+    const releases = await this.makeRequest<Release[]>(
+      `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
+    );
+
+    return releases.map(release => ({
+      id: release.id,
+      tag_name: release.tag_name,
+      name: release.name || release.tag_name,
+      body: release.body || '',
+      published_at: release.published_at,
+      html_url: release.html_url,
+      assets: release.assets || [],
+      zipball_url: release.zipball_url,
+      tarball_url: release.tarball_url,
+      repository: {
+        id: 0,
+        full_name: `${owner}/${repo}`,
+        name: repo,
+      },
+    }));
+  }
+
+  async getMultipleRepositoryReleases(
+    repositories: Repository[],
+    perPage = 5
+  ): Promise<{ releases: Release[]; failedRepos: { repoId: number; full_name: string; error: string }[] }> {
+    const { results, errors } = await this.controlledConcurrency(
+      repositories,
+      3,
+      async (repo) => {
+        const [owner, name] = repo.full_name.split('/');
+        const releases = await this.getRepositoryReleases(owner, name, 1, perPage);
+        releases.forEach(release => {
+          release.repository.id = repo.id;
+        });
+        return releases;
+      }
+    );
+
+    const allReleases: Release[] = [];
+    const failedRepos: { repoId: number; full_name: string; error: string }[] = [];
+
+    results.forEach((repoReleases, index) => {
+      if (repoReleases) {
+        allReleases.push(...repoReleases);
+      }
+    });
+
+    errors.forEach(({ item, error }) => {
+      const repo = item as Repository;
+      failedRepos.push({
+        repoId: repo.id,
+        full_name: repo.full_name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    const sortedReleases = allReleases.sort((a, b) =>
+      new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+    );
+
+    return { releases: sortedReleases, failedRepos };
+  }
+
+  // 获取仓库的增量releases（基于时间戳，since 直接传入 GitHub API）
+  async getIncrementalRepositoryReleases(
+    owner: string,
+    repo: string,
+    since?: string,
+    perPage = 10
+  ): Promise<Release[]> {
     try {
-      const releases = await this.makeRequest<Release[]>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
-      );
-      
+      let endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
+      if (since) {
+        const sinceDate = new Date(since);
+        endpoint += `&since=${sinceDate.toISOString()}`;
+      }
+
+      const releases = await this.makeRequest<Release[]>(endpoint);
+
       return releases.map(release => ({
         id: release.id,
         tag_name: release.tag_name,
@@ -166,76 +292,7 @@ export class GitHubApiService {
         },
       }));
     } catch (error) {
-      console.warn(`Failed to fetch releases for ${owner}/${repo}:`, error);
-      return [];
-    }
-  }
-
-  async getMultipleRepositoryReleases(repositories: Repository[]): Promise<Release[]> {
-    const allReleases: Release[] = [];
-    
-    for (const repo of repositories) {
-      const [owner, name] = repo.full_name.split('/');
-      const releases = await this.getRepositoryReleases(owner, name, 1, 5);
-      
-      // Add repository info to releases
-      releases.forEach(release => {
-        release.repository.id = repo.id;
-      });
-      
-      allReleases.push(...releases);
-      
-      // Rate limiting protection
-      await new Promise(resolve => setTimeout(resolve, 150));
-    }
-
-    // Sort by published date (newest first)
-    return allReleases.sort((a, b) => 
-      new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-    );
-  }
-
-  // 新增：获取仓库的增量releases（基于时间戳）
-  async getIncrementalRepositoryReleases(
-    owner: string, 
-    repo: string, 
-    since?: string, 
-    perPage = 10
-  ): Promise<Release[]> {
-    try {
-      const endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
-      
-      const releases = await this.makeRequest<Release[]>(endpoint);
-      
-      const mappedReleases = releases.map(release => ({
-        id: release.id,
-        tag_name: release.tag_name,
-        name: release.name || release.tag_name,
-        body: release.body || '',
-        published_at: release.published_at,
-        html_url: release.html_url,
-        assets: release.assets || [],
-        zipball_url: release.zipball_url,
-        tarball_url: release.tarball_url,
-        repository: {
-          id: 0,
-          full_name: `${owner}/${repo}`,
-          name: repo,
-        },
-      }));
-
-      // 如果提供了since时间戳，只返回更新的releases
-      if (since) {
-        const sinceDate = new Date(since);
-        return mappedReleases.filter(release => 
-          new Date(release.published_at) > sinceDate
-        );
-      }
-
-      return mappedReleases;
-    } catch (error) {
-      console.warn(`Failed to fetch incremental releases for ${owner}/${repo}:`, error);
-      return [];
+      throw error;
     }
   }
 

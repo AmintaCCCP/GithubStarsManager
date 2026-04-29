@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown } from 'lucide-react';
+import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, HelpCircle } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -30,12 +30,14 @@ export const ReleaseTimeline: React.FC = () => {
     releaseSearchQuery,
     releaseExpandedRepositories,
     releaseIsRefreshing,
+    includePreRelease,
     setReleaseViewMode,
     toggleReleaseSelectedFilter,
     clearReleaseSelectedFilters,
     setReleaseSearchQuery,
     toggleReleaseExpandedRepository,
     setReleaseIsRefreshing,
+    setIncludePreRelease,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -309,31 +311,46 @@ export const ReleaseTimeline: React.FC = () => {
       }
 
       const allNewReleases: Release[] = [];
-
-      const latestReleaseTime = releases.length > 0 
-        ? releases.reduce((max, r) => Math.max(max, new Date(r.published_at).getTime()), 0)
-        : 0;
-      const sinceTimestamp = latestReleaseTime > 0 ? new Date(latestReleaseTime).toISOString() : undefined;
+      const failedRepos: { full_name: string; error: string }[] = [];
 
       for (const repo of subscribedRepos) {
         const [owner, name] = repo.full_name.split('/');
-        
-        const hasExistingReleases = releases.some(r => r.repository.id === repo.id);
-        
-        let repoReleases: Release[];
-        if (!hasExistingReleases) {
-          repoReleases = await githubApi.getRepositoryReleases(owner, name, 1, 10);
-        } else {
-          repoReleases = await githubApi.getIncrementalRepositoryReleases(owner, name, sinceTimestamp, 10);
+
+        try {
+          let repoReleases: Release[];
+
+          if (!repo.hasFetchedReleases) {
+            repoReleases = await githubApi.getRepositoryReleases(owner, name, 1, 30);
+          } else {
+            const since = repo.lastReleaseSyncTime;
+            repoReleases = await githubApi.getIncrementalRepositoryReleases(
+              owner, name, since, 30
+            );
+          }
+
+          if (!includePreRelease) {
+            repoReleases = repoReleases.filter(r => !(r as any).prerelease);
+          }
+
+          repoReleases.forEach(release => {
+            release.repository.id = repo.id;
+          });
+
+          allNewReleases.push(...repoReleases);
+
+          const updatedRepo = {
+            ...repo,
+            lastReleaseSyncTime: new Date().toISOString(),
+            hasFetchedReleases: true,
+          };
+          updateRepository(updatedRepo);
+
+        } catch (error) {
+          failedRepos.push({
+            full_name: repo.full_name,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-        
-        repoReleases.forEach(release => {
-          release.repository.id = repo.id;
-        });
-        
-        allNewReleases.push(...repoReleases);
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
@@ -346,11 +363,19 @@ export const ReleaseTimeline: React.FC = () => {
       const now = new Date().toISOString();
       setLastRefreshTime(now);
 
-      const message = language === 'zh'
-        ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
-        : `Refresh completed! Found ${actuallyNewCount} new releases.`;
-
-      toast(message, 'success');
+      // 汇总 toast
+      if (failedRepos.length > 0) {
+        const failedNames = failedRepos.map(r => r.full_name).join('、');
+        const message = language === 'zh'
+          ? `刷新完成！新增 ${actuallyNewCount} 个Release，${failedRepos.length} 个仓库失败：${failedNames}`
+          : `Refresh completed! ${actuallyNewCount} new releases, ${failedRepos.length} failed: ${failedRepos.map(r => r.full_name).join(', ')}`;
+        toast(message, failedRepos.length > 0 ? 'warning' : 'success');
+      } else {
+        const message = language === 'zh'
+          ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
+          : `Refresh completed! Found ${actuallyNewCount} new releases.`;
+        toast(message, 'success');
+      }
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
@@ -598,15 +623,23 @@ export const ReleaseTimeline: React.FC = () => {
               </span>
             )}
 
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefresh}
-              disabled={releaseIsRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
-            </button>
+            {/* Refresh Button with help icon */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={releaseIsRefreshing}
+                  className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+                </button>
+                <div
+                  className="p-1 rounded-full hover:bg-light-surface dark:hover:bg-white/10 cursor-help"
+                  title={t('增量刷新已订阅仓库的 Release，仅获取上次同步后的新版本', 'Incremental refresh for subscribed repos (only new since last sync)')}
+                >
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
+                </div>
+              </div>
           </div>
         </div>
 
@@ -640,12 +673,31 @@ export const ReleaseTimeline: React.FC = () => {
 
           {/* Filters and View Toggle Row */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
               <AssetFilterManager
                 selectedFilters={selectedFilters}
                 onFilterToggle={handleFilterToggle}
                 onClearFilters={handleClearFilters}
               />
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includePreRelease}
+                    onChange={(e) => setIncludePreRelease(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-brand-indigo focus:ring-2 focus:ring-brand-violet cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-text-secondary">
+                    {t('包含 Pre-release', 'Include Pre-release')}
+                  </span>
+                </label>
+                <div
+                  className="p-1 rounded-full hover:bg-light-surface dark:hover:bg-white/10 cursor-help"
+                  title={t('控制刷新时是否包含预发布版本，应用于刷新结果', 'Toggle whether to include pre-release versions in refresh results')}
+                >
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
+                </div>
+              </div>
             </div>
 
             {/* View Mode Toggle Dropdown */}

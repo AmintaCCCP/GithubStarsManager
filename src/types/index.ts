@@ -23,11 +23,13 @@ export interface Repository {
   analyzed_at?: string;
   analysis_failed?: boolean;
   subscribed_to_releases?: boolean;
-  custom_description?: string;
-  custom_tags?: string[];
-  custom_category?: string;
-  category_locked?: boolean;
-  last_edited?: string;
+   custom_description?: string;
+   custom_tags?: string[];
+   custom_category?: string;
+   category_locked?: boolean;
+   last_edited?: string;
+   lastReleaseSyncTime?: string;
+   hasFetchedReleases?: boolean;
 }
 
 export interface ReleaseAsset {

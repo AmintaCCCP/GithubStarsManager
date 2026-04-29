@@ -156,15 +156,16 @@ interface AppActions {
   // Backend actions
   setBackendApiSecret: (secret: string | null) => void;
 
-  // Release Timeline View actions
-  setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
-  setReleaseSelectedFilters: (filters: string[]) => void;
-  toggleReleaseSelectedFilter: (filterId: string) => void;
-  clearReleaseSelectedFilters: () => void;
-  setReleaseSearchQuery: (query: string) => void;
-  toggleReleaseExpandedRepository: (repoId: number) => void;
-  setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
-  setReleaseIsRefreshing: (refreshing: boolean) => void;
+   // Release Timeline View actions
+   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
+   setReleaseSelectedFilters: (filters: string[]) => void;
+   toggleReleaseSelectedFilter: (filterId: string) => void;
+   clearReleaseSelectedFilters: () => void;
+   setReleaseSearchQuery: (query: string) => void;
+   toggleReleaseExpandedRepository: (repoId: number) => void;
+   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
+   setReleaseIsRefreshing: (refreshing: boolean) => void;
+   setIncludePreRelease: (include: boolean) => void;
 
   // Discovery actions
   setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
@@ -276,19 +277,22 @@ const normalizePersistedState = (
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
-  return {
-    ...currentState,
-    ...safePersisted,
-    theme:
-      safePersisted.theme === 'light' || safePersisted.theme === 'dark'
-        ? safePersisted.theme
-        : 'dark',
-    repositories,
-    releases,
-    searchResults: repositories,
-    releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
-    readReleases: normalizeNumberSet(safePersisted.readReleases),
-    releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
+    const includePreRelease = safePersisted.includePreRelease ?? true;
+
+    return {
+      ...currentState,
+      ...safePersisted,
+      includePreRelease,
+      theme:
+        safePersisted.theme === 'light' || safePersisted.theme === 'dark'
+          ? safePersisted.theme
+          : 'dark',
+      repositories,
+      releases,
+      searchResults: repositories,
+      releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
+      readReleases: normalizeNumberSet(safePersisted.readReleases),
+      releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     searchFilters: {
       ...initialSearchFilters,
       ...safePersisted.searchFilters,
@@ -651,11 +655,12 @@ export const useAppStore = create<AppState & AppActions>()(
       backendApiSecret: readSessionBackendSecret(),
       isSidebarCollapsed: false,
       readmeModalOpen: false,
-      releaseViewMode: 'timeline',
-      releaseSelectedFilters: [],
-      releaseSearchQuery: '',
-      releaseExpandedRepositories: new Set<number>(),
-      releaseIsRefreshing: false,
+       releaseViewMode: 'timeline',
+       releaseSelectedFilters: [],
+       releaseSearchQuery: '',
+       releaseExpandedRepositories: new Set<number>(),
+       releaseIsRefreshing: false,
+       includePreRelease: true,
 
       discoveryChannels: defaultDiscoveryChannels,
       discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
@@ -1180,7 +1185,8 @@ export const useAppStore = create<AppState & AppActions>()(
         return { releaseExpandedRepositories: newSet };
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
-      setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
+       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
+       setIncludePreRelease: (includePreRelease) => set({ includePreRelease }),
 
     // Discovery actions
     setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({
