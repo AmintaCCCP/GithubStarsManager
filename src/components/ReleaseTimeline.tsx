@@ -631,7 +631,6 @@ export const ReleaseTimeline: React.FC = () => {
             </div>
           </div>
           </div>
-        </div>
 
         {/* Search and Filters */}
         <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 mb-4">
@@ -664,7 +663,7 @@ export const ReleaseTimeline: React.FC = () => {
           {/* Filters and View Toggle Row */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex items-center gap-3 flex-wrap">
-              <button>
+              <button
                 disabled
                 className="flex items-center gap-1 px-3 py-1.5 text-sm bg-brand-indigo/20 text-brand-indigo rounded-lg cursor-not-allowed"
                 title={t('新建过滤器（即将推出）', 'New Filter (Coming Soon)')}
@@ -839,7 +838,6 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
 
        {/* Releases List */}
        <div className="space-y-2">
