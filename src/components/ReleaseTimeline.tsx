@@ -597,37 +597,6 @@ export const ReleaseTimeline: React.FC = () => {
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
               </span>
             )}
-
-            {/* Pre-release toggle + help icon (LEFT) */}
-              <div className="flex items-center space-x-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includePreRelease}
-                    onChange={(e) => setIncludePreRelease(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-brand-indigo focus:ring-2 focus:ring-brand-violet cursor-pointer"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-text-secondary">
-                    {t('包含 Pre-release', 'Include Pre-release')}
-                  </span>
-                </label>
-                <HelpCircle
-                  className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help"
-                  title={t('增量刷新已订阅仓库的 Release，仅获取上次同步后的新版本', 'Incremental refresh for subscribed repos (only new since last sync)')}
-                />
-              </div>
-
-            {/* Refresh Button (RIGHT) */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleRefresh}
-                  disabled={releaseIsRefreshing}
-                  className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-                  <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
-                </button>
-              </div>
             </div>
           </div>
           </div>
@@ -662,9 +631,45 @@ export const ReleaseTimeline: React.FC = () => {
 
           {/* Filters and View Toggle Row */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+
+
+            {/* Pre-release toggle + help icon (LEFT) */}
+              <div className="flex items-center space-x-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includePreRelease}
+                    onChange={(e) => setIncludePreRelease(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-brand-indigo focus:ring-2 focus:ring-brand-violet cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-text-secondary">
+                    {t('包含 Pre-release', 'Include Pre-release')}
+                  </span>
+                </label>
+
+              </div>
+
+            {/* Refresh Button (RIGHT) */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={releaseIsRefreshing}
+                  className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+                </button>
+              </div>
+
             <div className="flex items-center gap-3 flex-wrap">
-              <button
-                disabled
+
+              <AssetFilterManager
+                selectedFilters={selectedFilters}
+                onFilterToggle={handleFilterToggle}
+                onClearFilters={handleClearFilters}
+              />
+
+              <button disabled>
                 className="flex items-center gap-1 px-3 py-1.5 text-sm bg-brand-indigo/20 text-brand-indigo rounded-lg cursor-not-allowed"
                 title={t('新建过滤器（即将推出）', 'New Filter (Coming Soon)')}
               >
@@ -672,11 +677,6 @@ export const ReleaseTimeline: React.FC = () => {
                 <span>{t('新建', 'New')}</span>
               </button>
 
-              <AssetFilterManager
-                selectedFilters={selectedFilters}
-                onFilterToggle={handleFilterToggle}
-                onClearFilters={handleClearFilters}
-              />
             </div>
 
             {/* View Mode Toggle Dropdown */}
