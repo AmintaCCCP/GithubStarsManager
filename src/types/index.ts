@@ -53,6 +53,7 @@ export interface Release {
   assets: ReleaseAsset[];
   zipball_url?: string;
   tarball_url?: string;
+  prerelease?: boolean;
   repository: {
     id: number;
     full_name: string;

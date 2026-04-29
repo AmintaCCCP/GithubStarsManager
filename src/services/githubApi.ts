@@ -209,6 +209,7 @@ export class GitHubApiService {
       assets: release.assets || [],
       zipball_url: release.zipball_url,
       tarball_url: release.tarball_url,
+      prerelease: release.prerelease ?? false,
       repository: {
         id: 0,
         full_name: `${owner}/${repo}`,
@@ -219,14 +220,24 @@ export class GitHubApiService {
 
   async getMultipleRepositoryReleases(
     repositories: Repository[],
-    perPage = 5
+    perPage = 30
   ): Promise<{ releases: Release[]; failedRepos: { repoId: number; full_name: string; error: string }[] }> {
     const { results, errors } = await this.controlledConcurrency(
       repositories,
       3,
       async (repo) => {
         const [owner, name] = repo.full_name.split('/');
-        const releases = await this.getRepositoryReleases(owner, name, 1, perPage);
+        let releases: Release[];
+
+        if (!repo.hasFetchedReleases) {
+          // 新订阅仓库，全量获取
+          releases = await this.getRepositoryReleases(owner, name, 1, perPage);
+        } else {
+          // 已有数据，增量获取
+          const since = repo.lastReleaseSyncTime;
+          releases = await this.getIncrementalRepositoryReleases(owner, name, since, perPage);
+        }
+
         releases.forEach(release => {
           release.repository.id = repo.id;
         });
@@ -259,38 +270,63 @@ export class GitHubApiService {
     return { releases: sortedReleases, failedRepos };
   }
 
-  // 获取仓库的增量releases（基于时间戳，since 直接传入 GitHub API）
+  // 获取仓库的增量releases（基于时间戳，使用分页+published_at截止）
   async getIncrementalRepositoryReleases(
     owner: string,
     repo: string,
     since?: string,
-    perPage = 10
+    perPage = 30
   ): Promise<Release[]> {
     try {
-      let endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
-      if (since) {
-        const sinceDate = new Date(since);
-        endpoint += `&since=${sinceDate.toISOString()}`;
+      // 如果没有 since，直接获取最新一页即可
+      if (!since) {
+        return this.getRepositoryReleases(owner, repo, 1, perPage);
       }
 
-      const releases = await this.makeRequest<Release[]>(endpoint);
+      const sinceDate = new Date(since);
+      const newReleases: Release[] = [];
+      let page = 1;
+      const maxPages = 10; // 安全上限，防止无限循环
 
-      return releases.map(release => ({
-        id: release.id,
-        tag_name: release.tag_name,
-        name: release.name || release.tag_name,
-        body: release.body || '',
-        published_at: release.published_at,
-        html_url: release.html_url,
-        assets: release.assets || [],
-        zipball_url: release.zipball_url,
-        tarball_url: release.tarball_url,
-        repository: {
-          id: 0,
-          full_name: `${owner}/${repo}`,
-          name: repo,
-        },
-      }));
+      while (page <= maxPages) {
+        const releases = await this.makeRequest<any[]>(
+          `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
+        );
+
+        if (!releases || releases.length === 0) break;
+
+        let foundCutoff = false;
+        for (const release of releases) {
+          const pubDate = new Date(release.published_at);
+          if (pubDate <= sinceDate) {
+            foundCutoff = true;
+            break;
+          }
+          newReleases.push({
+            id: release.id,
+            tag_name: release.tag_name,
+            name: release.name || release.tag_name,
+            body: release.body || '',
+            published_at: release.published_at,
+            html_url: release.html_url,
+            assets: release.assets || [],
+            zipball_url: release.zipball_url,
+            tarball_url: release.tarball_url,
+            prerelease: release.prerelease ?? false,
+            repository: {
+              id: 0,
+              full_name: `${owner}/${repo}`,
+              name: repo,
+            },
+          });
+        }
+
+        if (foundCutoff) break;
+        if (releases.length < perPage) break;
+        page++;
+      }
+
+      return newReleases;
     } catch (error) {
       throw error;
     }

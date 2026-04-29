@@ -623,7 +623,6 @@ export const ReleaseTimeline: React.FC = () => {
               </span>
             )}
 
-            {/* Refresh Button with help icon */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleRefresh}
@@ -633,12 +632,21 @@ export const ReleaseTimeline: React.FC = () => {
                   <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
                   <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
                 </button>
-                <div
-                  className="p-1 rounded-full hover:bg-light-surface dark:hover:bg-white/10 cursor-help"
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includePreRelease}
+                    onChange={(e) => setIncludePreRelease(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-brand-indigo focus:ring-2 focus:ring-brand-violet cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-text-secondary">
+                    {t('包含 Pre-release', 'Include Pre-release')}
+                  </span>
+                </label>
+                <HelpCircle
+                  className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help"
                   title={t('增量刷新已订阅仓库的 Release，仅获取上次同步后的新版本', 'Incremental refresh for subscribed repos (only new since last sync)')}
-                >
-                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
-                </div>
+                />
               </div>
           </div>
         </div>
@@ -679,25 +687,14 @@ export const ReleaseTimeline: React.FC = () => {
                 onFilterToggle={handleFilterToggle}
                 onClearFilters={handleClearFilters}
               />
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includePreRelease}
-                    onChange={(e) => setIncludePreRelease(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-brand-indigo focus:ring-2 focus:ring-brand-violet cursor-pointer"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-text-secondary">
-                    {t('包含 Pre-release', 'Include Pre-release')}
-                  </span>
-                </label>
-                <div
-                  className="p-1 rounded-full hover:bg-light-surface dark:hover:bg-white/10 cursor-help"
-                  title={t('控制刷新时是否包含预发布版本，应用于刷新结果', 'Toggle whether to include pre-release versions in refresh results')}
-                >
-                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
-                </div>
-              </div>
+              <button
+                onClick={() => {}}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary rounded-lg transition-colors"
+                title={t('新建过滤器', 'New Filter')}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t('新建', 'New')}</span>
+              </button>
             </div>
 
             {/* View Mode Toggle Dropdown */}
