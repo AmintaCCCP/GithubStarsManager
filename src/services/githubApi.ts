@@ -286,9 +286,12 @@ export class GitHubApiService {
       const sinceDate = new Date(since);
       const newReleases: Release[] = [];
       let page = 1;
-      const maxPages = 10; // 安全上限，防止无限循环
 
-      while (page <= maxPages) {
+      while (true) {
+        if (page > 50) {
+          throw new Error(`Exceeded safety bound: page ${page} while paginating releases for ${owner}/${repo}`);
+        }
+
         const releases = await this.makeRequest<any[]>(
           `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
         );

@@ -663,7 +663,6 @@ export const ReleaseTimeline: React.FC = () => {
                 onClearFilters={handleClearFilters}
               />
               <button
-                onClick={() => {}}
                 className="flex items-center gap-1 px-3 py-1.5 text-sm bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary rounded-lg transition-colors"
                 title={t('新建过滤器', 'New Filter')}
               >
