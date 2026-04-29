@@ -310,48 +310,24 @@ export const ReleaseTimeline: React.FC = () => {
         return;
       }
 
-      const allNewReleases: Release[] = [];
-      const failedRepos: { full_name: string; error: string }[] = [];
+      const refreshStartedAt = new Date().toISOString();
 
-      for (const repo of subscribedRepos) {
-        const [owner, name] = repo.full_name.split('/');
+      const { releases: fetchedReleases, failedRepos } =
+        await githubApi.getMultipleRepositoryReleases(subscribedRepos, 30);
 
-        try {
-          let repoReleases: Release[];
+      const allNewReleases = includePreRelease?
+        fetchedReleases:
+        fetchedReleases.filter(r => !r.prelease);
 
-          if (!repo.hasFetchedReleases) {
-            repoReleases = await githubApi.getRepositoryReleases(owner, name, 1, 30);
-          } else {
-            const since = repo.lastReleaseSyncTime;
-            repoReleases = await githubApi.getIncrementalRepositoryReleases(
-              owner, name, since, 30
-            );
-          }
-
-          if (!includePreRelease) {
-            repoReleases = repoReleases.filter(r => !(r as any).prerelease);
-          }
-
-          repoReleases.forEach(release => {
-            release.repository.id = repo.id;
-          });
-
-          allNewReleases.push(...repoReleases);
-
-          const updatedRepo = {
-            ...repo,
-            lastReleaseSyncTime: new Date().toISOString(),
-            hasFetchedReleases: true,
-          };
-          updateRepository(updatedRepo);
-
-        } catch (error) {
-          failedRepos.push({
-            full_name: repo.full_name,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      const failedRepoNames = new Set(failedRepos.map(r => r.full_name));
+      subscribedRepos.forEach(repo => {
+        if (failedRepoNames.has(repo.full_name)) return;
+        updateRepository({
+          ...repo,
+          lastReleaseSyncTime: refreshStartedAt,
+          hasFetchedReleases: true,
+        });
+      });
 
       const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
       const actuallyNewCount = allNewReleases.filter(r => !existingIds.has(r.id)).length;
@@ -360,8 +336,7 @@ export const ReleaseTimeline: React.FC = () => {
         addReleases(allNewReleases);
       }
 
-      const now = new Date().toISOString();
-      setLastRefreshTime(now);
+      setLastRefreshTime(refreshStartedAt);
 
       // 汇总 toast
       if (failedRepos.length > 0) {
