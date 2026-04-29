@@ -769,12 +769,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   const getProseClass = useCallback(() => {
     switch (fontSize) {
       case 'small':
-        return 'prose prose-xs dark:prose-invert';
+        return 'prose prose-sm dark:prose-invert';
       case 'large':
         return 'prose prose-lg dark:prose-invert';
       case 'medium':
       default:
-        return 'prose prose-sm dark:prose-invert';
+        return 'prose dark:prose-invert';
     }
   }, [fontSize]);
 
