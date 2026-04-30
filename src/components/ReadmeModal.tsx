@@ -51,6 +51,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   const currentFontSize = FONT_SIZES[fontSizeIndex].value;
 
+  const getFontSizeType = useCallback((): 'small' | 'medium' | 'large' => {
+    switch (fontSizeIndex) {
+      case 0:
+        return 'small';
+      case 2:
+        return 'large';
+      case 1:
+      default:
+        return 'medium';
+    }
+  }, [fontSizeIndex]);
+
   const extractToc = useCallback((content: string): { items: TocItem[], idMap: Map<string, string> } => {
     const items: TocItem[] = [];
     const idMap = new Map<string, string>();
@@ -477,6 +489,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 enableHtml={true}
                 baseUrl={repository?.html_url}
                 headingIds={headingIdMap}
+                fontSize={getFontSizeType()}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
