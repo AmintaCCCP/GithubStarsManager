@@ -145,6 +145,9 @@ interface AppActions {
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setReadmeModalOpen: (open: boolean) => void;
+
+  // Hydration state
+  setHasHydrated: (hydrated: boolean) => void;
   
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
@@ -643,6 +646,7 @@ export const useAppStore = create<AppState & AppActions>()(
       collapsedSidebarCategoryCount: 20,
       assetFilters: defaultPresetFilters,
       theme: 'dark',
+      hasHydrated: false,
       currentView: 'repositories',
       selectedCategory: 'all',
       language: 'zh',
@@ -1150,6 +1154,9 @@ export const useAppStore = create<AppState & AppActions>()(
       setLanguage: (language) => set({ language }),
       setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       setReadmeModalOpen: (readmeModalOpen) => set({ readmeModalOpen }),
+
+      // Hydration state
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
@@ -1487,6 +1494,12 @@ export const useAppStore = create<AppState & AppActions>()(
           ...currentState,
           ...normalized,
         };
+      },
+      onRehydrateStorage: () => (state) => {
+        console.log('Store hydration complete');
+        if (state) {
+          state.setHasHydrated(true);
+        }
       },
     }
   )

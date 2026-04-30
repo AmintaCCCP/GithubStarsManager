@@ -903,8 +903,8 @@ export const SearchBar: React.FC = () => {
               <p className="font-medium mb-1 text-gray-900 dark:text-white">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                 {t(
-                  '使用多维度智能加权算法进行搜索和排序：仓库名称(40%)、描述(32%)、标签(25%)、AI摘要(15%)、平台语言(18%)等维度综合评分，支持精确匹配加成和流行度权重。',
-                  'Uses multi-dimensional intelligent weighted algorithm for search and ranking: repository name (40%), description (32%), tags (25%), AI summary (15%), platform/language (18%) and other dimensions with exact match bonus and popularity weighting.'
+                  '多维度智能加权算法（累积得分制）：名称(0.40分)、路径(0.35分)、自定义描述(0.32分)、描述(0.30分)、Topics(0.25分)、自定义标签(0.24分)、AI标签(0.22分)、平台(0.18分)、AI摘要(0.15分)、语言(0.12分)。支持精确匹配加分(+0.50/+0.30)和流行度加成。',
+                  'Multi-dimensional weighted algorithm (cumulative scoring): name(0.40), path(0.35), custom desc(0.32), desc(0.30), topics(0.25), custom tags(0.24), AI tags(0.22), platform(0.18), AI summary(0.15), language(0.12). Supports exact match bonus (+0.50/+0.30) and popularity boost.'
                 )}
               </p>
               <div className="absolute bottom-full right-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
