@@ -900,11 +900,16 @@ export const SearchBar: React.FC = () => {
           <div className="group relative">
             <AlertCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
             <div className="absolute right-0 top-full mt-2 w-80 max-w-xs p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
-              <p className="font-medium mb-1 text-gray-900 dark:text-white">{t('关于AI搜索', 'About AI Search')}</p>
+              <p className="font-medium mb-1 text-gray-900 dark:text-white">
+                {t('关于AI搜索', 'About AI Search')}
+              </p>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                {t(
-                  '多维度智能加权算法（累积得分制）：名称(0.40分)、路径(0.35分)、自定义描述(0.32分)、描述(0.30分)、Topics(0.25分)、自定义标签(0.24分)、AI标签(0.22分)、平台(0.18分)、AI摘要(0.15分)、语言(0.12分)。支持精确匹配加分(+0.50/+0.30)和流行度加成。',
-                  'Multi-dimensional weighted algorithm (cumulative scoring): name(0.40), path(0.35), custom desc(0.32), desc(0.30), topics(0.25), custom tags(0.24), AI tags(0.22), platform(0.18), AI summary(0.15), language(0.12). Supports exact match bonus (+0.50/+0.30) and popularity boost.'
+                {activeAIConfig ? t(
+                  'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
+                  'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant results. Supports natural language queries and concept matching.'
+                ) : t(
+                  '本地智能排序（累积得分制）：名称(0.40分)、路径(0.35分)、自定义描述(0.32分)、描述(0.30分)、Topics(0.25分)、自定义标签(0.24分)、AI标签(0.22分)、平台(0.18分)、AI摘要(0.15分)、语言(0.12分)。支持精确匹配加分(+0.50/+0.30)和流行度加成。',
+                  'Local intelligent ranking (cumulative scoring): name(0.40), path(0.35), custom desc(0.32), desc(0.30), topics(0.25), custom tags(0.24), AI tags(0.22), platform(0.18), AI summary(0.15), language(0.12). Supports exact match bonus (+0.50/+0.30) and popularity boost.'
                 )}
               </p>
               <div className="absolute bottom-full right-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
