@@ -54,7 +54,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   onClose,
   repository
 }) => {
-  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore();
+  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, theme } = useAppStore();
 
   const [formData, setFormData] = useState({
     description: '',
@@ -589,12 +589,15 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
   if (!repository) return null;
 
-  // 统一的卡片样式
-  const sectionClass = "p-5 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]";
-  const labelClass = "flex items-center space-x-2 text-sm font-medium text-gray-900 dark:text-text-primary mb-3";
-  const inputClass = "w-full px-3 py-2 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-all";
-  const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all";
-  const tagClass = "inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary border-transparent rounded-md text-sm border border-black/[0.06] dark:border-white/[0.04] dark:border-white/[0.04]";
+  // Unified card styles with enhanced light mode optimization
+  const sectionClass = "p-5 bg-white dark:bg-panel-dark rounded-xl border border-gray-200/80 dark:border-white/[0.04] shadow-sm";
+  const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-gray-900 dark:text-text-primary mb-3";
+  const inputClass = "w-full px-4 py-3 bg-gray-50/50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.04] rounded-xl text-gray-900 dark:text-text-primary placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-violet/30 focus:border-brand-violet dark:focus:ring-brand-violet/50 dark:focus:border-brand-violet transition-all duration-200 hover:bg-gray-100/50 dark:hover:bg-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
+  const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
+  const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
+  const tagClass = "inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-md text-sm border border-gray-200/80 dark:border-white/[0.04]";
+  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-gray-50 to-white dark:from-white/[0.02] dark:to-white/[0.04] border border-gray-200/80 dark:border-white/[0.04] rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
+  const infoTextClass = "text-gray-700 dark:text-text-secondary flex items-start";
 
   return (
     <Modal
@@ -678,16 +681,16 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               setFormData(prev => ({ ...prev, description: e.target.value }));
               setEditIntent(prev => ({ ...prev, description: 'keep-custom' }));
             }}
-            className={`${inputClass} resize-none`}
-            rows={3}
+            className={textareaClass}
+            rows={5}
             placeholder={t('输入自定义描述...', 'Enter custom description...')}
           />
 
-          {/* Save Effect Info - always visible */}
+          {/* Save Effect Info - Enhanced for Light Mode */}
           {editIntent.description === 'clear' ? (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-red flex items-start">
-                <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-status-red`}>
+                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '描述已清空，保存后将显示"（无描述）"。即使有AI总结或原始描述也不会显示。',
@@ -697,9 +700,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'reset-to-ai' ? (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
-                <Bot className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-brand-violet`}>
+                <Bot className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '保存后将清除自定义描述，显示AI总结。如果AI重新分析，描述可能随之变化。',
@@ -709,9 +712,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'reset-to-original' ? (
-            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
-                <FileText className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={infoTextClass}>
+                <FileText className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '保存后将清除自定义描述，显示GitHub原始描述。',
@@ -721,9 +724,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber flex items-start">
-                <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-status-amber`}>
+                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {repository?.ai_summary
                     ? t('当前编辑为空，保存后将显示AI总结。如需清空请点击"清除描述"。', 'Currently empty. AI summary will be shown after saving. Click "Clear" to explicitly clear.')
@@ -734,9 +737,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && customStatus.description ? (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
-                <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-brand-violet`}>
+                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '保存后将使用此自定义描述，优先级高于AI总结和原始描述。',
@@ -746,9 +749,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && formData.description.trim() !== '' && !customStatus.description ? (
-            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
-                <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={infoTextClass}>
+                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '当前内容与AI总结或原始描述一致，保存后将使用自动推断的来源。',
@@ -809,10 +812,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </button>
           </div>
 
-          {/* Feature Tip */}
-          <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.04] rounded-lg">
-            <p className="text-[11px] text-gray-500 dark:text-text-secondary flex items-start">
-              <Info className="w-3.5 h-3.5 mr-1.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-text-tertiary" />
+          {/* Feature Tip - Enhanced */}
+          <div className={`${infoBoxClass} bg-gradient-to-br from-blue-50/30 to-indigo-50/20 dark:from-transparent dark:to-transparent`}>
+            <p className="text-[11px] text-gray-600 dark:text-text-secondary flex items-start">
+              <Info className="w-3.5 h-3.5 mr-2 mt-0.5 flex-shrink-0 text-gray-400 dark:text-text-tertiary" />
               <span>
                 {t(
                   '描述优先级：自定义描述 > AI总结 > 原始描述。"重置"会清除自定义并回退到对应来源，"清除"会明确清空描述（不显示任何来源）。',
@@ -906,11 +909,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </button>
           </div>
 
-          {/* Custom Category Selection Info */}
+          {/* Custom Category Selection Info - Enhanced */}
           {editIntent.category === 'keep-custom' && formData.category && (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
-                <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-brand-violet`}>
+                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '已选择自定义分类。保存后仓库将固定显示在此分类中，不会随AI分析结果自动变化。建议同时开启分类锁定以防止同步时被覆盖。',
@@ -921,11 +924,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Reset Category Info */}
+          {/* Reset Category Info - Enhanced */}
           {editIntent.category === 'reset-to-ai' && (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-brand-violet flex items-start">
-                <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-brand-violet`}>
+                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '重置为AI分类将清除自定义分类设置，系统会根据AI标签自动推断分类。如果AI标签变化，分类可能会随之改变。',
@@ -937,9 +940,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {editIntent.category === 'reset-to-original' && (
-            <div className="mt-3 p-3 bg-light-bg dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary flex items-start">
-                <Info className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={infoTextClass}>
+                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '重置为默认分类将清除自定义分类设置，系统会根据仓库信息（名称、描述、语言等）自动匹配分类。',
@@ -950,11 +953,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Clear Category Warning */}
+          {/* Clear Category Warning - Enhanced */}
           {editIntent.category === 'clear' && (
-            <div className="mt-3 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-red flex items-start">
-                <AlertTriangle className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
+            <div className={infoBoxClass}>
+              <p className={`${infoTextClass} text-status-red`}>
+                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {t(
                     '清除分类后，仓库将不再有明确的分类归属。系统会尝试根据AI标签自动匹配分类，如果没有匹配到则可能显示在默认分类中。',
@@ -965,8 +968,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Category Lock */}
-          <div className="mt-4 p-4 bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-status-amber/20">
+          {/* Category Lock - Enhanced */}
+          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-status-amber/10 rounded-xl border border-gray-200/80 dark:border-white/[0.04] dark:border-status-amber/20 shadow-sm">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
@@ -1097,38 +1100,38 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </button>
           </div>
 
-          {/* Status Alert */}
+          {/* Status Alert - Enhanced */}
           {formData.tags.length === 0 && (
-            <div className="mb-4 p-3 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg">
-              <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber flex items-center">
+            <div className={`${infoBoxClass} mb-4`}>
+              <p className={`${infoTextClass} flex items-center`}>
                 {editIntent.tags === 'clear' ? (
                   <>
-                    <span className="mr-1">⚠️</span>
+                    <span className="mr-2">⚠️</span>
                     {t('标签已清空。保存后将不显示任何标签。', 'Tags cleared. No tags will be shown after saving.')}
                   </>
                 ) : editIntent.tags === 'reset-to-ai' ? (
                   <>
-                    <span className="mr-1 text-status-emerald">✓</span>
+                    <span className="mr-2 text-status-emerald">✓</span>
                     {t('将显示AI标签。', 'AI tags will be shown.')}
                   </>
                 ) : editIntent.tags === 'reset-to-original' ? (
                   <>
-                    <span className="mr-1 text-status-emerald">✓</span>
+                    <span className="mr-2 text-status-emerald">✓</span>
                     {t('将显示GitHub Topics。', 'GitHub Topics will be shown.')}
                   </>
                 ) : repository?.ai_tags && repository.ai_tags.length > 0 ? (
                   <>
-                    <span className="mr-1">⚠️</span>
+                    <span className="mr-2">⚠️</span>
                     {t('当前无自定义标签。保存后将显示AI标签。', 'No custom tags. AI tags will be shown after saving.')}
                   </>
                 ) : repository?.topics && repository.topics.length > 0 ? (
                   <>
-                    <span className="mr-1">⚠️</span>
+                    <span className="mr-2">⚠️</span>
                     {t('当前无自定义标签。保存后将显示GitHub Topics。', 'No custom tags. GitHub Topics will be shown after saving.')}
                   </>
                 ) : (
                   <>
-                    <span className="mr-1">⚠️</span>
+                    <span className="mr-2">⚠️</span>
                     {t('无可用标签。', 'No tags available.')}
                   </>
                 )}
@@ -1160,17 +1163,17 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
+        {/* Action Buttons - Enhanced */}
+        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200/80 dark:border-white/[0.04]">
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleCloseWithConfirm();
             }}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-900 dark:text-text-primary bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 dark:border dark:border-white/[0.04] transition-colors"
+            className="flex items-center space-x-2 px-4 py-2.5 text-gray-700 dark:text-text-primary bg-white dark:bg-white/[0.04] rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 border border-gray-200 dark:border-white/[0.04] transition-all duration-200 shadow-sm"
           >
             <X className="w-4 h-4" />
-            <span>{t('取消', 'Cancel')}</span>
+            <span className="font-medium">{t('取消', 'Cancel')}</span>
           </button>
           <button
             onClick={(e) => {
@@ -1178,7 +1181,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               void handleSave();
             }}
             disabled={!hasChanges}
-            className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-brand-indigo text-white rounded-xl hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium"
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
