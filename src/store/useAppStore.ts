@@ -1495,11 +1495,13 @@ export const useAppStore = create<AppState & AppActions>()(
           ...normalized,
         };
       },
-      onRehydrateStorage: () => (state) => {
-        console.log('Store hydration complete');
-        if (state) {
-          state.setHasHydrated(true);
+      onRehydrateStorage: (state) => (_rehydratedState, error) => {
+        if (error) {
+          console.error('Store hydration failed', error);
+        } else {
+          console.log('Store hydration complete');
         }
+        state.setHasHydrated(true);
       },
     }
   )
