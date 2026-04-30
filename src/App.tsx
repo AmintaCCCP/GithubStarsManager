@@ -72,17 +72,6 @@ function App() {
     }
   }, [theme]);
 
-  // Show loading state while store is hydrating to ensure correct theme is applied
-  if (!hasHydrated) {
-    return (
-      <div className="min-h-screen bg-light-bg dark:bg-marketing-black flex items-center justify-center">
-        <div className="text-gray-900 dark:text-text-primary text-lg font-medium animate-pulse">
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
@@ -110,6 +99,17 @@ function App() {
       }
     };
   }, []);
+
+  // Show loading state while store is hydrating to ensure correct theme is applied
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen bg-light-bg dark:bg-marketing-black flex items-center justify-center">
+        <div className="text-gray-900 dark:text-text-primary text-lg font-medium animate-pulse">
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   const handleCategorySelect = useCallback((category: string) => {
     setSelectedCategory(category);
