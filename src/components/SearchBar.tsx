@@ -50,7 +50,7 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) =
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 overflow-hidden">
+        <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-40 overflow-hidden">
           {sortOptions.map((option) => (
             <button
               key={option.value}
@@ -802,7 +802,7 @@ export const SearchBar: React.FC = () => {
   return (
     <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6 mb-6">
       {/* Search Input */}
-      <div className="relative mb-4">
+      <div className="relative mb-4 z-40">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
         <input
           ref={searchInputRef}
@@ -899,20 +899,20 @@ export const SearchBar: React.FC = () => {
           </button>
           <div className="group relative">
             <AlertCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
-            <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-              <p className="font-medium mb-1">{t('关于AI搜索', 'About AI Search')}</p>
-              <p className="text-gray-300">
-                {activeAIConfig
-                  ? t(
-                      '已配置AI服务时，将调用AI进行语义搜索和智能重排序。未配置时使用本地算法根据仓库名称、描述、标签等多维度进行匹配和排序。',
-                      'When AI service is configured, it will be called for semantic search and intelligent reranking. Otherwise, local algorithms are used to match and rank based on repository name, description, tags, and other dimensions.'
-                    )
-                  : t(
-                      '此功能使用本地算法进行智能排序。配置AI服务后可启用语义搜索功能，获得更精准的搜索结果。',
-                      'This feature uses local algorithms for intelligent ranking. Configure an AI service to enable semantic search for more accurate results.'
-                    )}
+            <div className="absolute right-0 top-full mt-2 w-80 max-w-xs p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
+              <p className="font-medium mb-1 text-gray-900 dark:text-white">
+                {t('关于AI搜索', 'About AI Search')}
               </p>
-              <div className="absolute bottom-full right-2 w-2 h-2 bg-gray-800 transform rotate-45"></div>
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                {activeAIConfig ? t(
+                  'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
+                  'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant results. Supports natural language queries and concept matching.'
+                ) : t(
+                  '回退模式：基础文本搜索与默认排序。当未配置AI服务时，系统将使用基础文本匹配进行搜索（支持名称、描述、标签、语言等字段），并应用标准的排序和过滤控制。此为轻量级搜索方案，无语义理解能力。',
+                  'Fallback mode: Basic text search with default sorting. When no AI service is configured, the system uses basic text matching for search (supports name, description, tags, language, etc.) and applies standard sort and filter controls. This is a lightweight search solution without semantic understanding capabilities.'
+                )}
+              </p>
+              <div className="absolute bottom-full right-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
             </div>
           </div>
         </div>
@@ -975,7 +975,7 @@ export const SearchBar: React.FC = () => {
         </div>
 
         {/* Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative z-30">
           <SortByDropdown
             value={searchFilters.sortBy}
             onChange={(value) => setSearchFilters({ sortBy: value as 'stars' | 'updated' | 'name' | 'starred' })}

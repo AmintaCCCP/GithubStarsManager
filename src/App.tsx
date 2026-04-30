@@ -51,11 +51,12 @@ const SettingsView = React.memo(() => <SettingsPanel />);
 SettingsView.displayName = 'SettingsView';
 
 function App() {
-  const { 
-    isAuthenticated, 
-    currentView, 
+  const {
+    isAuthenticated,
+    currentView,
     selectedCategory,
     theme,
+    hasHydrated,
     searchResults,
     repositories,
     setSelectedCategory,
@@ -107,7 +108,7 @@ function App() {
     switch (currentView) {
       case 'repositories':
         return (
-          <RepositoriesView 
+          <RepositoriesView
             repositories={repositories}
             searchResults={searchResults}
             selectedCategory={selectedCategory}
@@ -128,6 +129,17 @@ function App() {
         return null;
     }
   }, [currentView, repositories, searchResults, selectedCategory, handleCategorySelect]);
+
+  // Show loading state while store is hydrating to ensure correct theme is applied
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen bg-light-bg dark:bg-marketing-black flex items-center justify-center">
+        <div className="text-gray-900 dark:text-text-primary text-lg font-medium animate-pulse">
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginScreen />;

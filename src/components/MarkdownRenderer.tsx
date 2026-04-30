@@ -18,6 +18,7 @@ interface MarkdownRendererProps {
   enableHtml?: boolean;
   baseUrl?: string;
   headingIds?: Map<string, string>;
+  fontSize?: 'small' | 'medium' | 'large';
 }
 
 const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
@@ -92,10 +93,6 @@ const CodeBlock: React.FC<{
     }
   }, [codeText, uiLanguage]);
 
-  const codeLines = codeText.split('\n');
-  const lineCount = codeLines.length;
-  const showLineNumbers = lineCount > 3;
-
   const isBashLike = ['bash', 'sh', 'shell', 'zsh'].includes(normalizedLanguage);
   const isPowerShell = ['powershell', 'ps1'].includes(normalizedLanguage);
   const isCmdLike = ['cmd', 'bat'].includes(normalizedLanguage);
@@ -141,11 +138,6 @@ const CodeBlock: React.FC<{
           )}
         </div>
         <div className="flex items-center gap-2">
-          {showLineNumbers && (
-            <span className="text-xs text-gray-400 dark:text-text-tertiary font-mono">
-              {lineCount} {uiLanguage === 'zh' ? '行' : 'lines'}
-            </span>
-          )}
           <button
             onClick={handleCopy}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -187,36 +179,11 @@ const CodeBlock: React.FC<{
               ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-[#0d1117] dark:to-[#161b22]'
               : 'bg-light-bg dark:bg-[#0d1117]'
       }`}>
-        {showLineNumbers ? (
-          <div className="flex">
-            <div className={`flex-shrink-0 py-3 px-3 text-right select-none border-r ${
-              isBashLike
-                ? 'border-black/[0.06] dark:border-[#30363d] bg-status-emerald/10 dark:bg-[#161b22]'
-                : isPowerShell
-                  ? 'border-black/[0.06] dark:border-[#30363d] bg-gray-100 dark:bg-[#161b22]'
-                  : isCmdLike
-                    ? 'border-cyan-200 dark:border-[#30363d] bg-cyan-50/20 dark:bg-[#161b22]'
-                    : 'border-black/[0.06] dark:border-[#30363d] bg-light-surface/50 dark:bg-[#161b22]'
-            }`}>
-              {codeLines.map((_, i) => (
-                <div key={i} className="text-xs leading-6 text-gray-400 dark:text-[#6e7681] font-mono tabular-nums">
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-            <pre className={`flex-1 p-4 overflow-x-auto ${className || ''}`}>
-              <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-                {codeText}
-              </code>
-            </pre>
-          </div>
-        ) : (
-          <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-              {codeText}
-            </code>
-          </pre>
-        )}
+        <pre className={`p-4 overflow-x-auto ${className || ''}`}>
+          <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+            {codeText}
+          </code>
+        </pre>
       </div>
     </div>
   );
@@ -481,7 +448,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     setIsLoading(false);
   }, []);
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setHasError(false);
     setIsLoading(true);
     setImageSizeKnown(false);
@@ -784,7 +753,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   shouldRender = true,
   enableHtml = false,
   baseUrl,
-  headingIds
+  headingIds,
+  fontSize = 'medium'
 }) => {
   const headingCounterRef = useRef(headingIds?.size ?? 0);
   const headingTextCountMapRef = useRef(new Map<string, number>());
@@ -795,6 +765,18 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   }, [content, headingIds]);
 
   const rehypePlugins = enableHtml ? REHYPE_PLUGINS_WITH_HTML : REHYPE_PLUGINS_NO_HTML;
+
+  const getProseClass = useCallback(() => {
+    switch (fontSize) {
+      case 'small':
+        return 'prose prose-sm dark:prose-invert';
+      case 'large':
+        return 'prose prose-lg dark:prose-invert';
+      case 'medium':
+      default:
+        return 'prose dark:prose-invert';
+    }
+  }, [fontSize]);
 
   const getHeadingId = useCallback((children: React.ReactNode): string | undefined => {
     if (headingIds && headingIds.size > 0) {
@@ -933,7 +915,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   }
 
   return (
-    <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
+    <div className={`${getProseClass()} max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={rehypePlugins}
