@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp } from 'lucide-react';
+import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, Languages, RotateCcw } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { stripMarkdownFormatting } from '../utils/markdownUtils';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { useAppStore } from '../store/useAppStore';
+import { useMarkdownTranslation } from '../hooks/useMarkdownTranslation';
 
 interface TocItem {
   id: string;
@@ -48,6 +49,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const {
+    status: translateStatus,
+    progress: translateProgress,
+    error: translateError,
+    translatedContent,
+    translate,
+    revert,
+    reset: resetTranslation,
+  } = useMarkdownTranslation({
+    targetLanguage: language,
+  });
 
   const currentFontSize = FONT_SIZES[fontSizeIndex].value;
 
@@ -208,6 +221,19 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
+  const handleTranslate = useCallback(async () => {
+    if (translateStatus === 'translating') return;
+    if (readmeContent) {
+      await translate(readmeContent);
+    }
+  }, [readmeContent, translate, translateStatus]);
+
+  const handleRevertTranslation = useCallback(() => {
+    revert();
+  }, [revert]);
+
+  const displayContent = translatedContent || readmeContent;
+
   const fetchReadme = useCallback(async () => {
     if (!repository) return;
 
@@ -281,10 +307,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setScrollProgress(0);
       setShowBackToTop(false);
       setActiveHeadingId(null);
+      resetTranslation();
     } else {
       setShowToc(true);
     }
-  }, [isOpen]);
+  }, [isOpen, resetTranslation]);
 
   useEffect(() => {
     return () => {
@@ -390,6 +417,50 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </div>
             </div>
             <div className="flex items-center space-x-1">
+              {readmeContent && !loading && (
+                translateStatus === 'translated' ? (
+                  <button
+                    onClick={handleRevertTranslation}
+                    className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
+                    title={t('显示原文', 'Show Original')}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('原文', 'Original')}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleTranslate}
+                    disabled={translateStatus === 'translating'}
+                    className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                      translateStatus === 'translating'
+                        ? 'text-gray-400 dark:text-text-quaternary cursor-not-allowed'
+                        : 'text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10'
+                    }`}
+                    title={t('翻译文档', 'Translate Document')}
+                  >
+                    {translateStatus === 'translating' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="hidden sm:inline">
+                          {translateProgress.total > 0 
+                            ? `${translateProgress.current}/${translateProgress.total}` 
+                            : t('翻译中...', 'Translating...')}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Languages className="w-4 h-4" />
+                        <span className="hidden sm:inline">{t('翻译', 'Translate')}</span>
+                      </>
+                    )}
+                  </button>
+                )
+              )}
+              {translateError && (
+                <div className="px-3 py-1 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg max-w-[200px] truncate" title={translateError}>
+                  {translateError}
+                </div>
+              )}
               {tocItems.length > 0 && (
                 <button
                   onClick={() => setShowToc(!showToc)}
@@ -483,9 +554,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   {language === 'zh' ? '重试' : 'Retry'}
                 </button>
               </div>
-            ) : readmeContent ? (
+            ) : displayContent ? (
               <MarkdownRenderer
-                content={readmeContent}
+                content={displayContent}
                 enableHtml={true}
                 baseUrl={repository?.html_url}
                 headingIds={headingIdMap}
