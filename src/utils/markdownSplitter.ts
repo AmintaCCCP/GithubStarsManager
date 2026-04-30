@@ -14,7 +14,7 @@ export const splitMarkdownForTranslation = (markdown: string): ParsedContent => 
   segmentIdCounter = 0;
   const segments: MarkdownSegment[] = [];
 
-  const combinedRegex = /(```[\s\S]*?```)|(`[^`\n]+`)|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]*\]\([^)]+\))/g;
+  const combinedRegex = /(```[\s\S]*?```)|(~~~[\s\S]*?~~~)|(`[^`\n]+`)|(!\[([^\]]*)\]\([^)]+\))|(\[([^\]]*)\]\([^)]+\))/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -47,21 +47,87 @@ export const splitMarkdownForTranslation = (markdown: string): ParsedContent => 
     } else if (match[2]) {
       segments.push({
         id: segmentIdCounter++,
-        type: 'inline_code',
+        type: 'code_block',
         content: contentWithPrefix,
       });
     } else if (match[3]) {
       segments.push({
         id: segmentIdCounter++,
-        type: 'image',
+        type: 'inline_code',
         content: contentWithPrefix,
       });
     } else if (match[4]) {
-      segments.push({
-        id: segmentIdCounter++,
-        type: 'link',
-        content: contentWithPrefix,
-      });
+      const altText = match[5] || '';
+      const imageMatch = match[4];
+      const urlPart = imageMatch.substring(imageMatch.lastIndexOf(']('));
+      const prefix = contentWithPrefix.substring(0, contentWithPrefix.indexOf(imageMatch));
+      
+      if (altText) {
+        if (prefix) {
+          segments.push({
+            id: segmentIdCounter++,
+            type: 'translatable',
+            content: prefix,
+          });
+        }
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'translatable',
+          content: '![',
+        });
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'translatable',
+          content: altText,
+        });
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'image',
+          content: urlPart,
+        });
+      } else {
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'image',
+          content: contentWithPrefix,
+        });
+      }
+    } else if (match[6]) {
+      const linkText = match[7] || '';
+      const linkMatch = match[6];
+      const urlPart = linkMatch.substring(linkMatch.lastIndexOf(']('));
+      const prefix = contentWithPrefix.substring(0, contentWithPrefix.indexOf(linkMatch));
+      
+      if (linkText) {
+        if (prefix) {
+          segments.push({
+            id: segmentIdCounter++,
+            type: 'translatable',
+            content: prefix,
+          });
+        }
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'translatable',
+          content: '[',
+        });
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'translatable',
+          content: linkText,
+        });
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'link',
+          content: urlPart,
+        });
+      } else {
+        segments.push({
+          id: segmentIdCounter++,
+          type: 'link',
+          content: contentWithPrefix,
+        });
+      }
     }
 
     lastIndex = match.index + fullMatch.length;

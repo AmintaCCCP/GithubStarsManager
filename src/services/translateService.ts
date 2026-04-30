@@ -66,7 +66,7 @@ const storeToken = (token: string): void => {
   }
 };
 
-export const apiMsAuth = async (): Promise<string> => {
+export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
   const storedToken = getStoredToken();
   if (storedToken) {
     cachedToken = storedToken;
@@ -86,6 +86,7 @@ export const apiMsAuth = async (): Promise<string> => {
       const response = await fetch(AUTH_URL, {
         method: 'GET',
         credentials: 'omit',
+        signal,
       });
 
       if (!response.ok) {
@@ -95,6 +96,11 @@ export const apiMsAuth = async (): Promise<string> => {
       const token = await response.text();
       storeToken(token);
       return token;
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw err;
+      }
+      throw err;
     } finally {
       tokenPromise = null;
     }
@@ -117,10 +123,10 @@ export const translateText = async (options: TranslateOptions): Promise<Translat
     return { translatedText: text, detectedLanguage: '' };
   }
 
-  const token = await apiMsAuth();
+  const token = await apiMsAuth(signal);
 
   const params = queryString.stringify({
-    from: from || '',
+    ...(from && { from }),
     to,
     'api-version': '3.0',
   });
@@ -180,7 +186,7 @@ export const translateBatch = async (
 
   for (let i = 0; i < texts.length; i += batchSize) {
     if (signal?.aborted) {
-      throw new Error('Aborted');
+      throw new DOMException('Aborted', 'AbortError');
     }
 
     const batch = texts.slice(i, i + batchSize);
@@ -213,10 +219,10 @@ const translateBatchInternal = async (
   from?: string,
   signal?: AbortSignal
 ): Promise<TranslateResult[]> => {
-  const token = await apiMsAuth();
+  const token = await apiMsAuth(signal);
 
   const params = queryString.stringify({
-    from: from || '',
+    ...(from && { from }),
     to,
     'api-version': '3.0',
   });

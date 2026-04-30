@@ -265,9 +265,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
       if (content.trim()) {
         setReadmeContent(content);
-        const { items, idMap } = extractToc(content);
-        setTocItems(items);
-        setHeadingIdMap(idMap);
       } else {
         setError(language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file');
       }
@@ -280,13 +277,25 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setLoading(false);
       }
     }
-  }, [repository, githubToken, language, extractToc]);
+  }, [repository, githubToken, language]);
 
   useEffect(() => {
     if (isOpen && repository) {
       fetchReadme();
     }
   }, [isOpen, repository, fetchReadme]);
+
+  useEffect(() => {
+    if (translatedContent) {
+      const { items, idMap } = extractToc(translatedContent);
+      setTocItems(items);
+      setHeadingIdMap(idMap);
+    } else if (readmeContent) {
+      const { items, idMap } = extractToc(readmeContent);
+      setTocItems(items);
+      setHeadingIdMap(idMap);
+    }
+  }, [translatedContent, readmeContent, extractToc]);
 
   useEffect(() => {
     setReadmeModalOpen(isOpen);
