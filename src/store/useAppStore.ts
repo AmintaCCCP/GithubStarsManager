@@ -168,6 +168,7 @@ interface AppActions {
   toggleReleaseExpandedRepository: (repoId: number) => void;
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   setReleaseIsRefreshing: (refreshing: boolean) => void;
+  setIncludePreRelease: (include: boolean) => void;
 
   // Discovery actions
   setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
@@ -279,6 +280,24 @@ const normalizePersistedState = (
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
+  // Migration for old users: mark repos with existing releases as already synced
+  const migratedRepositories = repositories.map(repo => {
+    const hasExistingRelease = releases.some(r => r.repository?.id === repo.id);
+    if (hasExistingRelease && !repo.has_fetched_releases) {
+      return {
+        ...repo,
+        has_fetched_releases: true,
+        last_release_fetch_time: repo.last_release_fetch_time || new Date().toISOString()
+      };
+    }
+    return repo;
+  });
+
+  // Default includePreRelease to true if not set (backward compatibility)
+  const includePreRelease = safePersisted.includePreRelease !== undefined
+    ? safePersisted.includePreRelease
+    : true;
+
   return {
     ...currentState,
     ...safePersisted,
@@ -286,12 +305,13 @@ const normalizePersistedState = (
       safePersisted.theme === 'light' || safePersisted.theme === 'dark'
         ? safePersisted.theme
         : 'dark',
-    repositories,
+    repositories: migratedRepositories,
     releases,
-    searchResults: repositories,
+    searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
     releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
+    includePreRelease,
     searchFilters: {
       ...initialSearchFilters,
       ...safePersisted.searchFilters,
@@ -660,6 +680,7 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseSearchQuery: '',
       releaseExpandedRepositories: new Set<number>(),
       releaseIsRefreshing: false,
+      includePreRelease: true,
 
       discoveryChannels: defaultDiscoveryChannels,
       discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
@@ -1188,6 +1209,7 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
+      setIncludePreRelease: (includePreRelease) => set({ includePreRelease }),
 
     // Discovery actions
     setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({

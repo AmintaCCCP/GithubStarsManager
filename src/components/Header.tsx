@@ -99,10 +99,8 @@ export const Header: React.FC = () => {
 
       setRepositories(mergedRepositories);
 
-      // 3. 获取Release信息
-      console.log('Fetching releases...');
-      const releases = await githubApi.getMultipleRepositoryReleases(mergedRepositories.slice(0, 20));
-      setReleases(releases);
+      // Note: Release fetching is now handled by the Refresh button in Release Timeline
+      // Header sync only syncs the starred repos list
 
       setLastSync(new Date().toISOString());
       console.log('Sync completed successfully');
@@ -367,7 +365,7 @@ export const Header: React.FC = () => {
                 onClick={handleSync}
                 disabled={isLoading}
                 className="p-1 rounded hover:bg-light-surface dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                title={t('同步仓库', 'Sync repositories')}
+                title={t('同步星标仓库列表（不包含Release）', 'Sync starred repos list (excludes Release)')}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </button>

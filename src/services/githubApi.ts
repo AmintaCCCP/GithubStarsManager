@@ -1,11 +1,11 @@
-import { 
-  Repository, 
-  Release, 
-  GitHubUser, 
-  DiscoveryPlatform, 
-  ProgrammingLanguage, 
-  SortBy, 
-  SortOrder, 
+import {
+  Repository,
+  Release,
+  GitHubUser,
+  DiscoveryPlatform,
+  ProgrammingLanguage,
+  SortBy,
+  SortOrder,
   PaginatedDiscoveryRepositories,
   DiscoveryChannelId,
   TopicCategory,
@@ -35,16 +35,35 @@ interface GitHubSearchRepoResponse {
   total_count: number;
 }
 
+export interface ReleaseFetchOptions {
+  includePreRelease?: boolean;
+}
+
+export interface MultipleReleasesResult {
+  releases: Release[];
+  failedRepos: { repoId: number; full_name: string; error: string }[];
+}
 
 
 export class GitHubApiService {
   private token: string;
+  private rateLimitRemaining: number | null = null;
+  private rateLimitReset: number | null = null;
 
   constructor(token: string) {
     this.token = token;
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+    // Check rate limit before making request
+    if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
+      const waitMs = (this.rateLimitReset * 1000) - Date.now();
+      if (waitMs > 0) {
+        console.log(`Rate limit low (${this.rateLimitRemaining}), waiting ${Math.ceil(waitMs / 1000)}s for reset...`);
+        await new Promise(resolve => setTimeout(resolve, waitMs + 1000));
+      }
+    }
+
     const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
       ...options,
       signal,
@@ -56,9 +75,25 @@ export class GitHubApiService {
       },
     });
 
+    // Parse rate limit headers
+    const remaining = response.headers.get('X-RateLimit-Remaining');
+    const reset = response.headers.get('X-RateLimit-Reset');
+    if (remaining !== null) {
+      this.rateLimitRemaining = parseInt(remaining, 10);
+    }
+    if (reset !== null) {
+      this.rateLimitReset = parseInt(reset, 10);
+    }
+
     if (!response.ok) {
       if (response.status === 401) {
         throw new Error('GitHub token expired or invalid');
+      }
+      if (response.status === 403 && this.rateLimitRemaining === 0) {
+        const resetDate = this.rateLimitReset
+          ? new Date(this.rateLimitReset * 1000).toLocaleString()
+          : 'unknown';
+        throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
       }
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
@@ -78,7 +113,7 @@ export class GitHubApiService {
         return item;
       }) as T;
     }
-    
+
     return data;
   }
 
@@ -106,12 +141,12 @@ export class GitHubApiService {
     while (true) {
       const repos = await this.getStarredRepositories(page, perPage);
       if (repos.length === 0) break;
-      
+
       allRepos = [...allRepos, ...repos];
-      
+
       if (repos.length < perPage) break;
       page++;
-      
+
       // Rate limiting protection
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -148,7 +183,7 @@ export class GitHubApiService {
       const releases = await this.makeRequest<Release[]>(
         `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
       );
-      
+
       return releases.map(release => ({
         id: release.id,
         tag_name: release.tag_name,
@@ -159,6 +194,7 @@ export class GitHubApiService {
         assets: release.assets || [],
         zipball_url: release.zipball_url,
         tarball_url: release.tarball_url,
+        prerelease: release.prerelease ?? false,
         repository: {
           id: 0,
           full_name: `${owner}/${repo}`,
@@ -167,46 +203,144 @@ export class GitHubApiService {
       }));
     } catch (error) {
       console.warn(`Failed to fetch releases for ${owner}/${repo}:`, error);
-      return [];
+      throw error; // Re-throw to let caller handle
     }
   }
 
-  async getMultipleRepositoryReleases(repositories: Repository[]): Promise<Release[]> {
+  /**
+   * Fetch all releases for a repository with pagination (up to 30)
+   */
+  async fetchAllReleasesForRepo(owner: string, repo: string, perPage = 30): Promise<Release[]> {
     const allReleases: Release[] = [];
-    
-    for (const repo of repositories) {
-      const [owner, name] = repo.full_name.split('/');
-      const releases = await this.getRepositoryReleases(owner, name, 1, 5);
-      
-      // Add repository info to releases
-      releases.forEach(release => {
-        release.repository.id = repo.id;
-      });
-      
-      allReleases.push(...releases);
-      
-      // Rate limiting protection
-      await new Promise(resolve => setTimeout(resolve, 150));
+    let page = 1;
+
+    while (allReleases.length < perPage) {
+      const batch = await this.makeRequest<Release[]>(
+        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${Math.min(perPage, 30)}`
+      );
+
+      if (batch.length === 0) break;
+
+      const mapped = batch.map(release => ({
+        id: release.id,
+        tag_name: release.tag_name,
+        name: release.name || release.tag_name,
+        body: release.body || '',
+        published_at: release.published_at,
+        html_url: release.html_url,
+        assets: release.assets || [],
+        zipball_url: release.zipball_url,
+        tarball_url: release.tarball_url,
+        prerelease: release.prerelease ?? false,
+        repository: {
+          id: 0,
+          full_name: `${owner}/${repo}`,
+          name: repo,
+        },
+      }));
+
+      allReleases.push(...mapped);
+
+      if (batch.length < perPage) break;
+      page++;
+
+      // Rate limiting protection between pages
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
+    return allReleases.slice(0, perPage);
+  }
+
+  async getMultipleRepositoryReleases(
+    repositories: Repository[],
+    options: ReleaseFetchOptions = {}
+  ): Promise<MultipleReleasesResult> {
+    const { includePreRelease = true } = options;
+    const allReleases: Release[] = [];
+    const failedRepos: { repoId: number; full_name: string; error: string }[] = [];
+
+    // Controlled concurrency: process 3 repos at a time
+    const concurrency = 3;
+    let index = 0;
+
+    const workers = Array.from({ length: Math.min(concurrency, repositories.length) }, async () => {
+      while (true) {
+        const currentIndex = index++;
+        if (currentIndex >= repositories.length) break;
+
+        const repo = repositories[currentIndex];
+        const [owner, name] = repo.full_name.split('/');
+
+        try {
+          let releases: Release[];
+
+          if (!repo.has_fetched_releases) {
+            // New subscription: full sync (fetch up to 30)
+            releases = await this.fetchAllReleasesForRepo(owner, name, 30);
+          } else {
+            // Already synced: incremental sync (fetch 10, filter client-side)
+            const sinceTime = repo.last_release_fetch_time
+              ? new Date(repo.last_release_fetch_time)
+              : null;
+
+            releases = await this.getRepositoryReleases(owner, name, 1, 10);
+
+            // Client-side filtering by time
+            if (sinceTime) {
+              releases = releases.filter(r => {
+                const publishedTime = new Date(r.published_at);
+                return publishedTime > sinceTime;
+              });
+            }
+          }
+
+          // Add repository info to releases
+          releases.forEach(release => {
+            release.repository.id = repo.id;
+          });
+
+          // Filter by pre-release setting
+          if (!includePreRelease) {
+            releases = releases.filter(r => !r.prerelease);
+          }
+
+          allReleases.push(...releases);
+
+        } catch (error) {
+          failedRepos.push({
+            repoId: repo.id,
+            full_name: repo.full_name,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+
+        // Rate limiting protection between repos
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+    });
+
+    await Promise.all(workers);
+
     // Sort by published date (newest first)
-    return allReleases.sort((a, b) => 
+    const sortedReleases = allReleases.sort((a, b) =>
       new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
     );
+
+    return { releases: sortedReleases, failedRepos };
   }
 
   // 新增：获取仓库的增量releases（基于时间戳）
   async getIncrementalRepositoryReleases(
-    owner: string, 
-    repo: string, 
-    since?: string, 
+    owner: string,
+    repo: string,
+    since?: string,
     perPage = 10
   ): Promise<Release[]> {
     try {
       const endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
-      
+
       const releases = await this.makeRequest<Release[]>(endpoint);
-      
+
       const mappedReleases = releases.map(release => ({
         id: release.id,
         tag_name: release.tag_name,
@@ -217,6 +351,7 @@ export class GitHubApiService {
         assets: release.assets || [],
         zipball_url: release.zipball_url,
         tarball_url: release.tarball_url,
+        prerelease: release.prerelease ?? false,
         repository: {
           id: 0,
           full_name: `${owner}/${repo}`,
@@ -227,7 +362,7 @@ export class GitHubApiService {
       // 如果提供了since时间戳，只返回更新的releases
       if (since) {
         const sinceDate = new Date(since);
-        return mappedReleases.filter(release => 
+        return mappedReleases.filter(release =>
           new Date(release.published_at) > sinceDate
         );
       }
@@ -589,7 +724,7 @@ export class GitHubApiService {
               pushed_at: string;
             }>(`/repos/${owner}/${repo}`);
             r.id = data.id;
-            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
+            r.stargazers_count = data.stargizers_count ?? r.stargazers_count;
             r.forks_count = data.forks_count ?? r.forks_count;
             r.forks = data.forks ?? r.forks;
             r.language = data.language ?? r.language;
@@ -631,7 +766,7 @@ export class GitHubApiService {
   ): Promise<PaginatedDiscoveryRepositories> {
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const platformQuery = this.buildPlatformQuery(platform);
-    
+
     let query = `stars:>10 archived:false pushed:>=${fourteenDaysAgo}`;
     if (platformQuery) {
       query += ` ${platformQuery}`;
@@ -664,7 +799,7 @@ export class GitHubApiService {
     const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const platformQuery = this.buildPlatformQuery(platform);
-    
+
     let query = `stars:>1000 archived:false created:<${sixMonthsAgo} pushed:>=${oneYearAgo}`;
     if (platformQuery) {
       query += ` ${platformQuery}`;
@@ -696,7 +831,7 @@ export class GitHubApiService {
     perPage: number = 20
   ): Promise<PaginatedDiscoveryRepositories> {
     const platformQuery = this.buildPlatformQuery(platform);
-    
+
     let query = `${searchKeywords} in:name,description,topics stars:>10 archived:false`;
     if (platformQuery) {
       query += ` ${platformQuery}`;
@@ -795,6 +930,6 @@ export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): str
     scope: 'read:user user:email repo',
     state: Math.random().toString(36).substring(7),
   });
-  
+
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
 };
