@@ -278,19 +278,33 @@ export class GitHubApiService {
             // New subscription: full sync (fetch up to 30)
             releases = await this.fetchAllReleasesForRepo(owner, name, 30);
           } else {
-            // Already synced: incremental sync (fetch 10, filter client-side)
+            // Already synced: incremental sync with pagination until we cross the watermark
             const sinceTime = repo.last_release_fetch_time
               ? new Date(repo.last_release_fetch_time)
               : null;
 
-            releases = await this.getRepositoryReleases(owner, name, 1, 10);
+            let page = 1;
+            releases = [];
+            while (true) {
+              const batch = await this.getRepositoryReleases(owner, name, page, 10);
 
-            // Client-side filtering by time
-            if (sinceTime) {
-              releases = releases.filter(r => {
-                const publishedTime = new Date(r.published_at);
-                return publishedTime > sinceTime;
-              });
+              if (batch.length === 0) break;
+
+              const fresh = sinceTime
+                ? batch.filter(r => new Date(r.published_at) > sinceTime)
+                : batch;
+
+              releases.push(...fresh);
+
+              // Stop if we hit the watermark or ran out of data
+              if (
+                batch.length < 10 ||
+                (sinceTime && batch.some(r => new Date(r.published_at) <= sinceTime))
+              ) {
+                break;
+              }
+
+              page++;
             }
           }
 
