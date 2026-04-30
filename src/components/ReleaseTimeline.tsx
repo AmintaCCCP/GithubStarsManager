@@ -36,6 +36,8 @@ export const ReleaseTimeline: React.FC = () => {
     setReleaseSearchQuery,
     toggleReleaseExpandedRepository,
     setReleaseIsRefreshing,
+    includePreRelease,
+    setIncludePreRelease,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -179,9 +181,12 @@ export const ReleaseTimeline: React.FC = () => {
     return links;
   }, []);
 
-  const subscribedReleases = useMemo(() => 
-    releases.filter(release => releaseSubscriptions.has(release.repository.id)),
-    [releases, releaseSubscriptions]
+  const subscribedReleases = useMemo(() =>
+    releases.filter(release =>
+      releaseSubscriptions.has(release.repository.id) &&
+      (includePreRelease || !release.prerelease)
+    ),
+    [releases, releaseSubscriptions, includePreRelease]
   );
 
   // 预计算每个 release 的下载链接和过滤后的链接
@@ -301,6 +306,7 @@ export const ReleaseTimeline: React.FC = () => {
     setReleaseIsRefreshing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
+      // Only fetch releases for repos that are subscribed to releases
       const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
 
       if (subscribedRepos.length === 0) {
@@ -308,49 +314,50 @@ export const ReleaseTimeline: React.FC = () => {
         return;
       }
 
-      const allNewReleases: Release[] = [];
+      // Use the new getMultipleRepositoryReleases with options
+      const { releases: newReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
+        subscribedRepos,
+        { includePreRelease }
+      );
 
-      const latestReleaseTime = releases.length > 0 
-        ? releases.reduce((max, r) => Math.max(max, new Date(r.published_at).getTime()), 0)
-        : 0;
-      const sinceTimestamp = latestReleaseTime > 0 ? new Date(latestReleaseTime).toISOString() : undefined;
-
-      for (const repo of subscribedRepos) {
-        const [owner, name] = repo.full_name.split('/');
-        
-        const hasExistingReleases = releases.some(r => r.repository.id === repo.id);
-        
-        let repoReleases: Release[];
-        if (!hasExistingReleases) {
-          repoReleases = await githubApi.getRepositoryReleases(owner, name, 1, 10);
-        } else {
-          repoReleases = await githubApi.getIncrementalRepositoryReleases(owner, name, sinceTimestamp, 10);
-        }
-        
-        repoReleases.forEach(release => {
-          release.repository.id = repo.id;
-        });
-        
-        allNewReleases.push(...repoReleases);
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
-      const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
-      const actuallyNewCount = allNewReleases.filter(r => !existingIds.has(r.id)).length;
-
-      if (allNewReleases.length > 0) {
-        addReleases(allNewReleases);
-      }
-
+      // Update repository sync metadata only for repos that succeeded
       const now = new Date().toISOString();
+      const failedRepoIds = new Set(failedRepos.map(repo => repo.repoId));
+      for (const repo of subscribedRepos) {
+        if (failedRepoIds.has(repo.id)) {
+          continue;
+        }
+        updateRepository({
+          ...repo,
+          has_fetched_releases: true,
+          last_release_fetch_time: now,
+        });
+      }
+
+      // Filter out existing releases and add new ones
+      const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
+      const actuallyNewReleases = newReleases.filter(r => !existingIds.has(r.id));
+      const actuallyNewCount = actuallyNewReleases.length;
+
+      if (actuallyNewReleases.length > 0) {
+        addReleases(actuallyNewReleases);
+      }
+
       setLastRefreshTime(now);
 
-      const message = language === 'zh'
-        ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
-        : `Refresh completed! Found ${actuallyNewCount} new releases.`;
+      // Build success message with failed repos info
+      let message: string;
+      if (failedRepos.length > 0) {
+        message = language === 'zh'
+          ? `刷新完成！发现 ${actuallyNewCount} 个新Release，${failedRepos.length} 个仓库刷新失败。`
+          : `Refresh completed! Found ${actuallyNewCount} new releases, ${failedRepos.length} repos failed.`;
+      } else {
+        message = language === 'zh'
+          ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
+          : `Refresh completed! Found ${actuallyNewCount} new releases.`;
+      }
 
-      toast(message, 'success');
+      toast(message, actuallyNewCount > 0 ? 'success' : 'info');
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
@@ -527,19 +534,38 @@ export const ReleaseTimeline: React.FC = () => {
                }
              </p>
         
-        {/* 刷新按钮 - 在有订阅仓库时显示 */}
+        {/* Pre-release toggle + Refresh button */}
         {subscribedRepoCount > 0 && (
-           <div className="mb-6">
+           <div className="mb-6 flex flex-col items-center gap-3">
+             {/* Pre-release toggle */}
+             <label className="flex items-center gap-2 cursor-pointer select-none">
+               <button
+                 type="button"
+                 role="switch"
+                 aria-checked={includePreRelease}
+                 onClick={() => setIncludePreRelease(!includePreRelease)}
+                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
+               >
+                 <span
+                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
+                 />
+               </button>
+               <span className="text-sm text-gray-600 dark:text-text-secondary">
+                 {t('包含 Pre-release', 'Include Pre-release')}
+               </span>
+             </label>
+
+             {/* Refresh button */}
              <button
                onClick={handleRefresh}
                disabled={releaseIsRefreshing}
-               className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+               className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
              >
                <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
                <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
              </button>
             {lastRefreshTime && (
-              <p className="text-sm text-gray-500 dark:text-text-tertiary mt-2">
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
               </p>
             )}
@@ -597,6 +623,24 @@ export const ReleaseTimeline: React.FC = () => {
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
               </span>
             )}
+
+            {/* Pre-release toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includePreRelease}
+                onClick={() => setIncludePreRelease(!includePreRelease)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
+                />
+              </button>
+              <span className="text-xs text-gray-600 dark:text-text-secondary hidden sm:inline">
+                {t('Pre', 'Pre')}
+              </span>
+            </label>
 
             {/* Refresh Button */}
             <button
