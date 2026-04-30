@@ -181,9 +181,12 @@ export const ReleaseTimeline: React.FC = () => {
     return links;
   }, []);
 
-  const subscribedReleases = useMemo(() => 
-    releases.filter(release => releaseSubscriptions.has(release.repository.id)),
-    [releases, releaseSubscriptions]
+  const subscribedReleases = useMemo(() =>
+    releases.filter(release =>
+      releaseSubscriptions.has(release.repository.id) &&
+      (includePreRelease || !release.prerelease)
+    ),
+    [releases, releaseSubscriptions, includePreRelease]
   );
 
   // 预计算每个 release 的下载链接和过滤后的链接
@@ -317,9 +320,13 @@ export const ReleaseTimeline: React.FC = () => {
         { includePreRelease }
       );
 
-      // Update repository sync metadata
+      // Update repository sync metadata only for repos that succeeded
       const now = new Date().toISOString();
+      const failedRepoIds = new Set(failedRepos.map(repo => repo.repoId));
       for (const repo of subscribedRepos) {
+        if (failedRepoIds.has(repo.id)) {
+          continue;
+        }
         updateRepository({
           ...repo,
           has_fetched_releases: true,
@@ -532,14 +539,17 @@ export const ReleaseTimeline: React.FC = () => {
            <div className="mb-6 flex flex-col items-center gap-3">
              {/* Pre-release toggle */}
              <label className="flex items-center gap-2 cursor-pointer select-none">
-               <div
+               <button
+                 type="button"
+                 role="switch"
+                 aria-checked={includePreRelease}
                  onClick={() => setIncludePreRelease(!includePreRelease)}
                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
                >
                  <span
                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                  />
-               </div>
+               </button>
                <span className="text-sm text-gray-600 dark:text-text-secondary">
                  {t('包含 Pre-release', 'Include Pre-release')}
                </span>
@@ -616,14 +626,17 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Pre-release toggle */}
             <label className="flex items-center gap-1.5 cursor-pointer select-none">
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includePreRelease}
                 onClick={() => setIncludePreRelease(!includePreRelease)}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                 />
-              </div>
+              </button>
               <span className="text-xs text-gray-600 dark:text-text-secondary hidden sm:inline">
                 {t('Pre', 'Pre')}
               </span>

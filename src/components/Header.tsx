@@ -82,6 +82,8 @@ export const Header: React.FC = () => {
         if (existing) {
           return {
             ...newRepo,
+            has_fetched_releases: existing.has_fetched_releases,
+            last_release_fetch_time: existing.last_release_fetch_time,
             ai_summary: existing.ai_summary,
             ai_tags: existing.ai_tags,
             ai_platforms: existing.ai_platforms,

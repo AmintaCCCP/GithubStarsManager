@@ -724,7 +724,7 @@ export class GitHubApiService {
               pushed_at: string;
             }>(`/repos/${owner}/${repo}`);
             r.id = data.id;
-            r.stargazers_count = data.stargizers_count ?? r.stargazers_count;
+            r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
             r.forks_count = data.forks_count ?? r.forks_count;
             r.forks = data.forks ?? r.forks;
             r.language = data.language ?? r.language;

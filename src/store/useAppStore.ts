@@ -236,6 +236,7 @@ type PersistedAppState = Partial<
     | 'releaseViewMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
+    | 'includePreRelease'
     | 'discoveryChannels'
     | 'discoveryRepos'
     | 'discoveryLastRefresh'
@@ -284,10 +285,15 @@ const normalizePersistedState = (
   const migratedRepositories = repositories.map(repo => {
     const hasExistingRelease = releases.some(r => r.repository?.id === repo.id);
     if (hasExistingRelease && !repo.has_fetched_releases) {
+      // Backfill last_release_fetch_time from the latest persisted release timestamp
+      const repoReleases = releases.filter(r => r.repository?.id === repo.id);
+      const latestReleaseTime = repoReleases.length > 0
+        ? Math.max(...repoReleases.map(r => new Date(r.published_at).getTime()))
+        : null;
       return {
         ...repo,
         has_fetched_releases: true,
-        last_release_fetch_time: repo.last_release_fetch_time || new Date().toISOString()
+        last_release_fetch_time: repo.last_release_fetch_time || (latestReleaseTime ? new Date(latestReleaseTime).toISOString() : new Date().toISOString())
       };
     }
     return repo;
@@ -1356,6 +1362,7 @@ export const useAppStore = create<AppState & AppActions>()(
         releaseSelectedFilters: state.releaseSelectedFilters,
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
+        includePreRelease: state.includePreRelease,
 
       // 持久化发现设置
       discoveryChannels: state.discoveryChannels,
