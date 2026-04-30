@@ -28,6 +28,8 @@ export interface Repository {
   custom_category?: string;
   category_locked?: boolean;
   last_edited?: string;
+  last_release_fetch_time?: string;  // ISO timestamp, for incremental sync
+  has_fetched_releases?: boolean;   // whether this repo has been synced for releases
 }
 
 export interface ReleaseAsset {
@@ -51,6 +53,7 @@ export interface Release {
   assets: ReleaseAsset[];
   zipball_url?: string;
   tarball_url?: string;
+  prerelease?: boolean;
   repository: {
     id: number;
     full_name: string;
@@ -194,6 +197,7 @@ export interface AppState {
   releaseSearchQuery: string;
   releaseExpandedRepositories: Set<number>;
   releaseIsRefreshing: boolean;
+  includePreRelease: boolean;  // whether to include pre-release in refresh
 
   // Discovery
   discoveryChannels: DiscoveryChannel[];
