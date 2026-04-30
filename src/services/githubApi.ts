@@ -60,7 +60,23 @@ export class GitHubApiService {
       const waitMs = (this.rateLimitReset * 1000) - Date.now();
       if (waitMs > 0) {
         console.log(`Rate limit low (${this.rateLimitRemaining}), waiting ${Math.ceil(waitMs / 1000)}s for reset...`);
-        await new Promise(resolve => setTimeout(resolve, waitMs + 1000));
+        // Honor abort signal during rate limit wait
+        await new Promise<void>((resolve, reject) => {
+          const timeoutId = setTimeout(() => resolve(), waitMs + 1000);
+          const signalHandler = () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Aborted'));
+          };
+          signal?.addEventListener('abort', signalHandler);
+          // Also check if already aborted
+          if (signal?.aborted) {
+            clearTimeout(timeoutId);
+            signal?.removeEventListener('abort', signalHandler);
+            reject(new Error('Aborted'));
+          }
+        }).catch(err => {
+          if (err.message === 'Aborted') throw err;
+        });
       }
     }
 
@@ -208,15 +224,16 @@ export class GitHubApiService {
   }
 
   /**
-   * Fetch all releases for a repository with pagination (up to 30)
+   * Fetch all releases for a repository with pagination.
+   * New repos (never synced) use this for full sync - paginates until exhausted.
    */
-  async fetchAllReleasesForRepo(owner: string, repo: string, perPage = 30): Promise<Release[]> {
+  async fetchAllReleasesForRepo(owner: string, repo: string): Promise<Release[]> {
     const allReleases: Release[] = [];
     let page = 1;
 
-    while (allReleases.length < perPage) {
+    while (true) {
       const batch = await this.makeRequest<Release[]>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${Math.min(perPage, 30)}`
+        `/repos/${owner}/${repo}/releases?page=${page}&per_page=30`
       );
 
       if (batch.length === 0) break;
@@ -241,14 +258,14 @@ export class GitHubApiService {
 
       allReleases.push(...mapped);
 
-      if (batch.length < perPage) break;
+      if (batch.length < 30) break;
       page++;
 
       // Rate limiting protection between pages
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    return allReleases.slice(0, perPage);
+    return allReleases;
   }
 
   async getMultipleRepositoryReleases(
@@ -276,7 +293,7 @@ export class GitHubApiService {
 
           if (!repo.has_fetched_releases) {
             // New subscription: full sync (fetch up to 30)
-            releases = await this.fetchAllReleasesForRepo(owner, name, 30);
+            releases = await this.fetchAllReleasesForRepo(owner, name);
           } else {
             // Already synced: incremental sync with pagination until we cross the watermark
             const sinceTime = repo.last_release_fetch_time
