@@ -336,6 +336,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       const { items, idMap } = extractToc(displayContent);
       setTocItems(items);
       setHeadingIdMap(idMap);
+      setTranslatedHeadingMap(new Map());
     }
   }, [displayContent, extractToc]);
 

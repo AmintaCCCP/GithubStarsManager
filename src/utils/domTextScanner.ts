@@ -8,7 +8,7 @@ export interface DomBlockSegment {
   hasInlineCode: boolean;
 }
 
-const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, th, td, dt, dd, figcaption';
+const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, th, td, dt, dd, figcaption, summary';
 
 function getBlockType(tagName: string): DomBlockSegment['blockType'] {
   if (/^H[1-6]$/.test(tagName)) return 'heading';

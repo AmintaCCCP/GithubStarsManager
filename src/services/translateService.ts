@@ -71,6 +71,28 @@ const storeToken = (token: string): void => {
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+const extractHttpStatus = (err: unknown): number | null => {
+  const anyErr = err as Record<string, unknown>;
+  const response = anyErr?.response as Record<string, unknown> | undefined;
+  const status = response?.status ?? anyErr?.status;
+  if (typeof status === 'number') return status;
+
+  if (err instanceof Error) {
+    const match = err.message.match(/(?:status|failed)[:\s]*(\d{3})/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return null;
+};
+
+const isTransientError = (err: unknown): boolean => {
+  const status = extractHttpStatus(err);
+  if (status === null) return true;
+  return status === 429 || status >= 500;
+};
+
 const withTranslateRetry = async <T>(
   operation: (token: string) => Promise<T>,
   signal?: AbortSignal,
@@ -91,9 +113,13 @@ const withTranslateRetry = async <T>(
         throw err;
       }
 
-      if (attempt < maxRetries) {
-        await sleep(baseDelay * Math.pow(2, attempt - 1));
+      if (attempt >= maxRetries) break;
+
+      if (!isTransientError(err)) {
+        throw err;
       }
+
+      await sleep(baseDelay * Math.pow(2, attempt - 1));
     }
   }
 

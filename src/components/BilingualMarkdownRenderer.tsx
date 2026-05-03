@@ -53,24 +53,6 @@ const BILINGUAL_MODE_CSS = `
 }
 `;
 
-function appendSafeHTMLNodes(target: HTMLElement, source: HTMLElement): void {
-  for (let i = 0; i < source.childNodes.length; i++) {
-    const child = source.childNodes[i];
-    if (child.nodeType === Node.TEXT_NODE) {
-      target.appendChild(document.createTextNode(child.textContent || ''));
-    } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const el = child as HTMLElement;
-      if (el.tagName.toLowerCase() === 'code') {
-        const codeEl = document.createElement('code');
-        codeEl.textContent = el.textContent || '';
-        target.appendChild(codeEl);
-      } else {
-        appendSafeHTMLNodes(target, el);
-      }
-    }
-  }
-}
-
 const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, BilingualMarkdownRendererProps>(({
   markdown,
   baseUrl,
@@ -208,6 +190,8 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
         onProgress?.(completedCount, segments.length);
       }
 
+      const inlineContainerTags = new Set(['LI', 'TD', 'TH', 'DT', 'DD']);
+
       for (let i = 0; i < segments.length; i++) {
         if (!translatedTexts[i]) continue;
 
@@ -217,9 +201,21 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-gray-600 dark:text-text-tertiary text-sm leading-relaxed';
 
         if (segments[i].hasInlineCode) {
-          const temp = document.createElement('div');
-          temp.innerHTML = translatedTexts[i];
-          appendSafeHTMLNodes(wrapper, temp);
+          const codeRegex = /<code>([\s\S]*?)<\/code>/g;
+          let lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = codeRegex.exec(translatedTexts[i])) !== null) {
+            if (match.index > lastIndex) {
+              wrapper.appendChild(document.createTextNode(translatedTexts[i].slice(lastIndex, match.index)));
+            }
+            const codeEl = document.createElement('code');
+            codeEl.textContent = match[1];
+            wrapper.appendChild(codeEl);
+            lastIndex = codeRegex.lastIndex;
+          }
+          if (lastIndex < translatedTexts[i].length) {
+            wrapper.appendChild(document.createTextNode(translatedTexts[i].slice(lastIndex)));
+          }
         } else {
           wrapper.textContent = translatedTexts[i];
         }
@@ -228,7 +224,11 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           wrapper.setAttribute('data-bi-heading-id', segments[i].element.id);
         }
 
-        segments[i].element.after(wrapper);
+        if (inlineContainerTags.has(segments[i].element.tagName)) {
+          segments[i].element.appendChild(wrapper);
+        } else {
+          segments[i].element.after(wrapper);
+        }
         translationElementsRef.current.set(segments[i].id, wrapper);
       }
 
