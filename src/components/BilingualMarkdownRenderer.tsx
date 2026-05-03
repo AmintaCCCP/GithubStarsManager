@@ -8,7 +8,7 @@ import {
   wrapTextNodesWithAttr,
   unwrapSpans,
 } from '../utils/domTextScanner';
-import { translateBatch } from '../services/translateService';
+import { translateBatch, TranslateResult } from '../services/translateService';
 import { detectLanguage, getTranslateDirection, cleanTranslatedText } from '../utils/markdownSplitter';
 import { FileText, Languages, Eye, Loader2 } from 'lucide-react';
 
@@ -134,7 +134,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       return;
     }
 
-    const detected = detectLanguage(markdown);
+    const segmentTexts = segments.map(s => s.text).filter(Boolean);
+    const sampleText = segmentTexts.slice(0, 20).join(' ');
+    const detected = detectLanguage(sampleText);
     const targetLang = language;
 
     if (detected === targetLang) {
@@ -182,18 +184,43 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
 
         if (batchTexts.length === 0) continue;
 
-        const batchHasInlineCode = batchIndices.some(j => segments[j].hasInlineCode);
-        const textType = batchHasInlineCode ? 'html' as const : 'plain' as const;
+        const htmlIndices: number[] = [];
+        const htmlTexts: string[] = [];
+        const plainIndices: number[] = [];
+        const plainTexts: string[] = [];
 
-        const results = await translateBatch(batchTexts, direction.to, direction.from, signal, textType);
+        for (let k = 0; k < batchIndices.length; k++) {
+          const j = batchIndices[k];
+          if (segments[j].hasInlineCode) {
+            htmlIndices.push(j);
+            htmlTexts.push(segments[j].text);
+          } else {
+            plainIndices.push(j);
+            plainTexts.push(segments[j].text);
+          }
+        }
 
-        batchIndices.forEach((segIndex, resultIndex) => {
-          translatedTexts[segIndex] = cleanTranslatedText(results[resultIndex]?.translatedText || '');
-        });
+        const processResults = (indices: number[], results: TranslateResult[]) => {
+          indices.forEach((segIndex, resultIndex) => {
+            translatedTexts[segIndex] = cleanTranslatedText(results[resultIndex]?.translatedText || '');
+          });
+        };
 
-        completedCount += batchIndices.length;
-        setProgress({ current: completedCount, total: segments.length });
-        onProgress?.(completedCount, segments.length);
+        if (htmlTexts.length > 0) {
+          const htmlResults = await translateBatch(htmlTexts, direction.to, direction.from, signal, 'html');
+          processResults(htmlIndices, htmlResults);
+          completedCount += htmlIndices.length;
+          setProgress({ current: completedCount, total: segments.length });
+          onProgress?.(completedCount, segments.length);
+        }
+
+        if (plainTexts.length > 0) {
+          const plainResults = await translateBatch(plainTexts, direction.to, direction.from, signal, 'plain');
+          processResults(plainIndices, plainResults);
+          completedCount += plainIndices.length;
+          setProgress({ current: completedCount, total: segments.length });
+          onProgress?.(completedCount, segments.length);
+        }
       }
 
       const inlineContainerTags = new Set(['LI', 'TD', 'TH', 'DT', 'DD']);

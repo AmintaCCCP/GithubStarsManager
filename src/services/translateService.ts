@@ -8,7 +8,7 @@ class AuthExpiredError extends Error {
   }
 }
 
-interface TranslateResult {
+export interface TranslateResult {
   translatedText: string;
   detectedLanguage: string;
 }
@@ -76,8 +76,21 @@ const storeToken = (token: string): void => {
   }
 };
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(id);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 
 const extractHttpStatus = (err: unknown): number | null => {
   const anyErr = err as Record<string, unknown>;
@@ -128,7 +141,7 @@ const withTranslateRetry = async <T>(
         throw err;
       }
 
-      await sleep(baseDelay * Math.pow(2, attempt - 1));
+      await sleep(baseDelay * Math.pow(2, attempt - 1), signal);
     }
   }
 
@@ -245,6 +258,39 @@ export const translateText = async (options: TranslateOptions): Promise<Translat
   }, signal, 3);
 };
 
+function splitTextIntoChunks(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+
+  const chunks: string[] = [];
+  const paragraphs = text.split('\n');
+  let current = '';
+
+  for (const para of paragraphs) {
+    if (current.length + para.length + 1 > maxChars && current.length > 0) {
+      chunks.push(current);
+      current = para;
+    } else if (current.length > 0) {
+      current += '\n' + para;
+    } else {
+      current = para;
+    }
+
+    while (current.length > maxChars) {
+      const splitPoint = current.lastIndexOf(' ', maxChars);
+      if (splitPoint <= 0) {
+        chunks.push(current.slice(0, maxChars));
+        current = current.slice(maxChars);
+      } else {
+        chunks.push(current.slice(0, splitPoint));
+        current = current.slice(splitPoint + 1);
+      }
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 export const translateBatch = async (
   texts: string[],
   to: string,
@@ -273,6 +319,15 @@ export const translateBatch = async (
     let currentLength = 0;
 
     for (const text of batch) {
+      if (text.length > maxChars && currentBatch.length === 0) {
+        const chunks = splitTextIntoChunks(text, maxChars);
+        for (const chunk of chunks) {
+          const batchResults = await translateBatchInternal([chunk], to, from, signal, textType);
+          results.push(...batchResults);
+        }
+        continue;
+      }
+
       if (currentLength + text.length > maxChars && currentBatch.length > 0) {
         const batchResults = await translateBatchInternal(currentBatch, to, from, signal, textType);
         results.push(...batchResults);

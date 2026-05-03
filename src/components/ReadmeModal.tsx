@@ -108,7 +108,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     const container = contentRef.current;
 
     const translationWrapper = container.querySelector(`[data-bi-heading-id="${CSS.escape(id)}"]`) as HTMLElement | null;
-    if (translationWrapper) {
+    if (translationWrapper && translationWrapper.offsetParent !== null) {
       const elementRect = translationWrapper.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const scrollTop = container.scrollTop + elementRect.top - containerRect.top - 20;
@@ -221,7 +221,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       clearTimeout(timer);
       if (observer) observer.disconnect();
     };
-  }, [tocItems, readmeContent]);
+  }, [tocItems, readmeContent, translateStatus, displayMode]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
