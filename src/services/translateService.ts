@@ -16,6 +16,7 @@ let tokenPromise: Promise<string> | null = null;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const TRANSLATE_API_URL = 'https://api-edge.cognitive.microsofttranslator.com/translate';
 const AUTH_URL = 'https://edge.microsoft.com/translate/auth';
+const FALLBACK_TOKEN_TTL_MS = 8 * 60 * 1000;
 
 const parseJwtExpiration = (token: string): number => {
   try {
@@ -56,11 +57,12 @@ const getStoredToken = (): CachedToken | null => {
 
 const storeToken = (token: string): void => {
   try {
-    const expiresAt = parseJwtExpiration(token);
-    if (expiresAt > 0) {
-      cachedToken = { token, expiresAt };
-      localStorage.setItem('ms_translate_token', JSON.stringify(cachedToken));
+    let expiresAt = parseJwtExpiration(token);
+    if (expiresAt <= 0) {
+      expiresAt = Date.now() + FALLBACK_TOKEN_TTL_MS;
     }
+    cachedToken = { token, expiresAt };
+    localStorage.setItem('ms_translate_token', JSON.stringify(cachedToken));
   } catch {
     // ignore storage errors
   }

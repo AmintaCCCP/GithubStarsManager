@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { translateBatch, clearTranslateCache } from '../services/translateService';
 import {
-  splitMarkdownForTranslation,
-  reconstructMarkdown,
-  extractTranslatableChunks,
-  mergeTranslatedChunks,
+  splitMarkdownSimple,
+  restorePlaceholders,
   detectLanguage,
   getTranslateDirection,
+  TranslationSegment,
+  cleanTranslatedText,
 } from '../utils/markdownSplitter';
 
 export type TranslationStatus = 'idle' | 'translating' | 'translated' | 'error';
@@ -14,15 +14,17 @@ export type TranslationStatus = 'idle' | 'translating' | 'translated' | 'error';
 interface UseMarkdownTranslationOptions {
   targetLanguage: 'zh' | 'en';
   onProgress?: (current: number, total: number) => void;
+  onSegmentTranslated?: (index: number, total: number) => void;
 }
 
 interface UseMarkdownTranslationResult {
   status: TranslationStatus;
   progress: { current: number; total: number };
   error: string | null;
-  translatedContent: string | null;
+  segments: TranslationSegment[];
+  placeholderMap: Map<string, string>;
   detectedLanguage: 'zh' | 'en' | 'unknown';
-  translate: (content: string) => Promise<string | null>;
+  translate: (content: string) => Promise<boolean>;
   revert: () => void;
   clearError: () => void;
   reset: () => void;
@@ -31,24 +33,31 @@ interface UseMarkdownTranslationResult {
 export const useMarkdownTranslation = (
   options: UseMarkdownTranslationOptions
 ): UseMarkdownTranslationResult => {
-  const { targetLanguage, onProgress } = options;
+  const { targetLanguage, onProgress, onSegmentTranslated } = options;
 
   const [status, setStatus] = useState<TranslationStatus>('idle');
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
-  const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+  const [segments, setSegments] = useState<TranslationSegment[]>([]);
+  const [placeholderMap, setPlaceholderMap] = useState<Map<string, string>>(new Map());
   const [detectedLanguage, setDetectedLanguage] = useState<'zh' | 'en' | 'unknown'>('unknown');
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const originalContentRef = useRef<string | null>(null);
 
   const translate = useCallback(
-    async (content: string): Promise<string | null> => {
+    async (content: string): Promise<boolean> => {
       if (status === 'translating') {
-        return null;
+        return false;
       }
 
-      originalContentRef.current = content;
+      const { segments: newSegments, placeholderMap: newPlaceholderMap } = splitMarkdownSimple(content);
+      
+      if (newSegments.length === 0) {
+        setStatus('translated');
+        setSegments([]);
+        setPlaceholderMap(new Map());
+        return true;
+      }
 
       const detected = detectLanguage(content);
       setDetectedLanguage(detected);
@@ -56,80 +65,92 @@ export const useMarkdownTranslation = (
       if (detected === targetLanguage) {
         setError(detected === 'zh' ? '内容已是中文' : 'Content is already in English');
         setStatus('error');
-        return null;
+        return false;
       }
 
       setStatus('translating');
       setError(null);
-      setProgress({ current: 0, total: 0 });
+      setSegments(newSegments);
+      setPlaceholderMap(newPlaceholderMap);
+      setProgress({ current: 0, total: newSegments.length });
 
       abortControllerRef.current = new AbortController();
 
       try {
-        const { segments } = splitMarkdownForTranslation(content);
-        
-        const translatableSegments = segments.filter(s => s.type === 'translatable');
-
-        if (translatableSegments.length === 0) {
-          setStatus('translated');
-          setTranslatedContent(content);
-          return content;
-        }
-
-        const chunks = extractTranslatableChunks(segments);
-
-        if (chunks.length === 0) {
-          setStatus('translated');
-          setTranslatedContent(content);
-          return content;
-        }
-
-        const totalSegments = translatableSegments.length;
-        setProgress({ current: 0, total: totalSegments });
-        onProgress?.(0, totalSegments);
-
         const direction = getTranslateDirection(detected, targetLanguage);
-
-        const chunkTexts = chunks.map(c => c.content);
-        
+        const totalSegments = newSegments.length;
         let completedCount = 0;
-        const results = await translateBatch(
-          chunkTexts,
-          direction.to,
-          direction.from,
-          abortControllerRef.current.signal
-        );
 
-        const translations = results.map((r) => r.translatedText);
+        const batchSize = 10;
+        for (let i = 0; i < totalSegments; i += batchSize) {
+          if (abortControllerRef.current.signal.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+          }
 
-        const translatedMap = mergeTranslatedChunks(chunks, translations);
-        
-        completedCount = translations.length;
-        setProgress({ current: completedCount, total: totalSegments });
-        onProgress?.(completedCount, totalSegments);
+          const batchIndices: number[] = [];
+          const batchTexts: string[] = [];
+          
+          for (let j = i; j < Math.min(i + batchSize, totalSegments); j++) {
+            const segment = newSegments[j];
+            if (segment.hasCodeBlock) {
+              batchTexts.push(segment.originalContent);
+              batchIndices.push(j);
+            } else if (segment.originalContent.trim()) {
+              batchTexts.push(segment.originalContent);
+              batchIndices.push(j);
+            }
+          }
 
-        const result = reconstructMarkdown(segments, translatedMap);
+          if (batchTexts.length === 0) continue;
+
+          const results = await translateBatch(
+            batchTexts,
+            direction.to,
+            direction.from,
+            abortControllerRef.current.signal
+          );
+
+          setSegments(prev => {
+            const updated = [...prev];
+            batchIndices.forEach((segIndex, resultIndex) => {
+              let translatedText = results[resultIndex]?.translatedText || '';
+              translatedText = restorePlaceholders(translatedText, newPlaceholderMap);
+              translatedText = cleanTranslatedText(translatedText);
+              updated[segIndex] = {
+                ...updated[segIndex],
+                translatedContent: translatedText,
+                status: 'done',
+              };
+            });
+            return updated;
+          });
+
+          completedCount += batchIndices.length;
+          setProgress({ current: completedCount, total: totalSegments });
+          onProgress?.(completedCount, totalSegments);
+          batchIndices.forEach((segIndex) => {
+            onSegmentTranslated?.(segIndex, totalSegments);
+          });
+        }
 
         setStatus('translated');
-        setTranslatedContent(result);
         setProgress({ current: totalSegments, total: totalSegments });
         onProgress?.(totalSegments, totalSegments);
-
-        return result;
+        return true;
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           setStatus('idle');
-          return null;
+          return false;
         }
 
         const errorMessage =
           err instanceof Error ? err.message : 'Translation failed';
         setError(errorMessage);
         setStatus('error');
-        return null;
+        return false;
       }
     },
-    [status, targetLanguage, onProgress]
+    [status, targetLanguage, onProgress, onSegmentTranslated]
   );
 
   const revert = useCallback(() => {
@@ -138,7 +159,8 @@ export const useMarkdownTranslation = (
     }
 
     setStatus('idle');
-    setTranslatedContent(null);
+    setSegments([]);
+    setPlaceholderMap(new Map());
     setProgress({ current: 0, total: 0 });
     setError(null);
   }, []);
@@ -156,18 +178,19 @@ export const useMarkdownTranslation = (
     }
 
     setStatus('idle');
-    setTranslatedContent(null);
+    setSegments([]);
+    setPlaceholderMap(new Map());
     setProgress({ current: 0, total: 0 });
     setError(null);
     setDetectedLanguage('unknown');
-    originalContentRef.current = null;
   }, []);
 
   return {
     status,
     progress,
     error,
-    translatedContent,
+    segments,
+    placeholderMap,
     detectedLanguage,
     translate,
     revert,

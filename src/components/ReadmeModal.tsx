@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, Languages, RotateCcw } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
+import BilingualMarkdownRenderer from './BilingualMarkdownRenderer';
 import { stripMarkdownFormatting } from '../utils/markdownUtils';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
@@ -54,13 +55,22 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     status: translateStatus,
     progress: translateProgress,
     error: translateError,
-    translatedContent,
-    translate,
+    segments,
+translate,
     revert,
     reset: resetTranslation,
   } = useMarkdownTranslation({
     targetLanguage: language,
   });
+
+  const getDisplayContent = useCallback((): string => {
+    if (translateStatus === 'translated' && segments.length > 0) {
+      return segments
+        .map(s => s.translatedContent || s.originalContent)
+        .join('\n\n');
+    }
+    return readmeContent;
+  }, [translateStatus, segments, readmeContent]);
 
   const currentFontSize = FONT_SIZES[fontSizeIndex].value;
 
@@ -232,8 +242,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     revert();
   }, [revert]);
 
-  const displayContent = translatedContent || readmeContent;
-
   const fetchReadme = useCallback(async () => {
     if (!repository) return;
 
@@ -286,16 +294,13 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   }, [isOpen, repository, fetchReadme]);
 
   useEffect(() => {
-    if (translatedContent) {
-      const { items, idMap } = extractToc(translatedContent);
-      setTocItems(items);
-      setHeadingIdMap(idMap);
-    } else if (readmeContent) {
-      const { items, idMap } = extractToc(readmeContent);
+    const content = getDisplayContent();
+    if (content) {
+      const { items, idMap } = extractToc(content);
       setTocItems(items);
       setHeadingIdMap(idMap);
     }
-  }, [translatedContent, readmeContent, extractToc]);
+  }, [readmeContent, translateStatus, segments, extractToc, getDisplayContent]);
 
   useEffect(() => {
     setReadmeModalOpen(isOpen);
@@ -382,6 +387,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     return 'text-gray-500 dark:text-gray-500 text-xs';
   };
 
+  const isTranslating = translateStatus === 'translating';
+  const isTranslated = translateStatus === 'translated';
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div
@@ -398,7 +406,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           style={{ maxWidth: '1130px' }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Reading Progress Bar */}
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-700 z-20 rounded-t-xl overflow-hidden">
               <div
@@ -408,7 +415,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           )}
 
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-black/[0.06] dark:border-white/[0.04] flex-shrink-0">
             <div className="flex items-center space-x-3">
               <img
@@ -427,7 +433,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
             <div className="flex items-center space-x-1">
               {readmeContent && !loading && (
-                translateStatus === 'translated' ? (
+                isTranslated ? (
                   <button
                     onClick={handleRevertTranslation}
                     className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
@@ -439,15 +445,15 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 ) : (
                   <button
                     onClick={handleTranslate}
-                    disabled={translateStatus === 'translating'}
+                    disabled={isTranslating}
                     className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
-                      translateStatus === 'translating'
+                      isTranslating
                         ? 'text-gray-400 dark:text-text-quaternary cursor-not-allowed'
                         : 'text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10'
                     }`}
                     title={t('翻译文档', 'Translate Document')}
                   >
-                    {translateStatus === 'translating' ? (
+                    {isTranslating ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="hidden sm:inline">
@@ -510,9 +516,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          {/* Main Content Area */}
           <div className="flex-1 flex overflow-hidden">
-            {/* TOC Sidebar */}
             {showToc && tocItems.length > 0 && (
               <div className="w-56 border-r border-black/[0.06] dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0 readme-scrollbar">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary mb-3">
@@ -537,7 +541,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </div>
             )}
 
-            {/* Content */}
             <div
               ref={contentRef}
               className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
@@ -563,14 +566,25 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   {language === 'zh' ? '重试' : 'Retry'}
                 </button>
               </div>
-            ) : displayContent ? (
-              <MarkdownRenderer
-                content={displayContent}
-                enableHtml={true}
-                baseUrl={repository?.html_url}
-                headingIds={headingIdMap}
-                fontSize={getFontSizeType()}
-              />
+            ) : readmeContent ? (
+              isTranslated ? (
+                <BilingualMarkdownRenderer
+                  segments={segments}
+                  baseUrl={repository?.html_url}
+                  headingIds={headingIdMap}
+                  fontSize={getFontSizeType()}
+                  showTranslation={true}
+                  language={language}
+                />
+              ) : (
+                <MarkdownRenderer
+                  content={readmeContent}
+                  enableHtml={true}
+                  baseUrl={repository?.html_url}
+                  headingIds={headingIdMap}
+                  fontSize={getFontSizeType()}
+                />
+              )
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
                 <FileText className="w-12 h-12 text-gray-400 dark:text-text-quaternary mb-4" />
@@ -581,7 +595,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             )}
             </div>
 
-            {/* Back to Top Button */}
             {showBackToTop && (
               <button
                 onClick={scrollToTop}
