@@ -1,7 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { TranslationSegment } from '../utils/markdownSplitter';
-import { Loader2 } from 'lucide-react';
 
 interface BilingualMarkdownRendererProps {
   segments: TranslationSegment[];
@@ -19,8 +18,7 @@ const SegmentBlock: React.FC<{
   fontSize?: 'small' | 'medium' | 'large';
   showTranslation: boolean;
   language: 'zh' | 'en';
-}> = memo(({ segment, baseUrl, headingIds, fontSize, showTranslation, language }) => {
-  const isTranslating = segment.status === 'translating';
+}> = memo(({ segment, baseUrl, headingIds, fontSize, showTranslation }) => {
   const hasTranslation = segment.translatedContent !== null && segment.status === 'done';
 
   return (
@@ -35,29 +33,16 @@ const SegmentBlock: React.FC<{
         />
       </div>
       
-      {showTranslation && (
-        <>
-          {isTranslating && (
-            <div className="translated-content mt-2 pl-3 border-l-2 border-blue-400/50">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-text-quaternary">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>{language === 'zh' ? '翻译中...' : 'Translating...'}</span>
-              </div>
-            </div>
-          )}
-          
-          {hasTranslation && segment.translatedContent && (
-            <div className="translated-content mt-2 pl-3 border-l-2 border-blue-400 dark:border-blue-500">
-              <MarkdownRenderer
-                content={segment.translatedContent}
-                baseUrl={baseUrl}
-                headingIds={headingIds}
-                fontSize={fontSize}
-                enableHtml={true}
-              />
-            </div>
-          )}
-        </>
+      {showTranslation && hasTranslation && segment.translatedContent && (
+        <div className="translated-content mt-2 pl-3 border-l-2 border-blue-400 dark:border-blue-500">
+          <MarkdownRenderer
+            content={segment.translatedContent}
+            baseUrl={baseUrl}
+            headingIds={headingIds}
+            fontSize={fontSize}
+            enableHtml={true}
+          />
+        </div>
       )}
     </div>
   );

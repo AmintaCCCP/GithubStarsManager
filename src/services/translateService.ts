@@ -75,7 +75,7 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
     return storedToken.token;
   }
 
-  if (isTokenValid(cachedToken)) {
+  if (cachedToken && isTokenValid(cachedToken)) {
     return cachedToken.token;
   }
 
@@ -99,9 +99,6 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
       storeToken(token);
       return token;
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw err;
-      }
       throw err;
     } finally {
       tokenPromise = null;

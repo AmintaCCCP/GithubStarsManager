@@ -92,10 +92,7 @@ export const useMarkdownTranslation = (
           
           for (let j = i; j < Math.min(i + batchSize, totalSegments); j++) {
             const segment = newSegments[j];
-            if (segment.hasCodeBlock) {
-              batchTexts.push(segment.originalContent);
-              batchIndices.push(j);
-            } else if (segment.originalContent.trim()) {
+            if (segment.originalContent.trim()) {
               batchTexts.push(segment.originalContent);
               batchIndices.push(j);
             }
@@ -138,7 +135,7 @@ export const useMarkdownTranslation = (
         onProgress?.(totalSegments, totalSegments);
         return true;
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if ((err as { name?: string })?.name === 'AbortError') {
           setStatus('idle');
           return false;
         }

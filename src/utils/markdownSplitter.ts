@@ -27,7 +27,7 @@ export const splitMarkdownSimple = (markdown: string): SplitResult => {
 
   let processed = markdown;
 
-  processed = processed.replace(/```[\s\S]*?```/g, (match) => {
+  processed = processed.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (match) => {
     return createPlaceholder('CODE', match);
   });
 
@@ -117,10 +117,12 @@ export const detectLanguage = (content: string): 'zh' | 'en' | 'unknown' => {
 export const getTranslateDirection = (
   detected: 'zh' | 'en' | 'unknown',
   target: 'zh' | 'en'
-): { from: string; to: string } => {
-  const sourceLang = detected === 'unknown' ? 'auto' : detected;
+): { from?: string; to: string } => {
+  if (detected === 'unknown') {
+    return { to: target };
+  }
   return {
-    from: sourceLang,
+    from: detected,
     to: target,
   };
 };
