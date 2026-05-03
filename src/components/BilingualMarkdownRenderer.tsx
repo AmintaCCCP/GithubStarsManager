@@ -17,7 +17,6 @@ const SegmentBlock: React.FC<{
   headingIds?: Map<string, string>;
   fontSize?: 'small' | 'medium' | 'large';
   showTranslation: boolean;
-  language: 'zh' | 'en';
 }> = memo(({ segment, baseUrl, headingIds, fontSize, showTranslation }) => {
   const hasTranslation = segment.translatedContent !== null && segment.status === 'done';
 
@@ -67,10 +66,9 @@ const BilingualMarkdownRenderer: React.FC<BilingualMarkdownRendererProps> = memo
         headingIds={headingIds}
         fontSize={fontSize}
         showTranslation={showTranslation}
-        language={language}
       />
     ));
-  }, [segments, baseUrl, headingIds, fontSize, showTranslation, language]);
+  }, [segments, baseUrl, headingIds, fontSize, showTranslation]);
 
   return (
     <div className="bilingual-markdown">

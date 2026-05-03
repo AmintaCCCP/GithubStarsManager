@@ -34,7 +34,7 @@ const parseJwtExpiration = (token: string): number => {
   }
 };
 
-const isTokenValid = (cached: CachedToken | null): boolean => {
+const isTokenValid = (cached: CachedToken | null): cached is CachedToken => {
   if (!cached) return false;
   return Date.now() < cached.expiresAt - TOKEN_REFRESH_BUFFER_MS;
 };
@@ -75,7 +75,7 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
     return storedToken.token;
   }
 
-  if (cachedToken && isTokenValid(cachedToken)) {
+  if (isTokenValid(cachedToken)) {
     return cachedToken.token;
   }
 
