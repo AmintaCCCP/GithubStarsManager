@@ -53,6 +53,12 @@ const BILINGUAL_MODE_CSS = `
 }
 `;
 
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, BilingualMarkdownRendererProps>(({
   markdown,
   baseUrl,
@@ -209,7 +215,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
               wrapper.appendChild(document.createTextNode(translatedTexts[i].slice(lastIndex, match.index)));
             }
             const codeEl = document.createElement('code');
-            codeEl.textContent = match[1];
+            codeEl.textContent = decodeHtmlEntities(match[1]);
             wrapper.appendChild(codeEl);
             lastIndex = codeRegex.lastIndex;
           }

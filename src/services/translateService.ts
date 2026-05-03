@@ -1,5 +1,13 @@
 import queryString from 'query-string';
 
+class AuthExpiredError extends Error {
+  readonly isAuthExpired = true;
+  constructor() {
+    super('Auth expired');
+    this.name = 'AuthExpiredError';
+  }
+}
+
 interface TranslateResult {
   translatedText: string;
   detectedLanguage: string;
@@ -88,6 +96,7 @@ const extractHttpStatus = (err: unknown): number | null => {
 };
 
 const isTransientError = (err: unknown): boolean => {
+  if ((err as { isAuthExpired?: boolean })?.isAuthExpired) return true;
   const status = extractHttpStatus(err);
   if (status === null) return true;
   return status === 429 || status >= 500;
@@ -137,31 +146,42 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
     return cachedToken.token;
   }
 
-  if (tokenPromise) {
+  if (!tokenPromise) {
+    tokenPromise = (async () => {
+      try {
+        const response = await fetch(AUTH_URL, {
+          method: 'GET',
+          credentials: 'omit',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Auth failed: ${response.status}`);
+        }
+
+        const token = await response.text();
+        storeToken(token);
+        return token;
+      } finally {
+        tokenPromise = null;
+      }
+    })();
+  }
+
+  if (!signal) {
     return tokenPromise;
   }
 
-  tokenPromise = (async () => {
-    try {
-      const response = await fetch(AUTH_URL, {
-        method: 'GET',
-        credentials: 'omit',
-        signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Auth failed: ${response.status}`);
+  return Promise.race([
+    tokenPromise,
+    new Promise<string>((_, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
       }
-
-      const token = await response.text();
-      storeToken(token);
-      return token;
-    } finally {
-      tokenPromise = null;
-    }
-  })();
-
-  return tokenPromise;
+      const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+      signal.addEventListener('abort', onAbort, { once: true });
+    }),
+  ]);
 };
 
 export interface TranslateOptions {
@@ -203,6 +223,7 @@ export const translateText = async (options: TranslateOptions): Promise<Translat
       if (response.status === 401) {
         cachedToken = null;
         localStorage.removeItem('ms_translate_token');
+        throw new AuthExpiredError();
       }
       throw new Error(`Translation failed: ${response.status}`);
     }
@@ -302,6 +323,7 @@ const translateBatchInternal = async (
       if (response.status === 401) {
         cachedToken = null;
         localStorage.removeItem('ms_translate_token');
+        throw new AuthExpiredError();
       }
       throw new Error(`Translation failed: ${response.status}`);
     }

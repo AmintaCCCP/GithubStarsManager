@@ -187,7 +187,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             const topEntry = visibleEntries.reduce((a, b) =>
               a.boundingClientRect.top < b.boundingClientRect.top ? a : b
             );
-            setActiveHeadingId(topEntry.target.id);
+            const target = topEntry.target as HTMLElement;
+            setActiveHeadingId(target.dataset.biHeadingId ?? target.id);
           }
         },
         {
@@ -198,7 +199,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       );
 
       tocItems.forEach((item) => {
-        let el = container.querySelector(`#${CSS.escape(item.id)}`);
+        let el = container.querySelector(`[data-bi-heading-id="${CSS.escape(item.id)}"]`) as HTMLElement | null;
+        if (!el) {
+          el = container.querySelector(`#${CSS.escape(item.id)}`);
+        }
         if (!el && item.text) {
           const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
           for (let i = 0; i < headings.length; i++) {
@@ -366,6 +370,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setTranslateProgress({ current: 0, total: 0 });
       setTranslateError(null);
       setTranslatedHeadingMap(new Map());
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     } else {
       setShowToc(true);
     }

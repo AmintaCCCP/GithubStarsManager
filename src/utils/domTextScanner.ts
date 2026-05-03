@@ -28,6 +28,15 @@ interface ExtractedText {
   hasInlineCode: boolean;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
   let result = '';
   let hasInlineCode = false;
@@ -49,8 +58,13 @@ function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
 
     if (tag === 'code' && !el.closest('pre')) {
       hasInlineCode = true;
-      result += `<code>${el.textContent || ''}</code>`;
+      result += `<code>${escapeHtml(el.textContent || '')}</code>`;
       return;
+    }
+
+    const blockTags = /^(p|h[1-6]|li|blockquote|th|td|dt|dd|figcaption|summary)$/i;
+    if (blockTags.test(tag) && result.length > 0 && !result.endsWith('\n\n')) {
+      result += '\n\n';
     }
 
     for (let i = 0; i < el.childNodes.length; i++) {
