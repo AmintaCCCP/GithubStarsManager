@@ -738,13 +738,16 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 };
 
 const extractTextFromChildren = (children: React.ReactNode): string => {
-  if (typeof children === 'string') return children;
-  if (typeof children === 'number') return String(children);
-  if (Array.isArray(children)) return children.map(extractTextFromChildren).join('');
-  if (React.isValidElement(children)) {
-    return extractTextFromChildren((children.props as { children?: React.ReactNode }).children);
-  }
-  return '';
+  const inner = (children: React.ReactNode): string => {
+    if (typeof children === 'string') return children;
+    if (typeof children === 'number') return String(children);
+    if (Array.isArray(children)) return children.map(inner).join('');
+    if (React.isValidElement(children)) {
+      return inner((children.props as { children?: React.ReactNode }).children);
+    }
+    return '';
+  };
+  return inner(children).replace(/\s+/g, ' ').trim();
 };
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
