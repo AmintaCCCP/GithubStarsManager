@@ -5,6 +5,7 @@ export interface TranslationSegment {
   status: 'pending' | 'translating' | 'done' | 'error';
   hasCodeBlock: boolean;
   hasImage: boolean;
+  separator: string;
 }
 
 interface SplitResult {
@@ -31,6 +32,10 @@ export const splitMarkdownSimple = (markdown: string): SplitResult => {
     return createPlaceholder('CODE', match);
   });
 
+  processed = processed.replace(/`[^`\n]+`/g, (match) => {
+    return createPlaceholder('INLINE_CODE', match);
+  });
+
   processed = processed.replace(/!\[[^\]]*\]\([^)]+\)/g, (match) => {
     return createPlaceholder('IMG', match);
   });
@@ -43,23 +48,37 @@ export const splitMarkdownSimple = (markdown: string): SplitResult => {
     return createPlaceholder('HTML_IMG', match);
   });
 
-  const paragraphs = processed.split(/\n\n+/);
+  processed = processed.replace(/<details[\s\S]*?<\/details>/gi, (match) => {
+    return createPlaceholder('DETAILS', match);
+  });
 
-  const segments: TranslationSegment[] = paragraphs
-    .filter(p => p.trim())
-    .map((paragraph) => {
-      const hasCodeBlock = paragraph.includes('__CODE_');
-      const hasImage = paragraph.includes('__IMG_');
+  const separatorPattern = /(\n{2,})/g;
+  const parts = processed.split(separatorPattern);
+  
+  const segments: TranslationSegment[] = [];
+  let currentSeparator = '\n\n';
+  
+  for (let i = 0; i < parts.length; i += 2) {
+    const content = parts[i];
+    const separator = parts[i + 1] || '\n\n';
+    
+    if (content.trim()) {
+      const hasCodeBlock = content.includes('__CODE_');
+      const hasImage = content.includes('__IMG_') || content.includes('__HTML_IMG_');
       
-      return {
+      segments.push({
         id: segmentIdCounter++,
-        originalContent: paragraph,
+        originalContent: content,
         translatedContent: null,
         status: 'pending' as const,
         hasCodeBlock,
         hasImage,
-      };
-    });
+        separator: currentSeparator,
+      });
+    }
+    
+    currentSeparator = separator;
+  }
 
   return { segments, placeholderMap };
 };
@@ -88,7 +107,7 @@ export const restorePlaceholders = (
     }
   }
   
-  return result.trim();
+  return result;
 };
 
 export const detectLanguage = (content: string): 'zh' | 'en' | 'unknown' => {
@@ -128,9 +147,15 @@ export const getTranslateDirection = (
 };
 
 export const segmentsToMarkdown = (segments: TranslationSegment[]): string => {
-  return segments
-    .map(s => s.translatedContent || s.originalContent)
-    .join('\n\n');
+  if (segments.length === 0) return '';
+  
+  return segments.reduce((acc, segment, index) => {
+    const content = segment.translatedContent || segment.originalContent;
+    if (index === 0) {
+      return content;
+    }
+    return acc + segment.separator + content;
+  }, '');
 };
 
 export const cleanTranslatedText = (text: string): string => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, Languages, RotateCcw } from 'lucide-react';
+import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, Languages } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import BilingualMarkdownRenderer from './BilingualMarkdownRenderer';
 import { stripMarkdownFormatting } from '../utils/markdownUtils';
@@ -56,7 +56,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     progress: translateProgress,
     error: translateError,
     segments,
-translate,
+    placeholderMap,
+    translate,
     revert,
     reset: resetTranslation,
   } = useMarkdownTranslation({
@@ -65,9 +66,13 @@ translate,
 
   const getDisplayContent = useCallback((): string => {
     if (translateStatus === 'translated' && segments.length > 0) {
-      return segments
-        .map(s => s.translatedContent || s.originalContent)
-        .join('\n\n');
+      return segments.reduce((acc, segment, index) => {
+        const content = segment.translatedContent || segment.originalContent;
+        if (index === 0) {
+          return content;
+        }
+        return acc + segment.separator + content;
+      }, '');
     }
     return readmeContent;
   }, [translateStatus, segments, readmeContent]);
@@ -436,11 +441,11 @@ translate,
                 isTranslated ? (
                   <button
                     onClick={handleRevertTranslation}
-                    className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors"
-                    title={t('显示原文', 'Show Original')}
+                    className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet"
+                    title={t('关闭翻译', 'Close Translation')}
                   >
-                    <RotateCcw className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('原文', 'Original')}</span>
+                    <Languages className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('已翻译', 'Translated')}</span>
                   </button>
                 ) : (
                   <button
@@ -570,10 +575,10 @@ translate,
               isTranslated ? (
                 <BilingualMarkdownRenderer
                   segments={segments}
+                  placeholderMap={placeholderMap}
                   baseUrl={repository?.html_url}
                   headingIds={headingIdMap}
                   fontSize={getFontSizeType()}
-                  showTranslation={true}
                   language={language}
                 />
               ) : (
