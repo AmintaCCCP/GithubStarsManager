@@ -68,6 +68,38 @@ const storeToken = (token: string): void => {
   }
 };
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const withTranslateRetry = async <T>(
+  operation: (token: string) => Promise<T>,
+  signal?: AbortSignal,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const token = await apiMsAuth(signal);
+      return await operation(token);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      const name = (err as { name?: string })?.name;
+      if (name === 'AbortError' || name === 'CanceledError') {
+        throw err;
+      }
+
+      if (attempt < maxRetries) {
+        await sleep(baseDelay * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+
+  throw lastError!;
+};
+
 export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
   const storedToken = getStoredToken();
   if (storedToken) {
@@ -98,8 +130,6 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
       const token = await response.text();
       storeToken(token);
       return token;
-    } catch (err) {
-      throw err;
     } finally {
       tokenPromise = null;
     }
@@ -113,69 +143,72 @@ export interface TranslateOptions {
   to: string;
   text: string;
   signal?: AbortSignal;
+  textType?: 'html' | 'plain';
 }
 
 export const translateText = async (options: TranslateOptions): Promise<TranslateResult> => {
-  const { from, to, text, signal } = options;
+  const { from, to, text, signal, textType } = options;
 
   if (!text || text.trim() === '') {
     return { translatedText: text, detectedLanguage: '' };
   }
 
-  const token = await apiMsAuth(signal);
+  return withTranslateRetry(async (token) => {
+    const params = queryString.stringify({
+      ...(from && { from }),
+      to,
+      'api-version': '3.0',
+      ...(textType === 'html' && { textType: 'html' }),
+    });
 
-  const params = queryString.stringify({
-    ...(from && { from }),
-    to,
-    'api-version': '3.0',
-  });
+    const url = `${TRANSLATE_API_URL}?${params}`;
 
-  const url = `${TRANSLATE_API_URL}?${params}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify([{ Text: text }]),
+      signal,
+    });
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify([{ Text: text }]),
-    signal,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      cachedToken = null;
-      localStorage.removeItem('ms_translate_token');
+    if (!response.ok) {
+      if (response.status === 401) {
+        cachedToken = null;
+        localStorage.removeItem('ms_translate_token');
+      }
+      throw new Error(`Translation failed: ${response.status}`);
     }
-    throw new Error(`Translation failed: ${response.status}`);
-  }
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('Invalid translation response');
-  }
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid translation response');
+    }
 
-  const result = data[0];
-  const translatedText = result.translations?.[0]?.text || text;
-  const detectedLanguage = result.detectedLanguage?.language || '';
+    const result = data[0];
+    const translatedText = result.translations?.[0]?.text || text;
+    const detectedLanguage = result.detectedLanguage?.language || '';
 
-  return {
-    translatedText,
-    detectedLanguage,
-  };
+    return {
+      translatedText,
+      detectedLanguage,
+    };
+  }, signal, 3);
 };
 
 export const translateBatch = async (
   texts: string[],
   to: string,
   from?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  textType?: 'html' | 'plain'
 ): Promise<TranslateResult[]> => {
   if (texts.length === 0) return [];
   
   if (texts.length === 1) {
-    const result = await translateText({ text: texts[0], to, from, signal });
+    const result = await translateText({ text: texts[0], to, from, signal, textType });
     return [result];
   }
 
@@ -194,7 +227,7 @@ export const translateBatch = async (
 
     for (const text of batch) {
       if (currentLength + text.length > maxChars && currentBatch.length > 0) {
-        const batchResults = await translateBatchInternal(currentBatch, to, from, signal);
+        const batchResults = await translateBatchInternal(currentBatch, to, from, signal, textType);
         results.push(...batchResults);
         currentBatch = [];
         currentLength = 0;
@@ -204,7 +237,7 @@ export const translateBatch = async (
     }
 
     if (currentBatch.length > 0) {
-      const batchResults = await translateBatchInternal(currentBatch, to, from, signal);
+      const batchResults = await translateBatchInternal(currentBatch, to, from, signal, textType);
       results.push(...batchResults);
     }
   }
@@ -216,46 +249,48 @@ const translateBatchInternal = async (
   texts: string[],
   to: string,
   from?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  textType?: 'html' | 'plain'
 ): Promise<TranslateResult[]> => {
-  const token = await apiMsAuth(signal);
+  return withTranslateRetry(async (token) => {
+    const params = queryString.stringify({
+      ...(from && { from }),
+      to,
+      'api-version': '3.0',
+      ...(textType === 'html' && { textType: 'html' }),
+    });
 
-  const params = queryString.stringify({
-    ...(from && { from }),
-    to,
-    'api-version': '3.0',
-  });
+    const url = `${TRANSLATE_API_URL}?${params}`;
 
-  const url = `${TRANSLATE_API_URL}?${params}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(texts.map(t => ({ Text: t }))),
+      signal,
+    });
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(texts.map(t => ({ Text: t }))),
-    signal,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      cachedToken = null;
-      localStorage.removeItem('ms_translate_token');
+    if (!response.ok) {
+      if (response.status === 401) {
+        cachedToken = null;
+        localStorage.removeItem('ms_translate_token');
+      }
+      throw new Error(`Translation failed: ${response.status}`);
     }
-    throw new Error(`Translation failed: ${response.status}`);
-  }
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (!Array.isArray(data) || data.length !== texts.length) {
-    throw new Error('Invalid translation response');
-  }
+    if (!Array.isArray(data) || data.length !== texts.length) {
+      throw new Error('Invalid translation response');
+    }
 
-  return data.map((result, index) => ({
-    translatedText: result.translations?.[0]?.text || texts[index],
-    detectedLanguage: result.detectedLanguage?.language || '',
-  }));
+    return data.map((result, index) => ({
+      translatedText: result.translations?.[0]?.text || texts[index],
+      detectedLanguage: result.detectedLanguage?.language || '',
+    }));
+  }, signal, 3);
 };
 
 export const clearTranslateCache = (): void => {
