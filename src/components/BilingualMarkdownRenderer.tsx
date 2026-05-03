@@ -53,6 +53,24 @@ const BILINGUAL_MODE_CSS = `
 }
 `;
 
+function appendSafeHTMLNodes(target: HTMLElement, source: HTMLElement): void {
+  for (let i = 0; i < source.childNodes.length; i++) {
+    const child = source.childNodes[i];
+    if (child.nodeType === Node.TEXT_NODE) {
+      target.appendChild(document.createTextNode(child.textContent || ''));
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const el = child as HTMLElement;
+      if (el.tagName.toLowerCase() === 'code') {
+        const codeEl = document.createElement('code');
+        codeEl.textContent = el.textContent || '';
+        target.appendChild(codeEl);
+      } else {
+        appendSafeHTMLNodes(target, el);
+      }
+    }
+  }
+}
+
 const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, BilingualMarkdownRendererProps>(({
   markdown,
   baseUrl,
@@ -199,7 +217,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-gray-600 dark:text-text-tertiary text-sm leading-relaxed';
 
         if (segments[i].hasInlineCode) {
-          wrapper.innerHTML = translatedTexts[i];
+          const temp = document.createElement('div');
+          temp.innerHTML = translatedTexts[i];
+          appendSafeHTMLNodes(wrapper, temp);
         } else {
           wrapper.textContent = translatedTexts[i];
         }
