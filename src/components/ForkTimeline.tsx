@@ -264,8 +264,8 @@ export const ForkTimeline: React.FC = () => {
       return;
     }
 
-    // Only forks (those with a parent/source) can be synced
-    if (!fork.parent && !fork.source) {
+    // Only actual forks can be synced
+    if (!fork.fork) {
       toast(language === 'zh'
         ? `${fork.name} 不是 Fork 仓库，无法同步上游。`
         : `${fork.name} is not a fork. Cannot sync upstream.`,
@@ -572,7 +572,7 @@ export const ForkTimeline: React.FC = () => {
       {/* Fork List */}
       <div className="space-y-2">
         {paginatedForks.length === 0 ? (
-          <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06]-alt dark:border-white/[0.04]">
+          <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06] dark:border-white/[0.04]">
             <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
               {t('无符合条件的结果', 'No matching results')}

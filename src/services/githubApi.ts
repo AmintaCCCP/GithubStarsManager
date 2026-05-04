@@ -1006,6 +1006,14 @@ async getUserForks(): Promise<ForkRepo[]> {
         if (msg.includes('409')) {
           throw new Error('MERGE_CONFLICT');
         }
+        // 422: branch is already up to date (GitHub returns 422 Unprocessable Entity for this)
+        if (msg.includes('422')) {
+          return {
+            hasUpdates: false,
+            sourceUpdatedAt: null,
+            mergeType: 'none',
+          };
+        }
       }
       throw error;
     }

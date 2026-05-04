@@ -79,8 +79,23 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               </p>
               {sourceFullName && (
                 <p className="text-xs text-gray-400 dark:text-text-quaternary truncate mt-0.5 flex items-center gap-1">
-                  <span>↑</span>
-                  <span>{sourceFullName}</span>
+                  <span>{t('Forked from', 'Forked from')}</span>
+                  {fork.parent?.html_url || fork.source?.html_url ? (
+                    <a
+                      href={fork.parent?.html_url || fork.source?.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-indigo hover:underline truncate"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkAsRead();
+                      }}
+                    >
+                      {sourceFullName}
+                    </a>
+                  ) : (
+                    <span className="text-brand-indigo truncate">{sourceFullName}</span>
+                  )}
                 </p>
               )}
             </div>
@@ -227,6 +242,10 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
                         className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        aria-label={workflow.state === 'disabled'
+                          ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
+                          : `${language === 'zh' ? '运行工作流' : 'Run workflow'}: ${workflow.name}`
+                        }
                         title={workflow.state === 'disabled'
                           ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
                           : (language === 'zh' ? '运行工作流' : 'Run workflow')
