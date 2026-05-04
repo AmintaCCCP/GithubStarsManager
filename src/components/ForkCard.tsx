@@ -1,6 +1,6 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useCallback } from 'react';
 import { ExternalLink, GitFork, RefreshCw, ChevronDown, ChevronUp, FolderOpen, Folder, Play, Loader2 } from 'lucide-react';
-import { ForkRepo, WorkflowRun } from '../types';
+import { ForkRepo, WorkflowDefinition } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ForkCardProps {
@@ -10,8 +10,8 @@ interface ForkCardProps {
   onToggleWorkflows: () => void;
   onSyncUpstream: () => void;
   onMarkAsRead: () => void;
-  onRunWorkflow: (workflowPath: string, workflowName: string, branch: string) => void;
-  workflows: WorkflowRun[];
+  onRunWorkflow: (workflowPath: string, workflowName: string) => void;
+  workflows: WorkflowDefinition[];
   isLoadingWorkflows: boolean;
   isSyncing: boolean;
   language: 'zh' | 'en';
@@ -34,6 +34,8 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
 
   const sourceFullName = fork.source?.full_name || fork.parent?.full_name || '';
   const sourceName = fork.source?.name || fork.parent?.name || '';
+  // A repo is only a fork if it has a parent or source
+  const isFork = !!fork.parent || !!fork.source;
 
   return (
     <div
@@ -62,6 +64,11 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 {fork.language && (
                   <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
                     {fork.language}
+                  </span>
+                )}
+                {!isFork && (
+                  <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-white/[0.06] text-gray-600 dark:text-text-tertiary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
+                    {t('非Fork', 'Not Fork')}
                   </span>
                 )}
               </div>
@@ -117,15 +124,19 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 {isWorkflowsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
-              {/* Sync Upstream button */}
+              {/* Sync Upstream button — only enabled for actual forks */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onSyncUpstream();
                 }}
-                disabled={isSyncing}
-                className="p-1 rounded bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50"
-                title={t('同步上游仓库', 'Sync upstream repository')}
+                disabled={isSyncing || !isFork}
+                className={`p-1 rounded transition-colors disabled:cursor-not-allowed ${
+                  isFork
+                    ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                    : 'bg-light-surface text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                } ${isSyncing ? 'opacity-50' : ''}`}
+                title={isFork ? t('同步上游仓库', 'Sync upstream repository') : t('非Fork仓库，无法同步', 'Not a fork. Cannot sync.')}
                 aria-label={t('同步上游仓库', 'Sync upstream repository')}
               >
                 {isSyncing ? (
@@ -194,34 +205,32 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                     >
                       <div className="flex items-center space-x-2 min-w-0 flex-1">
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          workflow.conclusion === 'success' ? 'bg-green-500' :
-                          workflow.conclusion === 'failure' ? 'bg-red-500' :
-                          workflow.status === 'in_progress' ? 'bg-yellow-500 animate-pulse' :
-                          'bg-gray-400'
+                          workflow.state === 'active' ? 'bg-green-500' :
+                          workflow.state === 'disabled' ? 'bg-gray-400' :
+                          'bg-yellow-500'
                         }`} />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm truncate text-gray-900 dark:text-text-secondary">
                             {workflow.name}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-text-tertiary truncate">
-                            #{workflow.run_number} • {workflow.head_branch} • {formatDistanceToNow(new Date(workflow.created_at), { addSuffix: true })}
+                          <p className="text-xs text-gray-400 dark:text-text-quaternary truncate">
+                            {workflow.path}
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRunWorkflow(workflow.path, workflow.name, workflow.head_branch);
+                          onRunWorkflow(workflow.path, workflow.name);
                         }}
-                        disabled={workflow.status === 'in_progress'}
-                        className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                        title={t('运行工作流', 'Run workflow')}
+                        disabled={workflow.state === 'disabled'}
+                        className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        title={workflow.state === 'disabled'
+                          ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
+                          : (language === 'zh' ? '运行工作流' : 'Run workflow')
+                        }
                       >
-                        {workflow.status === 'in_progress' ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Play className="w-3.5 h-3.5" />
-                        )}
+                        <Play className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}

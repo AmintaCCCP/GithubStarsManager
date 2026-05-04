@@ -14,7 +14,7 @@ import {
   GitHubSearchUserResponse,
   GitHubUserDetail,
   ForkRepo,
-  WorkflowRun,
+  WorkflowDefinition,
 } from '../types';
 
 interface GitHubStarredItem {
@@ -956,21 +956,17 @@ export class GitHubApiService {
 
 async getUserForks(): Promise<ForkRepo[]> {
     try {
-      // Use the search API to find all forks owned by the authenticated user
-      // The /user/forks endpoint doesn't exist; use search: user:{login} fork:true
-      const user = await this.makeRequest<{ login: string }>('/user');
-      const login = user.login;
-
+      // Use /user/repos?type=forks to get only repositories the user has forked
       let allForks: ForkRepo[] = [];
       let page = 1;
       const perPage = 100;
 
       while (true) {
-        const data = await this.makeRequest<{ items: ForkRepo[]; total_count: number }>(
-          `/search/repositories?q=user:${login}+fork:true&sort=updated&per_page=${perPage}&page=${page}`
+        const forks = await this.makeRequest<ForkRepo[]>(
+          `/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`
         );
-        allForks = [...allForks, ...data.items];
-        if (data.items.length < perPage) break;
+        allForks = [...allForks, ...forks];
+        if (forks.length < perPage) break;
         page++;
         // Rate limiting protection
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -983,10 +979,10 @@ async getUserForks(): Promise<ForkRepo[]> {
     }
   }
 
-  async syncFork(owner: string, repo: string, branch: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null }> {
+  async syncFork(owner: string, repo: string, branch: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null; mergeType?: string }> {
     // Use GitHub's merge upstream API to sync the fork with its upstream
     try {
-      await this.makeRequest<{ message: string }>(
+      const result = await this.makeRequest<{ merge_type: string; message?: string }>(
         `/repos/${owner}/${repo}/merge_upstream`,
         {
           method: 'POST',
@@ -994,32 +990,45 @@ async getUserForks(): Promise<ForkRepo[]> {
         }
       );
       return {
-        hasUpdates: false,
+        hasUpdates: result.merge_type !== 'none',
         sourceUpdatedAt: new Date().toISOString(),
+        mergeType: result.merge_type,
       };
     } catch (error) {
-      // 409 Conflict means nothing to merge (already up to date) - not an error
-      // Any other error should be thrown
+      if (error instanceof Error) {
+        // Check for HTTP status in error message
+        const msg = error.message;
+        // 404: not a fork (no upstream configured) — treat as not syncable
+        if (msg.includes('404')) {
+          throw new Error('NOT_A_FORK');
+        }
+        // 409: merge conflict — can't auto-merge
+        if (msg.includes('409')) {
+          throw new Error('MERGE_CONFLICT');
+        }
+      }
       throw error;
     }
   }
 
-  async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowRun[]> {
+  async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowDefinition[]> {
     try {
-      // Use expand=run to include workflow path and definition ID in the response
-      const runs = await this.makeRequest<{ workflow_runs: WorkflowRun[] }>(
-        `/repos/${owner}/${repo}/actions/runs?per_page=20&expand=run`
+      // GET /repos/{owner}/{repo}/actions/workflows lists workflow files (definitions), not runs
+      const data = await this.makeRequest<{ workflows: WorkflowDefinition[] }>(
+        `/repos/${owner}/${repo}/actions/workflows?per_page=100`
       );
-      return runs.workflow_runs || [];
+      return data.workflows || [];
     } catch (error) {
       console.warn(`Failed to fetch workflows for ${owner}/${repo}:`, error);
       return [];
     }
   }
 
-  async triggerWorkflowRun(owner: string, repo: string, workflowId: string, branch: string): Promise<void> {
+  async triggerWorkflowRun(owner: string, repo: string, workflowPath: string, branch: string): Promise<void> {
+    // workflowPath is the file path (e.g. ".github/workflows/ci.yml") — URL-encode it
+    const encodedPath = encodeURIComponent(workflowPath);
     await this.makeRequest<void>(
-      `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+      `/repos/${owner}/${repo}/actions/workflows/${encodedPath}/dispatches`,
       {
         method: 'POST',
         body: JSON.stringify({ ref: branch }),

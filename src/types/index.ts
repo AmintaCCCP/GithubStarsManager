@@ -105,20 +105,16 @@ export interface ForkRepo {
   upstream_updated_at?: string; // last time we checked/fetched upstream updates
 }
 
-export interface WorkflowRun {
+export interface WorkflowDefinition {
   id: number;
   name: string;
-  status: string;
-  conclusion: string | null;
-  head_branch: string;
-  head_sha: string;
-  html_url: string;
+  path: string; // workflow file path, e.g. ".github/workflows/ci.yml"
+  state: string; // "active" | "disabled" | "warning"
   created_at: string;
   updated_at: string;
-  run_number: number;
-  event: string;
-  path: string; // workflow file path, e.g. ".github/workflows/ci.yml"
-  workflow_id: number; // workflow definition ID (not the run ID)
+  url: string;
+  html_url: string;
+  badge_url: string;
 }
 
 export interface GitHubUser {

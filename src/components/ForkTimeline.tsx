@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { ForkRepo, WorkflowRun } from '../types';
+import { ForkRepo, WorkflowDefinition } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,14 +33,14 @@ export const ForkTimeline: React.FC = () => {
     setForkIsRefreshing,
   } = useAppStore();
 
-  const { toast } = useDialog();
+  const { toast, confirm } = useDialog();
 
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   // Workflow expansion state (local UI state)
   const [expandedWorkflows, setExpandedWorkflows] = useState<Set<number>>(new Set());
-  const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowRun[]>>({});
+  const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
 
@@ -263,6 +263,25 @@ export const ForkTimeline: React.FC = () => {
       return;
     }
 
+    // Only forks (those with a parent/source) can be synced
+    if (!fork.parent && !fork.source) {
+      toast(language === 'zh'
+        ? `${fork.name} 不是 Fork 仓库，无法同步上游。`
+        : `${fork.name} is not a fork. Cannot sync upstream.`,
+        'error'
+      );
+      return;
+    }
+
+    const confirmed = await confirm(
+      language === 'zh' ? '确认同步' : 'Confirm Sync',
+      language === 'zh'
+        ? `确定要将 "${fork.name}" 同步到上游仓库 "${fork.source?.full_name || fork.parent?.full_name}" 吗？`
+        : `Sync "${fork.name}" with upstream "${fork.source?.full_name || fork.parent?.full_name}"?`,
+      { type: 'info' }
+    );
+    if (!confirmed) return;
+
     setSyncingForks(prev => new Set(prev).add(fork.id));
     try {
       const [owner, repo] = fork.full_name.split('/');
@@ -283,20 +302,33 @@ export const ForkTimeline: React.FC = () => {
         });
       }
 
-      toast(language === 'zh'
-        ? `已同步 ${fork.name} 到最新版本。`
-        : `${fork.name} synced to latest.`,
-        'success'
-      );
+      if (result.mergeType === 'none') {
+        toast(language === 'zh'
+          ? `${fork.name} 已是最新版本，无需同步。`
+          : `${fork.name} is already up to date.`,
+          'info'
+        );
+      } else {
+        toast(language === 'zh'
+          ? `已同步 ${fork.name} 到最新版本。`
+          : `${fork.name} synced to latest.`,
+          'success'
+        );
+      }
     } catch (error) {
       console.error('Sync failed:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      // 409 means already up to date
-      if (errorMsg.includes('409') || errorMsg.toLowerCase().includes('already up to date')) {
+      if (errorMsg === 'NOT_A_FORK') {
         toast(language === 'zh'
-          ? `${fork.name} 已是最新版本。`
-          : `${fork.name} is already up to date.`,
-          'info'
+          ? `${fork.name} 不是 Fork 仓库，无法同步上游。`
+          : `${fork.name} is not a fork. Cannot sync upstream.`,
+          'error'
+        );
+      } else if (errorMsg === 'MERGE_CONFLICT') {
+        toast(language === 'zh'
+          ? `同步失败：${fork.name} 与上游仓库存在合并冲突，请手动解决后重试。`
+          : `Sync failed: ${fork.name} has merge conflicts with upstream. Please resolve manually.`,
+          'error'
         );
       } else {
         toast(language === 'zh'
@@ -314,7 +346,7 @@ export const ForkTimeline: React.FC = () => {
     }
   };
 
-  const handleRunWorkflow = async (forkId: number, workflowPath: string, workflowName: string, branch: string) => {
+  const handleRunWorkflow = async (forkId: number, workflowPath: string, workflowName: string) => {
     if (!githubToken) {
       toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
       return;
@@ -323,6 +355,7 @@ export const ForkTimeline: React.FC = () => {
     const fork = forks.find(f => f.id === forkId);
     if (!fork) return;
 
+    const branch = fork.default_branch || 'main';
     try {
       const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
@@ -565,7 +598,7 @@ export const ForkTimeline: React.FC = () => {
                 onToggleWorkflows={() => toggleWorkflows(fork.id)}
                 onSyncUpstream={() => handleSyncUpstream(fork)}
                 onMarkAsRead={() => markForkAsRead(fork.id)}
-                onRunWorkflow={(workflowId, workflowName, branch) => handleRunWorkflow(fork.id, workflowId, workflowName, branch)}
+                onRunWorkflow={(workflowPath, workflowName) => handleRunWorkflow(fork.id, workflowPath, workflowName)}
                 workflows={workflows}
                 isLoadingWorkflows={isLoadingWf}
                 isSyncing={isSyncing}
