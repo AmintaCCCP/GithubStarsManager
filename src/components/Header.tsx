@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, GitFork } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { useDialog } from '../hooks/useDialog';
@@ -208,6 +208,19 @@ export const Header: React.FC = () => {
               {!isTextWrapped && t('发布', 'Releases')}
             </button>
             <button
+              onClick={() => setCurrentView('forks')}
+              aria-label={isTextWrapped ? t('复刻', 'Forks') : undefined}
+              title={isTextWrapped ? t('复刻', 'Forks') : undefined}
+              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
+                currentView === 'forks'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+              }`}
+            >
+              <GitFork className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
+              {!isTextWrapped && t('复刻', 'Forks')}
+            </button>
+            <button
               onClick={() => setCurrentView('subscription')}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'subscription'
@@ -256,6 +269,17 @@ export const Header: React.FC = () => {
               title={t('发布', 'Releases')}
             >
               <Calendar className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setCurrentView('forks')}
+              className={`p-2.5 rounded-lg transition-colors ${
+                currentView === 'forks'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+              }`}
+              title={t('复刻', 'Forks')}
+            >
+              <GitFork className="w-5 h-5" />
             </button>
             <button
               onClick={() => setCurrentView('subscription')}
@@ -320,6 +344,22 @@ export const Header: React.FC = () => {
                   <div className="flex items-center">
                     <Calendar className="w-5 h-5 mr-3" />
                     {t('发布', 'Releases')}
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('forks');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
+                    currentView === 'forks'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <GitFork className="w-5 h-5 mr-3" />
+                    {t('复刻', 'Forks')}
                   </div>
                 </button>
                 <button

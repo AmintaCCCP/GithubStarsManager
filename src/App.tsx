@@ -5,6 +5,7 @@ import { SearchBar } from './components/SearchBar';
 import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
+import { ForkTimeline } from './components/ForkTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { DiscoveryView } from './components/DiscoveryView';
 import { BackToTop } from './components/BackToTop';
@@ -46,6 +47,9 @@ RepositoriesView.displayName = 'RepositoriesView';
 
 const ReleasesView = React.memo(() => <ReleaseTimeline />);
 ReleasesView.displayName = 'ReleasesView';
+
+const ForksView = React.memo(() => <ForkTimeline />);
+ForksView.displayName = 'ForksView';
 
 const SettingsView = React.memo(() => <SettingsPanel />);
 SettingsView.displayName = 'SettingsView';
@@ -117,6 +121,8 @@ function App() {
         );
       case 'releases':
         return <ReleasesView />;
+      case 'forks':
+        return <ForksView />;
       case 'subscription':
         return (
           <ErrorBoundary>

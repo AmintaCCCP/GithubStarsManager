@@ -12,7 +12,9 @@ import {
   SubscriptionRepo,
   SubscriptionDev,
   GitHubSearchUserResponse,
-  GitHubUserDetail
+  GitHubUserDetail,
+  ForkRepo,
+  WorkflowRun,
 } from '../types';
 
 interface GitHubStarredItem {
@@ -952,6 +954,58 @@ export class GitHubApiService {
 
 
 
+async getUserForks(): Promise<ForkRepo[]> {
+    try {
+      const forks = await this.makeRequest<ForkRepo[]>(`/user/forks?per_page=100&sort=updated`);
+      return forks;
+    } catch (error) {
+      console.warn('Failed to fetch user forks:', error);
+      throw error;
+    }
+  }
+
+  async syncFork(owner: string, repo: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null }> {
+    // Use GitHub's merge upstream API to sync the fork with its upstream
+    try {
+      const result = await this.makeRequest<{ message: string }>(
+        `/repos/${owner}/${repo}/merge_upstream`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ ref: 'main' }),
+        }
+      );
+      return {
+        hasUpdates: false,
+        sourceUpdatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      // 409 Conflict means nothing to merge (already up to date) - not an error
+      // Any other error should be thrown
+      throw error;
+    }
+  }
+
+  async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowRun[]> {
+    try {
+      const runs = await this.makeRequest<{ workflow_runs: WorkflowRun[] }>(
+        `/repos/${owner}/${repo}/actions/runs?per_page=20`
+      );
+      return runs.workflow_runs || [];
+    } catch (error) {
+      console.warn(`Failed to fetch workflows for ${owner}/${repo}:`, error);
+      return [];
+    }
+  }
+
+  async triggerWorkflowRun(owner: string, repo: string, workflowId: string, branch: string): Promise<{ id: number }> {
+    return this.makeRequest<{ id: number }>(
+      `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ref: branch }),
+      }
+    );
+  }
 }
 
 export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): string => {
