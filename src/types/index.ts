@@ -62,6 +62,62 @@ export interface Release {
   is_read?: boolean;
 }
 
+// Fork types
+export interface ForkRepo {
+  id: number;
+  name: string;
+  fork: boolean;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  stargazers_count: number;
+  forks_count: number;
+  forks: number;
+  language: string | null;
+  created_at: string;
+  updated_at: string;
+  pushed_at: string;
+  default_branch: string;
+  owner: {
+    login: string;
+    avatar_url: string;
+  };
+  source: {
+    id: number;
+    full_name: string;
+    name: string;
+    description: string | null;
+    html_url: string;
+    stargazers_count: number;
+    forks_count: number;
+    updated_at: string;
+    owner: {
+      login: string;
+      avatar_url: string;
+    };
+  };
+  parent?: {
+    id: number;
+    full_name: string;
+    name: string;
+    html_url: string;
+  };
+  has_unread?: boolean;
+  upstream_updated_at?: string; // last time we checked/fetched upstream updates
+}
+
+export interface WorkflowDefinition {
+  id: number;
+  name: string;
+  path: string; // workflow file path, e.g. ".github/workflows/ci.yml"
+  state: string; // "active" | "disabled" | "warning"
+  created_at: string;
+  updated_at: string;
+  url: string;
+  html_url: string;
+  badge_url: string;
+}
+
 export interface GitHubUser {
   id: number;
   login: string;
@@ -176,7 +232,7 @@ export interface AppState {
   
   // UI
   theme: 'light' | 'dark';
-  currentView: 'repositories' | 'releases' | 'settings' | 'subscription';
+  currentView: 'repositories' | 'releases' | 'forks' | 'settings' | 'subscription';
   selectedCategory: string;
   language: 'zh' | 'en';
   isSidebarCollapsed: boolean;
@@ -190,6 +246,17 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+
+  // Fork Timeline View
+  forks: ForkRepo[];
+  readForks: Set<number>;
+
+  // Fork Timeline View State
+  forkViewMode: 'timeline' | 'repository';
+  forkSelectedFilters: string[];
+  forkSearchQuery: string;
+  forkExpandedRepositories: Set<number>;
+  forkIsRefreshing: boolean;
 
   // Release Timeline View
   releaseViewMode: 'timeline' | 'repository';

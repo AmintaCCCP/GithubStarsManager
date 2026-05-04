@@ -294,4 +294,28 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.5</downloadUrl>
   </version>
+  <version>
+    <number>0.5.6</number>
+    <releaseDate>2026-05-04</releaseDate>
+    <changelog>
+      <item>Fix: Gemini channel API endpoint URL display issue — selecting Gemini type now auto-fills the official default endpoint and constructs the correct v1beta/models/{model}:generateContent path automatically. (PR #123)</item>
+      <item>Feat: UI refactor with light mode improvements — enhanced focus rings, textarea scrolling/resize behavior, mobile typography, custom scrollbars, and improved tooltip readability in light mode. Added configurable font sizes for rendered content. (PR #128, contribution by @SummerRay160)</item>
+      <item>Fix: Complete Release sync mechanism — incremental sync for existing repos, paginated fetching of up to 30 releases per repo, rate limit handling with automatic wait, pre-release toggle with persisted preference, and failure count summary after refresh. (PR #129)</item>
+      <item>Feat: Bilingual README viewer with translate/revert controls — three display modes (original/translated/bilingual), per-heading translation support, auto-translate option, retry/abort flows, and robust handling for large documents. (PR #130, contribution by @SummerRay160)</item>
+      <item>Special thanks to @SummerRay160 for their outstanding contributions to this release!</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.6</downloadUrl>
+  </version>
+  <version>
+    <number>0.5.7</number>
+    <releaseDate>2026-05-05</releaseDate>
+    <changelog>
+      <item>New Forks View: Added a "Forks" tab in the top navigation bar between Releases and Trending for browsing and managing forked repositories. (PR #132)</item>
+      <item>Fork list sorted by upstream repository last update time (descending), with refresh button that checks for upstream updates and shows unread badge.</item>
+      <item>Per-fork cards showing language badge, source/parent info, unread pulse indicator, relative update times, and external repo link.</item>
+      <item>"Sync Upstream" button calls GitHub merge upstream API to sync Fork with upstream, with progress and localized success/error toasts.</item>
+      <item>Search, pagination, refresh with last-refresh time, and persisted view/search/preferences.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.7</downloadUrl>
+  </version>
 </versions>
