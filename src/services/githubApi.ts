@@ -986,7 +986,7 @@ async getUserForks(): Promise<ForkRepo[]> {
         `/repos/${owner}/${repo}/merge_upstream`,
         {
           method: 'POST',
-          body: JSON.stringify({ ref: branch }),
+          body: JSON.stringify({ branch }),
         }
       );
       return {
@@ -1008,25 +1008,34 @@ async getUserForks(): Promise<ForkRepo[]> {
   }
 
   // Check if a fork's branch is behind its upstream — returns true if "out-of-date"
-  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<boolean> {
+  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<{ needsSync: boolean, parentFullName?: string, parentHtmlUrl?: string }> {
     try {
       let parentOwner = '';
+      let resultParentFullName = parentFullName;
+      let resultParentHtmlUrl: string | undefined = undefined;
+
       if (parentFullName) {
         parentOwner = parentFullName.split('/')[0];
       } else {
-        const repoData = await this.makeRequest<{ parent?: { owner: { login: string } } }>(`/repos/${owner}/${repo}`);
-        if (!repoData.parent) return false;
+        const repoData = await this.makeRequest<{ parent?: { owner: { login: string }, full_name: string, html_url: string } }>(`/repos/${owner}/${repo}`);
+        if (!repoData.parent) return { needsSync: false };
         parentOwner = repoData.parent.owner.login;
+        resultParentFullName = repoData.parent.full_name;
+        resultParentHtmlUrl = repoData.parent.html_url;
       }
 
       const compareData = await this.makeRequest<{ behind_by: number }>(
         `/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`
       );
       
-      return compareData.behind_by > 0;
+      return { 
+        needsSync: compareData.behind_by > 0,
+        parentFullName: resultParentFullName,
+        parentHtmlUrl: resultParentHtmlUrl
+      };
     } catch (error) {
       console.warn(`Failed to check sync status for ${owner}/${repo}:`, error);
-      return false;
+      return { needsSync: false };
     }
   }
 

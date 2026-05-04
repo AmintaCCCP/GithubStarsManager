@@ -204,13 +204,25 @@ export const ForkTimeline: React.FC = () => {
         const [owner, repo] = fork.full_name.split('/');
         const branch = fork.default_branch || 'main';
         try {
-          const needsSync = await githubApi.checkForkSyncNeeded(
+          const result = await githubApi.checkForkSyncNeeded(
             owner, 
             repo, 
             branch, 
             fork.parent?.full_name || fork.source?.full_name
           );
-          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: needsSync }));
+          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: result.needsSync }));
+          
+          if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
+            setForks(prev => prev.map(f => f.id === fork.id ? { 
+              ...f, 
+              parent: { 
+                id: 0, 
+                full_name: result.parentFullName as string, 
+                name: (result.parentFullName as string).split('/')[1], 
+                html_url: result.parentHtmlUrl as string 
+              } 
+            } : f));
+          }
         } catch {
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
         }
