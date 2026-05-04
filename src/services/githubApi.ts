@@ -1008,18 +1008,25 @@ async getUserForks(): Promise<ForkRepo[]> {
   }
 
   // Check if a fork's branch is behind its upstream — returns true if "out-of-date"
-  async checkForkSyncNeeded(owner: string, repo: string, branch: string): Promise<boolean> {
+  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<boolean> {
     try {
-      await this.makeRequest<{ merge_type: string }>(
-        `/repos/${owner}/${repo}/merge_upstream`,
-        { method: 'POST', body: JSON.stringify({ ref: branch }) }
-      );
-      return true;
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('422')) {
-        return false;
+      let parentOwner = '';
+      if (parentFullName) {
+        parentOwner = parentFullName.split('/')[0];
+      } else {
+        const repoData = await this.makeRequest<{ parent?: { owner: { login: string } } }>(`/repos/${owner}/${repo}`);
+        if (!repoData.parent) return false;
+        parentOwner = repoData.parent.owner.login;
       }
-      throw error;
+
+      const compareData = await this.makeRequest<{ behind_by: number }>(
+        `/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`
+      );
+      
+      return compareData.behind_by > 0;
+    } catch (error) {
+      console.warn(`Failed to check sync status for ${owner}/${repo}:`, error);
+      return false;
     }
   }
 

@@ -204,7 +204,12 @@ export const ForkTimeline: React.FC = () => {
         const [owner, repo] = fork.full_name.split('/');
         const branch = fork.default_branch || 'main';
         try {
-          const needsSync = await githubApi.checkForkSyncNeeded(owner, repo, branch);
+          const needsSync = await githubApi.checkForkSyncNeeded(
+            owner, 
+            repo, 
+            branch, 
+            fork.parent?.full_name || fork.source?.full_name
+          );
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: needsSync }));
         } catch {
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
@@ -425,7 +430,7 @@ export const ForkTimeline: React.FC = () => {
               {t('复刻', 'Fork')}
             </h2>
             <p className="text-gray-700 dark:text-text-tertiary">
-              {t(`管理您的 ${forks.length} 个Fork仓库`, `Manage your ${forks.length} forked repositories`)}
+              {t(`管理您的 ${forks.filter(f => f.fork).length} 个Fork仓库`, `Manage your ${forks.filter(f => f.fork).length} forked repositories`)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
