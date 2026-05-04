@@ -306,4 +306,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.6</downloadUrl>
   </version>
+  <version>
+    <number>0.5.7</number>
+    <releaseDate>2026-05-04</releaseDate>
+    <changelog>
+      <item>New Forks View: Added a "Forks" tab in the top navigation bar between Releases and Trending for browsing and managing forked repositories. (PR #132)</item>
+      <item>Fork list sorted by upstream repository last update time (descending), with refresh button that checks for upstream updates and shows unread badge.</item>
+      <item>Per-fork cards showing language badge, source/parent info, unread pulse indicator, relative update times, and external repo link.</item>
+      <item>"Sync Upstream" button calls GitHub merge upstream API to sync Fork with upstream, with progress and localized success/error toasts.</item>
+      <item>Search, pagination, refresh with last-refresh time, and persisted view/search/preferences.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.7</downloadUrl>
+  </version>
 </versions>
