@@ -31,10 +31,12 @@ export default {
         'text-quaternary': '#62666d',
         
         // Linear Brand & Accent
-        'brand-indigo': '#5e6ad2',
-        'brand-violet': '#7170ff',
-        'brand-hover': '#828fff',
-        'security-lavender': '#7a7fad',
+      brand: {
+        indigo: '#5e6ad2',
+        violet: '#7170ff',
+        hover: '#828fff',
+      },
+      'security-lavender': '#7a7fad',
         
         // Linear Status
         'status-green': '#27a644',
