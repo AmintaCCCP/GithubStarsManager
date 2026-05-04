@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, GitFork } from 'lucide-react';
 import { ForkRepo, WorkflowDefinition } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
 import { useDialog } from '../hooks/useDialog';
-import { GitFork } from 'lucide-react';
+import { Modal } from './Modal';
 
 export const ForkTimeline: React.FC = () => {
   const {
@@ -46,6 +46,25 @@ export const ForkTimeline: React.FC = () => {
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
   // Track which forks need sync (out-of-date vs already-up-to-date)
   const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
+
+  // Sync Modal state
+  const [syncModal, setSyncModal] = useState<{
+    isOpen: boolean;
+    forkId: number | null;
+    owner: string;
+    repo: string;
+    branch: string;
+    full_name: string;
+  }>({
+    isOpen: false,
+    forkId: null,
+    owner: '',
+    repo: '',
+    branch: 'main',
+    full_name: ''
+  });
+  const [syncModalBranches, setSyncModalBranches] = useState<string[]>([]);
+  const [isFetchingBranches, setIsFetchingBranches] = useState(false);
 
   // Alias global state for local use
   const viewMode = forkViewMode;
@@ -213,7 +232,8 @@ export const ForkTimeline: React.FC = () => {
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: result.needsSync }));
           
           if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
-            setForks(prev => prev.map(f => f.id === fork.id ? { 
+            const currentForks = useAppStore.getState().forks;
+            setForks(currentForks.map(f => f.id === fork.id ? { 
               ...f, 
               parent: { 
                 id: 0, 
@@ -299,20 +319,46 @@ export const ForkTimeline: React.FC = () => {
       return;
     }
 
-    const confirmed = await confirm(
-      language === 'zh' ? 'Update branch' : 'Update branch',
-      language === 'zh'
-        ? `将 ${fork.name} 的 ${fork.default_branch || 'main'} 分支更新到上游仓库的最新版本？`
-        : `Update ${fork.name}'s ${fork.default_branch || 'main'} branch by merging upstream changes?`,
-      { type: 'info' }
-    );
-    if (!confirmed) return;
-
-    setSyncingForks(prev => new Set(prev).add(fork.id));
+    const defaultBranch = fork.default_branch || 'main';
+    const [owner, repo] = fork.full_name.split('/');
+    
+    setSyncModal({
+      isOpen: true,
+      forkId: fork.id,
+      owner,
+      repo,
+      branch: defaultBranch,
+      full_name: fork.full_name
+    });
+    setSyncModalBranches([]);
+    setIsFetchingBranches(true);
+    
     try {
-      const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
-      const result = await githubApi.syncFork(owner, repo, fork.default_branch || 'main');
+      const branches = await githubApi.getBranches(owner, repo);
+      setSyncModalBranches(branches);
+      if (branches.length > 0 && !branches.includes(defaultBranch)) {
+        setSyncModal(prev => ({ ...prev, branch: branches[0] }));
+      }
+    } finally {
+      setIsFetchingBranches(false);
+    }
+  };
+
+  const confirmSyncUpstream = async () => {
+    if (!githubToken || !syncModal.forkId) return;
+
+    const fork = forks.find(f => f.id === syncModal.forkId);
+    if (!fork) return;
+
+    const { owner, repo, branch } = syncModal;
+
+    setSyncModal(prev => ({ ...prev, isOpen: false }));
+    setSyncingForks(prev => new Set(prev).add(fork.id));
+    
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const result = await githubApi.syncFork(owner, repo, branch);
 
       // Mark fork as up-to-date in UI
       setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
@@ -325,8 +371,8 @@ export const ForkTimeline: React.FC = () => {
         );
       } else {
         toast(language === 'zh'
-          ? `已将 ${fork.name} 更新到上游最新版本。`
-          : `${fork.name} has been updated from upstream.`,
+          ? `已将 ${fork.name} 成功更新到上游最新版本。`
+          : `${fork.name} has been successfully updated from upstream.`,
           'success'
         );
       }
@@ -688,6 +734,63 @@ export const ForkTimeline: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Sync Branch Modal */}
+      <Modal
+        isOpen={syncModal.isOpen}
+        onClose={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
+        title={language === 'zh' ? '同步上游代码 (Sync upstream)' : 'Sync Upstream'}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-text-tertiary">
+            {language === 'zh' 
+              ? `选择要将上游变更合并到的分支 (${syncModal.full_name})：`
+              : `Select the branch to merge upstream changes into for ${syncModal.full_name}:`}
+          </p>
+
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+              {language === 'zh' ? '目标分支 (Target Branch)' : 'Target Branch'}
+            </label>
+            {isFetchingBranches ? (
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{language === 'zh' ? '加载分支列表中...' : 'Loading branches...'}</span>
+              </div>
+            ) : (
+              <select
+                value={syncModal.branch}
+                onChange={(e) => setSyncModal(prev => ({ ...prev, branch: e.target.value }))}
+                className="w-full px-3 py-2 bg-white dark:bg-panel-dark border border-gray-300 dark:border-white/[0.08] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-indigo focus:border-transparent dark:text-text-primary"
+              >
+                {syncModalBranches.length > 0 ? (
+                  syncModalBranches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))
+                ) : (
+                  <option value={syncModal.branch}>{syncModal.branch}</option>
+                )}
+              </select>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+            >
+              {language === 'zh' ? '取消' : 'Cancel'}
+            </button>
+            <button
+              onClick={confirmSyncUpstream}
+              disabled={isFetchingBranches || !syncModal.branch}
+              className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {language === 'zh' ? '确认同步' : 'Sync Branch'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

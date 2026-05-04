@@ -1039,6 +1039,16 @@ async getUserForks(): Promise<ForkRepo[]> {
     }
   }
 
+  async getBranches(owner: string, repo: string): Promise<string[]> {
+    try {
+      const branches = await this.makeRequest<{ name: string }[]>(`/repos/${owner}/${repo}/branches?per_page=100`);
+      return branches.map(b => b.name);
+    } catch (error) {
+      console.warn(`Failed to fetch branches for ${owner}/${repo}:`, error);
+      return [];
+    }
+  }
+
   async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowDefinition[]> {
     try {
       // GET /repos/{owner}/{repo}/actions/workflows lists workflow files (definitions), not runs
