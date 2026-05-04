@@ -14,6 +14,7 @@ interface ForkCardProps {
   workflows: WorkflowDefinition[];
   isLoadingWorkflows: boolean;
   isSyncing: boolean;
+  isRunningWorkflow: boolean;
   language: 'zh' | 'en';
 }
 
@@ -28,14 +29,15 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   workflows,
   isLoadingWorkflows,
   isSyncing,
+  isRunningWorkflow,
   language,
 }) => {
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const sourceFullName = fork.source?.full_name || fork.parent?.full_name || '';
   const sourceName = fork.source?.name || fork.parent?.name || '';
-  // A repo is only a fork if it has a parent or source
-  const isFork = !!fork.parent || !!fork.source;
+  // A repo is only a fork if it has a parent/source OR the fork boolean is true
+  const isFork = !!fork.parent || !!fork.source || fork.fork === true;
 
   return (
     <div
@@ -223,14 +225,18 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                           e.stopPropagation();
                           onRunWorkflow(workflow.path, workflow.name);
                         }}
-                        disabled={workflow.state === 'disabled'}
+                        disabled={workflow.state === 'disabled' || isRunningWorkflow}
                         className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                         title={workflow.state === 'disabled'
                           ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
                           : (language === 'zh' ? '运行工作流' : 'Run workflow')
                         }
                       >
-                        <Play className="w-3.5 h-3.5" />
+                        {isRunningWorkflow ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   ))}

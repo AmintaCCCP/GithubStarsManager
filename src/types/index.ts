@@ -66,6 +66,7 @@ export interface Release {
 export interface ForkRepo {
   id: number;
   name: string;
+  fork: boolean;
   full_name: string;
   description: string | null;
   html_url: string;

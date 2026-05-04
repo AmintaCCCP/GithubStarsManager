@@ -43,6 +43,7 @@ export const ForkTimeline: React.FC = () => {
   const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
+  const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
 
   // Alias global state for local use
   const viewMode = forkViewMode;
@@ -356,6 +357,7 @@ export const ForkTimeline: React.FC = () => {
     if (!fork) return;
 
     const branch = fork.default_branch || 'main';
+    setRunningWorkflows(prev => new Set(prev).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
@@ -376,6 +378,12 @@ export const ForkTimeline: React.FC = () => {
         : `Failed to run workflow.`,
         'error'
       );
+    } finally {
+      setRunningWorkflows(prev => {
+        const next = new Set(prev);
+        next.delete(forkId);
+        return next;
+      });
     }
   };
 
@@ -417,7 +425,7 @@ export const ForkTimeline: React.FC = () => {
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-text-primary mb-2">
-              {t('复刻时间线', 'Fork Timeline')}
+              {t('复刻', 'Fork')}
             </h2>
             <p className="text-gray-700 dark:text-text-tertiary">
               {t(`管理您的 ${forks.length} 个Fork仓库`, `Manage your ${forks.length} forked repositories`)}
@@ -588,6 +596,7 @@ export const ForkTimeline: React.FC = () => {
             const workflows = workflowsMap[fork.id] || [];
             const isLoadingWf = loadingWorkflows.has(fork.id);
             const isSyncing = syncingForks.has(fork.id);
+            const isRunningWf = runningWorkflows.has(fork.id);
 
             return (
               <ForkCard
@@ -602,6 +611,7 @@ export const ForkTimeline: React.FC = () => {
                 workflows={workflows}
                 isLoadingWorkflows={isLoadingWf}
                 isSyncing={isSyncing}
+                isRunningWorkflow={isRunningWf}
                 language={language}
               />
             );
