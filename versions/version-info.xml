@@ -308,7 +308,7 @@
   </version>
   <version>
     <number>0.5.7</number>
-    <releaseDate>2026-05-04</releaseDate>
+    <releaseDate>2026-05-05</releaseDate>
     <changelog>
       <item>New Forks View: Added a "Forks" tab in the top navigation bar between Releases and Trending for browsing and managing forked repositories. (PR #132)</item>
       <item>Fork list sorted by upstream repository last update time (descending), with refresh button that checks for upstream updates and shows unread badge.</item>
