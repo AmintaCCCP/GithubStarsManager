@@ -996,24 +996,28 @@ async getUserForks(): Promise<ForkRepo[]> {
       };
     } catch (error) {
       if (error instanceof Error) {
-        // Check for HTTP status in error message
         const msg = error.message;
-        // 404: not a fork (no upstream configured) — treat as not syncable
-        if (msg.includes('404')) {
-          throw new Error('NOT_A_FORK');
-        }
-        // 409: merge conflict — can't auto-merge
-        if (msg.includes('409')) {
-          throw new Error('MERGE_CONFLICT');
-        }
-        // 422: branch is already up to date (GitHub returns 422 Unprocessable Entity for this)
+        if (msg.includes('404')) throw new Error('NOT_A_FORK');
+        if (msg.includes('409')) throw new Error('MERGE_CONFLICT');
         if (msg.includes('422')) {
-          return {
-            hasUpdates: false,
-            sourceUpdatedAt: null,
-            mergeType: 'none',
-          };
+          return { hasUpdates: false, sourceUpdatedAt: null, mergeType: 'none' };
         }
+      }
+      throw error;
+    }
+  }
+
+  // Check if a fork's branch is behind its upstream — returns true if "out-of-date"
+  async checkForkSyncNeeded(owner: string, repo: string, branch: string): Promise<boolean> {
+    try {
+      await this.makeRequest<{ merge_type: string }>(
+        `/repos/${owner}/${repo}/merge_upstream`,
+        { method: 'POST', body: JSON.stringify({ ref: branch }) }
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('422')) {
+        return false;
       }
       throw error;
     }

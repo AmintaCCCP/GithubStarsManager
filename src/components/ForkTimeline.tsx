@@ -44,6 +44,8 @@ export const ForkTimeline: React.FC = () => {
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
+  // Track which forks need sync (out-of-date vs already-up-to-date)
+  const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
 
   // Alias global state for local use
   const viewMode = forkViewMode;
@@ -60,6 +62,9 @@ export const ForkTimeline: React.FC = () => {
   // Filter and sort forks
   const filteredForks = useMemo(() => {
     let filtered = [...forks];
+
+    // Only show actual forks (not user-created repos)
+    filtered = filtered.filter(fork => fork.fork === true);
 
     // Sort by source.updated_at desc (upstream latest update first)
     filtered.sort((a, b) => {
@@ -193,6 +198,20 @@ export const ForkTimeline: React.FC = () => {
       const now = new Date().toISOString();
       setLastRefreshTime(now);
 
+      // Pre-check sync status for all forks (out-of-date vs already up-to-date)
+      const syncChecks: Promise<void>[] = updatedForks.map(async (fork) => {
+        if (!fork.fork) return;
+        const [owner, repo] = fork.full_name.split('/');
+        const branch = fork.default_branch || 'main';
+        try {
+          const needsSync = await githubApi.checkForkSyncNeeded(owner, repo, branch);
+          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: needsSync }));
+        } catch {
+          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
+        }
+      });
+      await Promise.all(syncChecks);
+
       // Count new forks
       const newCount = newForks.filter(f => !existingForkMap.has(f.id)).length;
       if (newCount > 0) {
@@ -237,7 +256,8 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const loadWorkflows = async (forkId: number) => {
-    if (!githubToken) return;
+    const fork = forks.find(f => f.id === forkId);
+    if (!fork || !githubToken) return;
     const fork = forks.find(f => f.id === forkId);
     if (!fork) return;
 
@@ -264,21 +284,11 @@ export const ForkTimeline: React.FC = () => {
       return;
     }
 
-    // Only actual forks can be synced
-    if (!fork.fork) {
-      toast(language === 'zh'
-        ? `${fork.name} 不是 Fork 仓库，无法同步上游。`
-        : `${fork.name} is not a fork. Cannot sync upstream.`,
-        'error'
-      );
-      return;
-    }
-
     const confirmed = await confirm(
-      language === 'zh' ? '确认同步' : 'Confirm Sync',
+      language === 'zh' ? 'Update branch' : 'Update branch',
       language === 'zh'
-        ? `确定要将 "${fork.name}" 同步到上游仓库 "${fork.source?.full_name || fork.parent?.full_name}" 吗？`
-        : `Sync "${fork.name}" with upstream "${fork.source?.full_name || fork.parent?.full_name}"?`,
+        ? `将 ${fork.name} 的 ${fork.default_branch || 'main'} 分支更新到上游仓库的最新版本？`
+        : `Update ${fork.name}'s ${fork.default_branch || 'main'} branch by merging upstream changes?`,
       { type: 'info' }
     );
     if (!confirmed) return;
@@ -289,30 +299,19 @@ export const ForkTimeline: React.FC = () => {
       const githubApi = new GitHubApiService(githubToken);
       const result = await githubApi.syncFork(owner, repo, fork.default_branch || 'main');
 
-      // Update fork's upstream_updated_at and clear unread badge (user took action)
-      if (result.sourceUpdatedAt) {
-        updateFork({
-          ...fork,
-          upstream_updated_at: result.sourceUpdatedAt,
-        });
-        // Clear unread badge after sync
-        useAppStore.setState(state => {
-          const newReadForks = new Set(state.readForks);
-          newReadForks.add(fork.id);
-          return { readForks: newReadForks };
-        });
-      }
+      // Mark fork as up-to-date in UI
+      setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
 
       if (result.mergeType === 'none') {
         toast(language === 'zh'
-          ? `${fork.name} 已是最新版本，无需同步。`
+          ? `${fork.name} 已是最新版本，无需更新。`
           : `${fork.name} is already up to date.`,
           'info'
         );
       } else {
         toast(language === 'zh'
-          ? `已同步 ${fork.name} 到最新版本。`
-          : `${fork.name} synced to latest.`,
+          ? `已将 ${fork.name} 更新到上游最新版本。`
+          : `${fork.name} has been updated from upstream.`,
           'success'
         );
       }
@@ -597,6 +596,7 @@ export const ForkTimeline: React.FC = () => {
             const isLoadingWf = loadingWorkflows.has(fork.id);
             const isSyncing = syncingForks.has(fork.id);
             const isRunningWf = runningWorkflows.has(fork.id);
+            const needsSync = needsSyncMap[fork.id] ?? true;
 
             return (
               <ForkCard
@@ -612,6 +612,7 @@ export const ForkTimeline: React.FC = () => {
                 isLoadingWorkflows={isLoadingWf}
                 isSyncing={isSyncing}
                 isRunningWorkflow={isRunningWf}
+                needsSync={needsSync}
                 language={language}
               />
             );

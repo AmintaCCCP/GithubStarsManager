@@ -15,6 +15,7 @@ interface ForkCardProps {
   isLoadingWorkflows: boolean;
   isSyncing: boolean;
   isRunningWorkflow: boolean;
+  needsSync: boolean; // true = out-of-date, can sync; false = already up-to-date
   language: 'zh' | 'en';
 }
 
@@ -30,12 +31,12 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   isLoadingWorkflows,
   isSyncing,
   isRunningWorkflow,
+  needsSync,
   language,
 }) => {
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const sourceFullName = fork.source?.full_name || fork.parent?.full_name || '';
-  const sourceName = fork.source?.name || fork.parent?.name || '';
   // A repo is only a fork if it has a parent/source OR the fork boolean is true
   const isFork = !!fork.parent || !!fork.source || fork.fork === true;
 
@@ -66,11 +67,6 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 {fork.language && (
                   <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
                     {fork.language}
-                  </span>
-                )}
-                {!isFork && (
-                  <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-white/[0.06] text-gray-600 dark:text-text-tertiary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
-                    {t('非Fork', 'Not Fork')}
                   </span>
                 )}
               </div>
@@ -126,6 +122,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleWorkflows();
+                  onMarkAsRead();
                 }}
                 className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isWorkflowsExpanded
@@ -141,20 +138,23 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 {isWorkflowsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
-              {/* Sync Upstream button — only enabled for actual forks */}
+              {/* Sync Upstream button — enabled only when fork needs sync (out-of-date) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onSyncUpstream();
+                  onMarkAsRead();
                 }}
-                disabled={isSyncing || !isFork}
+                disabled={isSyncing || !needsSync}
                 className={`p-1 rounded transition-colors disabled:cursor-not-allowed ${
-                  isFork
+                  needsSync
                     ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
                     : 'bg-light-surface text-gray-300 dark:text-gray-600 cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
-                title={isFork ? t('同步上游仓库', 'Sync upstream repository') : t('非Fork仓库，无法同步', 'Not a fork. Cannot sync.')}
-                aria-label={t('同步上游仓库', 'Sync upstream repository')}
+                title={needsSync
+                  ? t('Update branch', 'Update branch')
+                  : t('已是最新版本', 'Already up to date')}
+                aria-label={t('Update branch', 'Update branch')}
               >
                 {isSyncing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -239,6 +239,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         onClick={(e) => {
                           e.stopPropagation();
                           onRunWorkflow(workflow.path, workflow.name);
+                          onMarkAsRead();
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
                         className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
