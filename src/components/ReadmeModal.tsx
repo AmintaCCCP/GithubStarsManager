@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp } from 'lucide-react';
-import MarkdownRenderer from './MarkdownRenderer';
+import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, Languages, Eye } from 'lucide-react';
+import BilingualMarkdownRenderer, { DisplayMode, BilingualMarkdownRendererHandle, TranslationStatus } from './BilingualMarkdownRenderer';
 import { stripMarkdownFormatting } from '../utils/markdownUtils';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
@@ -43,11 +43,25 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('bilingual');
+  const [errorExpanded, setErrorExpanded] = useState(false);
+  const [tocWidth, setTocWidth] = useState(224);
+  const [translatedHeadingMap, setTranslatedHeadingMap] = useState<Map<string, string>>(new Map());
 
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const bilingualRef = useRef<BilingualMarkdownRendererHandle>(null);
+  const [translateStatus, setTranslateStatus] = useState<TranslationStatus>('idle');
+  const [translateProgress, setTranslateProgress] = useState({ current: 0, total: 0 });
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const displayContent = readmeContent;
 
   const currentFontSize = FONT_SIZES[fontSizeIndex].value;
 
@@ -92,6 +106,19 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const scrollToHeading = useCallback((id: string, fallbackText?: string) => {
     if (!contentRef.current) return;
     const container = contentRef.current;
+
+    const translationWrapper = container.querySelector(`[data-bi-heading-id="${CSS.escape(id)}"]`) as HTMLElement | null;
+    if (translationWrapper && translationWrapper.offsetParent !== null) {
+      const elementRect = translationWrapper.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const scrollTop = container.scrollTop + elementRect.top - containerRect.top - 20;
+      try {
+        container.scrollTo({ top: scrollTop, behavior: 'smooth' });
+      } catch {
+        container.scrollTop = scrollTop;
+      }
+      return;
+    }
 
     let element = container.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
 
@@ -160,7 +187,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             const topEntry = visibleEntries.reduce((a, b) =>
               a.boundingClientRect.top < b.boundingClientRect.top ? a : b
             );
-            setActiveHeadingId(topEntry.target.id);
+            const target = topEntry.target as HTMLElement;
+            setActiveHeadingId(target.dataset.biHeadingId ?? target.id);
           }
         },
         {
@@ -171,7 +199,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       );
 
       tocItems.forEach((item) => {
-        let el = container.querySelector(`#${CSS.escape(item.id)}`);
+        let el = container.querySelector(`[data-bi-heading-id="${CSS.escape(item.id)}"]`) as HTMLElement | null;
+        if (!el) {
+          el = container.querySelector(`#${CSS.escape(item.id)}`);
+        }
         if (!el && item.text) {
           const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
           for (let i = 0; i < headings.length; i++) {
@@ -190,7 +221,27 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       clearTimeout(timer);
       if (observer) observer.disconnect();
     };
-  }, [tocItems, readmeContent]);
+  }, [tocItems, readmeContent, translateStatus, displayMode]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = e.clientX - startXRef.current;
+      setTocWidth(Math.max(150, Math.min(500, startWidthRef.current + delta)));
+    };
+    const handleMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const scrollToTop = useCallback(() => {
     if (contentRef.current) {
@@ -206,7 +257,32 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     setFontSizeIndex((prev) => (prev + 1) % FONT_SIZES.length);
   }, []);
 
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = tocWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [tocWidth]);
+
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+
+  const handleTranslate = useCallback(async () => {
+    if (translateStatus === 'translating') return;
+    await bilingualRef.current?.translate();
+  }, [translateStatus]);
+
+  const handleRevertTranslation = useCallback(() => {
+    bilingualRef.current?.revert();
+    setTranslatedHeadingMap(new Map());
+  }, []);
+
+  const handleHeadingsTranslated = useCallback((headings: { id: string; text: string }[]) => {
+    const map = new Map<string, string>();
+    headings.forEach(h => map.set(h.id, h.text));
+    setTranslatedHeadingMap(map);
+  }, []);
 
   const fetchReadme = useCallback(async () => {
     if (!repository) return;
@@ -239,9 +315,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
       if (content.trim()) {
         setReadmeContent(content);
-        const { items, idMap } = extractToc(content);
-        setTocItems(items);
-        setHeadingIdMap(idMap);
       } else {
         setError(language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file');
       }
@@ -254,13 +327,22 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setLoading(false);
       }
     }
-  }, [repository, githubToken, language, extractToc]);
+  }, [repository, githubToken, language]);
 
   useEffect(() => {
     if (isOpen && repository) {
       fetchReadme();
     }
   }, [isOpen, repository, fetchReadme]);
+
+  useEffect(() => {
+    if (displayContent) {
+      const { items, idMap } = extractToc(displayContent);
+      setTocItems(items);
+      setHeadingIdMap(idMap);
+      setTranslatedHeadingMap(new Map());
+    }
+  }, [displayContent, extractToc]);
 
   useEffect(() => {
     setReadmeModalOpen(isOpen);
@@ -281,6 +363,16 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setScrollProgress(0);
       setShowBackToTop(false);
       setActiveHeadingId(null);
+      setDisplayMode('bilingual');
+      setErrorExpanded(false);
+      bilingualRef.current?.revert();
+      setTranslateStatus('idle');
+      setTranslateProgress({ current: 0, total: 0 });
+      setTranslateError(null);
+      setTranslatedHeadingMap(new Map());
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     } else {
       setShowToc(true);
     }
@@ -346,6 +438,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     return 'text-gray-500 dark:text-gray-500 text-xs';
   };
 
+  const isTranslating = translateStatus === 'translating';
+  const isTranslated = translateStatus === 'translated';
+  const isTranslateError = translateStatus === 'error';
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div
@@ -362,7 +458,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           style={{ maxWidth: '1130px' }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Reading Progress Bar */}
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-700 z-20 rounded-t-xl overflow-hidden">
               <div
@@ -372,7 +467,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           )}
 
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-black/[0.06] dark:border-white/[0.04] flex-shrink-0">
             <div className="flex items-center space-x-3">
               <img
@@ -390,6 +484,93 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </div>
             </div>
             <div className="flex items-center space-x-1">
+              {readmeContent && !loading && (
+                isTranslated ? (
+                  <>
+                    <button
+                      onClick={handleRevertTranslation}
+                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet"
+                      title={t('关闭翻译', 'Close Translation')}
+                    >
+                      <Languages className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('已翻译', 'Translated')}</span>
+                    </button>
+                    {([
+                      { mode: 'original' as DisplayMode, icon: FileText, label: t('原文', 'Original') },
+                      { mode: 'translated' as DisplayMode, icon: Languages, label: t('译文', 'Translated') },
+                      { mode: 'bilingual' as DisplayMode, icon: Eye, label: t('双语', 'Bilingual') },
+                    ]).map(({ mode, icon: Icon, label }) => (
+                      <button
+                        key={mode}
+                        onClick={() => setDisplayMode(mode)}
+                        className={`flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors ${
+                          displayMode === mode
+                            ? 'bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet'
+                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-light-surface dark:hover:bg-white/5'
+                        }`}
+                        title={label}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="hidden sm:inline">{label}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : isTranslateError ? (
+                  <>
+                    <button
+                      onClick={handleTranslate}
+                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      title={t('重试翻译', 'Retry Translation')}
+                    >
+                      <Languages className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('重试', 'Retry')}</span>
+                    </button>
+                    <button
+                      onClick={handleRevertTranslation}
+                      className="flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-light-surface dark:hover:bg-white/5"
+                      title={t('关闭翻译', 'Close Translation')}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                    className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                      isTranslating
+                        ? 'text-gray-400 dark:text-text-quaternary cursor-not-allowed'
+                        : 'text-gray-700 dark:text-text-primary hover:text-gray-900 dark:hover:text-white hover:bg-light-surface dark:hover:bg-white/10'
+                    }`}
+                    title={t('翻译文档', 'Translate Document')}
+                  >
+                    {isTranslating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="hidden sm:inline">
+                          {translateProgress.total > 0 
+                            ? `${translateProgress.current}/${translateProgress.total}` 
+                            : t('翻译中...', 'Translating...')}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Languages className="w-4 h-4" />
+                        <span className="hidden sm:inline">{language === 'zh' ? t('翻译为中文', 'Translate to Chinese') : t('翻译为英文', 'Translate to English')}</span>
+                      </>
+                    )}
+                  </button>
+                )
+              )}
+              {translateError && (
+                <div
+                  className={`px-3 py-1 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg cursor-pointer ${errorExpanded ? 'max-w-[400px] whitespace-normal break-all' : 'max-w-[200px] truncate'}`}
+                  onClick={() => setErrorExpanded(!errorExpanded)}
+                  title={!errorExpanded ? translateError : undefined}
+                >
+                  {translateError}
+                </div>
+              )}
               {tocItems.length > 0 && (
                 <button
                   onClick={() => setShowToc(!showToc)}
@@ -430,34 +611,45 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          {/* Main Content Area */}
           <div className="flex-1 flex overflow-hidden">
-            {/* TOC Sidebar */}
             {showToc && tocItems.length > 0 && (
-              <div className="w-56 border-r border-black/[0.06] dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0 readme-scrollbar">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary mb-3">
-                  {t('目录', 'Contents')}
-                </h4>
-                <nav className="space-y-0.5">
-                  {tocItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => scrollToHeading(item.id, item.text)}
-                      className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
-                        activeHeadingId === item.id
-                          ? 'bg-brand-indigo/10 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet font-medium'
-                          : 'hover:bg-light-surface dark:hover:bg-white/5'
-                      }`}
-                      title={item.text}
-                    >
-                      {item.text}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+              <>
+                <div
+                  className="border-r border-black/[0.06] dark:border-white/[0.04] overflow-y-auto p-4 flex-shrink-0 readme-scrollbar"
+                  style={{ width: tocWidth }}
+                >
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary mb-3">
+                    {t('目录', 'Contents')}
+                  </h4>
+                  <nav className="space-y-0.5">
+                    {tocItems.map((item) => {
+                      const displayText = translatedHeadingMap.get(item.id) || item.text;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => scrollToHeading(item.id, item.text)}
+                          className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
+                            activeHeadingId === item.id
+                              ? 'bg-brand-indigo/10 text-brand-violet dark:bg-brand-indigo/10 dark:text-brand-violet font-medium'
+                              : 'hover:bg-light-surface dark:hover:bg-white/5'
+                          }`}
+                          title={displayText}
+                        >
+                          {displayText}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+                <div
+                  onMouseDown={handleResizeMouseDown}
+                  className="w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors flex-shrink-0 relative group"
+                >
+                  <div className="absolute inset-y-0 -left-1 -right-1" />
+                </div>
+              </>
             )}
 
-            {/* Content */}
             <div
               ref={contentRef}
               className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
@@ -484,12 +676,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </button>
               </div>
             ) : readmeContent ? (
-              <MarkdownRenderer
-                content={readmeContent}
-                enableHtml={true}
+              <BilingualMarkdownRenderer
+                ref={bilingualRef}
+                markdown={readmeContent}
                 baseUrl={repository?.html_url}
                 headingIds={headingIdMap}
                 fontSize={getFontSizeType()}
+                language={language}
+                displayMode={displayMode}
+                onDisplayModeChange={setDisplayMode}
+                onStatusChange={setTranslateStatus}
+                onProgress={(current, total) => setTranslateProgress({ current, total })}
+                onHeadingsTranslated={handleHeadingsTranslated}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
@@ -501,7 +699,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             )}
             </div>
 
-            {/* Back to Top Button */}
             {showBackToTop && (
               <button
                 onClick={scrollToTop}
