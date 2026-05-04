@@ -956,22 +956,41 @@ export class GitHubApiService {
 
 async getUserForks(): Promise<ForkRepo[]> {
     try {
-      const forks = await this.makeRequest<ForkRepo[]>(`/user/forks?per_page=100&sort=updated`);
-      return forks;
+      // Use the search API to find all forks owned by the authenticated user
+      // The /user/forks endpoint doesn't exist; use search: user:{login} fork:true
+      const user = await this.makeRequest<{ login: string }>('/user');
+      const login = user.login;
+
+      let allForks: ForkRepo[] = [];
+      let page = 1;
+      const perPage = 100;
+
+      while (true) {
+        const data = await this.makeRequest<{ items: ForkRepo[]; total_count: number }>(
+          `/search/repositories?q=user:${login}+fork:true&sort=updated&per_page=${perPage}&page=${page}`
+        );
+        allForks = [...allForks, ...data.items];
+        if (data.items.length < perPage) break;
+        page++;
+        // Rate limiting protection
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return allForks;
     } catch (error) {
       console.warn('Failed to fetch user forks:', error);
       throw error;
     }
   }
 
-  async syncFork(owner: string, repo: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null }> {
+  async syncFork(owner: string, repo: string, branch: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null }> {
     // Use GitHub's merge upstream API to sync the fork with its upstream
     try {
-      const result = await this.makeRequest<{ message: string }>(
+      await this.makeRequest<{ message: string }>(
         `/repos/${owner}/${repo}/merge_upstream`,
         {
           method: 'POST',
-          body: JSON.stringify({ ref: 'main' }),
+          body: JSON.stringify({ ref: branch }),
         }
       );
       return {
@@ -987,8 +1006,9 @@ async getUserForks(): Promise<ForkRepo[]> {
 
   async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowRun[]> {
     try {
+      // Use expand=run to include workflow path and definition ID in the response
       const runs = await this.makeRequest<{ workflow_runs: WorkflowRun[] }>(
-        `/repos/${owner}/${repo}/actions/runs?per_page=20`
+        `/repos/${owner}/${repo}/actions/runs?per_page=20&expand=run`
       );
       return runs.workflow_runs || [];
     } catch (error) {
@@ -997,8 +1017,8 @@ async getUserForks(): Promise<ForkRepo[]> {
     }
   }
 
-  async triggerWorkflowRun(owner: string, repo: string, workflowId: string, branch: string): Promise<{ id: number }> {
-    return this.makeRequest<{ id: number }>(
+  async triggerWorkflowRun(owner: string, repo: string, workflowId: string, branch: string): Promise<void> {
+    await this.makeRequest<void>(
       `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
       {
         method: 'POST',

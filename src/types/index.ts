@@ -76,6 +76,7 @@ export interface ForkRepo {
   created_at: string;
   updated_at: string;
   pushed_at: string;
+  default_branch: string;
   owner: {
     login: string;
     avatar_url: string;
@@ -116,6 +117,8 @@ export interface WorkflowRun {
   updated_at: string;
   run_number: number;
   event: string;
+  path: string; // workflow file path, e.g. ".github/workflows/ci.yml"
+  workflow_id: number; // workflow definition ID (not the run ID)
 }
 
 export interface GitHubUser {

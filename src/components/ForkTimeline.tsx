@@ -236,13 +236,14 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const loadWorkflows = async (forkId: number) => {
+    if (!githubToken) return;
     const fork = forks.find(f => f.id === forkId);
     if (!fork) return;
 
     setLoadingWorkflows(prev => new Set(prev).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
-      const githubApi = new GitHubApiService(githubToken!);
+      const githubApi = new GitHubApiService(githubToken);
       const workflows = await githubApi.getRepositoryWorkflows(owner, repo);
       setWorkflowsMap(prev => ({ ...prev, [forkId]: workflows }));
     } catch (error) {
@@ -266,7 +267,7 @@ export const ForkTimeline: React.FC = () => {
     try {
       const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
-      const result = await githubApi.syncFork(owner, repo);
+      const result = await githubApi.syncFork(owner, repo, fork.default_branch || 'main');
 
       // Update fork's upstream_updated_at and clear unread badge (user took action)
       if (result.sourceUpdatedAt) {
@@ -313,7 +314,7 @@ export const ForkTimeline: React.FC = () => {
     }
   };
 
-  const handleRunWorkflow = async (forkId: number, workflowId: string, workflowName: string, branch: string) => {
+  const handleRunWorkflow = async (forkId: number, workflowPath: string, workflowName: string, branch: string) => {
     if (!githubToken) {
       toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
       return;
@@ -325,7 +326,7 @@ export const ForkTimeline: React.FC = () => {
     try {
       const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
-      await githubApi.triggerWorkflowRun(owner, repo, workflowId, branch);
+      await githubApi.triggerWorkflowRun(owner, repo, workflowPath, branch);
 
       toast(language === 'zh'
         ? `已触发工作流 "${workflowName}" 在 ${branch} 分支。`

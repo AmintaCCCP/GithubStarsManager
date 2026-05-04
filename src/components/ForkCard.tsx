@@ -10,7 +10,7 @@ interface ForkCardProps {
   onToggleWorkflows: () => void;
   onSyncUpstream: () => void;
   onMarkAsRead: () => void;
-  onRunWorkflow: (workflowId: string, workflowName: string, branch: string) => void;
+  onRunWorkflow: (workflowPath: string, workflowName: string, branch: string) => void;
   workflows: WorkflowRun[];
   isLoadingWorkflows: boolean;
   isSyncing: boolean;
@@ -211,7 +211,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRunWorkflow(String(workflow.id), workflow.name, workflow.head_branch);
+                          onRunWorkflow(workflow.path, workflow.name, workflow.head_branch);
                         }}
                         disabled={workflow.status === 'in_progress'}
                         className="ml-2 p-1.5 rounded bg-brand-indigo text-white hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"

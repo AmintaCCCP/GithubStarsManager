@@ -696,8 +696,6 @@ export const useAppStore = create<AppState & AppActions>()(
       releases: [],
       releaseSubscriptions: new Set<number>(),
       readReleases: new Set<number>(),
-      readForks: new Set<number>(),
-      forks: [],
       customCategories: [],
       hiddenDefaultCategoryIds: [],
       defaultCategoryOverrides: {},
