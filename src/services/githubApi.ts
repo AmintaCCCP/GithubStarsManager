@@ -983,7 +983,7 @@ async getUserForks(): Promise<ForkRepo[]> {
     // Use GitHub's merge upstream API to sync the fork with its upstream
     try {
       const result = await this.makeRequest<{ merge_type: string; message?: string }>(
-        `/repos/${owner}/${repo}/merge_upstream`,
+        `/repos/${owner}/${repo}/merge-upstream`,
         {
           method: 'POST',
           body: JSON.stringify({ branch }),
