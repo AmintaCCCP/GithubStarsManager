@@ -258,8 +258,6 @@ export const ForkTimeline: React.FC = () => {
   const loadWorkflows = async (forkId: number) => {
     const fork = forks.find(f => f.id === forkId);
     if (!fork || !githubToken) return;
-    const fork = forks.find(f => f.id === forkId);
-    if (!fork) return;
 
     setLoadingWorkflows(prev => new Set(prev).add(forkId));
     try {
