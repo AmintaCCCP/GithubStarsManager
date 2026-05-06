@@ -12,7 +12,9 @@ import {
   SubscriptionRepo,
   SubscriptionDev,
   GitHubSearchUserResponse,
-  GitHubUserDetail
+  GitHubUserDetail,
+  ForkRepo,
+  WorkflowDefinition,
 } from '../types';
 
 interface GitHubStarredItem {
@@ -952,6 +954,125 @@ export class GitHubApiService {
 
 
 
+async getUserForks(): Promise<ForkRepo[]> {
+    try {
+      // Use /user/repos?type=forks to get only repositories the user has forked
+      let allForks: ForkRepo[] = [];
+      let page = 1;
+      const perPage = 100;
+
+      while (true) {
+        const forks = await this.makeRequest<ForkRepo[]>(
+          `/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`
+        );
+        allForks = [...allForks, ...forks];
+        if (forks.length < perPage) break;
+        page++;
+        // Rate limiting protection
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return allForks;
+    } catch (error) {
+      console.warn('Failed to fetch user forks:', error);
+      throw error;
+    }
+  }
+
+  async syncFork(owner: string, repo: string, branch: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null; mergeType?: string }> {
+    // Use GitHub's merge upstream API to sync the fork with its upstream
+    try {
+      const result = await this.makeRequest<{ merge_type: string; message?: string }>(
+        `/repos/${owner}/${repo}/merge-upstream`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ branch }),
+        }
+      );
+      return {
+        hasUpdates: result.merge_type !== 'none',
+        sourceUpdatedAt: new Date().toISOString(),
+        mergeType: result.merge_type,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        const msg = error.message;
+        if (msg.includes('404')) throw new Error('NOT_A_FORK');
+        if (msg.includes('409')) throw new Error('MERGE_CONFLICT');
+        if (msg.includes('422')) {
+          return { hasUpdates: false, sourceUpdatedAt: null, mergeType: 'none' };
+        }
+      }
+      throw error;
+    }
+  }
+
+  // Check if a fork's branch is behind its upstream — returns true if "out-of-date"
+  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<{ needsSync: boolean, parentFullName?: string, parentHtmlUrl?: string }> {
+    try {
+      let parentOwner = '';
+      let resultParentFullName = parentFullName;
+      let resultParentHtmlUrl: string | undefined = undefined;
+
+      if (parentFullName) {
+        parentOwner = parentFullName.split('/')[0];
+      } else {
+        const repoData = await this.makeRequest<{ parent?: { owner: { login: string }, full_name: string, html_url: string } }>(`/repos/${owner}/${repo}`);
+        if (!repoData.parent) return { needsSync: false };
+        parentOwner = repoData.parent.owner.login;
+        resultParentFullName = repoData.parent.full_name;
+        resultParentHtmlUrl = repoData.parent.html_url;
+      }
+
+      const compareData = await this.makeRequest<{ behind_by: number }>(
+        `/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`
+      );
+      
+      return { 
+        needsSync: compareData.behind_by > 0,
+        parentFullName: resultParentFullName,
+        parentHtmlUrl: resultParentHtmlUrl
+      };
+    } catch (error) {
+      console.warn(`Failed to check sync status for ${owner}/${repo}:`, error);
+      return { needsSync: false };
+    }
+  }
+
+  async getBranches(owner: string, repo: string): Promise<string[]> {
+    try {
+      const branches = await this.makeRequest<{ name: string }[]>(`/repos/${owner}/${repo}/branches?per_page=100`);
+      return branches.map(b => b.name);
+    } catch (error) {
+      console.warn(`Failed to fetch branches for ${owner}/${repo}:`, error);
+      return [];
+    }
+  }
+
+  async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowDefinition[]> {
+    try {
+      // GET /repos/{owner}/{repo}/actions/workflows lists workflow files (definitions), not runs
+      const data = await this.makeRequest<{ workflows: WorkflowDefinition[] }>(
+        `/repos/${owner}/${repo}/actions/workflows?per_page=100`
+      );
+      return data.workflows || [];
+    } catch (error) {
+      console.warn(`Failed to fetch workflows for ${owner}/${repo}:`, error);
+      return [];
+    }
+  }
+
+  async triggerWorkflowRun(owner: string, repo: string, workflowPath: string, branch: string): Promise<void> {
+    // workflowPath is the file path (e.g. ".github/workflows/ci.yml") — URL-encode it
+    const encodedPath = encodeURIComponent(workflowPath);
+    await this.makeRequest<void>(
+      `/repos/${owner}/${repo}/actions/workflows/${encodedPath}/dispatches`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ref: branch }),
+      }
+    );
+  }
 }
 
 export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): string => {

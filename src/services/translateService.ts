@@ -319,7 +319,14 @@ export const translateBatch = async (
     let currentLength = 0;
 
     for (const text of batch) {
-      if (text.length > maxChars && currentBatch.length === 0) {
+      // Always flush accumulated batch before handling an oversized item.
+      if (text.length > maxChars) {
+        if (currentBatch.length > 0) {
+          const batchResults = await translateBatchInternal(currentBatch, to, from, signal, textType);
+          results.push(...batchResults);
+          currentBatch = [];
+          currentLength = 0;
+        }
         const chunks = splitTextIntoChunks(text, maxChars);
         for (const chunk of chunks) {
           const batchResults = await translateBatchInternal([chunk], to, from, signal, textType);
@@ -329,6 +336,7 @@ export const translateBatch = async (
       }
 
       if (currentLength + text.length > maxChars && currentBatch.length > 0) {
+        // (this branch is now only reached for non-oversized items)
         const batchResults = await translateBatchInternal(currentBatch, to, from, signal, textType);
         results.push(...batchResults);
         currentBatch = [];

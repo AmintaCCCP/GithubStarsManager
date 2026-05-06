@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
-import { 
-  AppState, 
-  Repository, 
-  Release, 
+import {
+  AppState,
+  Repository,
+  Release,
+  ForkRepo,
   AIConfig, 
   WebDAVConfig, 
   SearchFilters, 
@@ -118,6 +119,13 @@ interface AppActions {
   removeReleasesByRepoId: (repoId: number) => void;
   markReleaseAsRead: (releaseId: number) => void;
   markAllReleasesAsRead: () => void;
+
+  // Fork actions
+  setForks: (forks: ForkRepo[]) => void;
+  addForks: (forks: ForkRepo[]) => void;
+  updateFork: (fork: ForkRepo) => void;
+  markForkAsRead: (forkId: number) => void;
+  markAllForksAsRead: () => void;
   
   // Category actions
   addCustomCategory: (category: Category) => void;
@@ -140,7 +148,7 @@ interface AppActions {
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
-  setCurrentView: (view: 'repositories' | 'releases' | 'settings' | 'subscription') => void;
+  setCurrentView: (view: 'repositories' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -169,6 +177,16 @@ interface AppActions {
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   setReleaseIsRefreshing: (refreshing: boolean) => void;
   setIncludePreRelease: (include: boolean) => void;
+
+  // Fork Timeline View actions
+  setForkViewMode: (mode: 'timeline' | 'repository') => void;
+  setForkSelectedFilters: (filters: string[]) => void;
+  toggleForkSelectedFilter: (filterId: string) => void;
+  clearForkSelectedFilters: () => void;
+  setForkSearchQuery: (query: string) => void;
+  toggleForkExpandedRepository: (repoId: number) => void;
+  setForkExpandedRepositories: (repoIds: Set<number>) => void;
+  setForkIsRefreshing: (refreshing: boolean) => void;
 
   // Discovery actions
   setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;
@@ -233,6 +251,11 @@ type PersistedAppState = Partial<
     | 'language'
     | 'searchFilters'
     | 'isSidebarCollapsed'
+    | 'forks'
+    | 'forkViewMode'
+    | 'forkSelectedFilters'
+    | 'forkSearchQuery'
+    | 'forkExpandedRepositories'
     | 'releaseViewMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
@@ -256,7 +279,9 @@ type PersistedAppState = Partial<
 > & {
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
+  readForks?: unknown;
   releaseExpandedRepositories?: unknown;
+  forkExpandedRepositories?: unknown;
 };
 
 const normalizeNumberSet = (value: unknown): Set<number> => {
@@ -316,6 +341,12 @@ const normalizePersistedState = (
     searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
+    readForks: normalizeNumberSet(safePersisted.readForks),
+    forks: Array.isArray(safePersisted.forks) ? safePersisted.forks : [],
+    forkViewMode: safePersisted.forkViewMode || 'timeline',
+    forkSelectedFilters: Array.isArray(safePersisted.forkSelectedFilters) ? safePersisted.forkSelectedFilters : [],
+    forkSearchQuery: typeof safePersisted.forkSearchQuery === 'string' ? safePersisted.forkSearchQuery : '',
+    forkExpandedRepositories: normalizeNumberSet(safePersisted.forkExpandedRepositories),
     releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     includePreRelease,
     searchFilters: {
@@ -688,6 +719,14 @@ export const useAppStore = create<AppState & AppActions>()(
       releaseIsRefreshing: false,
       includePreRelease: true,
 
+      forks: [],
+      readForks: new Set<number>(),
+      forkViewMode: 'timeline',
+      forkSelectedFilters: [],
+      forkSearchQuery: '',
+      forkExpandedRepositories: new Set<number>(),
+      forkIsRefreshing: false,
+
       discoveryChannels: defaultDiscoveryChannels,
       discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] },
       discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
@@ -730,6 +769,8 @@ export const useAppStore = create<AppState & AppActions>()(
         releases: [],
         releaseSubscriptions: new Set(),
         readReleases: new Set(),
+        forks: [],
+        readForks: new Set(),
         analyzingRepositoryIds: new Set(),
         searchResults: [],
         lastSync: null,
@@ -1217,6 +1258,48 @@ export const useAppStore = create<AppState & AppActions>()(
       setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
       setIncludePreRelease: (includePreRelease) => set({ includePreRelease }),
 
+      // Fork actions
+      setForks: (forks) => set({ forks }),
+      addForks: (newForks) => set((state) => {
+        const existingIds = new Set(state.forks.map(f => f.id));
+        const uniqueForks = newForks.filter(f => !existingIds.has(f.id));
+        return { forks: [...state.forks, ...uniqueForks] };
+      }),
+      updateFork: (fork) => set((state) => ({
+        forks: state.forks.map(f => f.id === fork.id ? fork : f),
+      })),
+      markForkAsRead: (forkId) => set((state) => {
+        const newReadForks = new Set(state.readForks);
+        newReadForks.add(forkId);
+        return { readForks: newReadForks };
+      }),
+      markAllForksAsRead: () => set((state) => {
+        const allForkIds = new Set(state.forks.map(f => f.id));
+        return { readForks: allForkIds };
+      }),
+
+      // Fork Timeline View actions
+      setForkViewMode: (forkViewMode) => set({ forkViewMode }),
+      setForkSelectedFilters: (forkSelectedFilters) => set({ forkSelectedFilters }),
+      toggleForkSelectedFilter: (filterId) => set((state) => ({
+        forkSelectedFilters: state.forkSelectedFilters.includes(filterId)
+          ? state.forkSelectedFilters.filter(id => id !== filterId)
+          : [...state.forkSelectedFilters, filterId]
+      })),
+      clearForkSelectedFilters: () => set({ forkSelectedFilters: [] }),
+      setForkSearchQuery: (forkSearchQuery) => set({ forkSearchQuery }),
+      toggleForkExpandedRepository: (repoId) => set((state) => {
+        const newSet = new Set(state.forkExpandedRepositories);
+        if (newSet.has(repoId)) {
+          newSet.delete(repoId);
+        } else {
+          newSet.add(repoId);
+        }
+        return { forkExpandedRepositories: newSet };
+      }),
+      setForkExpandedRepositories: (forkExpandedRepositories) => set({ forkExpandedRepositories }),
+      setForkIsRefreshing: (forkIsRefreshing) => set({ forkIsRefreshing }),
+
     // Discovery actions
     setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({
       selectedDiscoveryChannel,
@@ -1332,6 +1415,10 @@ export const useAppStore = create<AppState & AppActions>()(
         readReleases: Array.from(state.readReleases),
         releases: state.releases,
 
+        // 持久化Fork数据
+        forks: state.forks,
+        readForks: Array.from(state.readForks),
+
         // 持久化自定义分类
         customCategories: state.customCategories,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
@@ -1363,6 +1450,12 @@ export const useAppStore = create<AppState & AppActions>()(
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
         includePreRelease: state.includePreRelease,
+
+        // 持久化Fork页面视图设置
+        forkViewMode: state.forkViewMode,
+        forkSelectedFilters: state.forkSelectedFilters,
+        forkSearchQuery: state.forkSearchQuery,
+        forkExpandedRepositories: Array.from(state.forkExpandedRepositories),
 
       // 持久化发现设置
       discoveryChannels: state.discoveryChannels,
