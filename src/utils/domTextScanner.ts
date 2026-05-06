@@ -56,6 +56,10 @@ function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
       return;
     }
 
+    if (el.hasAttribute('data-translate') && el.getAttribute('data-translate') === 'false') {
+      return;
+    }
+
     if (tag === 'code' && !el.closest('pre')) {
       hasInlineCode = true;
       result += `<code>${escapeHtml(el.textContent || '')}</code>`;
@@ -135,6 +139,7 @@ export function wrapTextNodesWithAttr(element: HTMLElement, attr: string, value:
     const parent = node.parentElement;
     if (!parent) continue;
     if (parent.tagName === 'CODE' || parent.tagName === 'PRE' || parent.closest('pre')) continue;
+    if (parent.closest('[data-translate="false"]')) continue;
     if (!node.textContent?.trim()) continue;
     replacements.push({ textNode: node as Text, parent });
   }
