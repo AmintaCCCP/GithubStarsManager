@@ -1,0 +1,10 @@
+language: zh-CN  # 中文评论
+reviews:
+  auto_review:
+    enabled: true   # 新建PR自动审核
+    drafts: false   # 不审核草稿PR
+  min_lines: 1      # 至少1行改动才触发
+path_filters:       # 忽略的文件/目录
+  - "!**/*.md"
+  - "!node_modules/**"
+  - "!dist/**"
