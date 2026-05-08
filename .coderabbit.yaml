@@ -1,10 +1,34 @@
-language: zh-CN  # 中文评论
+# CodeRabbit 全局配置
+language: Chinese
 reviews:
-  auto_review:
-    enabled: true   # 新建PR自动审核
-    drafts: false   # 不审核草稿PR
-  min_lines: 1      # 至少1行改动才触发
-path_filters:       # 忽略的文件/目录
-  - "!**/*.md"
-  - "!node_modules/**"
-  - "!dist/**"
+  auto_review: true
+  profile: balanced
+  high_level_summary: true
+  review_status: true
+  poem: false
+  walkthrough: true
+
+# 自动总结 PR、代码解释
+knowledge_base:
+  enabled: true
+
+# 忽略不需要审查的文件
+ignore:
+  - "*.md"
+  - "docs/**"
+  - "static/**"
+  - "assets/**"
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
+
+# 审查规则：风格、安全、性能
+rules:
+  style:
+    enabled: true
+  security:
+    enabled: true
+  performance:
+    enabled: true
+  best_practices:
+    enabled: true
