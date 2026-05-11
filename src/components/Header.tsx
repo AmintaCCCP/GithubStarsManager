@@ -112,7 +112,8 @@ export const Header: React.FC = () => {
         setRepositories(merged);
         setLastSync(new Date().toISOString());
 
-        const newRepoCount = allStarred.length - repositories.length;
+        const existingIds = new Set(repositories.map(r => r.id));
+        const newRepoCount = allStarred.filter(r => !existingIds.has(r.id)).length;
         if (newRepoCount > 0) {
           toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
         } else {
@@ -164,7 +165,8 @@ export const Header: React.FC = () => {
       setRepositories(mergedRepositories);
       setLastSync(new Date().toISOString());
 
-      const newRepoCount = newRepositories.length - repositories.length;
+      const existingIds = new Set(repositories.map(r => r.id));
+      const newRepoCount = newRepositories.filter(r => !existingIds.has(r.id)).length;
       if (newRepoCount > 0) {
         toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
       } else {
@@ -278,6 +280,8 @@ export const Header: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('subscription')}
+              aria-label={isTextWrapped ? t('趋势', 'Trending') : undefined}
+              title={isTextWrapped ? t('趋势', 'Trending') : undefined}
               className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
                 currentView === 'subscription'
                   ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'

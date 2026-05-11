@@ -301,6 +301,7 @@ export const ForkTimeline: React.FC = () => {
       setWorkflowsMap(prev => ({ ...prev, [forkId]: workflows }));
     } catch (error) {
       console.error('Failed to load workflows:', error);
+      toast(language === 'zh' ? '加载工作流失败。' : 'Failed to load workflows.', 'error');
     } finally {
       setLoadingWorkflows(prev => {
         const newSet = new Set(prev);

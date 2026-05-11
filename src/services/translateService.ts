@@ -51,6 +51,7 @@ const withRetry = async <T>(
       // 仅在网络错误或服务端错误时重试
       const msg = lastError.message;
       const isTransient =
+        err instanceof TypeError ||
         msg.includes('Failed to fetch') ||
         msg.includes('NetworkError') ||
         msg.includes('AbortError') ||

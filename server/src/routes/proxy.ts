@@ -313,7 +313,14 @@ async function getMsTranslateToken(): Promise<string> {
     return msTranslateToken;
   }
 
-  const res = await fetch(MS_AUTH_URL, { method: 'GET' });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  let res: Response;
+  try {
+    res = await fetch(MS_AUTH_URL, { method: 'GET', signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!res.ok) throw new Error(`MS auth failed: ${res.status}`);
   const token = await res.text();
 
