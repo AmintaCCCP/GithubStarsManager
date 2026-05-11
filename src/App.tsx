@@ -15,6 +15,7 @@ import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import { backendAnalysis } from './services/backendAnalysisService';
 import type { AppState } from './types';
 
 const RepositoriesView = React.memo(({ 
@@ -87,6 +88,10 @@ function App() {
           await syncFromBackend();
           if (!cancelled) {
             unsubscribe = startAutoSync();
+          }
+          // Reconnect to any analysis batch that was running before page refresh
+          if (!cancelled) {
+            void backendAnalysis.resumeBatchAnalysis();
           }
         }
       } catch (err) {

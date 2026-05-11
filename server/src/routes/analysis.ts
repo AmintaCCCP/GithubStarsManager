@@ -56,6 +56,17 @@ router.post('/api/analysis/batch', (req, res) => {
   }
 });
 
+// GET /api/analysis/batches/active — list running batches (for page-refresh recovery)
+router.get('/api/analysis/batches/active', (_req, res) => {
+  try {
+    const active = analysisService.getRunningBatches();
+    res.json(active);
+  } catch (err) {
+    console.error('GET /api/analysis/batches/active error:', err);
+    res.status(500).json({ error: 'Failed to get active batches', code: 'ANALYSIS_ACTIVE_FAILED' });
+  }
+});
+
 // GET /api/analysis/batch/:batchId — check progress
 router.get('/api/analysis/batch/:batchId', (req, res) => {
   try {

@@ -94,6 +94,16 @@ export function getBatchStatus(batchId: string): AnalysisBatch | undefined {
   return batches.get(batchId);
 }
 
+export function getRunningBatches(): AnalysisBatch[] {
+  const result: AnalysisBatch[] = [];
+  for (const batch of batches.values()) {
+    if (batch.status === 'running') {
+      result.push(batch);
+    }
+  }
+  return result;
+}
+
 export function cancelBatch(batchId: string): boolean {
   const batch = batches.get(batchId);
   if (!batch || batch.status !== 'running') return false;
