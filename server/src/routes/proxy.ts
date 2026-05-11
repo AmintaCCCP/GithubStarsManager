@@ -67,17 +67,17 @@ router.post('/api/proxy/github/*', async (req, res) => {
     const queryString = new URL(req.url, 'http://localhost').search;
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
 
-    const body = req.body as { method?: string; headers?: Record<string, string> };
-    const method = body.method || 'GET';
-    
+    const proxyBody = req.body as { method?: string; headers?: Record<string, string>; body?: unknown };
+    const method = proxyBody.method || 'GET';
+
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
-      'Accept': body.headers?.Accept || 'application/vnd.github.v3+json',
+      'Accept': proxyBody.headers?.Accept || 'application/vnd.github.v3+json',
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const result = await proxyRequest({ url: targetUrl, method, headers });
+    const result = await proxyRequest({ url: targetUrl, method, headers, body: proxyBody.body as string | object | undefined });
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('GitHub proxy error:', err);
@@ -294,6 +294,94 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
   } catch (err) {
     console.error('GitHub search users proxy error:', err);
     res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
+  }
+});
+
+// === Microsoft Translator Proxy ===
+
+// MS auth token 在进程内存中缓存
+let msTranslateToken: string | null = null;
+let msTranslateTokenExpiresAt = 0;
+const MS_AUTH_URL = 'https://edge.microsoft.com/translate/auth';
+const MS_TRANSLATE_URL = 'https://api-edge.cognitive.microsofttranslator.com/translate';
+
+async function getMsTranslateToken(): Promise<string> {
+  const now = Date.now();
+  const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+  if (msTranslateToken && now < msTranslateTokenExpiresAt - TOKEN_REFRESH_BUFFER_MS) {
+    return msTranslateToken;
+  }
+
+  const res = await fetch(MS_AUTH_URL, { method: 'GET' });
+  if (!res.ok) throw new Error(`MS auth failed: ${res.status}`);
+  const token = await res.text();
+
+  // 解析 JWT 获取过期时间
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      if (payload.exp) {
+        msTranslateTokenExpiresAt = payload.exp * 1000;
+      }
+    }
+  } catch { /* 解析失败则用默认 8 分钟 */ }
+
+  if (msTranslateTokenExpiresAt <= now) {
+    msTranslateTokenExpiresAt = now + 8 * 60 * 1000;
+  }
+
+  msTranslateToken = token;
+  return token;
+}
+
+router.post('/api/proxy/translate', async (req, res) => {
+  try {
+    const { texts, to, from, textType } = req.body as {
+      texts: string[];
+      to: string;
+      from?: string;
+      textType?: string;
+    };
+
+    if (!texts || !Array.isArray(texts) || texts.length === 0 || !to) {
+      res.status(400).json({ error: 'texts and to are required', code: 'TRANSLATE_PARAMS_REQUIRED' });
+      return;
+    }
+
+    const token = await getMsTranslateToken();
+
+    const params = new URLSearchParams({ 'api-version': '3.0', to });
+    if (from) params.set('from', from);
+    if (textType === 'html') params.set('textType', 'html');
+
+    const targetUrl = `${MS_TRANSLATE_URL}?${params.toString()}`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+
+    const body = texts.map(t => ({ Text: t }));
+
+    const result = await proxyRequest({ url: targetUrl, method: 'POST', headers, body });
+
+    if (result.status === 401) {
+      // Token 过期，清除缓存后重试一次
+      msTranslateToken = null;
+      msTranslateTokenExpiresAt = 0;
+      const newToken = await getMsTranslateToken();
+      headers['Authorization'] = `Bearer ${newToken}`;
+      const retryResult = await proxyRequest({ url: targetUrl, method: 'POST', headers, body });
+      res.status(retryResult.status).json(retryResult.data);
+      return;
+    }
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    console.error('Translation proxy error:', err);
+    res.status(500).json({ error: 'Translation proxy failed', code: 'TRANSLATION_PROXY_FAILED' });
   }
 });
 

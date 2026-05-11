@@ -98,18 +98,17 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   // 执行取消Star操作
   const executeUnstar = useCallback(async () => {
-    if (!githubToken) return;
-    
+    if (!backend.isAvailable) return;
+
     setIsStarring(true);
-    
+
     try {
-      const githubApi = new GitHubApiService(githubToken);
       const [owner, name] = repo.full_name.split('/');
-      
+
       // 乐观更新：立即更新UI状态
       setOptimisticStarred(false);
-      
-      await githubApi.unstarRepository(owner, name);
+
+      await backend.unstarRepository(owner, name);
       
       // 从本地删除
       const existingRepo = repositories.find(r => r.full_name === repo.full_name);
@@ -126,18 +125,18 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       // 操作失败，回滚乐观状态
       setOptimisticStarred(null);
       console.error('Failed to unstar repository:', error);
-      const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
+      const errorMessage = t('取消 Star 失败，请检查后端服务或网络连接。', 'Failed to unstar repository. Please check the backend service or network connection.');
       toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
       setPendingUnstarAction(null);
     }
-  }, [githubToken, repo, repositories, deleteRepository, t]);
+  }, [repo, repositories, deleteRepository, t]);
 
   // 处理添加/取消Star
   const handleStar = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!githubToken || isStarring) return;
+    if (!backend.isAvailable || isStarring) return;
 
     if (isStarred) {
       // 取消Star - 显示自定义确认对话框
@@ -150,13 +149,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     setIsStarring(true);
     
     try {
-      const githubApi = new GitHubApiService(githubToken);
       const [owner, name] = repo.full_name.split('/');
-      
+
       // 乐观更新：立即更新UI状态
       setOptimisticStarred(true);
-      
-      await githubApi.starRepository(owner, name);
+
+      await backend.starRepository(owner, name);
       
       // 将DiscoveryRepo转换为Repository并添加到本地，保留AI分析结果
       const repositoryToAdd = {
@@ -187,12 +185,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       // 操作失败，回滚乐观状态
       setOptimisticStarred(null);
       console.error('Failed to star repository:', error);
-      const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
+      const errorMessage = t('Star 操作失败，请检查后端服务或网络连接。', 'Failed to star repository. Please check the backend service or network connection.');
       toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
     }
-  }, [githubToken, isStarring, repo, onStar, t, isStarred, addRepository, executeUnstar]);
+  }, [isStarring, repo, onStar, t, isStarred, addRepository, executeUnstar]);
 
   // 处理在ZRead打开
   const handleOpenInZRead = useCallback((e: React.MouseEvent) => {
@@ -439,7 +437,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {/* Star button */}
               <button
                 onClick={handleStar}
-                disabled={!githubToken || isStarring}
+                disabled={!backend.isAvailable || isStarring}
                 className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
                     ? 'bg-brand-indigo text-white shadow-sm dark:bg-brand-indigo/80 dark:text-white'

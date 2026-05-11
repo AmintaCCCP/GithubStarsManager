@@ -1,6 +1,6 @@
 import { translateBackendError } from '../utils/backendErrors';
 
-import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
+import { Repository, Release, AIConfig, WebDAVConfig, ForkRepo, WorkflowDefinition, TranslateResult } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 class BackendAdapter {
@@ -168,6 +168,210 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy error');
     const data = await res.json() as { rate: { remaining: number; reset: number } };
     return { remaining: data.rate.remaining, reset: data.rate.reset };
+  }
+
+  async starRepository(owner: string, repo: string): Promise<void> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(
+      `${this._backendUrl}/proxy/github/user/starred/${owner}/${repo}`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'PUT' })
+      }
+    );
+    if (!res.ok) await this.throwTranslatedError(res, 'Star repository proxy error');
+  }
+
+  async unstarRepository(owner: string, repo: string): Promise<void> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(
+      `${this._backendUrl}/proxy/github/user/starred/${owner}/${repo}`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'DELETE' })
+      }
+    );
+    if (!res.ok) await this.throwTranslatedError(res, 'Unstar repository proxy error');
+  }
+
+  // === Fork Operations ===
+
+  async getUserForks(): Promise<ForkRepo[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const allForks: ForkRepo[] = [];
+    let page = 1;
+    const perPage = 100;
+    while (true) {
+      const res = await this.fetchWithTimeout(
+        `${this._backendUrl}/proxy/github/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`,
+        {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ method: 'GET' })
+        }
+      );
+      if (!res.ok) {
+        if (res.status === 404) break;
+        await this.throwTranslatedError(res, 'Get user forks proxy error');
+      }
+      const data = await res.json() as ForkRepo[];
+      allForks.push(...data);
+      if (data.length < perPage) break;
+      page++;
+    }
+    return allForks;
+  }
+
+  async checkForkSyncNeeded(
+    owner: string, repo: string, branch: string, parentFullName?: string
+  ): Promise<{ needsSync: boolean; parentFullName?: string; parentHtmlUrl?: string }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    try {
+      let parentOwner = '';
+      let resultParentFullName = parentFullName;
+      let resultParentHtmlUrl: string | undefined;
+
+      if (parentFullName) {
+        parentOwner = parentFullName.split('/')[0];
+      } else {
+        const repoRes = await this.fetchWithTimeout(
+          `${this._backendUrl}/proxy/github/repos/${owner}/${repo}`,
+          {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({ method: 'GET' })
+          }
+        );
+        if (!repoRes.ok) return { needsSync: false };
+        const repoData = await repoRes.json() as { parent?: { owner: { login: string }; full_name: string; html_url: string } };
+        if (!repoData.parent) return { needsSync: false };
+        parentOwner = repoData.parent.owner.login;
+        resultParentFullName = repoData.parent.full_name;
+        resultParentHtmlUrl = repoData.parent.html_url;
+      }
+
+      const compareRes = await this.fetchWithTimeout(
+        `${this._backendUrl}/proxy/github/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`,
+        {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ method: 'GET' })
+        }
+      );
+      if (!compareRes.ok) return { needsSync: false };
+      const compareData = await compareRes.json() as { behind_by: number };
+
+      return {
+        needsSync: compareData.behind_by > 0,
+        parentFullName: resultParentFullName,
+        parentHtmlUrl: resultParentHtmlUrl
+      };
+    } catch {
+      return { needsSync: false };
+    }
+  }
+
+  async getBranches(owner: string, repo: string): Promise<string[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    try {
+      const res = await this.fetchWithTimeout(
+        `${this._backendUrl}/proxy/github/repos/${owner}/${repo}/branches?per_page=100`,
+        {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ method: 'GET' })
+        }
+      );
+      if (!res.ok) return [];
+      const branches = await res.json() as { name: string }[];
+      return branches.map(b => b.name);
+    } catch {
+      return [];
+    }
+  }
+
+  async getRepositoryWorkflows(owner: string, repo: string): Promise<WorkflowDefinition[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    try {
+      const res = await this.fetchWithTimeout(
+        `${this._backendUrl}/proxy/github/repos/${owner}/${repo}/actions/workflows?per_page=100`,
+        {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ method: 'GET' })
+        }
+      );
+      if (!res.ok) return [];
+      const data = await res.json() as { workflows: WorkflowDefinition[] };
+      return data.workflows || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async syncFork(owner: string, repo: string, branch: string): Promise<{ hasUpdates: boolean; sourceUpdatedAt: string | null; mergeType?: string }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(
+      `${this._backendUrl}/proxy/github/repos/${owner}/${repo}/merge-upstream`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'POST', body: { branch } })
+      }
+    );
+
+    if (!res.ok) {
+      if (res.status === 404) throw new Error('NOT_A_FORK');
+      if (res.status === 409) throw new Error('MERGE_CONFLICT');
+      if (res.status === 422) return { hasUpdates: false, sourceUpdatedAt: null, mergeType: 'none' };
+      await this.throwTranslatedError(res, 'Sync fork proxy error');
+    }
+
+    const result = await res.json() as { merge_type: string; message?: string };
+    return {
+      hasUpdates: result.merge_type !== 'none',
+      sourceUpdatedAt: new Date().toISOString(),
+      mergeType: result.merge_type,
+    };
+  }
+
+  async triggerWorkflowRun(owner: string, repo: string, workflowPath: string, branch: string): Promise<void> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const encodedPath = encodeURIComponent(workflowPath);
+    const res = await this.fetchWithTimeout(
+      `${this._backendUrl}/proxy/github/repos/${owner}/${repo}/actions/workflows/${encodedPath}/dispatches`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'POST', body: { ref: branch } })
+      }
+    );
+    if (!res.ok) await this.throwTranslatedError(res, 'Trigger workflow proxy error');
+  }
+
+  // === Translation Proxy ===
+
+  async translate(texts: string[], to: string, from?: string, textType?: string): Promise<TranslateResult[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(
+      `${this._backendUrl}/proxy/translate`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ texts, to, from, textType })
+      },
+      60000
+    );
+    if (!res.ok) await this.throwTranslatedError(res, 'Translation proxy error');
+    return res.json() as Promise<TranslateResult[]>;
   }
 
   // === AI Proxy ===

@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, GitFork } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
+import { backend } from '../services/backendAdapter';
 import { useDialog } from '../hooks/useDialog';
 
 export const Header: React.FC = () => {
@@ -65,6 +67,67 @@ export const Header: React.FC = () => {
   }, []);
 
   const handleSync = async () => {
+    // 优先通过后端代理同步，确保后端为唯一数据源
+    if (backend.isAvailable) {
+      setLoading(true);
+      try {
+        // 分页拉取所有星标仓库（通过后端代理，Token 存储在后端）
+        const allStarred: Repository[] = [];
+        let page = 1;
+        const perPage = 100;
+        while (true) {
+          const repos = await backend.fetchStarredRepos(page, perPage);
+          allStarred.push(...repos);
+          if (repos.length < perPage) break;
+          page++;
+        }
+
+        // 合并已有数据，保留 AI 分析结果和自定义字段
+        const existingRepoMap = new Map(repositories.map(repo => [repo.id, repo]));
+        const merged = allStarred.map(newRepo => {
+          const existing = existingRepoMap.get(newRepo.id);
+          if (existing) {
+            return {
+              ...newRepo,
+              has_fetched_releases: existing.has_fetched_releases,
+              last_release_fetch_time: existing.last_release_fetch_time,
+              ai_summary: existing.ai_summary,
+              ai_tags: existing.ai_tags,
+              ai_platforms: existing.ai_platforms,
+              analyzed_at: existing.analyzed_at,
+              analysis_failed: existing.analysis_failed,
+              custom_description: existing.custom_description,
+              custom_tags: existing.custom_tags,
+              custom_category: existing.custom_category,
+              category_locked: existing.category_locked,
+              last_edited: existing.last_edited,
+            };
+          }
+          return newRepo;
+        });
+
+        // 全量同步到后端数据库
+        await backend.syncRepositories(merged, true);
+
+        setRepositories(merged);
+        setLastSync(new Date().toISOString());
+
+        const newRepoCount = allStarred.length - repositories.length;
+        if (newRepoCount > 0) {
+          toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
+        } else {
+          toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
+        }
+      } catch (error) {
+        console.error('Backend sync failed:', error);
+        toast(t('同步失败，请检查后端连接。', 'Sync failed. Please check backend connection.'), 'error');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // 后端不可用时走前端直接调用 GitHub API（降级方案）
     if (!githubToken) {
       toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
@@ -73,7 +136,6 @@ export const Header: React.FC = () => {
     setLoading(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-
       const newRepositories = await githubApi.getAllStarredRepositories();
 
       const existingRepoMap = new Map(repositories.map(repo => [repo.id, repo]));
@@ -100,14 +162,8 @@ export const Header: React.FC = () => {
       });
 
       setRepositories(mergedRepositories);
-
-      // Note: Release fetching is now handled by the Refresh button in Release Timeline
-      // Header sync only syncs the starred repos list
-
       setLastSync(new Date().toISOString());
-      console.log('Sync completed successfully');
 
-      // 显示同步结果
       const newRepoCount = newRepositories.length - repositories.length;
       if (newRepoCount > 0) {
         toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
