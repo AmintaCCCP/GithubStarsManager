@@ -329,4 +329,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.6.0/github-stars-manager-0.6.0.dmg</downloadUrl>
   </version>
+  <version>
+    <number>0.6.1</number>
+    <releaseDate>2026-05-11</releaseDate>
+    <changelog>
+      <item>架构重构: 以后端为单一数据源，移除双向自动同步，用户操作改为精确 API 调用</item>
+      <item>修复: 后端 upsert 时按字段保留已有 AI 数据，防止 INSERT OR REPLACE 覆盖分析结果</item>
+      <item>修复: CategorySidebar/RepositoryEditModal/ReleaseTimeline 操作失败时的回滚和补偿逻辑</item>
+      <item>修复: SubscriptionRepoCard 中 existingRepo 可能为 undefined 的崩溃隐患</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.6.1/github-stars-manager-0.6.1.dmg</downloadUrl>
+  </version>
 </versions>
