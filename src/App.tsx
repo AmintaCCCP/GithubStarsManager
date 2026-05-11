@@ -85,13 +85,14 @@ function App() {
       try {
         await backend.init();
         if (backend.isAvailable && !cancelled) {
+          // Resume any in-progress analysis before syncing data,
+          // so the batch doesn't have time to complete during the sync window.
+          if (!cancelled) {
+            void backendAnalysis.resumeBatchAnalysis();
+          }
           await syncFromBackend();
           if (!cancelled) {
             unsubscribe = startAutoSync();
-          }
-          // Reconnect to any analysis batch that was running before page refresh
-          if (!cancelled) {
-            void backendAnalysis.resumeBatchAnalysis();
           }
         }
       } catch (err) {
