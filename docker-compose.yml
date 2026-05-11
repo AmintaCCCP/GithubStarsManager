@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   frontend:
-    build: .
+    image: lost4/gitstars:latest
     ports:
       - "8080:80"
     depends_on:
@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./server
+    image: lost4/gitstars:backend
     expose:
       - "3000"
     environment:
