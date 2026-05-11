@@ -236,7 +236,14 @@ export async function syncToBackend(): Promise<void> {
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
-      console.warn(`⚠️ Synced to backend with ${failures.length} error(s):`, failures.map(f => (f as PromiseRejectedResult).reason));
+      const failedSlices = [
+        reposSync.status === 'rejected' ? 'repositories' : null,
+        releasesSync.status === 'rejected' ? 'releases' : null,
+        aiSync.status === 'rejected' ? 'aiConfigs' : null,
+        webdavSync.status === 'rejected' ? 'webdavConfigs' : null,
+        settingsSync.status === 'rejected' ? 'settings' : null,
+      ].filter(Boolean);
+      console.warn(`⚠️ Synced to backend with ${failures.length} error(s):`, failedSlices);
       _hasPendingLocalChanges = true;
     } else {
       console.log('✅ Synced to backend');
@@ -257,6 +264,7 @@ export async function syncToBackend(): Promise<void> {
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
+        github_token: state.githubToken,
       });
     }
   } catch (err) {
@@ -319,7 +327,8 @@ export function startAutoSync(): () => void {
       state.categoryOrder !== prevState.categoryOrder ||
       state.customCategories !== prevState.customCategories ||
       state.assetFilters !== prevState.assetFilters ||
-      state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount;
+      state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount ||
+      state.githubToken !== prevState.githubToken;
 
     if (!changed) return;
 
