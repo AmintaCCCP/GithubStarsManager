@@ -78,7 +78,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     if (!selectedCategoryObj) return [];
 
     return repositories.filter(repo => {
-      if (repo.custom_category !== undefined) {
+      if (repo.custom_category != null) {
         if (repo.custom_category === '') {
           return false;
         }
@@ -490,7 +490,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleStop = async () => {
-    if (!isAnalyzingRef.current) return;
+    // 页面刷新后 isAnalyzingRef 重置为 false, 但后端批次可能正在运行
+    if (!isAnalyzingRef.current && !backendAnalysis.isRunning) return;
 
     const confirmMessage = language === 'zh'
       ? '确定要停止 AI 分析吗？已分析的结果将会保存。'
@@ -506,6 +507,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         shouldStopRef.current = true;
         backendAnalysis.cancelBatchAnalysis();
         setIsPaused(false);
+        // 立即清理 UI 状态，不等轮询检测到 cancelled
+        setLoading(false);
+        setAnalysisProgress({ current: 0, total: 0 });
         return;
       }
 

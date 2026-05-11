@@ -75,6 +75,10 @@ class BackendAnalysisService {
 
       return new Promise<void>((resolve) => {
         let lastReportedCount = 0;
+        let consecutiveFailures = 0;
+        const MAX_CONSECUTIVE_FAILURES = 5;
+        const MAX_POLL_TIME_MS = 10 * 60 * 1000; // 10分钟后强制退出
+        const startTime = Date.now();
 
         const poll = async (): Promise<void> => {
           // Guard: if a newer batch has replaced this one, silently exit
@@ -85,6 +89,8 @@ class BackendAnalysisService {
 
             // Re-check after await — another batch may have been started
             if (this.currentBatchId !== batchId) return;
+
+            consecutiveFailures = 0; // 成功后重置
 
             store.setAnalysisProgress({ current: progress.completed + progress.failed, total: progress.total });
             onProgress?.(progress.completed + progress.failed, progress.total);
@@ -128,8 +134,27 @@ class BackendAnalysisService {
               resolve();
               return;
             }
-          } catch {
-            // Poll errors are non-fatal — keep polling
+          } catch (err) {
+            consecutiveFailures++;
+
+            // 批次已被后端清理（如重启后丢失），视为已完成
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (errMsg.includes('404') || errMsg.includes('BATCH_NOT_FOUND') || errMsg.includes('Batch not found')) {
+              this.finishBatch(batchId, repositoryIds);
+              removeBatch(batchId);
+              store.setAnalysisProgress({ current: 0, total: 0 });
+              resolve(); // 调用方的 finally 块会处理 UI 清理
+              return;
+            }
+
+            // 连续失败或超时，强制退出防止永久转圈
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES || Date.now() - startTime > MAX_POLL_TIME_MS) {
+              this.finishBatch(batchId, repositoryIds);
+              removeBatch(batchId);
+              store.setAnalysisProgress({ current: 0, total: 0 });
+              resolve(); // 调用方的 finally 块会处理 UI 清理
+              return;
+            }
           }
 
           // Schedule next poll only if still the current batch
@@ -149,14 +174,28 @@ class BackendAnalysisService {
   }
 
   async cancelBatchAnalysis(): Promise<void> {
-    if (this.currentBatchId) {
-      try {
-        await backend.cancelAnalysis(this.currentBatchId);
-      } catch {
-        // Non-fatal
-      }
-      // Don't call finishBatch — the poll will detect 'cancelled' and clean up
+    const batchId = this.currentBatchId;
+    if (!batchId) return;
+
+    // 从 localStorage 中获取该批次的仓库 ID 以清理 analyzing 状态
+    const savedBatches = loadSavedBatches();
+    const saved = savedBatches.find((b) => b.batchId === batchId);
+    const repositoryIds = saved?.repositoryIds ?? [];
+
+    // 先向服务端发送取消请求
+    try {
+      await backend.cancelAnalysis(batchId);
+    } catch {
+      // Non-fatal — 即使服务端请求失败也要清理本地状态
     }
+
+    // 立即清理本地状态
+    this.finishBatch(batchId, repositoryIds);
+    removeBatch(batchId);
+
+    const store = useAppStore.getState();
+    store.setLoading(false);
+    store.setAnalysisProgress({ current: 0, total: 0 });
   }
 
   get isRunning(): boolean {
@@ -223,12 +262,19 @@ class BackendAnalysisService {
       this._isRunning = true;
       this.currentBatchId = active.batchId;
 
+      let consecutiveFailures = 0;
+      const MAX_CONSECUTIVE_FAILURES = 5;
+      const MAX_POLL_TIME_MS = 10 * 60 * 1000; // 10分钟后强制退出
+      const startTime = Date.now();
+
       const poll = async (): Promise<void> => {
         if (this.currentBatchId !== active.batchId) return;
 
         try {
           const progress = await backend.getAnalysisProgress(active.batchId);
           if (this.currentBatchId !== active.batchId) return;
+
+          consecutiveFailures = 0; // 成功后重置
 
           store.setAnalysisProgress({ current: progress.completed + progress.failed, total: progress.total });
           onProgress?.(progress.completed + progress.failed, progress.total);
@@ -267,8 +313,29 @@ class BackendAnalysisService {
             onComplete?.();
             return;
           }
-        } catch {
-          // Poll errors are non-fatal
+        } catch (err) {
+          consecutiveFailures++;
+
+          // 批次已被后端清理（如重启后丢失），视为已完成
+          const errMsg = err instanceof Error ? err.message : String(err);
+          if (errMsg.includes('404') || errMsg.includes('BATCH_NOT_FOUND') || errMsg.includes('Batch not found')) {
+            this.finishBatch(active.batchId, saved.repositoryIds);
+            removeBatch(active.batchId);
+            store.setLoading(false);
+            store.setAnalysisProgress({ current: 0, total: 0 });
+            onComplete?.();
+            return;
+          }
+
+          // 连续失败或超时，强制退出防止永久转圈
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES || Date.now() - startTime > MAX_POLL_TIME_MS) {
+            this.finishBatch(active.batchId, saved.repositoryIds);
+            removeBatch(active.batchId);
+            store.setLoading(false);
+            store.setAnalysisProgress({ current: 0, total: 0 });
+            onComplete?.();
+            return;
+          }
         }
 
         if (this.currentBatchId === active.batchId) {
