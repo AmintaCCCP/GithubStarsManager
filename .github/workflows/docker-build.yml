@@ -13,15 +13,18 @@ jobs:
   generate-tags:
     runs-on: ubuntu-24.04
     outputs:
-      version: ${{ steps.tags.outputs.version }}
+      frontend_version: ${{ steps.tags.outputs.frontend_version }}
+      backend_version: ${{ steps.tags.outputs.backend_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Generate tags
         id: tags
         run: |
-          VER=$(node -p "require('./package.json').version")
-          echo "version=$VER" >> $GITHUB_OUTPUT
+          FRONTEND_VER=$(node -p "require('./package.json').version")
+          BACKEND_VER=$(node -p "require('./server/package.json').version")
+          echo "frontend_version=$FRONTEND_VER" >> $GITHUB_OUTPUT
+          echo "backend_version=$BACKEND_VER" >> $GITHUB_OUTPUT
 
   build-frontend:
     needs: generate-tags
@@ -48,7 +51,7 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ needs.generate-tags.outputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:${{ needs.generate-tags.outputs.frontend_version }}
             ${{ env.FRONTEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -78,7 +81,7 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ needs.generate-tags.outputs.version }}-backend
+            ${{ env.BACKEND_IMAGE }}:${{ needs.generate-tags.outputs.backend_version }}-backend
             ${{ env.BACKEND_IMAGE }}:backend
           cache-from: type=gha
           cache-to: type=gha,mode=max

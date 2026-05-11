@@ -272,7 +272,13 @@ async function callAI(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<string> {
-  const apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+  let apiKey: string;
+  try {
+    apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+  } catch {
+    console.error('[analysis] Failed to decrypt AI API key');
+    throw new Error('Failed to decrypt AI API key');
+  }
   const apiType = (aiConfig.api_type as string) || 'openai';
   const baseUrl = aiConfig.base_url as string;
   const model = aiConfig.model as string;
@@ -343,8 +349,13 @@ async function callAI(
 
   if (result.status !== 200) {
     const errData = result.data as Record<string, unknown> | undefined;
-    console.error(`[analysis] AI API error details:`, errData);
-    const errorMsg = errData?.error?.message || errData?.message || 'Unknown error';
+    const errObj = errData?.error && typeof errData.error === 'object'
+      ? (errData.error as Record<string, unknown>)
+      : undefined;
+    const errorMsg = errObj?.message || errData?.message || 'Unknown error';
+    const requestId = typeof errData?.request_id === 'string' ? errData.request_id : undefined;
+    const errorCode = typeof errObj?.code === 'string' ? errObj.code : undefined;
+    console.error('[analysis] AI API error', { status: result.status, requestId, errorCode });
     throw new Error(`AI API returned ${result.status}: ${typeof errorMsg === 'string' ? errorMsg : 'Request failed'}`);
   }
 

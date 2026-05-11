@@ -16,9 +16,9 @@ npm run update-version 0.1.3 "修复搜索功能bug" "添加新的过滤选项" 
 ```
 
 这个命令会：
-- 更新 `package.json` 中的版本号
+- 更新 `package.json`（前端）和 `server/package.json`（后端）中的版本号
 - 在 `version-info.xml` 中添加新版本记录
-- 更新 `src/services/updateService.ts` 中的当前版本号
+- 后端 `/api/health` 接口会从 `server/package.json` 动态读取版本号
 
 ### 2. 手动更新（不推荐）
 
@@ -45,7 +45,7 @@ npm run update-version 0.1.3 "修复搜索功能bug" "添加新的过滤选项" 
 1. 使用 `npm run update-version` 更新版本信息
 2. 提交更改到 Git 仓库：
    ```bash
-   git add .
+   git add package.json server/package.json versions/version-info.xml
    git commit -m "chore: bump version to v0.1.3"
    git push origin main
    ```
