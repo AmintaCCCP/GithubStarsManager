@@ -1,34 +1,346 @@
-# CodeRabbit 全局配置
-language: Chinese
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# ──────────────────────────────────────────────
+# CodeRabbit 配置 — GithubStarsManager
+# 文档：https://docs.coderabbit.ai/guides/configure-coderabbit
+# ──────────────────────────────────────────────
+
+language: "zh-CN"
+
+tone_instructions: >
+  请用简洁专业的中文回复，重点关注代码质量、安全性和性能优化。
+  前端 React 18 + TypeScript + Vite + Tailwind CSS + Zustand。
+  后端 Express + better-sqlite3 (Node.js + TypeScript)。
+  注意暗色/亮色双主题兼容（dark: 前缀），以及移动端响应式布局。
+
+early_access: true
+enable_free_tier: true
+
+# ──────────────────────────────────────────────
+# 审查设置
+# ──────────────────────────────────────────────
 reviews:
-  auto_review: true
-  profile: balanced
+  profile: "chill"
+  request_changes_workflow: false
+
   high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  high_level_summary_in_walkthrough: true
+  changed_files_summary: true
+
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_prs: true
+
+  suggested_labels: true
+  auto_apply_labels: true
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+
   review_status: true
+  commit_status: true
+  fail_commit_status: false
+
+  collapse_walkthrough: true
+  review_details: true
+
   poem: false
-  walkthrough: true
+  in_progress_fortune: false
 
-# 自动总结 PR、代码解释
+  enable_prompt_for_ai_agents: true
+
+  # ── 标签规则 ──
+  labeling_instructions:
+    - label: "frontend"
+      instructions: "当 PR 包含 src/ 目录下的文件变更时应用此标签"
+    - label: "backend"
+      instructions: "当 PR 包含 server/ 目录下的文件变更时应用此标签"
+    - label: "docs"
+      instructions: "当 PR 仅包含 *.md 文件变更时应用此标签"
+    - label: "styles"
+      instructions: "当 PR 主要修改 CSS 文件或 Tailwind 样式时应用此标签"
+    - label: "bug"
+      instructions: "当 PR 标题或描述包含 fix/bugfix/修复 关键词时应用此标签"
+    - label: "feature"
+      instructions: "当 PR 标题或描述包含 feat/feature/新增 关键词时应用此标签"
+    - label: "docker"
+      instructions: "当 PR 包含 Dockerfile 或 docker-compose.yml 变更时应用此标签"
+    - label: "ci"
+      instructions: "当 PR 包含 .github/workflows/ 目录下的文件变更时应用此标签"
+
+  # ── 文件过滤 ──
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/data/**"
+    - "!**/package-lock.json"
+    - "!**/*.log"
+    - "!upload/**"
+    - "!templates/**"
+    - "!versions/**"
+
+  # ── 路径级审查指令 ──
+  path_instructions:
+    - path: "src/components/**"
+      instructions: >
+        React 组件目录（TypeScript + Tailwind CSS）。审查时请关注：
+        1. 是否同时兼容暗色（dark: 前缀）和亮色主题
+        2. 响应式布局是否完整（Tailwind 断点系统：sm/md/lg/xl）
+        3. Props 类型定义是否完整（TypeScript interface）
+        4. 组件是否保持单一职责
+        5. 无障碍访问（aria-label、role、键盘导航）
+        6. React.memo / useMemo / useCallback 的使用是否合理
+
+    - path: "src/components/settings/**"
+      instructions: >
+        设置面板组件。审查时请关注：
+        1. 表单状态管理和输入校验
+        2. 多语言文本处理（t(zh, en) 函数）
+        3. API 密钥/密码等敏感信息的输入框类型（type="password"）
+        4. 异步操作的状态反馈（loading/error/success）
+
+    - path: "src/components/ui/**"
+      instructions: >
+        通用 UI 组件。审查时请关注：
+        1. 组件的可复用性和可组合性
+        2. Props 接口的通用性
+        3. 暗色/亮色主题兼容
+
+    - path: "src/store/**"
+      instructions: >
+        Zustand 状态管理。审查时请关注：
+        1. 持久化存储（IndexedDB）的数据结构和版本迁移
+        2. Selector 的细粒度订阅（避免不必要的重渲染）
+        3. 敏感数据是否被持久化到客户端
+        4. 状态更新的原子性和一致性
+
+    - path: "src/services/**"
+      instructions: >
+        API 服务层。审查时请关注：
+        1. fetch 请求的超时处理（AbortController）
+        2. 错误处理和用户友好的错误信息翻译
+        3. API 密钥/Token 的传输安全性
+        4. 请求重试和降级策略
+        5. WebDAV/后端代理的 CORS 处理
+
+    - path: "src/hooks/**"
+      instructions: >
+        自定义 React Hooks。审查时请关注：
+        1. 依赖数组的正确性（useEffect/useCallback/useMemo）
+        2. 清理函数是否正确（避免内存泄漏）
+        3. 闭包陷阱（stale closure）
+
+    - path: "src/types/**"
+      instructions: >
+        TypeScript 类型定义。审查时请关注：
+        1. 类型定义的准确性和完整性
+        2. 是否合理使用 interface vs type
+        3. 泛型约束是否恰当
+
+    - path: "server/src/routes/**"
+      instructions: >
+        Express 路由层。审查时请关注：
+        1. 输入验证（req.body/req.params/req.query 的类型和范围检查）
+        2. SQL 注入防护（全部使用 ? 参数化查询，禁止字符串拼接）
+        3. 事务使用是否正确（批量操作应使用 db.transaction()）
+        4. 错误处理是否完善（try-catch + 统一错误响应格式）
+        5. 认证中间件是否正确应用（authMiddleware）
+        6. JSON 响应格式统一：{ data/error, code }
+
+    - path: "server/src/db/**"
+      instructions: >
+        better-sqlite3 数据访问层。审查时请关注：
+        1. 全部使用 ? 参数化查询，禁止字符串拼接
+        2. 数据库迁移的兼容性（addColumnIfMissing 模式）
+        3. WAL 模式和外键约束是否正确
+        4. 事务边界是否合理
+        5. 批量 INSERT 是否使用 db.transaction() 包裹
+
+    - path: "server/src/middleware/**"
+      instructions: >
+        Express 中间件。审查时请关注：
+        1. 认证逻辑的安全性（timingSafeEqual 防时序攻击）
+        2. 错误处理中间件的完整性
+        3. 中间件执行顺序是否正确
+
+    - path: "server/src/services/**"
+      instructions: >
+        后端服务层。审查时请关注：
+        1. 加密解密逻辑的正确性（AES-256-GCM）
+        2. 密钥管理和随机性
+        3. 错误处理不泄露敏感信息
+
+    - path: "nginx.conf"
+      instructions: >
+        Nginx 配置文件。审查时请关注：
+        1. 反向代理配置的正确性（/api/ → backend:3000）
+        2. CORS 头是否安全（避免反射任意 Origin）
+        3. 安全头（X-Frame-Options/X-XSS-Protection/X-Content-Type-Options）
+        4. 上传大小限制（client_max_body_size）
+        5. 代理超时设置
+
+    - path: "Dockerfile"
+      instructions: >
+        前端 Docker 构建（多阶段：node:18-alpine → nginx:alpine）。审查时请关注：
+        1. 构建阶段是否缓存了依赖层（npm ci）
+        2. 最终镜像体积
+        3. 非 root 用户运行（如适用）
+
+    - path: "server/Dockerfile"
+      instructions: >
+        后端 Docker 构建（多阶段：node:22-alpine → node:22-alpine）。审查时请关注：
+        1. npm prune --omit=dev 是否正确剥离开发依赖
+        2. 数据卷挂载是否正确（/app/data）
+        3. 非 root 用户运行（USER node）
+        4. 端口暴露（EXPOSE 3000）
+
+    - path: "docker-compose.yml"
+      instructions: >
+        Docker Compose 配置。审查时请关注：
+        1. 环境变量安全性（API_SECRET/ENCRYPTION_KEY 不应硬编码）
+        2. 卷挂载是否正确（数据持久化）
+        3. 服务依赖关系（depends_on）
+
+    - path: ".github/workflows/**"
+      instructions: >
+        GitHub Actions 工作流。审查时请关注：
+        1. 密钥/expose安全性（不应在日志中外泄）
+        2. 构建步骤的幂等性
+        3. 缓存策略是否合理
+
+  # ── 自动审查 ──
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "wip"
+    base_branches:
+      - "main"
+
+  # ── Anti-Slop 检测 ──
+  slop_detection:
+    enabled: true
+
+  # ── Finishing Touches ──
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+    simplify:
+      enabled: true
+
+  # ── Pre-merge 检查 ──
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: >
+        PR 标题应遵循 Conventional Commits 格式：
+        type(scope): description
+        类型包括：feat, fix, docs, style, refactor, perf, test, chore
+    description:
+      mode: "warning"
+    docstrings:
+      mode: "off"
+
+  # ── 工具配置 ──
+  tools:
+    # Node.js / TypeScript
+    eslint:
+      enabled: true
+
+    # Shell 脚本
+    shellcheck:
+      enabled: true
+
+    # Dockerfile
+    hadolint:
+      enabled: true
+
+    # Markdown 文档
+    markdownlint:
+      enabled: true
+
+    # YAML 配置
+    yamllint:
+      enabled: true
+
+    # GitHub Actions
+    actionlint:
+      enabled: true
+
+    # AST 语义分析
+    ast-grep:
+      essential_rules: true
+
+    # 安全扫描
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+
+    # GitHub 集成
+    github-checks:
+      enabled: true
+      timeout_ms: 120000
+
+    # 关闭不相关的语言/框架工具
+    biome:
+      enabled: false
+    ruff:
+      enabled: false
+    flake8:
+      enabled: false
+    phpstan:
+      enabled: false
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    checkov:
+      enabled: false
+    tflint:
+      enabled: false
+    detekt:
+      enabled: false
+    rubocop:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    pmd:
+      enabled: false
+    clang:
+      enabled: false
+    cppcheck:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+
+# ──────────────────────────────────────────────
+# 聊天设置
+# ──────────────────────────────────────────────
+chat:
+  auto_reply: true
+
+# ──────────────────────────────────────────────
+# 知识库
+# ──────────────────────────────────────────────
 knowledge_base:
-  enabled: true
-
-# 忽略不需要审查的文件
-ignore:
-  - "*.md"
-  - "docs/**"
-  - "static/**"
-  - "assets/**"
-  - "node_modules/**"
-  - "dist/**"
-  - "build/**"
-
-# 审查规则：风格、安全、性能
-rules:
-  style:
-    enabled: true
-  security:
-    enabled: true
-  performance:
-    enabled: true
-  best_practices:
-    enabled: true
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
