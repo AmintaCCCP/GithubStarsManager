@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, GitFork } from 'lucide-react';
 import { ForkRepo, WorkflowDefinition } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
+import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
 import { useDialog } from '../hooks/useDialog';
@@ -12,7 +12,6 @@ export const ForkTimeline: React.FC = () => {
   const {
     forks,
     readForks,
-    githubToken,
     language,
     setForks,
     addForks,
@@ -153,15 +152,14 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+    if (!backend.isAvailable) {
+      toast(language === 'zh' ? '后端服务未连接，请检查后端状态。' : 'Backend service not connected. Please check the backend status.', 'error');
       return;
     }
 
     setForkIsRefreshing(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
-      const newForks = await githubApi.getUserForks();
+      const newForks = await backend.getUserForks();
 
       // Merge with existing forks, preserving read status
       const existingForkMap = new Map(forks.map(f => [f.id, f]));
@@ -223,7 +221,7 @@ export const ForkTimeline: React.FC = () => {
         const [owner, repo] = fork.full_name.split('/');
         const branch = fork.default_branch || 'main';
         try {
-          const result = await githubApi.checkForkSyncNeeded(
+          const result = await backend.checkForkSyncNeeded(
             owner, 
             repo, 
             branch, 
@@ -294,13 +292,12 @@ export const ForkTimeline: React.FC = () => {
 
   const loadWorkflows = async (forkId: number) => {
     const fork = forks.find(f => f.id === forkId);
-    if (!fork || !githubToken) return;
+    if (!fork || !backend.isAvailable) return;
 
     setLoadingWorkflows(prev => new Set(prev).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
-      const githubApi = new GitHubApiService(githubToken);
-      const workflows = await githubApi.getRepositoryWorkflows(owner, repo);
+      const workflows = await backend.getRepositoryWorkflows(owner, repo);
       setWorkflowsMap(prev => ({ ...prev, [forkId]: workflows }));
     } catch (error) {
       console.error('Failed to load workflows:', error);
@@ -314,14 +311,14 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const handleSyncUpstream = async (fork: ForkRepo) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+    if (!backend.isAvailable) {
+      toast(language === 'zh' ? '后端服务未连接，请检查后端状态。' : 'Backend service not connected. Please check the backend status.', 'error');
       return;
     }
 
     const defaultBranch = fork.default_branch || 'main';
     const [owner, repo] = fork.full_name.split('/');
-    
+
     setSyncModal({
       isOpen: true,
       forkId: fork.id,
@@ -332,10 +329,9 @@ export const ForkTimeline: React.FC = () => {
     });
     setSyncModalBranches([]);
     setIsFetchingBranches(true);
-    
+
     try {
-      const githubApi = new GitHubApiService(githubToken);
-      const branches = await githubApi.getBranches(owner, repo);
+      const branches = await backend.getBranches(owner, repo);
       setSyncModalBranches(branches);
       if (branches.length > 0 && !branches.includes(defaultBranch)) {
         setSyncModal(prev => ({ ...prev, branch: branches[0] }));
@@ -346,7 +342,7 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const confirmSyncUpstream = async () => {
-    if (!githubToken || !syncModal.forkId) return;
+    if (!backend.isAvailable || !syncModal.forkId) return;
 
     const fork = forks.find(f => f.id === syncModal.forkId);
     if (!fork) return;
@@ -355,10 +351,9 @@ export const ForkTimeline: React.FC = () => {
 
     setSyncModal(prev => ({ ...prev, isOpen: false }));
     setSyncingForks(prev => new Set(prev).add(fork.id));
-    
+
     try {
-      const githubApi = new GitHubApiService(githubToken);
-      const result = await githubApi.syncFork(owner, repo, branch);
+      const result = await backend.syncFork(owner, repo, branch);
 
       // Mark fork as up-to-date in UI
       setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
@@ -408,8 +403,8 @@ export const ForkTimeline: React.FC = () => {
   };
 
   const handleRunWorkflow = async (forkId: number, workflowPath: string, workflowName: string) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+    if (!backend.isAvailable) {
+      toast(language === 'zh' ? '后端服务未连接，请检查后端状态。' : 'Backend service not connected. Please check the backend status.', 'error');
       return;
     }
 
@@ -420,8 +415,7 @@ export const ForkTimeline: React.FC = () => {
     setRunningWorkflows(prev => new Set(prev).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
-      const githubApi = new GitHubApiService(githubToken);
-      await githubApi.triggerWorkflowRun(owner, repo, workflowPath, branch);
+      await backend.triggerWorkflowRun(owner, repo, workflowPath, branch);
 
       toast(language === 'zh'
         ? `已触发工作流 "${workflowName}" 在 ${branch} 分支。`

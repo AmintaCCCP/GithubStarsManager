@@ -657,8 +657,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     try {
       switch (action) {
         case 'unstar': {
-          if (!githubToken) {
-            toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+          if (!backend.isAvailable) {
+            toast(language === 'zh' ? '后端服务未连接，请检查后端状态。' : 'Backend service not connected. Please check the backend status.', 'error');
             return;
           }
 
@@ -673,13 +673,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           );
           if (!confirmed) return;
 
-          const githubApi = new GitHubApiService(githubToken);
           const successIds: number[] = [];
 
           for (const repo of repos) {
             try {
               const [owner, name] = repo.full_name.split('/');
-              await githubApi.unstarRepository(owner, name);
+              await backend.unstarRepository(owner, name);
               successIds.push(repo.id);
             } catch (error) {
               console.error(`Failed to unstar ${repo.full_name}:`, error);

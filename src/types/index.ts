@@ -421,6 +421,11 @@ export interface SubscriptionChannel {
   enabled: boolean;
 }
 
+export interface TranslateResult {
+  translatedText: string;
+  detectedLanguage: string;
+}
+
 export const defaultSubscriptionChannels: SubscriptionChannel[] = [
   {
     id: 'most-stars',
