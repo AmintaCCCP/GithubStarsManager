@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Star, StarOff, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
-import type { DiscoveryRepo } from '../types';
+import type { DiscoveryRepo, Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
+import { backendAnalysis } from '../services/backendAnalysisService';
 import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
@@ -224,6 +226,64 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
     if (isAnalyzing) return;
 
+    // Backend-first: use server-side analysis if available
+    if (backend.isAvailable) {
+      setIsAnalyzing(true);
+
+      const allCategories = getAllCategories(customCategories, language);
+      const categoryNames = allCategories.map(c => c.name);
+
+      try {
+        await backend.syncRepositories([repo as Repository]);
+      } catch {
+        // Non-fatal
+      }
+
+      try {
+        await backendAnalysis.startBatchAnalysis({
+          repositoryIds: [repo.id],
+          configId: activeConfig.id,
+          language,
+          categoryNames,
+          onComplete: async () => {
+            try {
+              const { repositories: backendRepos } = await backend.fetchRepositories();
+              const updated = backendRepos.find(r => r.id === repo.id);
+              if (updated) {
+                const updatedRepo: DiscoveryRepo = {
+                  ...repo,
+                  ai_summary: updated.ai_summary,
+                  ai_tags: updated.ai_tags,
+                  ai_platforms: updated.ai_platforms,
+                  analyzed_at: updated.analyzed_at,
+                  analysis_failed: updated.analysis_failed || false,
+                };
+                updateDiscoveryRepo(updatedRepo);
+                if (onAnalyze) {
+                  onAnalyze(updatedRepo);
+                }
+              }
+            } catch {
+              // Non-fatal
+            }
+          },
+        });
+      } catch (err) {
+        console.error('Backend AI analysis error:', err);
+        const failedRepo: DiscoveryRepo = {
+          ...repo,
+          analyzed_at: new Date().toISOString(),
+          analysis_failed: true,
+        };
+        updateDiscoveryRepo(failedRepo);
+        toast(t('AI分析启动失败，请检查后端连接和AI配置。', 'AI analysis failed to start. Please check backend connection and AI configuration.'), 'error');
+      } finally {
+        setIsAnalyzing(false);
+      }
+      return;
+    }
+
+    // Frontend fallback
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -253,7 +313,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         analysis_failed: result.analysis_failed,
       };
       updateDiscoveryRepo(updatedRepo);
-      
+
       if (onAnalyze) {
         onAnalyze(updatedRepo);
       }
