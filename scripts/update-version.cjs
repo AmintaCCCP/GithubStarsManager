@@ -68,14 +68,11 @@ function updateVersionInfo() {
   }
 
   try {
-    // 更新 package.json
+    // 更新 package.json（前端）
     updatePackageJson(newVersion);
 
     // 更新 version-info.xml
     updateVersionXML(newVersion, changelog, customDownloadUrl);
-
-    // 更新 UpdateService 中的版本号
-    updateServiceVersion(newVersion);
 
     console.log(`✅ 版本已更新到 ${newVersion}`);
     console.log('📝 更新内容:');
@@ -94,13 +91,19 @@ function updateVersionInfo() {
 }
 
 function updatePackageJson(version) {
-  const packagePath = path.join(__dirname, '../package.json');
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  // 前端 package.json
+  const frontPath = path.join(__dirname, '../package.json');
+  const frontPkg = JSON.parse(fs.readFileSync(frontPath, 'utf8'));
+  frontPkg.version = version;
+  fs.writeFileSync(frontPath, JSON.stringify(frontPkg, null, 2) + '\n');
 
-  packageJson.version = version;
+  // 后端 package.json（Docker 镜像 tag 和 /api/health 的版本来源）
+  const serverPath = path.join(__dirname, '../server/package.json');
+  const serverPkg = JSON.parse(fs.readFileSync(serverPath, 'utf8'));
+  serverPkg.version = version;
+  fs.writeFileSync(serverPath, JSON.stringify(serverPkg, null, 2) + '\n');
 
-  fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
-  console.log(`📦 已更新 package.json 版本到 ${version}`);
+  console.log(`📦 已更新 package.json 和 server/package.json 版本到 ${version}`);
 }
 
 function updateVersionXML(version, changelog, customDownloadUrl) {
@@ -134,20 +137,6 @@ ${changelog.map(item => `      <item>${escapeXml(item)}</item>`).join('\n')}
 
   fs.writeFileSync(xmlPath, updatedXml);
   console.log(`📄 已更新 version-info.xml`);
-}
-
-function updateServiceVersion(version) {
-  const servicePath = path.join(__dirname, '../src/services/updateService.ts');
-  let serviceContent = fs.readFileSync(servicePath, 'utf8');
-
-  // 更新版本号
-  serviceContent = serviceContent.replace(
-    /return '\d+\.\d+\.\d+';/,
-    `return '${version}';`
-  );
-
-  fs.writeFileSync(servicePath, serviceContent);
-  console.log(`🔧 已更新 UpdateService 版本到 ${version}`);
 }
 
 function escapeXml(text) {
