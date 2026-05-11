@@ -343,7 +343,9 @@ async function callAI(
 
   if (result.status !== 200) {
     const errData = result.data as Record<string, unknown> | undefined;
-    throw new Error(`AI API returned ${result.status}: ${JSON.stringify(errData)}`);
+    console.error(`[analysis] AI API error details:`, errData);
+    const errorMsg = errData?.error?.message || errData?.message || 'Unknown error';
+    throw new Error(`AI API returned ${result.status}: ${typeof errorMsg === 'string' ? errorMsg : 'Request failed'}`);
   }
 
   return extractTextContent(apiType, result.data as Record<string, unknown>);
