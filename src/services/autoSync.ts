@@ -229,6 +229,7 @@ export async function syncToBackend(): Promise<void> {
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
+        github_token: state.githubToken,
       }),
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;

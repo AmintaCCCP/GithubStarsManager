@@ -259,11 +259,10 @@ async function fetchReadme(owner: string, repo: string): Promise<string> {
 // ── AI API call ──
 
 function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
-  const baseUrlWithSlash = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   try {
-    return new URL(pathWithVersion, baseUrlWithSlash).toString();
+    return new URL(pathWithVersion, new URL(baseUrl).origin).toString();
   } catch {
-    return `${baseUrlWithSlash}${pathWithVersion}`;
+    return `${baseUrl.replace(/\/$/, '')}/${pathWithVersion}`;
   }
 }
 
