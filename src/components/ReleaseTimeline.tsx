@@ -505,6 +505,9 @@ export const ReleaseTimeline: React.FC = () => {
       await backend.syncReleases(useAppStore.getState().releases);
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
+      // Revert backend: if the first call succeeded before the second failed,
+      // restore subscribed_to_releases to keep backend consistent with local rollback.
+      backend.updateRepository(repo.id, { subscribed_to_releases: true }).catch(() => {});
       updateRepository({ ...repo, subscribed_to_releases: true });
       const state = useAppStore.getState();
       useAppStore.setState({

@@ -209,10 +209,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     if (!confirmed) return;
 
+    const prevCategories = useAppStore.getState().customCategories;
     deleteCustomCategory(category.id);
     try {
       await backend.syncSettings({ customCategories: useAppStore.getState().customCategories });
     } catch {
+      useAppStore.setState({ customCategories: prevCategories });
       toast(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'), 'error');
     }
   };
