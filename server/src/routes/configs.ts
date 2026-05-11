@@ -426,7 +426,12 @@ router.get('/api/settings', (_req, res) => {
         settings.github_token_status = status;
       }
 
-      settings[key] = value;
+      // Try to parse JSON values back to objects/arrays
+      if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+        try { settings[key] = JSON.parse(value); } catch { settings[key] = value; }
+      } else {
+        settings[key] = value;
+      }
     }
 
     res.json(settings);
@@ -456,7 +461,7 @@ router.put('/api/settings', (req, res) => {
           value = encrypt(value, config.encryptionKey);
         }
 
-        stmt.run(key, value ?? null);
+        stmt.run(key, typeof value === 'string' ? value : value != null ? JSON.stringify(value) : null);
       }
     });
 
