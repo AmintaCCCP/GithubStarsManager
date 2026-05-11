@@ -217,6 +217,7 @@ class BackendAnalysisService {
       for (const id of saved.repositoryIds) {
         store.setAnalyzingRepository(id, true);
       }
+      store.setLoading(true);
       store.setAnalysisProgress({ current: active.completed + active.failed, total: active.total });
 
       this._isRunning = true;
@@ -261,6 +262,8 @@ class BackendAnalysisService {
               }
             }
 
+            store.setLoading(false);
+            store.setAnalysisProgress({ current: 0, total: 0 });
             onComplete?.();
             return;
           }
