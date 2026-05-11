@@ -472,13 +472,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const handlePauseResume = () => {
     if (!isAnalyzingRef.current) return;
 
-    // Backend analysis: pause = cancel
-    if (backendAnalysis.isRunning) {
-      shouldStopRef.current = true;
-      backendAnalysis.cancelBatchAnalysis();
-      setIsPaused(false);
-      return;
-    }
+    // Backend analysis doesn't support pause — use Stop instead
+    if (backendAnalysis.isRunning) return;
 
     const newPausedState = !isPaused;
     setIsPaused(newPausedState);
@@ -1196,8 +1191,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </span>
               <button
                 onClick={handlePauseResume}
-                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
-                title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
+                disabled={backendAnalysis.isRunning}
+                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={backendAnalysis.isRunning ? t('后端分析不支持暂停', 'Backend analysis does not support pause') : (isPaused ? t('继续', 'Resume') : t('暂停', 'Pause'))}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </button>

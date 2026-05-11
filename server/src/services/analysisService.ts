@@ -34,6 +34,20 @@ interface RepoInfo {
 // ── In-memory state ──
 
 const batches = new Map<string, AnalysisBatch>();
+const BATCH_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function cleanupBatches(): void {
+  const now = Date.now();
+  for (const [id, batch] of batches) {
+    if (batch.status !== 'running' && batch.completedAt) {
+      if (now - new Date(batch.completedAt).getTime() > BATCH_TTL_MS) {
+        batches.delete(id);
+      }
+    }
+  }
+}
+
+setInterval(cleanupBatches, 10 * 60 * 1000); // every 10 minutes
 
 function generateId(): string {
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -369,7 +383,7 @@ function repoInfoString(repo: RepoInfo, readmeContent: string, language: string)
     `${isZh ? '描述' : 'Description'}: ${repo.description || (isZh ? '无描述' : 'No description')}`,
     `${isZh ? '编程语言' : 'Programming Language'}: ${repo.language || (isZh ? '未知' : 'Unknown')}`,
     `${isZh ? 'Star数' : 'Stars'}: ${repo.stargazers_count}`,
-    `${isZh ? '主题标签' : 'Topics'}: ${(repo.topics ? JSON.parse(repo.topics).join(', ') : '') || (isZh ? '无' : 'None')}`,
+    `${isZh ? '主题标签' : 'Topics'}: ${(() => { try { return repo.topics ? JSON.parse(repo.topics).join(', ') : ''; } catch { return ''; } })() || (isZh ? '无' : 'None')}`,
     '',
     `${isZh ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:`,
     readmeContent.substring(0, 2000),

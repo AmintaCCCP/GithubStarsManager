@@ -373,7 +373,9 @@ class BackendAdapter {
   async getAnalysisProgress(batchId: string): Promise<{ batchId: string; status: string; total: number; completed: number; failed: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batch/${batchId}`);
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batch/${batchId}`, {
+      headers: this.getAuthHeaders(),
+    });
     if (!res.ok) await this.throwTranslatedError(res, 'Analysis progress error');
     return res.json() as Promise<{ batchId: string; status: string; total: number; completed: number; failed: number }>;
   }
