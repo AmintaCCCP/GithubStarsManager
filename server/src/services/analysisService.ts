@@ -272,7 +272,13 @@ async function callAI(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<string> {
-  const apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+  let apiKey: string;
+  try {
+    apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+  } catch {
+    console.error('[analysis] Failed to decrypt AI API key');
+    throw new Error('Failed to decrypt AI API key');
+  }
   const apiType = (aiConfig.api_type as string) || 'openai';
   const baseUrl = aiConfig.base_url as string;
   const model = aiConfig.model as string;

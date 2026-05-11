@@ -4,7 +4,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8'));
+let version = 'unknown';
+try {
+  const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8'));
+  version = pkg.version ?? 'unknown';
+} catch {
+  version = 'unknown';
+}
 
 const router = Router();
 
