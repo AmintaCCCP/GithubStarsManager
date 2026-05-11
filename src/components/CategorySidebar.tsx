@@ -10,7 +10,7 @@ import {
 import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
 import { CategoryEditModal } from './CategoryEditModal';
-import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
 import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 import { useDialog } from '../hooks/useDialog';
 
@@ -211,7 +211,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     deleteCustomCategory(category.id);
     try {
-      await forceSyncToBackend();
+      await backend.syncSettings({ customCategories: useAppStore.getState().customCategories });
     } catch {
       toast(t('删除分类失败，请检查后端连接。', 'Failed to delete category. Please check backend connection.'), 'error');
     }
@@ -231,7 +231,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     hideDefaultCategory(category.id);
     try {
-      await forceSyncToBackend();
+      await backend.syncSettings({ hiddenDefaultCategoryIds: useAppStore.getState().hiddenDefaultCategoryIds });
     } catch {
       showDefaultCategory(category.id);
       toast(t('隐藏分类失败，请检查后端连接。', 'Failed to hide category. Please check backend connection.'), 'error');
@@ -295,7 +295,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     updateRepository(nextRepo);
 
     try {
-      await forceSyncToBackend();
+      await backend.updateRepository(repository.id, {
+        custom_category: customCategoryValue,
+        category_locked: customCategoryValue !== undefined && customCategoryValue !== '',
+        last_edited: nextRepo.last_edited,
+      });
     } catch {
       handleSyncError(originalRepo);
     }

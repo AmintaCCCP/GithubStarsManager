@@ -5,7 +5,6 @@ import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
-import { forceSyncToBackend } from '../services/autoSync';
 import { backend } from '../services/backendAdapter';
 import { backendAnalysis } from '../services/backendAnalysisService';
 import { GitHubApiService } from '../services/githubApi';
@@ -579,7 +578,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       const [owner, repo] = repository.full_name.split('/');
       await githubApi.unstarRepository(owner, repo);
       deleteRepository(repository.id);
-      await forceSyncToBackend();
+      if (backend.isAvailable) {
+        backend.deleteRepository(repository.id).catch(() => { /* non-critical */ });
+      }
       const successMessage = language === 'zh'
         ? '已成功取消 Star'
         : 'Successfully unstarred';

@@ -3,7 +3,7 @@ import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, Chevron
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
-import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -501,7 +501,8 @@ export const ReleaseTimeline: React.FC = () => {
     removeReleasesByRepoId(repo.id);
 
     try {
-      await forceSyncToBackend();
+      await backend.updateRepository(repo.id, { subscribed_to_releases: false });
+      await backend.syncReleases(useAppStore.getState().releases);
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
       updateRepository({ ...repo, subscribed_to_releases: true });

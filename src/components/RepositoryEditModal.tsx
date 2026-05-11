@@ -3,7 +3,7 @@ import { Save, X, Plus, Lock, Unlock, RotateCcw, Bot, Edit3, FileText, Tag, Fold
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
-import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 
 interface RepositoryEditModalProps {
@@ -377,7 +377,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     updatedRepo.last_edited = new Date().toISOString();
 
     updateRepository(updatedRepo);
-    await forceSyncToBackend();
+    await backend.updateRepository(repository.id, {
+      custom_description: updatedRepo.custom_description,
+      custom_tags: updatedRepo.custom_tags,
+      custom_category: updatedRepo.custom_category,
+      category_locked: updatedRepo.category_locked,
+      last_edited: updatedRepo.last_edited,
+    });
     onClose();
   };
 
