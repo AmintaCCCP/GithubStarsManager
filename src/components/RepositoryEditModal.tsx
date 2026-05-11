@@ -3,8 +3,9 @@ import { Save, X, Plus, Lock, Unlock, RotateCcw, Bot, Edit3, FileText, Tag, Fold
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
-import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
+import { useDialog } from '../hooks/useDialog';
 
 interface RepositoryEditModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   repository
 }) => {
   const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, theme } = useAppStore();
+  const { toast } = useDialog();
 
   const [formData, setFormData] = useState({
     description: '',
@@ -376,9 +378,22 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     // 更新编辑时间
     updatedRepo.last_edited = new Date().toISOString();
 
+    const originalRepo = { ...repository };
     updateRepository(updatedRepo);
-    await forceSyncToBackend();
-    onClose();
+    try {
+      await backend.updateRepository(repository.id, {
+        custom_description: updatedRepo.custom_description,
+        custom_tags: updatedRepo.custom_tags,
+        custom_category: updatedRepo.custom_category,
+        category_locked: updatedRepo.category_locked,
+        last_edited: updatedRepo.last_edited,
+      });
+      onClose();
+    } catch (err) {
+      updateRepository(originalRepo);
+      console.error('Failed to save repository:', err);
+      toast(t('保存失败，请检查后端连接。', 'Failed to save. Please check backend connection.'), 'error');
+    }
   };
 
   const handleClose = () => {

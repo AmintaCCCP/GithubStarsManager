@@ -3,7 +3,6 @@ import { Star, StarOff, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, 
 import type { DiscoveryRepo, Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
-import { forceSyncToBackend } from '../services/autoSync';
 import { backend } from '../services/backendAdapter';
 import { backendAnalysis } from '../services/backendAnalysisService';
 import { GitHubApiService } from '../services/githubApi';
@@ -116,10 +115,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       const existingRepo = repositories.find(r => r.full_name === repo.full_name);
       if (existingRepo) {
         deleteRepository(existingRepo.id);
+        if (backend.isAvailable) {
+          backend.deleteRepository(existingRepo.id).catch(() => {});
+        }
       }
-      
-      await forceSyncToBackend();
-      
+
       // 操作成功，清除乐观状态
       setOptimisticStarred(null);
     } catch (error) {
@@ -175,8 +175,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         onStar(repo);
       }
       
-      await forceSyncToBackend();
-      
+      if (backend.isAvailable) {
+        backend.syncRepositories([repositoryToAdd]).catch(() => {});
+      }
+
       // 操作成功，清除乐观状态
       setOptimisticStarred(null);
 

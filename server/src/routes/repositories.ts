@@ -90,7 +90,7 @@ router.put('/api/repositories', (req, res) => {
       return;
     }
 
-    // 验证每个仓库的ID
+    // Validate each repository
     for (const repo of repositories) {
       if (!repo.id || typeof repo.id !== 'number' || repo.id <= 0) {
         res.status(400).json({ error: 'Each repository must have a valid positive integer id', code: 'INVALID_REPOSITORY_ID' });
@@ -156,9 +156,74 @@ router.put('/api/repositories', (req, res) => {
         deleteRepositoriesNotIn(placeholders).run(...repoIds);
       }
 
+      // Pre-fetch existing AI data to preserve it when incoming repo has no AI data
+      const existingAI = new Map<number, {
+        ai_summary: string | null;
+        ai_tags: string;
+        ai_platforms: string;
+        analyzed_at: string | null;
+        analysis_failed: number;
+      }>();
+      const ids = repositories.map(r => r.id).filter((id): id is number => typeof id === 'number');
+      if (ids.length > 0) {
+        const phs = ids.map(() => '?').join(', ');
+        const rows = db.prepare(
+          `SELECT id, ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed
+           FROM repositories WHERE id IN (${phs})`
+        ).all(...ids) as Array<{
+          id: number;
+          ai_summary: string | null;
+          ai_tags: string | null;
+          ai_platforms: string | null;
+          analyzed_at: string | null;
+          analysis_failed: number | null;
+        }>;
+        for (const row of rows) {
+          existingAI.set(row.id, {
+            ai_summary: row.ai_summary,
+            ai_tags: row.ai_tags ?? '[]',
+            ai_platforms: row.ai_platforms ?? '[]',
+            analyzed_at: row.analyzed_at,
+            analysis_failed: row.analysis_failed ?? 0,
+          });
+        }
+      }
+
       let count = 0;
       for (const repo of repositories) {
         const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
+        const existing = existingAI.get(repo.id as number);
+
+        // Preserve existing AI data field-by-field when incoming value is empty
+        const hasAnyIncomingAI =
+          (repo.ai_summary != null && repo.ai_summary !== '') ||
+          (Array.isArray(repo.ai_tags) && repo.ai_tags.length > 0) ||
+          (Array.isArray(repo.ai_platforms) && repo.ai_platforms.length > 0) ||
+          repo.analyzed_at != null ||
+          repo.analysis_failed === true ||
+          repo.analysis_failed === 1;
+
+        const hasIncomingSummary = repo.ai_summary != null && repo.ai_summary !== '';
+        const hasIncomingTags = Array.isArray(repo.ai_tags) && repo.ai_tags.length > 0;
+        const hasIncomingPlatforms = Array.isArray(repo.ai_platforms) && repo.ai_platforms.length > 0;
+        const hasIncomingAnalyzedAt = repo.analyzed_at != null;
+
+        const aiSummary = hasIncomingSummary
+          ? repo.ai_summary
+          : (existing?.ai_summary ?? null);
+        const aiTagsJson = hasIncomingTags
+          ? JSON.stringify(repo.ai_tags)
+          : (existing?.ai_tags ?? '[]');
+        const aiPlatformsJson = hasIncomingPlatforms
+          ? JSON.stringify(repo.ai_platforms)
+          : (existing?.ai_platforms ?? '[]');
+        const analyzedAt = hasIncomingAnalyzedAt
+          ? repo.analyzed_at
+          : (existing?.analyzed_at ?? null);
+        const analysisFailed = hasAnyIncomingAI
+          ? ((repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0)
+          : (existing?.analysis_failed ?? 0);
+
         stmt.run(
           repo.id, repo.name, repo.full_name, repo.description ?? null,
           repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
@@ -166,10 +231,10 @@ router.put('/api/repositories', (req, res) => {
           repo.starred_at ?? null,
           owner?.login ?? '', owner?.avatar_url ?? null,
           JSON.stringify(Array.isArray(repo.topics) ? repo.topics : []),
-          repo.ai_summary ?? null,
-          JSON.stringify(Array.isArray(repo.ai_tags) ? repo.ai_tags : []),
-          JSON.stringify(Array.isArray(repo.ai_platforms) ? repo.ai_platforms : []),
-          repo.analyzed_at ?? null, (repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0,
+          aiSummary,
+          aiTagsJson,
+          aiPlatformsJson,
+          analyzedAt, analysisFailed,
           repo.custom_description ?? null,
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
@@ -263,7 +328,7 @@ router.delete('/api/repositories/:id', (req, res) => {
     const deleteAll = db.transaction(() => {
       const releaseResult = deleteReleases.run(id);
       const repoResult = deleteRepo.run(id);
-      
+
       return {
         releasesDeleted: releaseResult.changes,
         repoDeleted: repoResult.changes
@@ -277,8 +342,8 @@ router.delete('/api/repositories/:id', (req, res) => {
       return;
     }
 
-    res.json({ 
-      deleted: true, 
+    res.json({
+      deleted: true,
       id,
       releasesDeleted: result.releasesDeleted
     });

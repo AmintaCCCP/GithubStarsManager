@@ -14,7 +14,7 @@ import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
-import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import { syncFromBackend, startAutoSync } from './services/autoSync';
 import { backendAnalysis } from './services/backendAnalysisService';
 import type { AppState } from './types';
 
@@ -104,7 +104,7 @@ function App() {
     return () => {
       cancelled = true;
       if (unsubscribe) {
-        stopAutoSync(unsubscribe);
+        unsubscribe();
       }
     };
   }, []);

@@ -198,15 +198,36 @@ class BackendAdapter {
 
   // === Data Sync ===
 
-  async syncRepositories(repos: Repository[]): Promise<void> {
+  async syncRepositories(repos: Repository[], isFullSync = false): Promise<void> {
     if (!this._backendUrl) return;
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ repositories: repos, isFullSync: true })
+      body: JSON.stringify({ repositories: repos, isFullSync })
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Sync repositories error');
+  }
+
+  async updateRepository(id: number, fields: Record<string, unknown>): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories/${id}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Update repository error');
+  }
+
+  async deleteRepository(id: number): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Delete repository error');
   }
 
   async fetchRepositories(): Promise<{ repositories: Repository[]; total: number }> {
@@ -283,7 +304,7 @@ class BackendAdapter {
   }
 
 
-  // === Settings (active selections) ===
+  // === Settings ===
 
   async syncSettings(settings: Record<string, unknown>): Promise<void> {
     if (!this._backendUrl) return;

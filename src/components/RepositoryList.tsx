@@ -13,7 +13,6 @@ import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptim
 import { backend } from '../services/backendAdapter';
 import { backendAnalysis } from '../services/backendAnalysisService';
 import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
-import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
 
 interface RepositoryListProps {
@@ -620,8 +619,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       }
     }
 
-    await forceSyncToBackend();
-
     const skipMsg = failedRepos.length > 0
       ? (language === 'zh'
         ? `\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
@@ -688,9 +685,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           // 仅删除成功 unstar 的仓库
           for (const repoId of successIds) {
             deleteRepository(repoId);
+            backend.deleteRepository(repoId).catch(() => {});
           }
-
-          await forceSyncToBackend();
           toast(language === 'zh'
             ? `成功取消 ${successIds.length} 个仓库的 Star`
             : `Successfully unstarred ${successIds.length} repositories`,
@@ -840,7 +836,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             const stats = optimizerRef.current!.getStats();
             console.log('Bulk AI Analysis Stats:', stats);
 
-            await forceSyncToBackend();
             toast(language === 'zh'
               ? `成功分析 ${successCount} 个仓库，失败 ${failedCount} 个 (平均响应: ${stats.averageResponseTime}ms)`
               : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`,
@@ -877,7 +872,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             }
           }
 
-          await forceSyncToBackend();
           toast(language === 'zh'
             ? `成功订阅 ${successCount} 个仓库的版本发布`
             : `Successfully subscribed to ${successCount} repositories releases`,
@@ -909,8 +903,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               failedRepos.push(repo.full_name);
             }
           }
-
-          await forceSyncToBackend();
 
           // 汇总结果显示
           const successCount = subscribedRepos.length - failedRepos.length;
@@ -954,7 +946,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             }
           }
 
-          await forceSyncToBackend();
           const skipMsg = skippedCount > 0
             ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个没有自定义分类的仓库` : `\n\nSkipped ${skippedCount} repositories without custom category`)
             : '';
@@ -992,7 +983,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             }
           }
 
-          await forceSyncToBackend();
           if (failedRepos.length > 0) {
             toast(language === 'zh'
               ? `成功解锁 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
@@ -1050,8 +1040,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         failedRepos.push(repo.full_name);
       }
     }
-
-    await forceSyncToBackend();
 
     // 汇总结果显示
     const successCount = selectedRepos.length - failedRepos.length;
