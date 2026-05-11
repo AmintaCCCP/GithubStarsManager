@@ -356,6 +356,37 @@ class BackendAdapter {
     }
   }
 
+  // === AI Analysis ===
+
+  async startAnalysis(repositoryIds: number[], configId: string, language: string, categoryNames: string[]): Promise<{ batchId: string; status: string; total: number }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batch`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ repositoryIds, configId, language, categoryNames }),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Start analysis error');
+    return res.json() as Promise<{ batchId: string; status: string; total: number }>;
+  }
+
+  async getAnalysisProgress(batchId: string): Promise<{ batchId: string; status: string; total: number; completed: number; failed: number }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batch/${batchId}`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Analysis progress error');
+    return res.json() as Promise<{ batchId: string; status: string; total: number; completed: number; failed: number }>;
+  }
+
+  async cancelAnalysis(batchId: string): Promise<void> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batch/${batchId}/cancel`, { method: 'POST', headers: this.getAuthHeaders() });
+    if (!res.ok) await this.throwTranslatedError(res, 'Cancel analysis error');
+  }
+
   // === GitHub Search Proxy ===
 
   async searchRepositories(queryParams: Record<string, string>): Promise<{ items: Repository[] }> {

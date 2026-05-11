@@ -10,6 +10,8 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
+import { backend } from '../services/backendAdapter';
+import { backendAnalysis } from '../services/backendAnalysisService';
 import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
@@ -323,6 +325,48 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     );
     if (!confirmed) return;
 
+    // Backend-first: use server-side analysis if available
+    if (backend.isAvailable) {
+      shouldStopRef.current = false;
+      isAnalyzingRef.current = true;
+      setLoading(true);
+      setAnalysisProgress({ current: 0, total: targetRepos.length });
+      setShowDropdown(false);
+      setIsPaused(false);
+
+      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+      const repoIds = targetRepos.map(r => r.id);
+
+      try {
+        await backendAnalysis.startBatchAnalysis({
+          repositoryIds: repoIds,
+          configId: activeConfig.id,
+          language,
+          categoryNames,
+          onProgress: (current, total) => {
+            setAnalysisProgress({ current, total });
+          },
+          onComplete: (completed, failed) => {
+            const message = shouldStopRef.current
+              ? t(`AI分析已停止！成功: ${completed}, 失败: ${failed}`, `AI analysis stopped! Success: ${completed}, Failed: ${failed}`)
+              : t(`AI分析完成！成功: ${completed}, 失败: ${failed}`, `AI analysis completed! Success: ${completed}, Failed: ${failed}`);
+            toast(message, 'success');
+          },
+        });
+      } catch (error) {
+        console.error('Backend AI analysis failed:', error);
+        toast(t('AI分析启动失败，请检查后端连接和AI配置。', 'AI analysis failed to start. Please check backend connection and AI configuration.'), 'error');
+      } finally {
+        isAnalyzingRef.current = false;
+        shouldStopRef.current = false;
+        setLoading(false);
+        setAnalysisProgress({ current: 0, total: 0 });
+        setIsPaused(false);
+      }
+      return;
+    }
+
+    // Frontend fallback
     // 重置状态
     shouldStopRef.current = false;
     isAnalyzingRef.current = true;
@@ -427,6 +471,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const handlePauseResume = () => {
     if (!isAnalyzingRef.current) return;
+
+    // Backend analysis doesn't support pause — use Stop instead
+    if (backendAnalysis.isRunning) return;
+
     const newPausedState = !isPaused;
     setIsPaused(newPausedState);
 
@@ -455,6 +503,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       { type: 'warning' }
     );
     if (confirmed) {
+      if (backendAnalysis.isRunning) {
+        shouldStopRef.current = true;
+        backendAnalysis.cancelBatchAnalysis();
+        setIsPaused(false);
+        return;
+      }
+
       shouldStopRef.current = true;
       // 中止优化器
       if (optimizerRef.current) {
@@ -672,12 +727,51 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             return;
           }
 
-          // 设置加载状态
+          // Backend-first: use server-side analysis if available
+          if (backend.isAvailable) {
+            shouldStopRef.current = false;
+            isAnalyzingRef.current = true;
+            setLoading(true);
+            setAnalysisProgress({ current: 0, total: repos.length });
+
+            const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+            const repoIds = repos.map(r => r.id);
+
+            try {
+              await backendAnalysis.startBatchAnalysis({
+                repositoryIds: repoIds,
+                configId: activeConfig.id,
+                language,
+                categoryNames,
+                onProgress: (current, total) => {
+                  setAnalysisProgress({ current, total });
+                },
+                onComplete: (completed, failed) => {
+                  toast(
+                    shouldStopRef.current
+                      ? t(`AI分析已停止！成功: ${completed}, 失败: ${failed}`, `AI analysis stopped! Success: ${completed}, Failed: ${failed}`)
+                      : t(`AI分析完成！成功: ${completed}, 失败: ${failed}`, `AI analysis completed! Success: ${completed}, Failed: ${failed}`),
+                    'success'
+                  );
+                },
+              });
+            } catch (error) {
+              console.error('Backend AI analysis failed:', error);
+              toast(t('AI分析启动失败，请检查后端连接和AI配置。', 'AI analysis failed to start. Please check backend connection and AI configuration.'), 'error');
+            } finally {
+              isAnalyzingRef.current = false;
+              shouldStopRef.current = false;
+              setLoading(false);
+              setAnalysisProgress({ current: 0, total: 0 });
+            }
+            break;
+          }
+
+          // Frontend fallback
           setLoading(true);
           isAnalyzingRef.current = true;
           setAnalysisProgress({ current: 0, total: repos.length });
 
-          // 创建优化器实例并保存到 ref
           optimizerRef.current = new AIAnalysisOptimizer({
             initialConcurrency: activeConfig.concurrency || 3,
             maxConcurrency: 10,
@@ -756,7 +850,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             console.error('Bulk AI analysis failed:', error);
             toast(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed', 'error');
           } finally {
-            // 确保状态重置
             optimizerRef.current = null;
             isAnalyzingRef.current = false;
             shouldStopRef.current = false;
@@ -1098,8 +1191,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </span>
               <button
                 onClick={handlePauseResume}
-                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
-                title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
+                disabled={backendAnalysis.isRunning}
+                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={backendAnalysis.isRunning ? t('后端分析不支持暂停', 'Backend analysis does not support pause') : (isPaused ? t('继续', 'Resume') : t('暂停', 'Pause'))}
+                aria-label={backendAnalysis.isRunning ? t('后端分析不支持暂停', 'Backend analysis does not support pause') : (isPaused ? t('继续', 'Resume') : t('暂停', 'Pause'))}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </button>

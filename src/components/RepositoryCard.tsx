@@ -6,6 +6,8 @@ import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
+import { backendAnalysis } from '../services/backendAnalysisService';
 import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
@@ -302,6 +304,34 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       }
     }
 
+    if (isAnalyzing) return;
+
+    // Backend-first: use server-side analysis if available
+    if (backend.isAvailable) {
+      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+
+      try {
+        await backendAnalysis.startBatchAnalysis({
+          repositoryIds: [repoId],
+          configId: activeConfig.id,
+          language,
+          categoryNames,
+          onComplete: (completed, failed) => {
+            const reanalysis = !!repository.analyzed_at;
+            const message = reanalysis
+              ? t('AI重新分析完成！', 'AI re-analysis completed!')
+              : t('AI分析完成！', 'AI analysis completed!');
+            toast(message, 'success');
+          },
+        });
+      } catch (error) {
+        console.error('Backend AI analysis failed:', error);
+        toast(t('AI分析启动失败，请检查后端连接和AI配置。', 'AI analysis failed to start. Please check backend connection and AI configuration.'), 'error');
+      }
+      return;
+    }
+
+    // Frontend fallback
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;

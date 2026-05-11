@@ -19,9 +19,12 @@ import {
   Calendar
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import type { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
+import { backend } from '../services/backendAdapter';
+import { backendAnalysis } from '../services/backendAnalysisService';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
 import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
@@ -494,6 +497,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
   const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
+  const shouldStopRef = useRef(false);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -770,6 +774,100 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
     setIsAnalyzing(true);
     setAnalysisState({ paused: false, aborted: false });
+
+    // Backend-first: use server-side analysis if available
+    if (backend.isAvailable) {
+      shouldStopRef.current = false;
+      const storeState = useAppStore.getState();
+      const allCategoryNames = storeState.customCategories.map(c => c.name);
+      const categoryNames = [
+        ...allCategoryNames,
+        ...(language === 'zh'
+          ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
+          : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
+      ];
+
+      setAnalysisProgress({ current: 0, total: unanalyzed.length });
+
+      try {
+        await backend.syncRepositories(unanalyzed as Repository[]);
+      } catch {
+        // Non-fatal: backend may already have these repos
+      }
+
+      try {
+        await backendAnalysis.startBatchAnalysis({
+          repositoryIds: unanalyzed.map(r => r.id),
+          configId: activeConfig.id,
+          language,
+          categoryNames,
+          onProgress: (current, total) => {
+            setAnalysisProgress({ current, total });
+          },
+          onComplete: async (completed, failed) => {
+            // Refresh discovery repos from backend to get AI results
+            try {
+              const { repositories: backendRepos } = await backend.fetchRepositories();
+              const repoMap = new Map(backendRepos.map(r => [r.id, r]));
+              for (const dRepo of unanalyzed) {
+                const updated = repoMap.get(dRepo.id);
+                if (updated) {
+                  const storeState = useAppStore.getState();
+                  const allCategoriesForResolution = [...storeState.customCategories];
+                  const resolvedCategory = resolveCategoryAssignment(
+                    updated,
+                    updated.ai_tags || [],
+                    allCategoriesForResolution
+                  );
+                  const wasCategoryLocked = !!dRepo.category_locked;
+                  updateDiscoveryRepo({
+                    ...dRepo,
+                    ai_summary: updated.ai_summary,
+                    ai_tags: updated.ai_tags,
+                    ai_platforms: updated.ai_platforms,
+                    custom_category: resolvedCategory,
+                    category_locked: wasCategoryLocked,
+                    analyzed_at: updated.analyzed_at,
+                    analysis_failed: updated.analysis_failed || false,
+                  });
+                  discoveryAnalysisStorage.saveAnalysis(dRepo.id, {
+                    ai_summary: updated.ai_summary,
+                    ai_tags: updated.ai_tags,
+                    ai_platforms: updated.ai_platforms,
+                    analyzed_at: updated.analyzed_at,
+                    analysis_failed: updated.analysis_failed || false,
+                  });
+                }
+              }
+            } catch {
+              // Non-fatal
+            }
+            toast(
+              shouldStopRef.current
+                ? t(
+                  `AI分析已停止！成功 ${completed} 个${failed > 0 ? `，失败 ${failed} 个` : ''}`,
+                  `AI analysis stopped! ${completed} succeeded${failed > 0 ? `, ${failed} failed` : ''}`
+                )
+                : t(
+                  `AI分析完成！成功 ${completed} 个${failed > 0 ? `，失败 ${failed} 个` : ''}`,
+                  `AI analysis complete! ${completed} succeeded${failed > 0 ? `, ${failed} failed` : ''}`
+                ),
+              completed === 0 ? 'error' : failed > 0 ? 'info' : 'success'
+            );
+          },
+        });
+      } catch (err) {
+        console.error('Backend AI analysis error:', err);
+        toast(t('AI分析启动失败，请检查后端连接和AI配置。', 'AI analysis failed to start. Please check backend connection and AI configuration.'), 'error');
+      } finally {
+        setIsAnalyzing(false);
+        setAnalysisOptimizer(null);
+        setAnalysisProgress({ current: 0, total: 0 });
+      }
+      return;
+    }
+
+    // Frontend fallback
     const storeState = useAppStore.getState();
     const allCategoriesForResolution = [
       ...storeState.customCategories,
@@ -875,6 +973,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
 
   const handleAbortAnalysis = useCallback(() => {
+    if (backendAnalysis.isRunning) {
+      shouldStopRef.current = true;
+      backendAnalysis.cancelBatchAnalysis();
+      return;
+    }
     analysisOptimizer?.abort();
     setAnalysisState(prev => ({ ...prev, aborted: true }));
   }, [analysisOptimizer]);
