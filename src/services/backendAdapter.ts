@@ -387,6 +387,16 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Cancel analysis error');
   }
 
+  async getActiveBatches(): Promise<Array<{ batchId: string; status: string; total: number; completed: number; failed: number; repositoryIds: number[] }>> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/analysis/batches/active`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Active batches error');
+    return res.json() as Promise<Array<{ batchId: string; status: string; total: number; completed: number; failed: number; repositoryIds: number[] }>>;
+  }
+
   // === GitHub Search Proxy ===
 
   async searchRepositories(queryParams: Record<string, string>): Promise<{ items: Repository[] }> {
