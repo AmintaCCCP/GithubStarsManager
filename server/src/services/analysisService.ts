@@ -344,7 +344,7 @@ async function callAI(
   if (result.status !== 200) {
     const errData = result.data as Record<string, unknown> | undefined;
     console.error(`[analysis] AI API error details:`, errData);
-    const errorMsg = errData?.error?.message || errData?.message || 'Unknown error';
+    const errorMsg = (errData?.error as Record<string, unknown>)?.message || errData?.message || 'Unknown error';
     throw new Error(`AI API returned ${result.status}: ${typeof errorMsg === 'string' ? errorMsg : 'Request failed'}`);
   }
 
