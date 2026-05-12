@@ -599,7 +599,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     const newState = !isSubscribed;
     toggleReleaseSubscription(repository.id);
     if (backend.isAvailable) {
-      backend.updateRepository(repository.id, { subscribed_to_releases: newState }).catch(() => {});
+      backend.updateRepository(repository.id, { subscribed_to_releases: newState })
+        .catch((err) => console.warn('Failed to sync subscription state:', err));
     }
   };
 

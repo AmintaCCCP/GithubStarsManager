@@ -172,13 +172,19 @@ class BackendAdapter {
 
   async fetchAllReleasesForRepo(owner: string, repo: string): Promise<Release[]> {
     const allReleases: Release[] = [];
+    const maxPages = 50;
     let page = 1;
 
-    while (true) {
-      const batch = await this.getRepositoryReleases(owner, repo, page, 30);
-      if (batch.length === 0) break;
-      allReleases.push(...batch);
-      if (batch.length < 30) break;
+    while (page <= maxPages) {
+      try {
+        const batch = await this.getRepositoryReleases(owner, repo, page, 30);
+        if (batch.length === 0) break;
+        allReleases.push(...batch);
+        if (batch.length < 30) break;
+      } catch (err) {
+        console.warn(`Release fetch failed for ${owner}/${repo} at page ${page}:`, err);
+        break;
+      }
       page++;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -237,9 +243,10 @@ class BackendAdapter {
             }
           }
 
-          releases.forEach(release => {
-            release.repository.id = repo.id;
-          });
+          releases = releases.map(release => ({
+            ...release,
+            repository: { ...release.repository, id: repo.id },
+          }));
 
           if (!includePreRelease) {
             releases = releases.filter(r => !r.prerelease);

@@ -782,6 +782,8 @@ export const useAppStore = create<AppState & AppActions>()(
         for (const repo of repositories) {
           if (repo.subscribed_to_releases) {
             nextReleaseSubscriptions.add(repo.id);
+          } else {
+            nextReleaseSubscriptions.delete(repo.id);
           }
         }
         return { repositories, searchResults: repositories, releaseSubscriptions: nextReleaseSubscriptions };
