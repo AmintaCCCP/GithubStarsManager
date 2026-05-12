@@ -266,10 +266,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
               model: cfg.model, customPrompt: cfg.customPrompt,
               useCustomPrompt: cfg.useCustomPrompt, concurrency: cfg.concurrency,
               reasoningEffort: cfg.reasoningEffort,
-              apiKey: cfg.apiKey || existing.apiKey, isActive: existing.isActive,
+              apiKey: (cfg.apiKey && cfg.apiKey !== '***') ? cfg.apiKey : existing.apiKey, isActive: existing.isActive,
             });
           } else {
-            addAIConfig({ ...cfg, apiKey: cfg.apiKey || '', isActive: cfg.isActive });
+            addAIConfig({ ...cfg, apiKey: (cfg.apiKey && cfg.apiKey !== '***') ? cfg.apiKey : '', isActive: cfg.isActive });
           }
         }
       }
@@ -288,11 +288,11 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           if (existing) {
             updateWebDAVConfig(cfg.id, {
               name: cfg.name, url: cfg.url, username: cfg.username,
-              path: cfg.path, password: cfg.password || existing.password,
+              path: cfg.path, password: (cfg.password && cfg.password !== '***') ? cfg.password : existing.password,
               isActive: existing.isActive,
             });
           } else {
-            addWebDAVConfig({ ...cfg, password: cfg.password || '', isActive: false });
+            addWebDAVConfig({ ...cfg, password: (cfg.password && cfg.password !== '***') ? cfg.password : '', isActive: false });
           }
         }
       }
@@ -472,7 +472,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           </div>
           <button
             onClick={triggerBackup}
-            disabled={isBackingUp || noActiveConfig}
+            disabled={isBackingUp || (!backend.isAvailable && noActiveConfig)}
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isBackingUp ? (
@@ -501,8 +501,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           {/* 备份文件列表 */}
           {backupFiles.length > 0 ? (
             <div className="mb-3">
+              <label htmlFor="backup-file-select" className="sr-only">{t('选择备份文件', 'Select backup file')}</label>
               <select
                 id="backup-file-select"
+                aria-label={t('选择备份文件', 'Select backup file')}
                 value={selectedFile}
                 onChange={(e) => setSelectedFile(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
