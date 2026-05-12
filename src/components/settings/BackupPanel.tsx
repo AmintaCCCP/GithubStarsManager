@@ -98,6 +98,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     }
     setAutoSaving(true);
     try {
+      // 启用自动备份时，先同步 WebDAV 配置到后端，确保校验时有活跃配置
+      if (autoEnabled) {
+        await backend.syncWebDAVConfigs(webdavConfigs);
+      }
       await backend.updateBackupSettings({
         auto_backup_enabled: autoEnabled,
         auto_backup_interval_hours: intervalHours,
@@ -147,7 +151,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         exportedAt: new Date().toISOString(),
         version: '1.0'
       };
-      const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const filename = `github-stars-backup-${new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '')}.json`;
       const success = await webdavService.uploadFile(filename, JSON.stringify(backupData, null, 2));
       if (success) {
         setLastBackup(new Date().toISOString());
@@ -178,8 +182,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         .sort()
         .reverse();
       setBackupFiles(backupFiles);
-      if (backupFiles.length > 0 && !selectedFile) {
+      if (backupFiles.length > 0 && (!selectedFile || !backupFiles.includes(selectedFile))) {
         setSelectedFile(backupFiles[0]);
+      } else if (backupFiles.length === 0) {
+        setSelectedFile('');
       }
     } catch (error) {
       toast(`${t('获取备份列表失败', 'Failed to load backup list')}: ${(error as Error).message}`, 'error');
@@ -217,6 +223,36 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       }
 
       const backupData = JSON.parse(backupContent);
+
+      // 兼容后端备份格式（snake_case → camelCase）
+      if (!backupData.aiConfigs && Array.isArray(backupData.ai_configs)) {
+        backupData.aiConfigs = (backupData.ai_configs as Record<string, unknown>[]).map((c: Record<string, unknown>) => ({
+          id: c.id, name: c.name,
+          apiType: c.api_type || c.apiType,
+          baseUrl: c.base_url || c.baseUrl,
+          model: c.model,
+          apiKey: c.api_key_encrypted ? '***' : (c.apiKey || ''),
+          customPrompt: c.custom_prompt || c.customPrompt,
+          useCustomPrompt: c.use_custom_prompt ?? c.useCustomPrompt,
+          concurrency: c.concurrency,
+          reasoningEffort: c.reasoning_effort || c.reasoningEffort,
+          isActive: c.is_active ?? c.isActive,
+        }));
+      }
+      if (!backupData.webdavConfigs && Array.isArray(backupData.webdav_configs)) {
+        backupData.webdavConfigs = (backupData.webdav_configs as Record<string, unknown>[]).map((c: Record<string, unknown>) => ({
+          id: c.id, name: c.name, url: c.url, username: c.username,
+          password: c.password_encrypted ? '***' : (c.password || ''),
+          path: c.path,
+          isActive: c.is_active ?? c.isActive,
+        }));
+      }
+      if (!backupData.customCategories && Array.isArray(backupData.categories)) {
+        backupData.customCategories = (backupData.categories as Record<string, unknown>[]).map((c: Record<string, unknown>) => ({
+          id: c.id, name: c.name,
+          isCustom: c.is_custom ?? c.isCustom ?? true,
+        }));
+      }
 
       if (Array.isArray(backupData.repositories)) {
         setRepositories(backupData.repositories);
@@ -301,6 +337,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         `已从 ${selectedFile} 恢复数据：仓库 ${backupData.repositories?.length ?? 0}，发布 ${backupData.releases?.length ?? 0}，自定义分类 ${backupData.customCategories?.length ?? 0}。`,
         `Restored from ${selectedFile}: repositories ${backupData.repositories?.length ?? 0}, releases ${backupData.releases?.length ?? 0}, custom categories ${backupData.customCategories?.length ?? 0}.`
       ), 'success');
+      await loadAutoStatus();
     } catch (error) {
       console.error('Restore failed:', error);
       toast(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`, 'error');
