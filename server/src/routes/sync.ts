@@ -2,82 +2,15 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { exportAllData } from '../services/backupService.js';
 
 const router = Router();
-
-function maskApiKey(key: string | null | undefined): string {
-  if (!key || typeof key !== 'string') return '';
-  if (key.length <= 4) return '****';
-  return '***' + key.slice(-4);
-}
 
 // POST /api/sync/export
 router.post('/api/sync/export', (_req, res) => {
   try {
     const db = getDb();
-
-    const repositories = db.prepare('SELECT * FROM repositories').all() as Record<string, unknown>[];
-    const releases = db.prepare('SELECT * FROM releases').all() as Record<string, unknown>[];
-    const categories = db.prepare('SELECT * FROM categories').all() as Record<string, unknown>[];
-    const assetFilters = db.prepare('SELECT * FROM asset_filters').all() as Record<string, unknown>[];
-
-    // AI configs — mask api_key
-    const aiConfigRows = db.prepare('SELECT * FROM ai_configs').all() as Record<string, unknown>[];
-    const aiConfigs = aiConfigRows.map((row) => {
-      const masked = { ...row };
-      if (masked.api_key_encrypted && typeof masked.api_key_encrypted === 'string') {
-        try {
-          masked.api_key_masked = maskApiKey(decrypt(masked.api_key_encrypted, config.encryptionKey));
-        } catch {
-          masked.api_key_masked = '****';
-        }
-      }
-      delete masked.api_key_encrypted;
-      return masked;
-    });
-
-    // WebDAV configs — mask password
-    const webdavRows = db.prepare('SELECT * FROM webdav_configs').all() as Record<string, unknown>[];
-    const webdavConfigs = webdavRows.map((row) => {
-      const masked = { ...row };
-      if (masked.password_encrypted && typeof masked.password_encrypted === 'string') {
-        try {
-          masked.password_masked = maskApiKey(decrypt(masked.password_encrypted, config.encryptionKey));
-        } catch {
-          masked.password_masked = '****';
-        }
-      }
-      delete masked.password_encrypted;
-      return masked;
-    });
-
-    // Settings — mask github_token
-    const settingsRows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
-    const settings: Record<string, unknown> = {};
-    for (const row of settingsRows) {
-      const key = row.key as string;
-      let value = row.value as string | null;
-      if (key === 'github_token' && value) {
-        try {
-          value = maskApiKey(decrypt(value, config.encryptionKey));
-        } catch {
-          value = '****';
-        }
-      }
-      settings[key] = value;
-    }
-
-    res.json({
-      version: 1,
-      exported_at: new Date().toISOString(),
-      repositories,
-      releases,
-      categories,
-      asset_filters: assetFilters,
-      ai_configs: aiConfigs,
-      webdav_configs: webdavConfigs,
-      settings,
-    });
+    res.json(exportAllData(db, true));
   } catch (err) {
     console.error('POST /api/sync/export error:', err);
     res.status(500).json({ error: 'Failed to export data', code: 'EXPORT_DATA_FAILED' });

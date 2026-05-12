@@ -531,6 +531,53 @@ export class WebDAVService {
     }
   }
 
+  async deleteFile(filename: string): Promise<boolean> {
+    try {
+      if (this.useProxy) {
+        const response = await this.proxyFetch('DELETE', this.getRelativePath(filename));
+        if (response.ok) return true;
+        if (response.status === 404) return false;
+        if (response.status === 401) throw new Error('身份验证失败。请检查用户名和密码。');
+        throw new Error(`删除失败，HTTP状态码 ${response.status}`);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        const response = await fetch(this.getFullPath(filename), {
+          method: 'DELETE',
+          headers: {
+            'Authorization': this.getAuthHeader(),
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) return true;
+        if (response.status === 404) return false;
+        if (response.status === 401) throw new Error('身份验证失败。请检查用户名和密码。');
+        throw new Error(`删除失败，HTTP状态码 ${response.status}: ${response.statusText}`);
+      } catch (fetchError: unknown) {
+        clearTimeout(timeoutId);
+
+        if ((fetchError as Error).name === 'AbortError') {
+          throw new Error('删除超时。请检查网络连接。');
+        }
+
+        throw fetchError;
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (err.message.includes('身份验证失败') ||
+          err.message.includes('删除超时')) {
+        throw error;
+      }
+      return this.handleNetworkError(error, '删除');
+    }
+  }
+
   private parsePropfindXml(xmlText: string): string[] {
     const collectionUrl = `${this.config.url}${this.basePath}`;
 
