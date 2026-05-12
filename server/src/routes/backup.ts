@@ -51,6 +51,10 @@ router.put('/api/backup/settings', (req, res) => {
 
     const errors: string[] = [];
 
+    if (auto_backup_enabled !== undefined && typeof auto_backup_enabled !== 'boolean') {
+      errors.push('auto_backup_enabled 必须为布尔类型');
+    }
+
     if (auto_backup_interval_hours !== undefined) {
       if (
         typeof auto_backup_interval_hours !== 'number' ||
