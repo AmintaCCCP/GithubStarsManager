@@ -355,7 +355,9 @@ const normalizePersistedState = (
       sortBy: safePersisted.searchFilters?.sortBy || 'stars',
       sortOrder: safePersisted.searchFilters?.sortOrder || 'desc',
     },
-    webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
+    webdavConfigs: Array.isArray(safePersisted.webdavConfigs)
+      ? safePersisted.webdavConfigs.map(c => ({ ...c, isActive: c.id === safePersisted.activeWebDAVConfig }))
+      : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -890,7 +892,10 @@ export const useAppStore = create<AppState & AppActions>()(
         webdavConfigs: state.webdavConfigs.filter(config => config.id !== id),
         activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig
       })),
-      setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
+      setActiveWebDAVConfig: (activeWebDAVConfig) => set((state) => ({
+        webdavConfigs: state.webdavConfigs.map(c => ({ ...c, isActive: c.id === activeWebDAVConfig })),
+        activeWebDAVConfig
+      })),
       setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
