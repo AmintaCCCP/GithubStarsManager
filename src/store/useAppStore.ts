@@ -355,7 +355,17 @@ const normalizePersistedState = (
       sortBy: safePersisted.searchFilters?.sortBy || 'stars',
       sortOrder: safePersisted.searchFilters?.sortOrder || 'desc',
     },
-    webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
+    webdavConfigs: (() => {
+      if (!Array.isArray(safePersisted.webdavConfigs)) return [];
+      return safePersisted.webdavConfigs.map(c => ({ ...c, isActive: c.id === safePersisted.activeWebDAVConfig }));
+    })(),
+    // 如果 activeWebDAVConfig 指向的配置已不存在，清除该引用
+    activeWebDAVConfig: (() => {
+      const configs = safePersisted.webdavConfigs;
+      const id = safePersisted.activeWebDAVConfig;
+      if (!id || !Array.isArray(configs)) return null;
+      return configs.some(c => c.id === id) ? id : null;
+    })(),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -890,7 +900,10 @@ export const useAppStore = create<AppState & AppActions>()(
         webdavConfigs: state.webdavConfigs.filter(config => config.id !== id),
         activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig
       })),
-      setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
+      setActiveWebDAVConfig: (activeWebDAVConfig) => set((state) => ({
+        webdavConfigs: state.webdavConfigs.map(c => ({ ...c, isActive: c.id === activeWebDAVConfig })),
+        activeWebDAVConfig
+      })),
       setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
