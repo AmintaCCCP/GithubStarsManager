@@ -78,10 +78,17 @@ class BackendAdapter {
   }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
+    let serverError: string | undefined;
     try {
-      const data = await res.json();
-      code = data.code;
+      const data = await res.json() as { code?: unknown; error?: unknown };
+      code = typeof data.code === 'string' ? data.code : undefined;
+      if (typeof data.error === 'string' && data.error.trim()) {
+        serverError = data.error.trim();
+      }
     } catch { /* body not JSON */ }
+    if (serverError) {
+      throw new Error(serverError);
+    }
     throw new Error(translateBackendError(code, `${fallbackPrefix}: ${res.status}`));
   }
 
