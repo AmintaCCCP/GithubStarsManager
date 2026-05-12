@@ -149,7 +149,7 @@ async function webdavDeleteFile(
   username: string,
   password: string,
   filePath: string
-): Promise<void> {
+): Promise<boolean> {
   const result = await proxyRequest({
     url: `${baseUrl}${filePath}`,
     method: 'DELETE',
@@ -158,9 +158,10 @@ async function webdavDeleteFile(
     },
     timeout: 15000,
   });
-  if (result.status < 200 || result.status >= 300) {
-    console.warn(`WebDAV DELETE ${filePath} returned HTTP ${result.status}`);
-  }
+  if (result.status >= 200 && result.status < 300) return true;
+  if (result.status === 404) return false;
+  console.warn(`WebDAV DELETE ${filePath} returned HTTP ${result.status}`);
+  return false;
 }
 
 function parsePropfindXml(xmlText: string): string[] {
@@ -217,16 +218,22 @@ async function cleanupOldBackups(
     const toDelete = backupFiles.slice(0, backupFiles.length - retentionCount);
     const basePath = dirPath.endsWith('/') ? dirPath : `${dirPath}/`;
 
+    let deletedCount = 0;
     for (const file of toDelete) {
       try {
-        await webdavDeleteFile(baseUrl, username, password, `${basePath}${file}`);
-        console.log(`[Backup] Deleted old backup: ${file}`);
+        const deleted = await webdavDeleteFile(baseUrl, username, password, `${basePath}${file}`);
+        if (deleted) {
+          deletedCount++;
+          console.log(`[Backup] Deleted old backup: ${file}`);
+        } else {
+          console.warn(`[Backup] Skip delete (not removed): ${file}`);
+        }
       } catch (err) {
         console.warn(`[Backup] Failed to delete ${file}:`, err);
       }
     }
 
-    return { deleted: toDelete.length, retained: backupFiles.length - toDelete.length };
+    return { deleted: deletedCount, retained: backupFiles.length - deletedCount };
   } catch (err) {
     console.warn('[Backup] Failed to cleanup old backups:', err);
     return { deleted: 0, retained: 0 };

@@ -37,6 +37,12 @@ router.get('/api/backup/settings', (_req, res) => {
 router.put('/api/backup/settings', (req, res) => {
   try {
     const db = getDb();
+
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      res.status(400).json({ error: '请求体格式无效', code: 'VALIDATION_FAILED' });
+      return;
+    }
+
     const { auto_backup_enabled, auto_backup_interval_hours, auto_backup_retention_count } = req.body as {
       auto_backup_enabled?: boolean;
       auto_backup_interval_hours?: number;
@@ -46,13 +52,25 @@ router.put('/api/backup/settings', (req, res) => {
     const errors: string[] = [];
 
     if (auto_backup_interval_hours !== undefined) {
-      if (typeof auto_backup_interval_hours !== 'number' || auto_backup_interval_hours < 1 || auto_backup_interval_hours > 720) {
+      if (
+        typeof auto_backup_interval_hours !== 'number' ||
+        !Number.isFinite(auto_backup_interval_hours) ||
+        !Number.isInteger(auto_backup_interval_hours) ||
+        auto_backup_interval_hours < 1 ||
+        auto_backup_interval_hours > 720
+      ) {
         errors.push('备份间隔必须在 1-720 小时之间');
       }
     }
 
     if (auto_backup_retention_count !== undefined) {
-      if (typeof auto_backup_retention_count !== 'number' || auto_backup_retention_count < 0 || auto_backup_retention_count > 365) {
+      if (
+        typeof auto_backup_retention_count !== 'number' ||
+        !Number.isFinite(auto_backup_retention_count) ||
+        !Number.isInteger(auto_backup_retention_count) ||
+        auto_backup_retention_count < 0 ||
+        auto_backup_retention_count > 365
+      ) {
         errors.push('保留份数必须在 0-365 之间（0 表示不限制）');
       }
     }

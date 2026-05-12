@@ -145,13 +145,14 @@ export const AutoBackupPanel: React.FC<AutoBackupPanelProps> = ({ t }) => {
 
       {/* Enable toggle */}
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label id="auto-backup-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('启用自动备份', 'Enable Auto Backup')}
         </label>
         <button
           type="button"
           role="switch"
           aria-checked={enabled}
+          aria-labelledby="auto-backup-label"
           disabled={noActiveConfig}
           onClick={() => setEnabled(!enabled)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
@@ -168,10 +169,11 @@ export const AutoBackupPanel: React.FC<AutoBackupPanelProps> = ({ t }) => {
 
       {/* Interval */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor="auto-backup-interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           {t('备份间隔（小时）', 'Backup Interval (Hours)')}
         </label>
         <input
+          id="auto-backup-interval"
           type="number"
           min={1}
           max={720}
@@ -186,10 +188,11 @@ export const AutoBackupPanel: React.FC<AutoBackupPanelProps> = ({ t }) => {
 
       {/* Retention */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor="auto-backup-retention" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           {t('保留最近份数', 'Retention Count')}
         </label>
         <input
+          id="auto-backup-retention"
           type="number"
           min={0}
           max={365}
