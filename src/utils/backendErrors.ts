@@ -51,6 +51,11 @@ const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   SYNC_AI_CONFIGS_FAILED: { zh: '同步 AI 配置失败', en: 'Failed to sync AI configs' },
   SYNC_WEBDAV_CONFIGS_FAILED: { zh: '同步 WebDAV 配置失败', en: 'Failed to sync WebDAV configs' },
   INVALID_REQUEST: { zh: '无效的请求', en: 'Invalid request' },
+  VALIDATION_FAILED: { zh: '请求参数校验失败', en: 'Request validation failed' },
+  UPDATE_BACKUP_SETTINGS_FAILED: { zh: '更新备份设置失败', en: 'Failed to update backup settings' },
+  FETCH_BACKUP_SETTINGS_FAILED: { zh: '获取备份设置失败', en: 'Failed to fetch backup settings' },
+  FETCH_BACKUP_STATUS_FAILED: { zh: '获取备份状态失败', en: 'Failed to fetch backup status' },
+  TRIGGER_BACKUP_FAILED: { zh: '触发备份失败', en: 'Failed to trigger backup' },
   FETCH_SETTINGS_FAILED: { zh: '获取设置失败', en: 'Failed to fetch settings' },
   UPDATE_SETTINGS_FAILED: { zh: '更新设置失败', en: 'Failed to update settings' },
   // Sync

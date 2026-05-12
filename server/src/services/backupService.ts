@@ -353,6 +353,12 @@ async function checkAndBackup(): Promise<void> {
   const activeConfig = await getActiveConfig();
   if (!activeConfig) return;
 
+  // 检测活跃配置是否变更，若变更则重置上次备份时间，确保新配置尽快备份
+  if (lastActiveConfigId !== activeConfig.id) {
+    lastBackupTime = null;
+    lastActiveConfigId = activeConfig.id;
+  }
+
   const intervalRow = db.prepare("SELECT value FROM settings WHERE key = 'auto_backup_interval_hours'").get() as { value: string } | undefined;
   const intervalHours = intervalRow ? parseInt(intervalRow.value, 10) || 24 : 24;
   const intervalMs = intervalHours * 3600 * 1000;
