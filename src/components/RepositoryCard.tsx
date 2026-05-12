@@ -595,6 +595,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     }
   };
 
+  const handleToggleSubscription = () => {
+    const newState = !isSubscribed;
+    toggleReleaseSubscription(repository.id);
+    if (backend.isAvailable) {
+      backend.updateRepository(repository.id, { subscribed_to_releases: newState })
+        .catch((err) => console.warn('Failed to sync subscription state:', err));
+    }
+  };
+
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -849,7 +858,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
           </SelectionAwareButton>
           <SelectionAwareButton
-            onClick={() => toggleReleaseSubscription(repository.id)}
+            onClick={handleToggleSubscription}
             selectionMode={selectionMode}
             className={`${isSubscribed
               ? 'bg-brand-indigo text-white shadow-sm dark:bg-brand-indigo/80 dark:text-white'

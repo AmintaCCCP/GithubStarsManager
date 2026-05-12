@@ -112,6 +112,42 @@ export const ForkTimeline: React.FC = () => {
   const startIndex = (clampedPage - 1) * itemsPerPage;
   const paginatedForks = filteredForks.slice(startIndex, startIndex + itemsPerPage);
 
+  // Auto-load forks on mount if empty
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  useEffect(() => {
+    if (initialLoadDone) return;
+    if (!backend.isAvailable) return;
+    if (forks.length > 0) {
+      setInitialLoadDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    const loadForks = async () => {
+      setForkIsRefreshing(true);
+      try {
+        const newForks = await backend.getUserForks();
+        if (cancelled) return;
+        if (newForks.length > 0) {
+          setForks(newForks);
+        }
+        setInitialLoadDone(true);
+      } catch {
+        // Silent fail on auto-load
+      } finally {
+        if (!cancelled) {
+          setForkIsRefreshing(false);
+        }
+      }
+    };
+    loadForks();
+
+    return () => { cancelled = true; };
+    // Only run on mount when backend becomes available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backend.isAvailable]);
+
   // Sync currentPage when data changes
   useEffect(() => {
     const maxPage = Math.max(totalPages, 1);

@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
@@ -16,7 +15,6 @@ export const ReleaseTimeline: React.FC = () => {
     repositories,
     releaseSubscriptions,
     readReleases,
-    githubToken,
     language,
     assetFilters,
     addReleases,
@@ -276,6 +274,50 @@ export const ReleaseTimeline: React.FC = () => {
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
   const paginatedRepositoryGroups = repositoryGroups.slice(startIndex, startIndex + itemsPerPage);
 
+  // Auto-load releases on mount if empty
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  useEffect(() => {
+    if (initialLoadDone) return;
+    if (!backend.isAvailable) return;
+    if (releases.length > 0) {
+      setInitialLoadDone(true);
+      return;
+    }
+
+    const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
+    if (subscribedRepos.length === 0) {
+      setInitialLoadDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    const loadReleases = async () => {
+      setReleaseIsRefreshing(true);
+      try {
+        const { releases: newReleases } = await backend.getMultipleRepositoryReleases(
+          subscribedRepos,
+          { includePreRelease }
+        );
+        if (cancelled) return;
+        if (newReleases.length > 0) {
+          addReleases(newReleases);
+        }
+        setInitialLoadDone(true);
+      } catch {
+        // Silent fail on auto-load
+      } finally {
+        if (!cancelled) {
+          setReleaseIsRefreshing(false);
+        }
+      }
+    };
+    loadReleases();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backend.isAvailable]);
+
   // 同步 currentPage 状态，确保始终在有效范围内
   useEffect(() => {
     const maxPage = Math.max(totalPages, 1);
@@ -298,24 +340,21 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+    if (!backend.isAvailable) {
+      toast(language === 'zh' ? '后端服务未连接，请检查后端状态。' : 'Backend service not connected. Please check the backend status.', 'error');
+      return;
+    }
+
+    const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
+
+    if (subscribedRepos.length === 0) {
+      toast(language === 'zh' ? '没有订阅的仓库。' : 'No subscribed repositories.', 'error');
       return;
     }
 
     setReleaseIsRefreshing(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
-      // Only fetch releases for repos that are subscribed to releases
-      const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
-
-      if (subscribedRepos.length === 0) {
-        toast(language === 'zh' ? '没有订阅的仓库。' : 'No subscribed repositories.', 'error');
-        return;
-      }
-
-      // Use the new getMultipleRepositoryReleases with options
-      const { releases: newReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
+      const { releases: newReleases, failedRepos } = await backend.getMultipleRepositoryReleases(
         subscribedRepos,
         { includePreRelease }
       );
