@@ -775,6 +775,90 @@ class BackendAdapter {
       followers: number;
     }> }>;
   }
+
+  // === Backup Settings ===
+
+  async fetchBackupSettings(): Promise<{
+    auto_backup_enabled: boolean;
+    auto_backup_interval_hours: number;
+    auto_backup_retention_count: number;
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/backup/settings`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch backup settings error');
+    return res.json() as Promise<{
+      auto_backup_enabled: boolean;
+      auto_backup_interval_hours: number;
+      auto_backup_retention_count: number;
+    }>;
+  }
+
+  async updateBackupSettings(settings: {
+    auto_backup_enabled?: boolean;
+    auto_backup_interval_hours?: number;
+    auto_backup_retention_count?: number;
+  }): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/backup/settings`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Update backup settings error');
+  }
+
+  async fetchBackupStatus(): Promise<{
+    lastBackupTime: string | null;
+    nextScheduledTime: string | null;
+    isEnabled: boolean;
+    activeConfigId: string | null;
+    activeConfigName: string | null;
+    intervalHours: number;
+    retentionCount: number;
+    isBackingUp: boolean;
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/backup/status`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch backup status error');
+    return res.json() as Promise<{
+      lastBackupTime: string | null;
+      nextScheduledTime: string | null;
+      isEnabled: boolean;
+      activeConfigId: string | null;
+      activeConfigName: string | null;
+      intervalHours: number;
+      retentionCount: number;
+      isBackingUp: boolean;
+    }>;
+  }
+
+  async triggerBackup(): Promise<{
+    success: boolean;
+    message: string;
+    backupTime?: string;
+    retainedCount?: number;
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/backup/trigger`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Trigger backup error');
+    return res.json() as Promise<{
+      success: boolean;
+      message: string;
+      backupTime?: string;
+      retainedCount?: number;
+    }>;
+  }
 }
 
 export const backend = new BackendAdapter();

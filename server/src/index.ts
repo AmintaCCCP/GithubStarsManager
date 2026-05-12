@@ -15,6 +15,8 @@ import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
 import analysisRouter from './routes/analysis.js';
+import backupRouter from './routes/backup.js';
+import { startBackupScheduler, stopBackupScheduler } from './services/backupService.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -42,6 +44,7 @@ export function createApp(): express.Express {
   app.use(proxyRouter);
 
   app.use(analysisRouter);
+  app.use(backupRouter);
 
   // Global error handler
   app.use(errorHandler);
@@ -54,6 +57,10 @@ function startServer(): void {
   const db = getDb();
   runMigrations(db);
   console.log('✅ Database initialized');
+
+  // Start auto-backup scheduler
+  startBackupScheduler();
+  console.log('✅ Backup scheduler started');
 
   const app = createApp();
 
@@ -68,6 +75,7 @@ function startServer(): void {
   const shutdown = () => {
     console.log('\n🛑 Shutting down...');
     server.close(() => {
+      stopBackupScheduler();
       closeDb();
       console.log('👋 Server stopped');
       process.exit(0);

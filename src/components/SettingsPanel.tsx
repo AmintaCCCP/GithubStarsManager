@@ -5,6 +5,7 @@ import {
   Bot,
   Cloud,
   Database,
+  Clock,
   Server,
   Package,
   X,
@@ -16,12 +17,13 @@ import {
   AIConfigPanel,
   WebDAVPanel,
   BackupPanel,
+  AutoBackupPanel,
   BackendPanel,
   CategoryPanel,
   DataManagementPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'auto-backup' | 'backend' | 'category' | 'data';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -268,6 +270,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       icon: <Database className="w-5 h-5" />,
     },
     {
+      id: 'auto-backup',
+      label: t('自动备份', 'Auto Backup'),
+      icon: <Clock className="w-5 h-5" />,
+    },
+    {
       id: 'backend',
       label: t('后端同步', 'Backend'),
       icon: <Server className="w-5 h-5" />,
@@ -295,6 +302,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <WebDAVPanel t={t} />;
         case 'backup':
           return <BackupPanel t={t} />;
+        case 'auto-backup':
+          return <AutoBackupPanel t={t} />;
         case 'backend':
           return <BackendPanel t={t} />;
         case 'category':
