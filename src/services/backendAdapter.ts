@@ -141,7 +141,7 @@ class BackendAdapter {
     }
   }
 
-  async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Record<string, unknown>[]> {
+  async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Release[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     try {
@@ -151,10 +151,113 @@ class BackendAdapter {
         body: JSON.stringify({ method: 'GET' })
       });
       if (!res.ok) return [];
-      return res.json() as Promise<Record<string, unknown>[]>;
+      const data = await res.json() as Record<string, unknown>[];
+      return data.map((r) => ({
+        id: r.id as number,
+        tag_name: r.tag_name as string,
+        name: (r.name || r.tag_name) as string,
+        body: (r.body || '') as string,
+        published_at: r.published_at as string,
+        html_url: r.html_url as string,
+        assets: (r.assets || []) as Release['assets'],
+        zipball_url: r.zipball_url as string | undefined,
+        tarball_url: r.tarball_url as string | undefined,
+        prerelease: (r.prerelease ?? false) as boolean,
+        repository: { id: 0, full_name: `${owner}/${repo}`, name: repo },
+      }));
     } catch {
       return [];
     }
+  }
+
+  async fetchAllReleasesForRepo(owner: string, repo: string): Promise<Release[]> {
+    const allReleases: Release[] = [];
+    let page = 1;
+
+    while (true) {
+      const batch = await this.getRepositoryReleases(owner, repo, page, 30);
+      if (batch.length === 0) break;
+      allReleases.push(...batch);
+      if (batch.length < 30) break;
+      page++;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allReleases;
+  }
+
+  async getMultipleRepositoryReleases(
+    repositories: { id: number; full_name: string; has_fetched_releases?: boolean; last_release_fetch_time?: string }[],
+    options: { includePreRelease?: boolean } = {}
+  ): Promise<{ releases: Release[]; failedRepos: { repoId: number; full_name: string; error: string }[] }> {
+    const { includePreRelease = true } = options;
+    const allReleases: Release[] = [];
+    const failedRepos: { repoId: number; full_name: string; error: string }[] = [];
+
+    const concurrency = 3;
+    let index = 0;
+
+    const workers = Array.from({ length: Math.min(concurrency, repositories.length) }, async () => {
+      while (true) {
+        const currentIndex = index++;
+        if (currentIndex >= repositories.length) break;
+
+        const repo = repositories[currentIndex];
+        const [owner, name] = repo.full_name.split('/');
+
+        try {
+          let releases: Release[];
+
+          if (!repo.has_fetched_releases) {
+            releases = await this.fetchAllReleasesForRepo(owner, name);
+          } else {
+            const sinceTime = repo.last_release_fetch_time
+              ? new Date(repo.last_release_fetch_time)
+              : null;
+
+            let page = 1;
+            releases = [];
+            while (true) {
+              const batch = await this.getRepositoryReleases(owner, name, page, 10);
+              if (batch.length === 0) break;
+
+              const fresh = sinceTime
+                ? batch.filter(r => new Date(r.published_at) > sinceTime)
+                : batch;
+
+              releases.push(...fresh);
+
+              if (
+                batch.length < 10 ||
+                (sinceTime && batch.some(r => new Date(r.published_at) <= sinceTime))
+              ) {
+                break;
+              }
+              page++;
+            }
+          }
+
+          releases.forEach(release => {
+            release.repository.id = repo.id;
+          });
+
+          if (!includePreRelease) {
+            releases = releases.filter(r => !r.prerelease);
+          }
+
+          allReleases.push(...releases);
+        } catch (error) {
+          failedRepos.push({
+            repoId: repo.id,
+            full_name: repo.full_name,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    return { releases: allReleases, failedRepos };
   }
 
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {

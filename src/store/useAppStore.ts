@@ -777,7 +777,15 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
 
       // Repository actions
-      setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
+      setRepositories: (repositories) => set((state) => {
+        const nextReleaseSubscriptions = new Set(state.releaseSubscriptions);
+        for (const repo of repositories) {
+          if (repo.subscribed_to_releases) {
+            nextReleaseSubscriptions.add(repo.id);
+          }
+        }
+        return { repositories, searchResults: repositories, releaseSubscriptions: nextReleaseSubscriptions };
+      }),
       updateRepository: (repo) => set((state) => {
         const updatedRepositories = state.repositories.map(r => r.id === repo.id ? repo : r);
         return {
