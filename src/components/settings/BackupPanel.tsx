@@ -363,7 +363,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                 onClick={() => setAutoEnabled(!autoEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                   noActiveConfig && !autoEnabled ? 'opacity-50 cursor-not-allowed' : ''
-                } ${autoEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                } ${autoEnabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                   autoEnabled ? 'translate-x-6' : 'translate-x-1'
@@ -415,7 +415,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             <button
               onClick={saveAutoSettings}
               disabled={autoSaving}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-brand-indigo hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <RotateCw className={`w-4 h-4 ${autoSaving ? 'animate-spin' : ''}`} />
               {autoSaving ? t('保存中...', 'Saving...') : t('保存设置', 'Save Settings')}
