@@ -222,8 +222,9 @@ class BackendAdapter {
               : null;
 
             let page = 1;
+            const maxPages = 50;
             releases = [];
-            while (true) {
+            while (page <= maxPages) {
               const batch = await this.getRepositoryReleases(owner, name, page, 10);
               if (batch.length === 0) break;
 
@@ -240,6 +241,7 @@ class BackendAdapter {
                 break;
               }
               page++;
+              await new Promise(resolve => setTimeout(resolve, 100));
             }
           }
 
