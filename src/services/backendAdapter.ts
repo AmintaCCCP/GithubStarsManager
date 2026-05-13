@@ -78,8 +78,8 @@ class BackendAdapter {
   }
 
   /**
-   * Retry wrapper with exponential backoff for transient network errors
-   * (ERR_CONNECTION_RESET, timeouts, abort).
+   * Retry wrapper with exponential backoff for transient network errors.
+   * Covers browser fetch (Chrome/Firefox/Safari) and Node.js undici fetch.
    */
   private async fetchWithRetry(url: string, options?: RequestInit, timeoutMs = 30000, maxRetries = 3): Promise<Response> {
     let lastError: Error | undefined;
@@ -90,10 +90,17 @@ class BackendAdapter {
         lastError = err as Error;
         const isRetryable =
           lastError.name === 'AbortError' ||
-          lastError.message?.includes('ERR_CONNECTION_RESET') ||
-          lastError.message?.includes('ERR_CONNECTION_CLOSED') ||
+          // Browser messages: Chrome/Edge "Failed to fetch", Firefox "NetworkError...", Safari "Load failed"
           lastError.message?.includes('Failed to fetch') ||
-          lastError.message?.includes('NetworkError');
+          lastError.message?.includes('NetworkError') ||
+          lastError.message?.includes('Load failed') ||
+          // Node.js undici: message is "fetch failed", real code is in error.cause
+          lastError.message === 'fetch failed' ||
+          (lastError as { cause?: { code?: string } }).cause?.code === 'ECONNRESET' ||
+          (lastError as { cause?: { code?: string } }).cause?.code === 'ECONNREFUSED' ||
+          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_SOCKET' ||
+          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_HEADERS_TIMEOUT';
         if (!isRetryable || attempt === maxRetries) throw lastError;
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
@@ -101,7 +108,7 @@ class BackendAdapter {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    throw lastError!;
+    throw lastError!; // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript control flow can't prove this is unreachable
   }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
