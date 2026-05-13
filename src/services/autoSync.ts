@@ -128,8 +128,20 @@ export async function syncFromBackend(): Promise<void> {
 
     // Update store then commit hash — hash only changes if setter succeeds
     if (changed.repos && reposResult.status === 'fulfilled') {
-      state.setRepositories(reposResult.value.repositories);
-      _lastHash.repos = hashes.repos;
+      const backendRepos = reposResult.value.repositories;
+      const localRepos = state.repositories;
+      // Distinguish first-ever sync (bootstrap) from an authoritative empty backend.
+      // On bootstrap the hash is still '' — preserve local cache and push it to backend.
+      // On subsequent syncs, accept the backend state even if empty (e.g. user cleared
+      // stars from another device).
+      const isBootstrapEmpty =
+        backendRepos.length === 0 && localRepos.length > 0 && _lastHash.repos === '';
+      if (isBootstrapEmpty) {
+        _hasPendingPush = true;
+      } else {
+        state.setRepositories(backendRepos);
+        _lastHash.repos = hashes.repos;
+      }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
       state.setReleases(releasesResult.value.releases);

@@ -3,6 +3,7 @@ import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, G
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { useDialog } from '../hooks/useDialog';
+import { forceSyncToBackend } from '../services/autoSync';
 
 export const Header: React.FC = () => {
   const {
@@ -100,6 +101,9 @@ export const Header: React.FC = () => {
       });
 
       setRepositories(mergedRepositories);
+
+      // Force-push to backend immediately (bypass 2s debounce) so data survives a page refresh
+      forceSyncToBackend().catch(console.error);
 
       // Note: Release fetching is now handled by the Refresh button in Release Timeline
       // Header sync only syncs the starred repos list
