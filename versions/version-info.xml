@@ -318,4 +318,19 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.7</downloadUrl>
   </version>
+  <version>
+    <number>0.5.8</number>
+    <releaseDate>2026-05-13</releaseDate>
+    <changelog>
+      <item>feat: Added data-translate attribute support to skip specific elements during AI translation. (PR #134, contribution by @SummerRay160)</item>
+      <item>fix: Fixed releases sync INSERT statement missing one placeholder, causing SqliteError on every release sync. (PR #140, contribution by @iamvicliu)</item>
+      <item>fix: Fixed better-sqlite3 RangeError when saving AI/WebDAV config objects — complex values are now properly JSON-serialized. (PR #140, contribution by @iamvicliu)</item>
+      <item>fix: Gemini thinking model support — raised maxTokens to 2048 for connection tests, extended timeout to 30s, and filtered out thinking trace parts from responses. (PR #140, contribution by @iamvicliu)</item>
+      <item>fix: Prevented starred repos from disappearing when page is refreshed within 2 seconds of sync by pushing data to backend immediately after fetching. (PR #142, contribution by @iamvicliu)</item>
+      <item>fix: Guard against empty backend response silently wiping locally-cached repos — local data is now preserved when backend returns empty. (PR #142, contribution by @iamvicliu)</item>
+      <item>fix: Disabled thinking chain for Xiaomi MiMo models to prevent reasoning content from leaking into analysis results. Fixes #127. (PR #143)</item>
+      <item>fix: Added automatic retry with exponential backoff for sync network errors (ERR_CONNECTION_RESET), increased frontend sync timeout from 30s to 120s, bumped nginx proxy timeouts to 300s with proxy_buffering off. Fixes #133. (PR #144)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.8</downloadUrl>
+  </version>
 </versions>
