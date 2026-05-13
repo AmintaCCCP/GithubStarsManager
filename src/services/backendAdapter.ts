@@ -76,6 +76,33 @@ class BackendAdapter {
       clearTimeout(timeoutId);
     }
   }
+
+  /**
+   * Retry wrapper with exponential backoff for transient network errors
+   * (ERR_CONNECTION_RESET, timeouts, abort).
+   */
+  private async fetchWithRetry(url: string, options?: RequestInit, timeoutMs = 30000, maxRetries = 3): Promise<Response> {
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.fetchWithTimeout(url, options, timeoutMs);
+      } catch (err) {
+        lastError = err as Error;
+        const isRetryable =
+          lastError.name === 'AbortError' ||
+          lastError.message?.includes('ERR_CONNECTION_RESET') ||
+          lastError.message?.includes('ERR_CONNECTION_CLOSED') ||
+          lastError.message?.includes('Failed to fetch') ||
+          lastError.message?.includes('NetworkError');
+        if (!isRetryable || attempt === maxRetries) throw lastError;
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
+        console.warn(`⚠️ Sync request failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`, lastError.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    throw lastError!;
+  }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
     try {
@@ -201,20 +228,20 @@ class BackendAdapter {
   async syncRepositories(repos: Repository[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories`, {
+    const res = await this.fetchWithRetry(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ repositories: repos, isFullSync: true })
-    });
+    }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync repositories error');
   }
 
   async fetchRepositories(): Promise<{ repositories: Repository[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/repositories?limit=10000`, {
+    const res = await this.fetchWithRetry(`${this._backendUrl}/repositories?limit=10000`, {
       headers: this.getAuthHeaders()
-    });
+    }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
     return res.json() as Promise<{ repositories: Repository[]; total: number }>;
   }
@@ -222,20 +249,20 @@ class BackendAdapter {
   async syncReleases(releases: Release[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases`, {
+    const res = await this.fetchWithRetry(`${this._backendUrl}/releases`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ releases })
-    });
+    }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync releases error');
   }
 
   async fetchReleases(): Promise<{ releases: Release[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases?limit=10000`, {
+    const res = await this.fetchWithRetry(`${this._backendUrl}/releases?limit=10000`, {
       headers: this.getAuthHeaders()
-    });
+    }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
     return res.json() as Promise<{ releases: Release[]; total: number }>;
   }
