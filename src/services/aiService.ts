@@ -79,6 +79,10 @@ export class AIService {
     return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
   }
 
+  private isMiMoModel(): boolean {
+    return this.config.model.trim().toLowerCase().includes('mimo');
+  }
+
   private async requestText(options: {
     system: string;
     user: string;
@@ -97,6 +101,7 @@ export class AIService {
         { role: 'user', content: options.user },
       ];
       const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
+      const isMiMoModel = this.isMiMoModel();
 
       const requestBody = apiType === 'openai-responses'
         ? {
@@ -105,6 +110,7 @@ export class AIService {
             temperature: options.temperature,
             max_output_tokens: options.maxTokens,
             ...(reasoning ? { reasoning } : {}),
+            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
           }
         : {
             model: this.config.model,
@@ -112,6 +118,7 @@ export class AIService {
             max_tokens: options.maxTokens,
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
             ...(!isDeepSeekReasoner && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
+            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
           };
 
       let data: Record<string, unknown>;
