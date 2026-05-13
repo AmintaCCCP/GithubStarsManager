@@ -121,6 +121,22 @@ router.put('/api/repositories', (req, res) => {
         res.status(400).json({ error: 'Each repository must have a valid non-negative stargazers_count', code: 'INVALID_STARGAZERS_COUNT' });
         return;
       }
+      if (repo.forks_count !== undefined && repo.forks_count !== null && (!Number.isInteger(repo.forks_count) || (repo.forks_count as number) < 0)) {
+        res.status(400).json({ error: 'forks_count must be a non-negative integer', code: 'INVALID_FORKS_COUNT' });
+        return;
+      }
+      if (repo.forks !== undefined && repo.forks !== null && (!Number.isInteger(repo.forks) || (repo.forks as number) < 0)) {
+        res.status(400).json({ error: 'forks must be a non-negative integer', code: 'INVALID_FORKS' });
+        return;
+      }
+      if (repo.last_release_fetch_time !== undefined && repo.last_release_fetch_time !== null && typeof repo.last_release_fetch_time !== 'string') {
+        res.status(400).json({ error: 'last_release_fetch_time must be a string or null', code: 'INVALID_LAST_RELEASE_FETCH_TIME' });
+        return;
+      }
+      if (repo.has_fetched_releases !== undefined && repo.has_fetched_releases !== null && ![true, false, 0, 1].includes(repo.has_fetched_releases as never)) {
+        res.status(400).json({ error: 'has_fetched_releases must be a boolean or 0/1', code: 'INVALID_HAS_FETCHED_RELEASES' });
+        return;
+      }
     }
 
     const stmt = db.prepare(`
@@ -269,6 +285,19 @@ router.patch('/api/repositories/:id', (req, res) => {
     const id = parseInt(req.params.id);
     const updates = req.body as Record<string, unknown>;
 
+    if (updates.forks_count !== undefined && updates.forks_count !== null && (!Number.isInteger(updates.forks_count) || (updates.forks_count as number) < 0)) {
+      res.status(400).json({ error: 'forks_count must be a non-negative integer', code: 'INVALID_FORKS_COUNT' });
+      return;
+    }
+    if (updates.forks !== undefined && updates.forks !== null && (!Number.isInteger(updates.forks) || (updates.forks as number) < 0)) {
+      res.status(400).json({ error: 'forks must be a non-negative integer', code: 'INVALID_FORKS' });
+      return;
+    }
+    if (updates.last_release_fetch_time !== undefined && updates.last_release_fetch_time !== null && typeof updates.last_release_fetch_time !== 'string') {
+      res.status(400).json({ error: 'last_release_fetch_time must be a string or null', code: 'INVALID_LAST_RELEASE_FETCH_TIME' });
+      return;
+    }
+
     const allowedFields: Record<string, (v: unknown) => unknown> = {
       ai_summary: (v) => v,
       ai_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
@@ -283,8 +312,8 @@ router.patch('/api/repositories/:id', (req, res) => {
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       description: (v) => v,
       name: (v) => v,
-      forks_count: (v) => (typeof v === 'number' ? v : 0),
-      forks: (v) => (typeof v === 'number' ? v : 0),
+      forks_count: (v) => v,
+      forks: (v) => v,
       last_release_fetch_time: (v) => v,
       has_fetched_releases: (v) => (v === true || v === 1) ? 1 : 0,
     };
