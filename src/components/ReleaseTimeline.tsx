@@ -943,7 +943,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onToggleReleaseNotes={() => toggleReleaseNotes(release.id)}
                 onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                 onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
-                onMarkAsRead={() => markReleaseAsRead(release.id)}
+                onMarkAsRead={() => { markReleaseAsRead(release.id); backend.markReleaseAsRead(release.id).catch(() => {}); }}
                 language={language}
                 formatFileSize={formatFileSize}
               />
@@ -1027,7 +1027,7 @@ export const ReleaseTimeline: React.FC = () => {
                             onToggleReleaseNotes={() => toggleReleaseNotes(release.id)}
                             onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                             onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
-                            onMarkAsRead={() => markReleaseAsRead(release.id)}
+                            onMarkAsRead={() => { markReleaseAsRead(release.id); backend.markReleaseAsRead(release.id).catch(() => {}); }}
                             language={language}
                             formatFileSize={formatFileSize}
                           />

@@ -584,6 +584,25 @@ class BackendAdapter {
     return res.json() as Promise<{ releases: Release[]; total: number }>;
   }
 
+  async markReleaseAsRead(releaseId: number): Promise<void> {
+    if (!this._backendUrl) return;
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases/${releaseId}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ is_read: true }),
+    });
+    if (!res.ok) console.warn(`Failed to mark release ${releaseId} as read on backend: ${res.status}`);
+  }
+
+  async markAllReleasesAsRead(): Promise<void> {
+    if (!this._backendUrl) return;
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/releases/mark-all-read`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) console.warn(`Failed to mark all releases as read on backend: ${res.status}`);
+  }
+
   async syncAIConfigs(configs: AIConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 

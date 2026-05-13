@@ -5,6 +5,9 @@ const migrations: Record<number, (db: Database.Database) => void> = {
   1: (db) => {
     initializeSchema(db);
   },
+  2: (db) => {
+    initializeSchema(db);
+  },
 };
 
 export function runMigrations(db: Database.Database): void {

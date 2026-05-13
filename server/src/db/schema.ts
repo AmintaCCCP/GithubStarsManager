@@ -39,7 +39,11 @@ export function initializeSchema(db: Database.Database): void {
       custom_category TEXT,
       category_locked INTEGER DEFAULT 0,
       last_edited TEXT,
-      subscribed_to_releases INTEGER DEFAULT 0
+      subscribed_to_releases INTEGER DEFAULT 0,
+      forks_count INTEGER DEFAULT 0,
+      forks INTEGER DEFAULT 0,
+      last_release_fetch_time TEXT,
+      has_fetched_releases INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS releases (
@@ -118,4 +122,8 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'asset_filters', 'description', 'TEXT');
   addColumnIfMissing(db, 'asset_filters', 'platform', 'TEXT');
   addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'forks_count', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'forks', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'last_release_fetch_time', 'TEXT');
+  addColumnIfMissing(db, 'repositories', 'has_fetched_releases', 'INTEGER DEFAULT 0');
 }

@@ -968,11 +968,18 @@ export const useAppStore = create<AppState & AppActions>()(
       markReleaseAsRead: (releaseId) => set((state) => {
         const newReadReleases = new Set(state.readReleases);
         newReadReleases.add(releaseId);
-        return { readReleases: newReadReleases };
+        const updatedReleases = state.releases.map(r =>
+          r.id === releaseId ? { ...r, is_read: true } : r
+        );
+        return { readReleases: newReadReleases, releases: updatedReleases };
       }),
       markAllReleasesAsRead: () => set((state) => {
-        const allReleaseIds = new Set(state.releases.map(r => r.id));
-        return { readReleases: allReleaseIds };
+        const allReleaseIds = state.releases.map(r => r.id);
+        const updatedReleases = state.releases.map(r => ({ ...r, is_read: true }));
+        return {
+          readReleases: new Set(allReleaseIds),
+          releases: updatedReleases,
+        };
       }),
 
       // Category actions

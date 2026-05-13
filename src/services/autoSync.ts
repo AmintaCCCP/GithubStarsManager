@@ -111,6 +111,15 @@ export async function syncFromBackend(): Promise<void> {
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
       state.setReleases(releasesResult.value.releases);
+      // Merge backend is_read into local readReleases Set
+      const backendReadIds = releasesResult.value.releases
+        .filter((r: { is_read?: boolean; id: number }) => r.is_read)
+        .map((r: { is_read?: boolean; id: number }) => r.id);
+      if (backendReadIds.length > 0) {
+        const latestReadReleases = useAppStore.getState().readReleases;
+        const merged = new Set([...latestReadReleases, ...backendReadIds]);
+        useAppStore.setState({ readReleases: merged });
+      }
       _lastHash.releases = hashes.releases;
     }
     if (changed.ai && aiResult.status === 'fulfilled') {

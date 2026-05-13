@@ -24,6 +24,10 @@ export interface RepositoryRow {
   category_locked: number;
   last_edited: string | null;
   subscribed_to_releases: number;
+  forks_count: number;
+  forks: number;
+  last_release_fetch_time: string | null;
+  has_fetched_releases: number;
 }
 
 export interface ReleaseRow {

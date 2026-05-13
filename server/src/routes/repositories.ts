@@ -21,6 +21,8 @@ function transformRepo(row: Record<string, unknown>) {
     description: row.description,
     html_url: row.html_url,
     stargazers_count: row.stargazers_count,
+    forks_count: row.forks_count ?? 0,
+    forks: row.forks ?? 0,
     language: row.language,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -39,6 +41,8 @@ function transformRepo(row: Record<string, unknown>) {
     category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
+    last_release_fetch_time: row.last_release_fetch_time ?? undefined,
+    has_fetched_releases: !!row.has_fetched_releases,
   };
 }
 
@@ -126,8 +130,9 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases,
+        forks_count, forks, last_release_fetch_time, has_fetched_releases
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -238,7 +243,11 @@ router.put('/api/repositories', (req, res) => {
           repo.custom_description ?? null,
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
-          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0
+          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
+          repo.forks_count ?? 0,
+          repo.forks ?? 0,
+          repo.last_release_fetch_time ?? null,
+          (repo.has_fetched_releases === true || repo.has_fetched_releases === 1) ? 1 : 0
         );
         count++;
       }
@@ -274,6 +283,10 @@ router.patch('/api/repositories/:id', (req, res) => {
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       description: (v) => v,
       name: (v) => v,
+      forks_count: (v) => (typeof v === 'number' ? v : 0),
+      forks: (v) => (typeof v === 'number' ? v : 0),
+      last_release_fetch_time: (v) => v,
+      has_fetched_releases: (v) => (v === true || v === 1) ? 1 : 0,
     };
 
     const setClauses: string[] = [];
