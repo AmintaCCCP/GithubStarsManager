@@ -130,10 +130,15 @@ export async function syncFromBackend(): Promise<void> {
     if (changed.repos && reposResult.status === 'fulfilled') {
       const backendRepos = reposResult.value.repositories;
       const localRepos = state.repositories;
-      // Don't overwrite a non-empty local store with an empty backend response.
-      // This prevents the initial syncFromBackend call from wiping locally-cached
-      // repos before the user has had a chance to push them to the backend.
-      if (backendRepos.length > 0 || localRepos.length === 0) {
+      // Distinguish first-ever sync (bootstrap) from an authoritative empty backend.
+      // On bootstrap the hash is still '' — preserve local cache and push it to backend.
+      // On subsequent syncs, accept the backend state even if empty (e.g. user cleared
+      // stars from another device).
+      const isBootstrapEmpty =
+        backendRepos.length === 0 && localRepos.length > 0 && _lastHash.repos === '';
+      if (isBootstrapEmpty) {
+        _hasPendingPush = true;
+      } else {
         state.setRepositories(backendRepos);
         _lastHash.repos = hashes.repos;
       }

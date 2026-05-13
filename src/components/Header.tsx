@@ -103,7 +103,7 @@ export const Header: React.FC = () => {
       setRepositories(mergedRepositories);
 
       // Force-push to backend immediately (bypass 2s debounce) so data survives a page refresh
-      void forceSyncToBackend();
+      forceSyncToBackend().catch(console.error);
 
       // Note: Release fetching is now handled by the Refresh button in Release Timeline
       // Header sync only syncs the starred repos list
