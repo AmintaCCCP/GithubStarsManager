@@ -100,7 +100,7 @@ router.put('/api/releases', (req, res) => {
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
         zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const upsert = db.transaction(() => {

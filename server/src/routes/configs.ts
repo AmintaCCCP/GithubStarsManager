@@ -456,7 +456,15 @@ router.put('/api/settings', (req, res) => {
           value = encrypt(value, config.encryptionKey);
         }
 
-        stmt.run(key, value ?? null);
+        // better-sqlite3 interprets objects/arrays as named parameter maps,
+        // causing RangeError. Serialize non-primitive values to JSON strings.
+        const serialized =
+          value === null || value === undefined
+            ? null
+            : typeof value === 'object'
+              ? JSON.stringify(value)
+              : value;
+        stmt.run(key, serialized);
       }
     });
 
