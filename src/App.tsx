@@ -20,29 +20,46 @@ import type { AppState } from './types';
 const RepositoriesView = React.memo(({ 
   repositories, 
   searchResults, 
+  searchFilters,
   selectedCategory, 
   onCategorySelect 
 }: { 
   repositories: AppState['repositories'];
   searchResults: AppState['searchResults'];
+  searchFilters: AppState['searchFilters'];
   selectedCategory: string;
   onCategorySelect: (category: string) => void;
-}) => (
-  <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-    <CategorySidebar 
-      repositories={repositories}
-      selectedCategory={selectedCategory}
-      onCategorySelect={onCategorySelect}
-    />
-    <div className="flex-1 space-y-6">
-      <SearchBar />
-      <RepositoryList 
-        repositories={searchResults.length > 0 ? searchResults : repositories}
+}) => {
+  const hasActiveSearchFilters =
+    !!searchFilters.query.trim() ||
+    searchFilters.languages.length > 0 ||
+    searchFilters.tags.length > 0 ||
+    searchFilters.platforms.length > 0 ||
+    searchFilters.minStars !== undefined ||
+    searchFilters.maxStars !== undefined ||
+    searchFilters.isAnalyzed !== undefined ||
+    searchFilters.isSubscribed !== undefined ||
+    searchFilters.isEdited !== undefined ||
+    searchFilters.isCategoryLocked !== undefined ||
+    searchFilters.analysisFailed !== undefined;
+
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <CategorySidebar
+        repositories={repositories}
         selectedCategory={selectedCategory}
+        onCategorySelect={onCategorySelect}
       />
+      <div className="flex-1 space-y-6">
+        <SearchBar />
+        <RepositoryList
+          repositories={hasActiveSearchFilters ? searchResults : repositories}
+          selectedCategory={selectedCategory}
+        />
+      </div>
     </div>
-  </div>
-));
+  );
+});
 RepositoriesView.displayName = 'RepositoriesView';
 
 const ReleasesView = React.memo(() => <ReleaseTimeline />);
@@ -62,6 +79,7 @@ function App() {
     theme,
     hasHydrated,
     searchResults,
+    searchFilters,
     repositories,
     setSelectedCategory,
   } = useAppStore();
@@ -115,6 +133,7 @@ function App() {
           <RepositoriesView
             repositories={repositories}
             searchResults={searchResults}
+            searchFilters={searchFilters}
             selectedCategory={selectedCategory}
             onCategorySelect={handleCategorySelect}
           />
@@ -134,7 +153,7 @@ function App() {
       default:
         return null;
     }
-  }, [currentView, repositories, searchResults, selectedCategory, handleCategorySelect]);
+  }, [currentView, repositories, searchResults, searchFilters, selectedCategory, handleCategorySelect]);
 
   // Show loading state while store is hydrating to ensure correct theme is applied
   if (!hasHydrated) {
