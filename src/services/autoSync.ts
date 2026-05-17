@@ -1,5 +1,6 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
+import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
 
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
@@ -139,7 +140,7 @@ export async function syncFromBackend(): Promise<void> {
       if (isBootstrapEmpty) {
         _hasPendingPush = true;
       } else {
-        state.setRepositories(backendRepos);
+        state.setRepositories(mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos));
         _lastHash.repos = hashes.repos;
       }
     }
