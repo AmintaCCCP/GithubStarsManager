@@ -39,6 +39,10 @@ function hasActiveSearchFilters(filters: SearchFilters): boolean {
   );
 }
 
+/**
+ * Main repository view combining category sidebar, search bar, and repository list.
+ * Switches between search results and full list based on active search filters.
+ */
 const RepositoriesView = React.memo(({
   repositories,
   searchResults,

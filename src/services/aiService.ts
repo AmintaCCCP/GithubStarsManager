@@ -629,6 +629,16 @@ Focus on practicality and accurate categorization to help users quickly understa
     return this.performBasicSearch(repositories, query);
   }
 
+  /**
+   * Search repositories using AI semantic search with fallback to enhanced basic search.
+   * Attempts to call the configured AI service to parse search intent and extract
+   * multilingual keywords, then delegates to performEnhancedSearch. Falls back to
+   * performEnhancedBasicSearch with intelligent ranking if AI is unavailable or fails.
+   *
+   * @param repositories - The full list of repositories to search
+   * @param query - The user's search query string
+   * @returns Filtered and ranked repositories matching the query
+   */
   async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
     console.log('🤖 AI Service: Starting enhanced search for:', query);
     if (!query.trim()) return repositories;
