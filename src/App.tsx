@@ -15,33 +15,44 @@ import { useAutoUpdateCheck } from './components/UpdateChecker';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
-import type { AppState } from './types';
+import type { AppState, SearchFilters } from './types';
 
-const RepositoriesView = React.memo(({ 
-  repositories, 
-  searchResults, 
+/**
+ * Check if any search/filter/sort condition is active (non-default).
+ * Used to decide whether to display searchResults or the full repository list.
+ */
+function hasActiveSearchFilters(filters: SearchFilters): boolean {
+  return (
+    !!filters.query.trim() ||
+    filters.languages.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.platforms.length > 0 ||
+    filters.minStars !== undefined ||
+    filters.maxStars !== undefined ||
+    filters.isAnalyzed !== undefined ||
+    filters.isSubscribed !== undefined ||
+    filters.isEdited !== undefined ||
+    filters.isCategoryLocked !== undefined ||
+    filters.analysisFailed !== undefined ||
+    filters.sortBy !== 'stars' ||
+    filters.sortOrder !== 'desc'
+  );
+}
+
+const RepositoriesView = React.memo(({
+  repositories,
+  searchResults,
   searchFilters,
-  selectedCategory, 
-  onCategorySelect 
-}: { 
+  selectedCategory,
+  onCategorySelect
+}: {
   repositories: AppState['repositories'];
   searchResults: AppState['searchResults'];
   searchFilters: AppState['searchFilters'];
   selectedCategory: string;
   onCategorySelect: (category: string) => void;
 }) => {
-  const hasActiveSearchFilters =
-    !!searchFilters.query.trim() ||
-    searchFilters.languages.length > 0 ||
-    searchFilters.tags.length > 0 ||
-    searchFilters.platforms.length > 0 ||
-    searchFilters.minStars !== undefined ||
-    searchFilters.maxStars !== undefined ||
-    searchFilters.isAnalyzed !== undefined ||
-    searchFilters.isSubscribed !== undefined ||
-    searchFilters.isEdited !== undefined ||
-    searchFilters.isCategoryLocked !== undefined ||
-    searchFilters.analysisFailed !== undefined;
+  const isActive = hasActiveSearchFilters(searchFilters);
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
@@ -53,7 +64,7 @@ const RepositoriesView = React.memo(({
       <div className="flex-1 space-y-6">
         <SearchBar />
         <RepositoryList
-          repositories={hasActiveSearchFilters ? searchResults : repositories}
+          repositories={isActive ? searchResults : repositories}
           selectedCategory={selectedCategory}
         />
       </div>
