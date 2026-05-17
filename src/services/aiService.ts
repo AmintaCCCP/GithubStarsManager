@@ -629,16 +629,49 @@ Focus on practicality and accurate categorization to help users quickly understa
     return this.performBasicSearch(repositories, query);
   }
 
+  /**
+   * Search repositories using AI semantic search with fallback to enhanced basic search.
+   * Attempts to call the configured AI service to parse search intent and extract
+   * multilingual keywords, then delegates to performEnhancedSearch. Falls back to
+   * performEnhancedBasicSearch with intelligent ranking if AI is unavailable or fails.
+   *
+   * @param repositories - The full list of repositories to search
+   * @param query - The user's search query string
+   * @returns Filtered and ranked repositories matching the query
+   */
   async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
     console.log('🤖 AI Service: Starting enhanced search for:', query);
     if (!query.trim()) return repositories;
 
-    // 直接使用增强的基础搜索，提供智能排序
+    try {
+      console.log('🚀 AI Service: Calling configured AI service for semantic search');
+      const searchPrompt = this.createSearchPrompt(query);
+      const system = this.language === 'zh'
+        ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
+        : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
+
+      const content = await this.requestText({
+        system,
+        user: searchPrompt,
+        temperature: 0.1,
+        maxTokens: 200,
+      });
+
+      if (content) {
+        const searchTerms = this.parseSearchResponse(content);
+        const results = this.performEnhancedSearch(repositories, query, searchTerms);
+        console.log('✨ AI Service: AI semantic search completed, results:', results.length);
+        return results;
+      }
+    } catch (error) {
+      console.warn('❌ AI Service: AI semantic search failed, falling back to enhanced basic search:', error);
+    }
+
     console.log('🔄 AI Service: Using enhanced basic search with intelligent ranking');
-    const results = this.performEnhancedBasicSearch(repositories, query);
-    console.log('✨ AI Service: Enhanced search completed, results:', results.length);
-    
-    return results;
+    const fallbackResults = this.performEnhancedBasicSearch(repositories, query);
+    console.log('✨ AI Service: Enhanced search completed, results:', fallbackResults.length);
+
+    return fallbackResults;
   }
 
   // Enhanced basic search with intelligent ranking (fallback when AI fails)
