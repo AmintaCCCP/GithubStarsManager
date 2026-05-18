@@ -8,6 +8,7 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'ai_platforms',
   'analyzed_at',
   'analysis_failed',
+  'subscribed_to_releases',
   'custom_description',
   'custom_tags',
   'custom_category',
