@@ -140,8 +140,9 @@ export async function syncFromBackend(): Promise<void> {
       if (isBootstrapEmpty) {
         _hasPendingPush = true;
       } else {
-        state.setRepositories(mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos));
-        _lastHash.repos = hashes.repos;
+        const merged = mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
+        state.setRepositories(merged);
+        _lastHash.repos = quickHash(merged);
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
