@@ -41,9 +41,6 @@ mac:
         - arm64
   icon: dist/vite.svg
   category: public.app-category.productivity
-  hardenedRuntime: true
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.inherit.plist
 
 dmg:
   title: GitHub Stars Manager
