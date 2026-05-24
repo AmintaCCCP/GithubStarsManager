@@ -601,6 +601,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             ai_platforms: existingRepo.ai_platforms,
             analyzed_at: existingRepo.analyzed_at,
             analysis_failed: existingRepo.analysis_failed,
+            analysis_error: existingRepo.analysis_error,
           };
         }
         const persisted = persistedAnalyses.get(newRepo.id);
@@ -612,6 +613,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             ai_platforms: persisted.ai_platforms,
             analyzed_at: persisted.analyzed_at,
             analysis_failed: persisted.analysis_failed,
+            analysis_error: persisted.analysis_error,
           };
         }
         return newRepo;
