@@ -1067,6 +1067,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.repository.id === nextProps.repository.id &&
     prevProps.repository.analyzed_at === nextProps.repository.analyzed_at &&
     prevProps.repository.analysis_failed === nextProps.repository.analysis_failed &&
+    prevProps.repository.analysis_error === nextProps.repository.analysis_error &&
     prevProps.repository.ai_summary === nextProps.repository.ai_summary &&
     prevProps.repository.ai_tags === nextProps.repository.ai_tags &&
     prevProps.repository.ai_platforms === nextProps.repository.ai_platforms &&
