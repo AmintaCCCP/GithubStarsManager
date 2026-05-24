@@ -564,8 +564,18 @@ jobs:
         # An empty CSC_LINK causes electron-builder to treat CWD as a cert
         # file and fail with "not a file".
         if [ -n "$CSC_LINK_SECRET" ]; then
-          echo "CSC_LINK=$CSC_LINK_SECRET" >> "$GITHUB_ENV"
-          echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          {
+            echo "CSC_LINK<<__EOF__"
+            echo "$CSC_LINK_SECRET"
+            echo "__EOF__"
+          } >> "$GITHUB_ENV"
+          if [ -n "$CSC_KEY_PASSWORD_SECRET" ]; then
+            {
+              echo "CSC_KEY_PASSWORD<<__EOF__"
+              echo "$CSC_KEY_PASSWORD_SECRET"
+              echo "__EOF__"
+            } >> "$GITHUB_ENV"
+          fi
           echo "Signing certificate configured"
         else
           echo "No signing certificate — electron-builder will ad-hoc sign"
