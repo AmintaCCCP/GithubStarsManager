@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2 } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -327,7 +327,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         custom_category: result.custom_category,
         category_locked: result.category_locked,
         analyzed_at: result.analyzed_at,
-        analysis_failed: result.analysis_failed
+        analysis_failed: result.analysis_failed,
+        analysis_error: undefined,
       };
 
       updateRepository(updatedRepo);
@@ -341,11 +342,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       if (!controller.signal.aborted) {
         console.error('AI analysis failed:', error);
 
-        const failedResult = createFailedAnalysisResult();
+        const errorMsg = error instanceof Error && error.message
+          ? error.message
+          : (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection');
+        const failedResult = createFailedAnalysisResult(errorMsg);
         const failedRepo = {
           ...repository,
           analyzed_at: failedResult.analyzed_at,
-          analysis_failed: failedResult.analysis_failed
+          analysis_failed: failedResult.analysis_failed,
+          analysis_error: failedResult.analysis_error,
         };
 
         updateRepository(failedRepo);
@@ -913,6 +918,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <div className="flex items-center space-x-1 text-xs text-status-red dark:text-status-red" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
+              <div className="group relative">
+                <HelpCircle className="w-3 h-3 text-status-red/70 dark:text-status-red/70 cursor-help" />
+                <div className="absolute left-0 top-full mt-2 w-72 max-w-xs p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
+                  </p>
+                  <div className="absolute top-[-4px] left-3 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+                </div>
+              </div>
             </div>
           ) : displayContent.isAnalyzed ? (
             <div 
