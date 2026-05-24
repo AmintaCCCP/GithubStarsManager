@@ -22,6 +22,7 @@ export interface Repository {
   ai_platforms?: string[];
   analyzed_at?: string;
   analysis_failed?: boolean;
+  analysis_error?: string;
   subscribed_to_releases?: boolean;
   custom_description?: string;
   custom_tags?: string[];
