@@ -4,6 +4,7 @@ export interface DiscoveryAnalysisData {
   ai_platforms?: string[];
   analyzed_at?: string;
   analysis_failed?: boolean;
+  analysis_error?: string;
 }
 
 const DB_NAME = 'github-stars-discovery-analysis';

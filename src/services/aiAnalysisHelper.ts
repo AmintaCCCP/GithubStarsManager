@@ -12,6 +12,7 @@ export interface AIAnalysisResult {
   category_locked?: boolean;
   analyzed_at: string;
   analysis_failed: boolean;
+  analysis_error?: string;
 }
 
 export interface AnalyzeRepositoryOptions {
@@ -61,12 +62,13 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   };
 };
 
-export const createFailedAnalysisResult = (): AIAnalysisResult => ({
+export const createFailedAnalysisResult = (error?: string): AIAnalysisResult => ({
   summary: '',
   tags: [],
   platforms: [],
   analyzed_at: new Date().toISOString(),
   analysis_failed: true,
+  analysis_error: error || undefined,
 });
 
 export const getDefaultCategoryNames = (customCategories: Category[], language: string = 'zh'): string[] => {
