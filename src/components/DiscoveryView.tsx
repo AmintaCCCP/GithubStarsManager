@@ -601,6 +601,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             ai_platforms: existingRepo.ai_platforms,
             analyzed_at: existingRepo.analyzed_at,
             analysis_failed: existingRepo.analysis_failed,
+            analysis_error: existingRepo.analysis_error,
           };
         }
         const persisted = persistedAnalyses.get(newRepo.id);
@@ -612,6 +613,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             ai_platforms: persisted.ai_platforms,
             analyzed_at: persisted.analyzed_at,
             analysis_failed: persisted.analysis_failed,
+            analysis_error: persisted.analysis_error,
           };
         }
         return newRepo;
@@ -826,6 +828,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               category_locked: wasCategoryLocked,
               analyzed_at: new Date().toISOString(),
               analysis_failed: false,
+              analysis_error: undefined,
             };
             updateDiscoveryRepo(updatedRepo);
             discoveryAnalysisStorage.saveAnalysis(updatedRepo.id, {
@@ -834,6 +837,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               ai_platforms: result.platforms,
               analyzed_at: updatedRepo.analyzed_at,
               analysis_failed: false,
+              analysis_error: undefined,
             });
           } else if (!result.success && result.repo) {
             const failedRepo: DiscoveryRepo = {
@@ -843,11 +847,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
               platform: discoveryPlatform,
               analyzed_at: new Date().toISOString(),
               analysis_failed: true,
+              analysis_error: result.error?.message || undefined,
             };
             updateDiscoveryRepo(failedRepo);
             discoveryAnalysisStorage.saveAnalysis(failedRepo.id, {
               analyzed_at: failedRepo.analyzed_at,
               analysis_failed: true,
+              analysis_error: failedRepo.analysis_error,
             });
           }
         }

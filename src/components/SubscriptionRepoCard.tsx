@@ -251,6 +251,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         ai_platforms: result.platforms,
         analyzed_at: result.analyzed_at,
         analysis_failed: result.analysis_failed,
+        analysis_error: undefined,
       };
       updateDiscoveryRepo(updatedRepo);
       
@@ -260,11 +261,15 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     } catch (error) {
       if (!controller.signal.aborted) {
         console.error('AI analysis error:', error);
-        const failedResult = createFailedAnalysisResult();
+        const errorMsg = error instanceof Error && error.message
+          ? error.message
+          : t('AI分析失败，请检查AI配置和网络连接', 'AI analysis failed, please check AI configuration and network connection');
+        const failedResult = createFailedAnalysisResult(errorMsg);
         const failedRepo: DiscoveryRepo = {
           ...repo,
           analyzed_at: failedResult.analyzed_at,
           analysis_failed: failedResult.analysis_failed,
+          analysis_error: failedResult.analysis_error,
         };
         updateDiscoveryRepo(failedRepo);
         toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
