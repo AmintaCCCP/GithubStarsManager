@@ -555,7 +555,25 @@ jobs:
         chmod -R 755 dist/ || echo "Could not set dist permissions"
         chmod -R 755 electron/ || echo "Could not set electron permissions"
         chmod -R 755 build/ || echo "Could not set build permissions"
-        
+
+    - name: Configure macOS signing
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        # Only set CSC_LINK when a signing certificate is actually configured.
+        # An empty CSC_LINK causes electron-builder to treat CWD as a cert
+        # file and fail with "not a file".
+        if [ -n "$CSC_LINK_SECRET" ]; then
+          echo "CSC_LINK=$CSC_LINK_SECRET" >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          echo "Signing certificate configured"
+        else
+          echo "No signing certificate — electron-builder will ad-hoc sign"
+        fi
+      env:
+        CSC_LINK_SECRET: ${{ secrets.CSC_LINK }}
+        CSC_KEY_PASSWORD_SECRET: ${{ secrets.CSC_KEY_PASSWORD }}
+
     - name: Build Electron app
       run: npm run dist
       env:
@@ -564,13 +582,7 @@ jobs:
         DEBUG: electron-builder
         # Linux 特定环境变量
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-        # macOS signing and notarization
-        CSC_LINK: ${{ secrets.CSC_LINK }}
-        CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        
+
     - name: List build output
       shell: bash
       run: |
