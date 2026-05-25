@@ -137,7 +137,21 @@ export class AIService {
           signal: options.signal,
         });
         if (!response.ok) {
-          throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+          let errorDetail = '';
+          try {
+            const text = await response.text();
+            try {
+              const errorBody = JSON.parse(text);
+              errorDetail = typeof errorBody === 'object'
+                ? JSON.stringify(errorBody)
+                : String(errorBody);
+            } catch {
+              errorDetail = text;
+            }
+          } catch {
+            // ignore
+          }
+          throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
       }
@@ -195,7 +209,21 @@ export class AIService {
           signal: options.signal,
         });
         if (!response.ok) {
-          throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+          let errorDetail = '';
+          try {
+            const text = await response.text();
+            try {
+              const errorBody = JSON.parse(text);
+              errorDetail = typeof errorBody === 'object'
+                ? JSON.stringify(errorBody)
+                : String(errorBody);
+            } catch {
+              errorDetail = text;
+            }
+          } catch {
+            // ignore
+          }
+          throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
       }
