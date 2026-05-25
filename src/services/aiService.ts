@@ -73,11 +73,13 @@ export class AIService {
    */
   private sanitizeForPrompt(content: string): string {
     // 移除 null 字节和控制字符（保留换行、回车、制表符）
+    // eslint-disable-next-line no-control-regex
     let sanitized = content.replace(/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-    // 替换孤立代理项：先移除未配对的高位代理，再移除未配对的低位代理
-    // 避免使用 lookbehind 以兼容 Safari 12+
-    sanitized = sanitized.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '�');
-    sanitized = sanitized.replace(/[\uDC00-\uDFFF]/g, '�');
+    // 替换孤立代理项，同时保留合法代理对（避免 lookbehind 以兼容 Safari 12+）
+    sanitized = sanitized.replace(
+      /([\uD800-\uDBFF][\uDC00-\uDFFF])|[\uD800-\uDBFF]|[\uDC00-\uDFFF]/g,
+      (m, pair) => (pair ? m : '�')
+    );
     return sanitized;
   }
 
