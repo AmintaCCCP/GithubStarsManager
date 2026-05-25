@@ -83,6 +83,20 @@ export class AIService {
     return this.config.model.trim().toLowerCase().includes('mimo');
   }
 
+  private async extractErrorDetail(response: Response): Promise<string> {
+    try {
+      const text = await response.text();
+      try {
+        const errorBody = JSON.parse(text);
+        return typeof errorBody === 'object' ? JSON.stringify(errorBody) : String(errorBody);
+      } catch {
+        return text;
+      }
+    } catch {
+      return '';
+    }
+  }
+
   private async requestText(options: {
     system: string;
     user: string;
@@ -137,20 +151,7 @@ export class AIService {
           signal: options.signal,
         });
         if (!response.ok) {
-          let errorDetail = '';
-          try {
-            const text = await response.text();
-            try {
-              const errorBody = JSON.parse(text);
-              errorDetail = typeof errorBody === 'object'
-                ? JSON.stringify(errorBody)
-                : String(errorBody);
-            } catch {
-              errorDetail = text;
-            }
-          } catch {
-            // ignore
-          }
+          const errorDetail = await this.extractErrorDetail(response);
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
@@ -209,20 +210,7 @@ export class AIService {
           signal: options.signal,
         });
         if (!response.ok) {
-          let errorDetail = '';
-          try {
-            const text = await response.text();
-            try {
-              const errorBody = JSON.parse(text);
-              errorDetail = typeof errorBody === 'object'
-                ? JSON.stringify(errorBody)
-                : String(errorBody);
-            } catch {
-              errorDetail = text;
-            }
-          } catch {
-            // ignore
-          }
+          const errorDetail = await this.extractErrorDetail(response);
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
@@ -278,7 +266,8 @@ ${options.user}` : options.user;
         signal: options.signal,
       });
       if (!response.ok) {
-        throw new Error(`AI API error: ${response.status} ${response.statusText}`);
+        const errorDetail = await this.extractErrorDetail(response);
+        throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
       data = await response.json();
     }
