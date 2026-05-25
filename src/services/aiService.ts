@@ -74,8 +74,10 @@ export class AIService {
   private sanitizeForPrompt(content: string): string {
     // 移除 null 字节和控制字符（保留换行、回车、制表符）
     let sanitized = content.replace(/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-    // 替换孤立高位代理 (U+D800-U+DBFF) 和孤立低位代理 (U+DC00-U+DFFF)
-    sanitized = sanitized.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '�');
+    // 替换孤立代理项：先移除未配对的高位代理，再移除未配对的低位代理
+    // 避免使用 lookbehind 以兼容 Safari 12+
+    sanitized = sanitized.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '�');
+    sanitized = sanitized.replace(/[\uDC00-\uDFFF]/g, '�');
     return sanitized;
   }
 
@@ -344,7 +346,7 @@ ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
-${this.sanitizeForPrompt(readmeContent).substring(0, 2000)}
+${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
     `.trim();
 
     const categoriesInfo = customCategories && customCategories.length > 0 
@@ -369,7 +371,7 @@ ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
-${this.sanitizeForPrompt(readmeContent).substring(0, 2000)}
+${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
     `.trim();
 
     const categoriesInfo = customCategories && customCategories.length > 0 
