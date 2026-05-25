@@ -112,11 +112,20 @@ class BackendAdapter {
   }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
+    let detail = '';
     try {
       const data = await res.json();
       code = data.code;
+      // Extract nested error details (e.g., DeepSeek returns { error: { message, type, code } })
+      if (data.error) {
+        const err = data.error;
+        detail = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+      } else if (data.message) {
+        detail = data.message;
+      }
     } catch { /* body not JSON */ }
-    throw new Error(translateBackendError(code, `${fallbackPrefix}: ${res.status}`));
+    const translated = translateBackendError(code, `${fallbackPrefix}: ${res.status}`);
+    throw new Error(detail ? `${translated} - ${detail}` : translated);
   }
 
   // === GitHub Proxy ===
