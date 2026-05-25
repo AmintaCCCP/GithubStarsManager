@@ -66,6 +66,23 @@ export class AIService {
     this.language = language;
   }
 
+  /**
+   * 清理用户内容中可能导致 JSON 序列化问题的字符
+   * - 移除 null 字节和控制字符（保留 \n \r \t）
+   * - 替换孤立代理项（lone surrogates），避免某些 JSON 解析器报错
+   */
+  private sanitizeForPrompt(content: string): string {
+    // 移除 null 字节和控制字符（保留换行、回车、制表符）
+    // eslint-disable-next-line no-control-regex
+    let sanitized = content.replace(/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    // 替换孤立代理项，同时保留合法代理对（避免 lookbehind 以兼容 Safari 12+）
+    sanitized = sanitized.replace(
+      /([\uD800-\uDBFF][\uDC00-\uDFFF])|[\uD800-\uDBFF]|[\uDC00-\uDFFF]/g,
+      (m, pair) => (pair ? m : '�')
+    );
+    return sanitized;
+  }
+
   private getApiType(): AIApiType {
     return this.config.apiType || 'openai';
   }
@@ -325,13 +342,13 @@ ${options.user}` : options.user;
   private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
     const repoInfo = `
 ${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
-${this.language === 'zh' ? '描述' : 'Description'}: ${repository.description || (this.language === 'zh' ? '无描述' : 'No description')}
+${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(repository.description || (this.language === 'zh' ? '无描述' : 'No description'))}
 ${this.language === 'zh' ? '编程语言' : 'Programming Language'}: ${repository.language || (this.language === 'zh' ? '未知' : 'Unknown')}
 ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
-${readmeContent.substring(0, 2000)}
+${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
     `.trim();
 
     const categoriesInfo = customCategories && customCategories.length > 0 
@@ -350,13 +367,13 @@ ${readmeContent.substring(0, 2000)}
   private createAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
     const repoInfo = `
 ${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
-${this.language === 'zh' ? '描述' : 'Description'}: ${repository.description || (this.language === 'zh' ? '无描述' : 'No description')}
+${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(repository.description || (this.language === 'zh' ? '无描述' : 'No description'))}
 ${this.language === 'zh' ? '编程语言' : 'Programming Language'}: ${repository.language || (this.language === 'zh' ? '未知' : 'Unknown')}
 ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
-${readmeContent.substring(0, 2000)}
+${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
     `.trim();
 
     const categoriesInfo = customCategories && customCategories.length > 0 
