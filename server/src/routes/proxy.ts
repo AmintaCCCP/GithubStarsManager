@@ -2,7 +2,22 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
-import { proxyRequest } from '../services/proxyService.js';
+import { proxyRequest, ProxyConfig } from '../services/proxyService.js';
+
+function getProxyConfig(): ProxyConfig | null {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+    if (!row?.value) return null;
+    const parsed = JSON.parse(row.value);
+    if (parsed && parsed.enabled && parsed.host && parsed.port) {
+      return parsed as ProxyConfig;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const router = Router();
 
@@ -77,7 +92,8 @@ router.post('/api/proxy/github/*', async (req, res) => {
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const result = await proxyRequest({ url: targetUrl, method, headers });
+    const proxyConfig = getProxyConfig();
+    const result = await proxyRequest({ url: targetUrl, method, headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('GitHub proxy error:', err);
@@ -187,12 +203,14 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
 
+    const proxyConfig = getProxyConfig();
     const result = await proxyRequest({
       url: targetUrl,
       method: 'POST',
       headers,
       body: effectiveRequestBody,
       timeout,
+      proxyConfig,
     });
 
     res.status(result.status).json(result.data);
@@ -242,12 +260,14 @@ router.post('/api/proxy/webdav', async (req, res) => {
       headers['Content-Type'] = headers['Content-Type'] || 'application/xml';
     }
 
+    const proxyConfig = getProxyConfig();
     const result = await proxyRequest({
       url: targetUrl,
       method,
       headers,
       body: requestBody,
       timeout: 60000,
+      proxyConfig,
     });
 
     res.status(result.status).json(result.data);
@@ -288,7 +308,8 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers });
+    const proxyConfig = getProxyConfig();
+    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('GitHub search repositories proxy error:', err);
@@ -327,11 +348,88 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers });
+    const proxyConfig = getProxyConfig();
+    const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('GitHub search users proxy error:', err);
     res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
+  }
+});
+
+// GET /api/settings/proxy
+router.get('/api/settings/proxy', (_req, res) => {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+    if (!row?.value) {
+      res.json({ enabled: false, type: 'http', host: '', port: 7890 });
+      return;
+    }
+    const parsed = JSON.parse(row.value);
+    // Mask password
+    if (parsed.password) {
+      parsed.hasPassword = true;
+      parsed.password = '';
+    }
+    res.json(parsed);
+  } catch {
+    res.json({ enabled: false, type: 'http', host: '', port: 7890 });
+  }
+});
+
+// PUT /api/settings/proxy
+router.put('/api/settings/proxy', (req, res) => {
+  try {
+    const db = getDb();
+    const { enabled, type, host, port, username, password } = req.body;
+
+    const configToStore: Record<string, unknown> = { enabled, type, host, port, username };
+    if (password) {
+      configToStore.password = password;
+    }
+
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+      .run('proxy_config', JSON.stringify(configToStore));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to save proxy config:', err);
+    res.status(500).json({ error: 'Failed to save proxy config' });
+  }
+});
+
+// POST /api/settings/proxy/test
+router.post('/api/settings/proxy/test', async (req, res) => {
+  try {
+    const { host, port, type } = req.body;
+    if (!host || !port) {
+      res.json({ success: false, error: 'Host and port are required' });
+      return;
+    }
+
+    // Test TCP connectivity to the proxy server
+    const net = await import('net');
+    const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(5000);
+      socket.on('connect', () => {
+        socket.destroy();
+        resolve({ success: true });
+      });
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve({ success: false, error: 'Connection timeout' });
+      });
+      socket.on('error', (err: Error) => {
+        resolve({ success: false, error: err.message });
+      });
+      socket.connect(port, host);
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, error: err instanceof Error ? err.message : 'Unknown error' });
   }
 });
 

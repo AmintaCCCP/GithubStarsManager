@@ -187,7 +187,7 @@ jobs:
           fs.mkdirSync('electron', { recursive: true });
         }
         
-        const mainJsContent = 'const { app, BrowserWindow, Menu, shell, globalShortcut } = require(\\'electron\\');\\n' +
+        const mainJsContent = 'const { app, BrowserWindow, Menu, shell, globalShortcut, ipcMain } = require(\\'electron\\');\\n' +
           'const path = require(\\'path\\');\\n' +
           'const fs = require(\\'fs\\');\\n' +
           'const isDev = process.env.NODE_ENV === \\'development\\';\\n\\n' +
@@ -204,7 +204,8 @@ jobs:
           '      enableRemoteModule: false,\\n' +
           '      webSecurity: false,\\n' +
           '      allowRunningInsecureContent: true,\\n' +
-          '      devTools: true // 生产环境也允许 DevTools 便于排障\\n' +
+          '      devTools: true, // 生产环境也允许 DevTools 便于排障\\n' +
+          '      preload: path.join(__dirname, \\'preload.js\\')\\n' +
           '    },\\n' +
           '    icon: path.join(__dirname, \\'../build/icon.png\\'),\\n' +
           '    titleBarStyle: \\'default\\', // 使用默认标题栏，避免重叠问题\\n' +
@@ -375,8 +376,71 @@ jobs:
           '    mainWindow = null;\\n' +
           '  });\\n' +
           '}\\n\\n' +
+          'const PROXY_CONFIG_PATH = path.join(app.getPath(\\'userData\\'), \\'proxy-config.json\\');\\n\\n' +
+          'function loadProxyConfig() {\\n' +
+          '  try {\\n' +
+          '    if (fs.existsSync(PROXY_CONFIG_PATH)) {\\n' +
+          '      return JSON.parse(fs.readFileSync(PROXY_CONFIG_PATH, \\'utf-8\\'));\\n' +
+          '    }\\n' +
+          '  } catch (e) { console.error(\\'Failed to load proxy config:\\', e); }\\n' +
+          '  return { enabled: false, type: \\'http\\', host: \\'\\', port: 7890 };\\n' +
+          '}\\n\\n' +
+          'function saveProxyConfig(config) {\\n' +
+          '  fs.writeFileSync(PROXY_CONFIG_PATH, JSON.stringify(config, null, 2));\\n' +
+          '}\\n\\n' +
+          'async function applyProxy(config) {\\n' +
+          '  if (!mainWindow || mainWindow.isDestroyed()) return;\\n' +
+          '  if (config.enabled && config.host && config.port) {\\n' +
+          '    const proxyUrl = config.type === \\'socks5\\'\\n' +
+          '      ? \\'socks5://\\' + config.host + \\':\\' + config.port\\n' +
+          '      : \\'http://\\' + config.host + \\':\\' + config.port;\\n' +
+          '    await mainWindow.webContents.session.setProxy({\\n' +
+          '      proxyRules: proxyUrl,\\n' +
+          '      proxyBypassRules: \\'<local>;localhost;127.0.0.1\\'\\n' +
+          '    });\\n' +
+          '    console.log(\\'[Proxy] Applied:\\', proxyUrl);\\n' +
+          '  } else {\\n' +
+          '    await mainWindow.webContents.session.setProxy({ proxyRules: \\'direct:\\\\' });\\n' +
+          '    console.log(\\'[Proxy] Disabled, using direct connection\\');\\n' +
+          '  }\\n' +
+          '}\\n\\n' +
+          'ipcMain.handle(\\'set-proxy\\', async (event, config) => {\\n' +
+          '  saveProxyConfig(config);\\n' +
+          '  await applyProxy(config);\\n' +
+          '  return { success: true };\\n' +
+          '});\\n\\n' +
+          'ipcMain.handle(\\'get-proxy\\', () => {\\n' +
+          '  return loadProxyConfig();\\n' +
+          '});\\n\\n' +
+          'ipcMain.handle(\\'test-proxy\\', async (event, config) => {\\n' +
+          '  try {\\n' +
+          '    const net = require(\\'net\\');\\n' +
+          '    return new Promise((resolve) => {\\n' +
+          '      const socket = new net.Socket();\\n' +
+          '      socket.setTimeout(5000);\\n' +
+          '      socket.on(\\'connect\\', () => {\\n' +
+          '        socket.destroy();\\n' +
+          '        resolve({ success: true });\\n' +
+          '      });\\n' +
+          '      socket.on(\\'timeout\\', () => {\\n' +
+          '        socket.destroy();\\n' +
+          '        resolve({ success: false, error: \\'Connection timeout\\' });\\n' +
+          '      });\\n' +
+          '      socket.on(\\'error\\', (err) => {\\n' +
+          '        resolve({ success: false, error: err.message });\\n' +
+          '      });\\n' +
+          '      socket.connect(config.port, config.host);\\n' +
+          '    });\\n' +
+          '  } catch (e) {\\n' +
+          '    return { success: false, error: e.message };\\n' +
+          '  }\\n' +
+          '});\\n\\n' +
           'app.whenReady().then(() => {\\n' +
           '  createWindow();\\n' +
+          '  const savedProxy = loadProxyConfig();\\n' +
+          '  if (savedProxy.enabled && savedProxy.host && savedProxy.port) {\\n' +
+          '    applyProxy(savedProxy);\\n' +
+          '  }\\n' +
           '  globalShortcut.register(\\'CommandOrControl+Shift+I\\', () => {\\n' +
           '    const focused = BrowserWindow.getFocusedWindow();\\n' +
           '    if (focused && !focused.isDestroyed()) {\\n' +
@@ -399,7 +463,17 @@ jobs:
           '});';
         
         fs.writeFileSync('electron/main.js', mainJsContent);
-        
+
+        const preloadJsContent = `const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  setProxy: (config) => ipcRenderer.invoke('set-proxy', config),
+  getProxy: () => ipcRenderer.invoke('get-proxy'),
+  testProxy: (config) => ipcRenderer.invoke('test-proxy', config),
+});
+`;
+        fs.writeFileSync('electron/preload.js', preloadJsContent);
+
         const electronPackageJson = {
           name: 'github-stars-manager-desktop',
           version: '1.0.0',

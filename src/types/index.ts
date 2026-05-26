@@ -158,6 +158,17 @@ export interface WebDAVConfig {
   passwordStatus?: SecretStatus;
 }
 
+export type ProxyType = 'http' | 'socks5';
+
+export interface ProxyConfig {
+  enabled: boolean;
+  type: ProxyType;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+}
+
 export interface SearchFilters {
   query: string;
   tags: string[];
@@ -247,6 +258,9 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+
+  // Network Proxy
+  proxyConfig: ProxyConfig;
 
   // Fork Timeline View
   forks: ForkRepo[];
