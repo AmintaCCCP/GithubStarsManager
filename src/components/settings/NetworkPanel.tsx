@@ -39,6 +39,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     if (!isFormValid) return;
 
     setSaving(true);
+    setTestResult(null);
+    const previousConfig = proxyConfig;
     try {
       // Sync to Electron first (if applicable)
       if (isElectron()) {
@@ -64,6 +66,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
       // Only persist locally after remote sync succeeds
       setProxyConfig(form);
     } catch (e) {
+      // Rollback: restore Electron proxy to previous state
+      if (isElectron()) {
+        try { await electronProxy.setProxy(previousConfig); } catch { /* best effort */ }
+      }
       setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
     } finally {
       setSaving(false);
