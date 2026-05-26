@@ -540,6 +540,8 @@ const normalizePersistedState = (
           type: validType as import('../types').ProxyType,
           host: validHost,
           port: validPort,
+          username: typeof obj.username === 'string' ? obj.username : undefined,
+          // password 不从持久化恢复，仅在内存中
         };
       }
       return { enabled: false, type: 'http' as const, host: '', port: 7890 };
@@ -1499,7 +1501,15 @@ export const useAppStore = create<AppState & AppActions>()(
       discoverySortBy: state.discoverySortBy,
       discoverySortOrder: state.discoverySortOrder,
       discoverySelectedTopic: state.discoverySelectedTopic,
-      proxyConfig: state.proxyConfig,
+      // 持久化代理配置，但排除密码（安全考虑）
+      proxyConfig: {
+        enabled: state.proxyConfig.enabled,
+        type: state.proxyConfig.type,
+        host: state.proxyConfig.host,
+        port: state.proxyConfig.port,
+        username: state.proxyConfig.username,
+        // password 不持久化，仅保留在内存中
+      },
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
