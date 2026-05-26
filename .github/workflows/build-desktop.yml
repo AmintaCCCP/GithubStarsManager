@@ -419,27 +419,73 @@ jobs:
           '  return loadProxyConfig();\\n' +
           '});\\n\\n' +
           'ipcMain.handle(\\'test-proxy\\', async (event, config) => {\\n' +
+          '  const net = require(\\'net\\');\\n' +
+          '  const connectToProxy = () => new Promise((resolve, reject) => {\\n' +
+          '    const socket = new net.Socket();\\n' +
+          '    socket.setTimeout(5000);\\n' +
+          '    socket.on(\\'connect\\', () => resolve(socket));\\n' +
+          '    socket.on(\\'timeout\\', () => { socket.destroy(); reject(new Error(\\'Connection timeout\\')); });\\n' +
+          '    socket.on(\\'error\\', (err) => reject(err));\\n' +
+          '    socket.connect(config.port, config.host);\\n' +
+          '  });\\n' +
           '  try {\\n' +
-          '    const net = require(\\'net\\');\\n' +
-          '    return new Promise((resolve) => {\\n' +
-          '      const socket = new net.Socket();\\n' +
-          '      socket.setTimeout(5000);\\n' +
-          '      socket.on(\\'connect\\', () => {\\n' +
-          '        socket.destroy();\\n' +
-          '        resolve({ success: true });\\n' +
+          '    if (config.type === \\'socks5\\') {\\n' +
+          '      const socket = await connectToProxy();\\n' +
+          '      return await new Promise((resolve) => {\\n' +
+          '        const greeting = config.username\\n' +
+          '          ? Buffer.from([0x05, 0x02, 0x00, 0x02])\\n' +
+          '          : Buffer.from([0x05, 0x01, 0x00]);\\n' +
+          '        socket.setTimeout(5000);\\n' +
+          '        socket.write(greeting);\\n' +
+          '        let step = 0;\\n' +
+          '        socket.on(\\'data\\', (data) => {\\n' +
+          '          if (step === 0) {\\n' +
+          '            if (data[0] !== 0x05) { socket.destroy(); resolve({ success: false, error: \\'Invalid SOCKS5 version\\' }); return; }\\n' +
+          '            if (data[1] === 0xFF) { socket.destroy(); resolve({ success: false, error: \\'No acceptable auth method\\' }); return; }\\n' +
+          '            if (data[1] === 0x02 && config.username && config.password) {\\n' +
+          '              step = 1;\\n' +
+          '              const userBuf = Buffer.from(config.username, \\'utf8\\');\\n' +
+          '              const passBuf = Buffer.from(config.password, \\'utf8\\');\\n' +
+          '              const authReq = Buffer.alloc(3 + userBuf.length + passBuf.length);\\n' +
+          '              authReq[0] = 0x01; authReq[1] = userBuf.length;\\n' +
+          '              userBuf.copy(authReq, 2);\\n' +
+          '              authReq[2 + userBuf.length] = passBuf.length;\\n' +
+          '              passBuf.copy(authReq, 3 + userBuf.length);\\n' +
+          '              socket.write(authReq);\\n' +
+          '            } else { socket.destroy(); resolve({ success: true }); }\\n' +
+          '          } else if (step === 1) {\\n' +
+          '            socket.destroy();\\n' +
+          '            resolve(data[0] === 0x01 && data[1] === 0x00\\n' +
+          '              ? { success: true }\\n' +
+          '              : { success: false, error: \\'SOCKS5 authentication failed\\' });\\n' +
+          '          }\\n' +
+          '        });\\n' +
+          '        socket.on(\\'timeout\\', () => { socket.destroy(); resolve({ success: false, error: \\'SOCKS5 handshake timeout\\' }); });\\n' +
+          '        socket.on(\\'error\\', (err) => resolve({ success: false, error: err.message }));\\n' +
           '      });\\n' +
-          '      socket.on(\\'timeout\\', () => {\\n' +
-          '        socket.destroy();\\n' +
-          '        resolve({ success: false, error: \\'Connection timeout\\' });\\n' +
+          '    } else {\\n' +
+          '      const socket = await connectToProxy();\\n' +
+          '      return await new Promise((resolve) => {\\n' +
+          '        socket.setTimeout(5000);\\n' +
+          '        const authHeader = config.username && config.password\\n' +
+          '          ? \\'Proxy-Authorization: Basic \\' + Buffer.from(config.username + \\':\\' + config.password).toString(\\'base64\\') + \\'\\\\r\\\\n\\'\\n' +
+          '          : \\'\\';\\n' +
+          '        socket.write(\\'CONNECT httpbin.org:443 HTTP/1.1\\\\r\\\\nHost: httpbin.org:443\\\\r\\\\n\\' + authHeader + \\'\\\\r\\\\n\\');\\n' +
+          '        let responseData = \\'\\';\\n' +
+          '        socket.on(\\'data\\', (data) => {\\n' +
+          '          responseData += data.toString();\\n' +
+          '          if (responseData.includes(\\'\\\\r\\\\n\\\\r\\\\n\\')) {\\n' +
+          '            socket.destroy();\\n' +
+          '            if (responseData.includes(\\'200\\')) resolve({ success: true });\\n' +
+          '            else if (responseData.includes(\\'407\\')) resolve({ success: false, error: \\'Proxy authentication required\\' });\\n' +
+          '            else resolve({ success: false, error: \\'Proxy rejected: \\' + (responseData.split(\\'\\\\r\\\\n\\')[0] || \\'Unknown\\') });\\n' +
+          '          }\\n' +
+          '        });\\n' +
+          '        socket.on(\\'timeout\\', () => { socket.destroy(); resolve({ success: false, error: \\'HTTP proxy handshake timeout\\' }); });\\n' +
+          '        socket.on(\\'error\\', (err) => resolve({ success: false, error: err.message }));\\n' +
           '      });\\n' +
-          '      socket.on(\\'error\\', (err) => {\\n' +
-          '        resolve({ success: false, error: err.message });\\n' +
-          '      });\\n' +
-          '      socket.connect(config.port, config.host);\\n' +
-          '    });\\n' +
-          '  } catch (e) {\\n' +
-          '    return { success: false, error: e.message };\\n' +
-          '  }\\n' +
+          '    }\\n' +
+          '  } catch (e) { return { success: false, error: e.message }; }\\n' +
           '});\\n\\n' +
           'app.whenReady().then(() => {\\n' +
           '  createWindow();\\n' +
