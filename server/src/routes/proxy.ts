@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { decrypt } from '../services/crypto.js';
+import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig } from '../services/proxyService.js';
 
@@ -11,6 +11,13 @@ function getProxyConfig(): ProxyConfig | null {
     if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
     if (parsed && parsed.enabled && parsed.host && parsed.port) {
+      // Decrypt password if encrypted
+      if (parsed.password_encrypted) {
+        try {
+          parsed.password = decrypt(parsed.password_encrypted, config.encryptionKey);
+        } catch { parsed.password = ''; }
+        delete parsed.password_encrypted;
+      }
       return parsed as ProxyConfig;
     }
     return null;
@@ -367,11 +374,12 @@ router.get('/api/settings/proxy', (_req, res) => {
       return;
     }
     const parsed = JSON.parse(row.value);
-    // Mask password
-    if (parsed.password) {
+    // Mask password - don't expose encrypted value
+    if (parsed.password_encrypted) {
       parsed.hasPassword = true;
-      parsed.password = '';
     }
+    delete parsed.password_encrypted;
+    delete parsed.password;
     res.json(parsed);
   } catch {
     res.json({ enabled: false, type: 'http', host: '', port: 7890 });
@@ -384,23 +392,21 @@ router.put('/api/settings/proxy', (req, res) => {
     const db = getDb();
     const { enabled, type, host, port, username, password } = req.body;
 
-    // Preserve existing password if not provided in the request
-    let storedPassword: string | undefined;
-    if (!password) {
-      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
-      if (existing?.value) {
-        try {
-          const parsed = JSON.parse(existing.value);
-          storedPassword = parsed.password;
-        } catch { /* ignore */ }
-      }
+    // Preserve existing encrypted password if not provided in the request
+    let existingEncrypted: string | undefined;
+    const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+    if (existing?.value) {
+      try {
+        const parsed = JSON.parse(existing.value);
+        existingEncrypted = parsed.password_encrypted;
+      } catch { /* ignore */ }
     }
 
     const configToStore: Record<string, unknown> = { enabled, type, host, port, username };
     if (password) {
-      configToStore.password = password;
-    } else if (storedPassword) {
-      configToStore.password = storedPassword;
+      configToStore.password_encrypted = encrypt(password, config.encryptionKey);
+    } else if (existingEncrypted) {
+      configToStore.password_encrypted = existingEncrypted;
     }
 
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
