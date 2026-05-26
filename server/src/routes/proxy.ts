@@ -137,6 +137,12 @@ router.post('/api/proxy/ai', async (req, res) => {
       baseUrl = aiConfig.base_url as string;
       model = aiConfig.model as string;
       reasoningEffort = normalizeReasoningEffort(aiConfig.reasoning_effort);
+      try {
+        const parsed = new URL(baseUrl);
+        if (parsed.protocol !== 'https:') {
+          console.warn(`[Proxy] ⚠️ AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
+        }
+      } catch { /* invalid URL, will be caught by validateUrl later */ }
     } else {
       res.status(400).json({ error: 'configId or config required', code: 'CONFIG_ID_REQUIRED' });
       return;
