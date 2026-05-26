@@ -424,30 +424,124 @@ router.put('/api/settings/proxy', (req, res) => {
 // POST /api/settings/proxy/test
 router.post('/api/settings/proxy/test', async (req, res) => {
   try {
-    const { host, port, type } = req.body;
+    const { host, port, type, username, password } = req.body;
     if (!host || !port) {
       res.json({ success: false, error: 'Host and port are required' });
       return;
     }
 
-    // Test TCP connectivity to the proxy server
     const net = await import('net');
-    const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-      const socket = new net.Socket();
-      socket.setTimeout(5000);
-      socket.on('connect', () => {
-        socket.destroy();
-        resolve({ success: true });
+    type NetSocket = import('net').Socket;
+
+    const connectToProxy = (): Promise<NetSocket> =>
+      new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        socket.setTimeout(5000);
+        socket.on('connect', () => resolve(socket));
+        socket.on('timeout', () => { socket.destroy(); reject(new Error('Connection timeout')); });
+        socket.on('error', (err: Error) => reject(err));
+        socket.connect(port, host);
       });
-      socket.on('timeout', () => {
-        socket.destroy();
-        resolve({ success: false, error: 'Connection timeout' });
-      });
-      socket.on('error', (err: Error) => {
-        resolve({ success: false, error: err.message });
-      });
-      socket.connect(port, host);
-    });
+
+    let result: { success: boolean; error?: string };
+
+    if (type === 'socks5') {
+      // SOCKS5 protocol handshake test
+      try {
+        const socket = await connectToProxy();
+        result = await new Promise((resolve) => {
+          // Step 1: Send SOCKS5 greeting (version 5, 1 method, no-auth)
+          const greeting = username
+            ? Buffer.from([0x05, 0x02, 0x00, 0x02]) // no-auth + username/password
+            : Buffer.from([0x05, 0x01, 0x00]);        // no-auth only
+
+          socket.setTimeout(5000);
+          socket.write(greeting);
+
+          let step = 0;
+          socket.on('data', (data: Buffer) => {
+            if (step === 0) {
+              // Step 2: Server selects auth method
+              if (data[0] !== 0x05) {
+                socket.destroy();
+                resolve({ success: false, error: `Invalid SOCKS5 version: ${data[0]}` });
+                return;
+              }
+              if (data[1] === 0xFF) {
+                socket.destroy();
+                resolve({ success: false, error: 'SOCKS5 server: no acceptable auth method' });
+                return;
+              }
+              if (data[1] === 0x02 && username && password) {
+                // Username/password auth
+                step = 1;
+                const userBuf = Buffer.from(username, 'utf8');
+                const passBuf = Buffer.from(password, 'utf8');
+                const authReq = Buffer.alloc(3 + userBuf.length + passBuf.length);
+                authReq[0] = 0x01; // auth version
+                authReq[1] = userBuf.length;
+                userBuf.copy(authReq, 2);
+                authReq[2 + userBuf.length] = passBuf.length;
+                passBuf.copy(authReq, 3 + userBuf.length);
+                socket.write(authReq);
+              } else {
+                // No-auth accepted, test passed
+                socket.destroy();
+                resolve({ success: true });
+              }
+            } else if (step === 1) {
+              // Step 3: Auth response
+              socket.destroy();
+              if (data[0] === 0x01 && data[1] === 0x00) {
+                resolve({ success: true });
+              } else {
+                resolve({ success: false, error: 'SOCKS5 authentication failed' });
+              }
+            }
+          });
+
+          socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'SOCKS5 handshake timeout' }); });
+          socket.on('error', (err: Error) => { resolve({ success: false, error: err.message }); });
+        });
+      } catch (err) {
+        result = { success: false, error: err instanceof Error ? err.message : 'Connection failed' };
+      }
+    } else {
+      // HTTP proxy: send CONNECT request to verify it's a working proxy
+      try {
+        const socket = await connectToProxy();
+        result = await new Promise((resolve) => {
+          socket.setTimeout(5000);
+          const authHeader = username && password
+            ? `Proxy-Authorization: Basic ${Buffer.from(`${username}:${password}`).toString('base64')}\r\n`
+            : '';
+          const connectReq = `CONNECT httpbin.org:443 HTTP/1.1\r\nHost: httpbin.org:443\r\n${authHeader}\r\n`;
+          socket.write(connectReq);
+
+          let responseData = '';
+          socket.on('data', (data: Buffer) => {
+            responseData += data.toString();
+            // Wait for end of HTTP headers
+            if (responseData.includes('\r\n\r\n')) {
+              socket.destroy();
+              if (responseData.includes('200')) {
+                resolve({ success: true });
+              } else if (responseData.includes('407')) {
+                resolve({ success: false, error: 'Proxy authentication required' });
+              } else {
+                const statusLine = responseData.split('\r\n')[0] || 'Unknown';
+                resolve({ success: false, error: `Proxy rejected CONNECT: ${statusLine}` });
+              }
+            }
+          });
+
+          socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'HTTP proxy handshake timeout' }); });
+          socket.on('error', (err: Error) => { resolve({ success: false, error: err.message }); });
+        });
+      } catch (err) {
+        result = { success: false, error: err instanceof Error ? err.message : 'Connection failed' };
+      }
+    }
 
     res.json(result);
   } catch (err) {
