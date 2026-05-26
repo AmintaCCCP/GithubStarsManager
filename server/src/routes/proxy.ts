@@ -384,9 +384,23 @@ router.put('/api/settings/proxy', (req, res) => {
     const db = getDb();
     const { enabled, type, host, port, username, password } = req.body;
 
+    // Preserve existing password if not provided in the request
+    let storedPassword: string | undefined;
+    if (!password) {
+      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+      if (existing?.value) {
+        try {
+          const parsed = JSON.parse(existing.value);
+          storedPassword = parsed.password;
+        } catch { /* ignore */ }
+      }
+    }
+
     const configToStore: Record<string, unknown> = { enabled, type, host, port, username };
     if (password) {
       configToStore.password = password;
+    } else if (storedPassword) {
+      configToStore.password = storedPassword;
     }
 
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')

@@ -95,11 +95,31 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
     // 配置代理
     if (proxyConfig?.enabled && proxyConfig.host && proxyConfig.port) {
-      axiosConfig.proxy = {
-        protocol: proxyConfig.type === 'socks5' ? 'socks5' : 'http',
-        host: proxyConfig.host,
-        port: proxyConfig.port,
-      };
+      if (proxyConfig.type === 'socks5') {
+        // SOCKS5: axios 不原生支持，使用 socks-proxy-agent
+        const { SocksProxyAgent } = await import('socks-proxy-agent');
+        const socksUrl = `socks5://${proxyConfig.host}:${proxyConfig.port}`;
+        const agent = new SocksProxyAgent(socksUrl);
+        axiosConfig.httpAgent = agent;
+        axiosConfig.httpsAgent = agent;
+        axiosConfig.proxy = false; // 禁用 axios 内置代理，使用自定义 agent
+      } else {
+        // HTTP/HTTPS 代理
+        axiosConfig.proxy = {
+          protocol: 'http',
+          host: proxyConfig.host,
+          port: proxyConfig.port,
+        };
+        if (proxyConfig.username && proxyConfig.password) {
+          axiosConfig.proxy.auth = {
+            username: proxyConfig.username,
+            password: proxyConfig.password,
+          };
+        }
+      }
+    } else {
+      // 显式禁用代理，防止 axios 回退到环境变量 HTTP_PROXY/HTTPS_PROXY
+      axiosConfig.proxy = false;
     }
 
     const response = await axios(axiosConfig);

@@ -33,33 +33,38 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     return null;
   }
 
+  const isFormValid = !form.enabled || (form.host.trim() && form.port >= 1 && form.port <= 65535);
+
   const handleSave = async () => {
+    if (!isFormValid) return;
+
     setSaving(true);
     try {
-      // Save to store
-      setProxyConfig(form);
-
-      // If Electron, sync to Electron main process
+      // Sync to Electron first (if applicable)
       if (isElectron()) {
         await electronProxy.setProxy(form);
       }
 
-      // If backend is available, sync to backend
+      // Sync to backend (if applicable)
       if (backend.isAvailable) {
-        try {
-          const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (backendApiSecret) {
-            authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-          }
-          await fetch('/api/settings/proxy', {
-            method: 'PUT',
-            headers: authHeaders,
-            body: JSON.stringify(form),
-          });
-        } catch {
-          // Backend sync is best-effort
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        const resp = await fetch('/api/settings/proxy', {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify(form),
+        });
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
         }
       }
+
+      // Only persist locally after remote sync succeeds
+      setProxyConfig(form);
+    } catch (e) {
+      setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
     } finally {
       setSaving(false);
     }
@@ -73,22 +78,20 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
         const result = await electronProxy.testProxy(form);
         setTestResult(result);
       } else if (backend.isAvailable) {
-        try {
-          const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (backendApiSecret) {
-            authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-          }
-          const resp = await fetch('/api/settings/proxy/test', {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify(form),
-          });
-          const data = await resp.json();
-          setTestResult(data);
-        } catch (e) {
-          setTestResult({ success: false, error: e instanceof Error ? e.message : 'Unknown error' });
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
+        const resp = await fetch('/api/settings/proxy/test', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(form),
+        });
+        const data = await resp.json();
+        setTestResult(data);
       }
+    } catch (e) {
+      setTestResult({ success: false, error: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
       setTesting(false);
     }
@@ -109,6 +112,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           type="button"
           role="switch"
           aria-checked={form.enabled}
+          aria-label={t('启用网络代理', 'Enable network proxy')}
           onClick={() => setForm({ ...form, enabled: !form.enabled })}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.enabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
         >
@@ -219,6 +223,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                     />
                     <button
                       type="button"
+                      aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-text-secondary"
                     >
@@ -249,7 +254,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
             <button
               onClick={handleSave}
-              disabled={saving || !hasChanges}
+              disabled={saving || !hasChanges || !isFormValid}
               className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
