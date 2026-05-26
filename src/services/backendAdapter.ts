@@ -227,6 +227,18 @@ class BackendAdapter {
     return res.json();
   }
 
+  async proxyAIRequestWithConfig(aiConfig: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string }, body: object): Promise<unknown> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ config: aiConfig, body })
+    }, 120000);
+    if (!res.ok) await this.throwTranslatedError(res, 'AI proxy error');
+    return res.json();
+  }
+
   // === WebDAV Proxy ===
 
   async proxyWebDAV(configId: string, method: string, path: string, body?: string, headers?: Record<string, string>): Promise<Response> {
