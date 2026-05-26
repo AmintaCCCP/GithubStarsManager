@@ -400,7 +400,7 @@ jobs:
           '    });\\n' +
           '    console.log(\\'[Proxy] Applied:\\', proxyUrl);\\n' +
           '  } else {\\n' +
-          '    await mainWindow.webContents.session.setProxy({ proxyRules: \\'direct:\\\\' });\\n' +
+          '    await mainWindow.webContents.session.setProxy({ proxyRules: \\'direct://\\' });\\n' +
           '    console.log(\\'[Proxy] Disabled, using direct connection\\');\\n' +
           '  }\\n' +
           '}\\n\\n' +
