@@ -9,8 +9,11 @@ import {
   Package,
   X,
   Trash2,
+  Wifi,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { isElectron } from '../services/electronProxy';
+import { backend } from '../services/backendAdapter';
 import {
   GeneralPanel,
   AIConfigPanel,
@@ -19,9 +22,10 @@ import {
   BackendPanel,
   CategoryPanel,
   DataManagementPanel,
+  NetworkPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data' | 'network';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -282,6 +286,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('数据管理', 'Data Management'),
       icon: <Trash2 className="w-5 h-5" />,
     },
+    ...((isElectron() || backend.isAvailable) ? [{
+      id: 'network' as SettingsTab,
+      label: t('网络设置', 'Network'),
+      icon: <Wifi className="w-5 h-5" />,
+    }] : []),
   ];
 
   const renderTabContent = () => {
@@ -301,6 +310,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <CategoryPanel t={t} />;
         case 'data':
           return <DataManagementPanel t={t} />;
+        case 'network':
+          return <NetworkPanel t={t} />;
         default:
           return null;
       }
