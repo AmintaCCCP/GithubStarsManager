@@ -5,16 +5,17 @@ import {
   Repository,
   Release,
   ForkRepo,
-  AIConfig, 
-  WebDAVConfig, 
-  SearchFilters, 
-  GitHubUser, 
-  Category, 
-  AssetFilter, 
-  UpdateNotification, 
-  AnalysisProgress, 
-  DiscoveryChannel, 
-  DiscoveryChannelId, 
+  AIConfig,
+  WebDAVConfig,
+  ProxyConfig,
+  SearchFilters,
+  GitHubUser,
+  Category,
+  AssetFilter,
+  UpdateNotification,
+  AnalysisProgress,
+  DiscoveryChannel,
+  DiscoveryChannelId,
   DiscoveryRepo,
   DiscoveryPlatform,
   ProgrammingLanguage,
@@ -167,6 +168,9 @@ interface AppActions {
   // Backend actions
   setBackendApiSecret: (secret: string | null) => void;
 
+  // Proxy actions
+  setProxyConfig: (updates: Partial<ProxyConfig>) => void;
+
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
   setReleaseSelectedFilters: (filters: string[]) => void;
@@ -271,6 +275,7 @@ type PersistedAppState = Partial<
     | 'discoveryLanguage'
     | 'discoverySortBy'
     | 'discoverySortOrder'
+    | 'proxyConfig'
     | 'subscriptionRepos'
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
@@ -523,6 +528,13 @@ const normalizePersistedState = (
         defaultSubscriptionChannels.filter(dch => !persisted.some((ch: unknown) => (ch as Record<string, unknown>).id === dch.id))
       );
     })(),
+    proxyConfig: (() => {
+      const p = (safePersisted as Record<string, unknown>).proxyConfig;
+      if (p && typeof p === 'object' && typeof (p as Record<string, unknown>).enabled === 'boolean') {
+        return p as import('../types').ProxyConfig;
+      }
+      return { enabled: false, type: 'http' as const, host: '', port: 7890 };
+    })(),
   };
 };
 
@@ -710,6 +722,7 @@ export const useAppStore = create<AppState & AppActions>()(
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
+      proxyConfig: { enabled: false, type: 'http', host: '', port: 7890 },
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       releaseViewMode: 'timeline',
@@ -1234,6 +1247,9 @@ export const useAppStore = create<AppState & AppActions>()(
         writeSessionBackendSecret(backendApiSecret);
         set({ backendApiSecret });
       },
+      setProxyConfig: (updates) => set((state) => ({
+        proxyConfig: { ...state.proxyConfig, ...updates }
+      })),
 
       // Release Timeline View actions
       setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
@@ -1389,7 +1405,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 5,
+      version: 6,
       storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -1474,6 +1490,7 @@ export const useAppStore = create<AppState & AppActions>()(
       discoverySortBy: state.discoverySortBy,
       discoverySortOrder: state.discoverySortOrder,
       discoverySelectedTopic: state.discoverySelectedTopic,
+      proxyConfig: state.proxyConfig,
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
@@ -1593,6 +1610,11 @@ export const useAppStore = create<AppState & AppActions>()(
     (state as Record<string, unknown>).discoveryScrollPositions = {
       'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0,
     };
+  }
+
+  // v5→v6: 初始化 proxyConfig
+  if (state && !(state as Record<string, unknown>).proxyConfig) {
+    (state as Record<string, unknown>).proxyConfig = { enabled: false, type: 'http', host: '', port: 7890 };
   }
 
         return state as PersistedAppState;

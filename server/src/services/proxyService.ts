@@ -1,9 +1,21 @@
+import axios, { AxiosRequestConfig } from 'axios';
+
+export interface ProxyConfig {
+  enabled: boolean;
+  type: 'http' | 'socks5';
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+}
+
 export interface ProxyRequestOptions {
   url: string;
   method: string;
   headers?: Record<string, string>;
   body?: string | object;
   timeout?: number;
+  proxyConfig?: ProxyConfig | null;
 }
 
 export interface ProxyResponse {
@@ -57,60 +69,86 @@ function validateUrl(rawUrl: string): void {
 }
 
 export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyResponse> {
-  const { url, method, headers = {}, body, timeout = 30000 } = options;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const { url, method, headers = {}, body, timeout = 30000, proxyConfig } = options;
 
   try {
     validateUrl(url);
     console.log(`[Proxy] ${method} ${redactUrl(url)}`);
 
-    const fetchOptions: RequestInit = {
-      method,
+    const axiosConfig: AxiosRequestConfig = {
+      url,
+      method: method.toLowerCase() as AxiosRequestConfig['method'],
       headers,
-      signal: controller.signal,
+      timeout,
+      validateStatus: () => true, // 不抛出 HTTP 错误状态码
     };
 
     if (body && method !== 'GET' && method !== 'HEAD') {
-      fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+      axiosConfig.data = body;
       const hasContentType = Object.keys(headers).some(
         k => k.toLowerCase() === 'content-type'
       );
-      if (!hasContentType) {
-        (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/json';
+      if (!hasContentType && typeof body === 'object') {
+        axiosConfig.headers = { ...axiosConfig.headers, 'Content-Type': 'application/json' };
       }
     }
 
-    const response = await fetch(url, fetchOptions);
+    // 配置代理
+    if (proxyConfig?.enabled && proxyConfig.host && proxyConfig.port) {
+      axiosConfig.proxy = {
+        protocol: proxyConfig.type === 'socks5' ? 'socks5' : 'http',
+        host: proxyConfig.host,
+        port: proxyConfig.port,
+      };
+    }
+
+    const response = await axios(axiosConfig);
 
     console.log(`[Proxy] ${method} ${redactUrl(url)} -> ${response.status}`);
 
     const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
+    if (response.headers) {
+      for (const [key, value] of Object.entries(response.headers)) {
+        responseHeaders[key] = String(value);
+      }
+    }
 
     let data: unknown;
-    const contentType = response.headers.get('content-type') || '';
-    const text = await response.text();
-    if (contentType.includes('application/json') && text.length > 0) {
+    const contentType = String(response.headers['content-type'] || '');
+    if (contentType.includes('application/json') && typeof response.data === 'object') {
+      data = response.data;
+    } else if (typeof response.data === 'string') {
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(response.data);
       } catch {
-        data = text;
+        data = response.data;
       }
     } else {
-      data = text;
+      data = response.data;
     }
 
     return { status: response.status, headers: responseHeaders, data };
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      return { status: 504, headers: {}, data: { error: 'Gateway Timeout', code: 'GATEWAY_TIMEOUT' } };
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        return { status: 504, headers: {}, data: { error: 'Gateway Timeout', code: 'GATEWAY_TIMEOUT' } };
+      }
+      if (error.code === 'ECONNREFUSED') {
+        return { status: 502, headers: {}, data: { error: 'Proxy connection refused', code: 'PROXY_CONNECTION_REFUSED', details: error.message } };
+      }
+      if (error.code === 'ETIMEDOUT') {
+        return { status: 504, headers: {}, data: { error: 'Proxy connection timeout', code: 'PROXY_TIMEOUT', details: error.message } };
+      }
+      if (error.response) {
+        // 请求已发出，服务器返回了错误状态码
+        return {
+          status: error.response.status,
+          headers: {},
+          data: error.response.data || { error: 'Upstream error' }
+        };
+      }
     }
     console.error(`[Proxy] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return { status: 502, headers: {}, data: { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: error instanceof Error ? error.message : 'Unknown error' } };
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
