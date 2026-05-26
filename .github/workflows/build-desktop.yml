@@ -391,9 +391,15 @@ jobs:
           'async function applyProxy(config) {\\n' +
           '  if (!mainWindow || mainWindow.isDestroyed()) return;\\n' +
           '  if (config.enabled && config.host && config.port) {\\n' +
+          '    let auth = \\'\\';\\n' +
+          '    if (config.username) {\\n' +
+          '      auth = config.password\\n' +
+          '        ? encodeURIComponent(config.username) + \\':\\' + encodeURIComponent(config.password) + \\'@\\'\\n' +
+          '        : encodeURIComponent(config.username) + \\'@\\';\\n' +
+          '    }\\n' +
           '    const proxyUrl = config.type === \\'socks5\\'\\n' +
-          '      ? \\'socks5://\\' + config.host + \\':\\' + config.port\\n' +
-          '      : \\'http://\\' + config.host + \\':\\' + config.port;\\n' +
+          '      ? \\'socks5://\\' + auth + config.host + \\':\\' + config.port\\n' +
+          '      : \\'http://\\' + auth + config.host + \\':\\' + config.port;\\n' +
           '    await mainWindow.webContents.session.setProxy({\\n' +
           '      proxyRules: proxyUrl,\\n' +
           '      proxyBypassRules: \\'<local>;localhost;127.0.0.1\\'\\n' +
