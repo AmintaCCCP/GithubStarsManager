@@ -4,7 +4,6 @@ import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { version } from '../../../package.json';
 import { PROJECT_REPO_URL } from '../../constants/project';
-import { NetworkPanel } from './NetworkPanel';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -133,8 +132,6 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </button>
         </div>
       </div>
-
-      <NetworkPanel t={t} />
     </div>
   );
 };
