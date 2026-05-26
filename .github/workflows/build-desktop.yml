@@ -464,14 +464,13 @@ jobs:
         
         fs.writeFileSync('electron/main.js', mainJsContent);
 
-        const preloadJsContent = `const { contextBridge, ipcRenderer } = require('electron');
-
-contextBridge.exposeInMainWorld('electronAPI', {
-  setProxy: (config) => ipcRenderer.invoke('set-proxy', config),
-  getProxy: () => ipcRenderer.invoke('get-proxy'),
-  testProxy: (config) => ipcRenderer.invoke('test-proxy', config),
-});
-`;
+        const preloadJsContent = 'const { contextBridge, ipcRenderer } = require(\\'electron\\');\\n' +
+          '\\n' +
+          'contextBridge.exposeInMainWorld(\\'electronAPI\\', {\\n' +
+          '  setProxy: (config) => ipcRenderer.invoke(\\'set-proxy\\', config),\\n' +
+          '  getProxy: () => ipcRenderer.invoke(\\'get-proxy\\'),\\n' +
+          '  testProxy: (config) => ipcRenderer.invoke(\\'test-proxy\\', config),\\n' +
+          '});\\n';
         fs.writeFileSync('electron/preload.js', preloadJsContent);
 
         const electronPackageJson = {

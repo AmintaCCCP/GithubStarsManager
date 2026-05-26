@@ -530,8 +530,17 @@ const normalizePersistedState = (
     })(),
     proxyConfig: (() => {
       const p = (safePersisted as Record<string, unknown>).proxyConfig;
-      if (p && typeof p === 'object' && typeof (p as Record<string, unknown>).enabled === 'boolean') {
-        return p as import('../types').ProxyConfig;
+      if (p && typeof p === 'object') {
+        const obj = p as Record<string, unknown>;
+        const validType = obj.type === 'http' || obj.type === 'socks5' ? obj.type : 'http';
+        const validHost = typeof obj.host === 'string' ? obj.host : '';
+        const validPort = typeof obj.port === 'number' && Number.isFinite(obj.port) ? obj.port : 7890;
+        return {
+          enabled: typeof obj.enabled === 'boolean' ? obj.enabled : false,
+          type: validType as import('../types').ProxyType,
+          host: validHost,
+          port: validPort,
+        };
       }
       return { enabled: false, type: 'http' as const, host: '', port: 7890 };
     })(),
