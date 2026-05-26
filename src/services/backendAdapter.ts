@@ -70,6 +70,17 @@ class BackendAdapter {
   private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    // If the caller provides a signal, forward its abort to our internal controller
+    const callerSignal = options?.signal;
+    if (callerSignal) {
+      if (callerSignal.aborted) {
+        controller.abort();
+      } else {
+        callerSignal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+    }
+
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } finally {
@@ -215,13 +226,27 @@ class BackendAdapter {
 
   // === AI Proxy ===
 
-  async proxyAIRequest(configId: string, body: object): Promise<unknown> {
+  async proxyAIRequest(configId: string, body: object, signal?: AbortSignal): Promise<unknown> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ configId, body })
+      body: JSON.stringify({ configId, body }),
+      signal,
+    }, 120000);
+    if (!res.ok) await this.throwTranslatedError(res, 'AI proxy error');
+    return res.json();
+  }
+
+  async proxyAIRequestWithConfig(aiConfig: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string }, body: object, signal?: AbortSignal): Promise<unknown> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ config: aiConfig, body }),
+      signal,
     }, 120000);
     if (!res.ok) await this.throwTranslatedError(res, 'AI proxy error');
     return res.json();

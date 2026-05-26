@@ -85,30 +85,68 @@ router.post('/api/proxy/github/*', async (req, res) => {
   }
 });
 
+function normalizeReasoningEffort(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  return value === 'minimal' ? 'low' : value;
+}
+
 // POST /api/proxy/ai
+// Accepts either { configId, body } (lookup from DB) or { config, body } (inline config for one-time requests)
 router.post('/api/proxy/ai', async (req, res) => {
   try {
     const db = getDb();
-    const { configId, body: requestBody } = req.body as { configId: string; body: Record<string, unknown> };
+    const { configId, config: inlineConfig, body: requestBody } = req.body as {
+      configId?: string;
+      config?: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string };
+      body: Record<string, unknown>;
+    };
 
-    if (!configId) {
-      res.status(400).json({ error: 'configId required', code: 'CONFIG_ID_REQUIRED' });
+    let apiKey: string;
+    let apiType: string;
+    let baseUrl: string;
+    let model: string;
+    let reasoningEffort: string | null;
+
+    if (inlineConfig && !configId) {
+      // Inline config path (for form tests without a saved config ID)
+      apiKey = inlineConfig.apiKey;
+      apiType = inlineConfig.apiType || 'openai';
+      baseUrl = inlineConfig.baseUrl;
+      model = inlineConfig.model;
+      reasoningEffort = normalizeReasoningEffort(inlineConfig.reasoningEffort);
+      if (!baseUrl || !apiKey || !model) {
+        res.status(400).json({ error: 'baseUrl, apiKey, and model are required', code: 'INVALID_REQUEST' });
+        return;
+      }
+      // Warn if API key is transmitted over non-HTTPS connection
+      try {
+        const parsed = new URL(baseUrl);
+        if (parsed.protocol !== 'https:') {
+          console.warn(`[Proxy] ⚠️ AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
+        }
+      } catch { /* invalid URL, will be caught by validateUrl later */ }
+    } else if (configId) {
+      // DB lookup path (for saved configs)
+      const aiConfig = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined;
+      if (!aiConfig) {
+        res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
+        return;
+      }
+      apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+      apiType = (aiConfig.api_type as string) || 'openai';
+      baseUrl = aiConfig.base_url as string;
+      model = aiConfig.model as string;
+      reasoningEffort = normalizeReasoningEffort(aiConfig.reasoning_effort);
+      try {
+        const parsed = new URL(baseUrl);
+        if (parsed.protocol !== 'https:') {
+          console.warn(`[Proxy] ⚠️ AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
+        }
+      } catch { /* invalid URL, will be caught by validateUrl later */ }
+    } else {
+      res.status(400).json({ error: 'configId or config required', code: 'CONFIG_ID_REQUIRED' });
       return;
     }
-
-    const aiConfig = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined;
-    if (!aiConfig) {
-      res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
-      return;
-    }
-
-    const apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
-    const apiType = (aiConfig.api_type as string) || 'openai';
-    const baseUrl = aiConfig.base_url as string;
-    const model = aiConfig.model as string;
-    const reasoningEffort = aiConfig.reasoning_effort === 'minimal'
-      ? 'low'
-      : aiConfig.reasoning_effort as string | null | undefined;
 
     let targetUrl: string;
     const headers: Record<string, string> = {
