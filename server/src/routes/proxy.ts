@@ -11,11 +11,9 @@ function getProxyConfig(): ProxyConfig | null {
     if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
     if (parsed && parsed.enabled && parsed.host && parsed.port) {
-      // Decrypt password if encrypted
+      // Decrypt password if encrypted - fail closed on decrypt error
       if (parsed.password_encrypted) {
-        try {
-          parsed.password = decrypt(parsed.password_encrypted, config.encryptionKey);
-        } catch { parsed.password = ''; }
+        parsed.password = decrypt(parsed.password_encrypted, config.encryptionKey);
         delete parsed.password_encrypted;
       }
       return parsed as ProxyConfig;
@@ -391,22 +389,26 @@ router.put('/api/settings/proxy', (req, res) => {
   try {
     const db = getDb();
     const { enabled, type, host, port, username, password } = req.body;
-
-    // Preserve existing encrypted password if not provided in the request
-    let existingEncrypted: string | undefined;
-    const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
-    if (existing?.value) {
-      try {
-        const parsed = JSON.parse(existing.value);
-        existingEncrypted = parsed.password_encrypted;
-      } catch { /* ignore */ }
-    }
+    const passwordProvided = 'password' in req.body;
 
     const configToStore: Record<string, unknown> = { enabled, type, host, port, username };
-    if (password) {
+    if (passwordProvided && password) {
+      // New password provided - encrypt and store
       configToStore.password_encrypted = encrypt(password, config.encryptionKey);
-    } else if (existingEncrypted) {
-      configToStore.password_encrypted = existingEncrypted;
+    } else if (passwordProvided && !password) {
+      // Explicitly empty password - clear stored secret
+      // No password_encrypted field = no password
+    } else {
+      // Password field omitted - preserve existing encrypted password
+      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+      if (existing?.value) {
+        try {
+          const parsed = JSON.parse(existing.value);
+          if (parsed.password_encrypted) {
+            configToStore.password_encrypted = parsed.password_encrypted;
+          }
+        } catch { /* ignore */ }
+      }
     }
 
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
