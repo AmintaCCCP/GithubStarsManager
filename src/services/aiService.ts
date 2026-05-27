@@ -154,11 +154,7 @@ export class AIService {
 
       let data: Record<string, unknown>;
       if (backend.isAvailable) {
-        if (this.config.id) {
-          data = await backend.proxyAIRequest(this.config.id, requestBody, options.signal) as Record<string, unknown>;
-        } else {
-          data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal) as Record<string, unknown>;
-        }
+        data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal) as Record<string, unknown>;
       } else {
         const url = buildFinalApiUrl(this.config.baseUrl, apiType);
         const response = await fetch(url, {
@@ -216,11 +212,7 @@ export class AIService {
 
       let data: unknown;
       if (backend.isAvailable) {
-        if (this.config.id) {
-          data = await backend.proxyAIRequest(this.config.id, requestBody, options.signal);
-        } else {
-          data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal);
-        }
+        data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal);
       } else {
         const url = buildApiUrl(this.config.baseUrl, 'v1/messages');
         const response = await fetch(url, {
@@ -276,11 +268,7 @@ ${options.user}` : options.user;
 
     let data: unknown;
     if (backend.isAvailable) {
-      if (this.config.id) {
-        data = await backend.proxyAIRequest(this.config.id, requestBody, options.signal);
-      } else {
-        data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal);
-      }
+      data = await backend.proxyAIRequestWithConfig(this.config, requestBody, options.signal);
     } else {
       const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
