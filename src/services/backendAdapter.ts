@@ -136,7 +136,10 @@ class BackendAdapter {
       }
     } catch { /* body not JSON */ }
     const translated = translateBackendError(code, `${fallbackPrefix}: ${res.status}`);
-    throw new Error(detail ? `${translated} - ${detail}` : translated);
+    const error = new Error(detail ? `${translated} - ${detail}` : translated) as Error & { statusCode?: number; code?: string };
+    error.statusCode = res.status;
+    if (code) error.code = code;
+    throw error;
   }
 
   // === GitHub Proxy ===
@@ -268,9 +271,9 @@ class BackendAdapter {
         // Fall through to inline config on 404 (config not synced yet)
         if (res.status !== 404) await this.throwTranslatedError(res, 'AI proxy error');
       } catch (err) {
-        // If it's a non-404 error, rethrow; otherwise fall through
-        const msg = err instanceof Error ? err.message : '';
-        if (!msg.includes('AI config not found') && !msg.includes('AI_CONFIG_NOT_FOUND')) throw err;
+        // Rethrow non-404 errors; fall through to inline config on config-not-found
+        const e = err as Error & { statusCode?: number; code?: string };
+        if (e.statusCode !== 404 && e.code !== 'AI_CONFIG_NOT_FOUND') throw err;
       }
     }
 
