@@ -252,6 +252,32 @@ class BackendAdapter {
     return res.json();
   }
 
+  async proxyAIRequestWithFallback(configId: string, aiConfig: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string }, body: object, signal?: AbortSignal): Promise<unknown> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    // Try configId lookup first to avoid sending API key inline
+    if (configId) {
+      try {
+        const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ configId, body }),
+          signal,
+        }, 120000);
+        if (res.ok) return res.json();
+        // Fall through to inline config on 404 (config not synced yet)
+        if (res.status !== 404) await this.throwTranslatedError(res, 'AI proxy error');
+      } catch (err) {
+        // If it's a non-404 error, rethrow; otherwise fall through
+        const msg = err instanceof Error ? err.message : '';
+        if (!msg.includes('AI config not found') && !msg.includes('AI_CONFIG_NOT_FOUND')) throw err;
+      }
+    }
+
+    // Fallback: send full config inline
+    return this.proxyAIRequestWithConfig(aiConfig, body, signal);
+  }
+
   // === WebDAV Proxy ===
 
   async proxyWebDAV(configId: string, method: string, path: string, body?: string, headers?: Record<string, string>): Promise<Response> {
