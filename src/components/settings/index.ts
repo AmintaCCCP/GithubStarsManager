@@ -5,3 +5,4 @@ export { BackendPanel } from './BackendPanel';
 export { CategoryPanel } from './CategoryPanel';
 export { GeneralPanel } from './GeneralPanel';
 export { DataManagementPanel } from './DataManagementPanel';
+export { NetworkPanel } from './NetworkPanel';
