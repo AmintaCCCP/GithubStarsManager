@@ -136,7 +136,10 @@ class BackendAdapter {
       }
     } catch { /* body not JSON */ }
     const translated = translateBackendError(code, `${fallbackPrefix}: ${res.status}`);
-    throw new Error(detail ? `${translated} - ${detail}` : translated);
+    const error = new Error(detail ? `${translated} - ${detail}` : translated) as Error & { statusCode?: number; code?: string };
+    error.statusCode = res.status;
+    if (code) error.code = code;
+    throw error;
   }
 
   // === GitHub Proxy ===
@@ -250,6 +253,32 @@ class BackendAdapter {
     }, 120000);
     if (!res.ok) await this.throwTranslatedError(res, 'AI proxy error');
     return res.json();
+  }
+
+  async proxyAIRequestWithFallback(configId: string, aiConfig: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string }, body: object, signal?: AbortSignal): Promise<unknown> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    // Try configId lookup first to avoid sending API key inline
+    if (configId) {
+      try {
+        const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ configId, body }),
+          signal,
+        }, 120000);
+        if (res.ok) return res.json();
+        // Fall through to inline config on 404 (config not synced yet)
+        if (res.status !== 404) await this.throwTranslatedError(res, 'AI proxy error');
+      } catch (err) {
+        // Rethrow non-404 errors; fall through to inline config on config-not-found
+        const e = err as Error & { statusCode?: number; code?: string };
+        if (e.statusCode !== 404 && e.code !== 'AI_CONFIG_NOT_FOUND') throw err;
+      }
+    }
+
+    // Fallback: send full config inline
+    return this.proxyAIRequestWithConfig(aiConfig, body, signal);
   }
 
   // === WebDAV Proxy ===
