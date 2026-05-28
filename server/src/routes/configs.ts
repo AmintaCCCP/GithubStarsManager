@@ -194,7 +194,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     console.error('PUT /api/configs/ai/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
       res.status(422).json({
-        error: 'All AI configs were skipped due to missing API keys',
+        error: 'All AI configs were skipped — check the errors field for per-config reasons',
         code: 'SYNC_AI_CONFIGS_ALL_SKIPPED',
         synced: 0,
         skipped: syncResult.skipped.length,
@@ -411,7 +411,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
     console.error('PUT /api/configs/webdav/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
       res.status(422).json({
-        error: 'All WebDAV configs were skipped due to missing passwords',
+        error: 'All WebDAV configs were skipped — check the errors field for per-config reasons',
         code: 'SYNC_WEBDAV_CONFIGS_ALL_SKIPPED',
         synced: 0,
         skipped: syncResult.skipped.length,
