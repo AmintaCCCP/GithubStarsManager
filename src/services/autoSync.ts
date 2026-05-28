@@ -170,7 +170,22 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.ai = hashes.ai;
     }
     if (changed.webdav && webdavResult.status === 'fulfilled') {
-      state.setWebDAVConfigs(webdavResult.value);
+      // Filter out configs with decrypt_failed status — preserve local password values
+      // to prevent backend decryption failures from overwriting valid local data.
+      const backendConfigs = webdavResult.value;
+      const localConfigs = state.webdavConfigs;
+      const mergedConfigs = backendConfigs.map(bc => {
+        if (bc.passwordStatus === 'decrypt_failed' || !bc.password) {
+          const local = localConfigs.find(lc => lc.id === bc.id);
+          if (local && local.password) {
+            console.warn(`[sync] Backend decrypt_failed for WebDAV config "${bc.name}", preserving local password`);
+            return { ...bc, password: local.password, passwordStatus: 'ok' as const };
+          }
+        }
+        return bc;
+      });
+      state.setWebDAVConfigs(mergedConfigs);
+      // Store raw backend hash for consistent change detection
       _lastHash.webdav = hashes.webdav;
     }
     // Sync active selections from settings
