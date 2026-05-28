@@ -165,7 +165,9 @@ export async function syncFromBackend(): Promise<void> {
         return bc;
       });
       state.setAIConfigs(mergedConfigs);
-      _lastHash.ai = quickHash(mergedConfigs);
+      // Store raw backend hash so change detection compares against the same payload.
+      // Using mergedConfigs would cause a mismatch and re-trigger on every poll.
+      _lastHash.ai = hashes.ai;
     }
     if (changed.webdav && webdavResult.status === 'fulfilled') {
       state.setWebDAVConfigs(webdavResult.value);
