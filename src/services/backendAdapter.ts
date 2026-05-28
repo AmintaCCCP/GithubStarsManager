@@ -354,13 +354,17 @@ class BackendAdapter {
     }, 30000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync AI configs error');
 
-    // Parse response for partial failure details
+    // Parse response and throw on partial failure so callers don't clear pending changes
     try {
       const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
       if (data.skipped && data.skipped > 0) {
-        console.warn(`[sync] ${data.skipped} AI config(s) skipped:`, data.errors);
+        const reasons = data.errors?.map(e => `${e.name}: ${e.reason}`).join('; ') ?? '';
+        throw new Error(`Sync AI configs partial failure: ${data.skipped} skipped${reasons ? ` (${reasons})` : ''}`);
       }
-    } catch { /* ignore parse errors */ }
+    } catch (err) {
+      // Re-throw our own errors; ignore JSON parse errors from empty responses
+      if (err instanceof Error && err.message.startsWith('Sync AI configs partial failure')) throw err;
+    }
   }
 
   async fetchAIConfigs(): Promise<AIConfig[]> {
@@ -390,13 +394,17 @@ class BackendAdapter {
     }, 30000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync WebDAV configs error');
 
-    // Parse response for partial failure details
+    // Parse response and throw on partial failure so callers don't clear pending changes
     try {
       const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
       if (data.skipped && data.skipped > 0) {
-        console.warn(`[sync] ${data.skipped} WebDAV config(s) skipped:`, data.errors);
+        const reasons = data.errors?.map(e => `${e.name}: ${e.reason}`).join('; ') ?? '';
+        throw new Error(`Sync WebDAV configs partial failure: ${data.skipped} skipped${reasons ? ` (${reasons})` : ''}`);
       }
-    } catch { /* ignore parse errors */ }
+    } catch (err) {
+      // Re-throw our own errors; ignore JSON parse errors from empty responses
+      if (err instanceof Error && err.message.startsWith('Sync WebDAV configs partial failure')) throw err;
+    }
   }
 
   async fetchWebDAVConfigs(): Promise<WebDAVConfig[]> {

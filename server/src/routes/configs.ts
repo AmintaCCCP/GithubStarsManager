@@ -103,6 +103,9 @@ router.post('/api/configs/ai', (req, res) => {
 // PUT /api/configs/ai/bulk — replace all AI configs (for sync)
 // MUST be registered before :id route to avoid matching 'bulk' as an id
 router.put('/api/configs/ai/bulk', (req, res) => {
+  // Shared between transaction, response, and error handler
+  const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
+
   try {
     const db = getDb();
     const configs = req.body.configs as Array<{
@@ -123,9 +126,6 @@ router.put('/api/configs/ai/bulk', (req, res) => {
       res.status(400).json({ error: 'configs array required', code: 'INVALID_REQUEST' });
       return;
     }
-
-    // Shared between transaction and response — transaction populates, response reads
-    const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
 
     const bulkSync = db.transaction(() => {
       const existingKeys = new Map<string, string>();
@@ -193,8 +193,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/ai/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
-      const count = Array.isArray(req.body?.configs) ? req.body.configs.length : 0;
-      res.status(422).json({ error: 'All AI configs were skipped due to missing API keys', code: 'SYNC_AI_CONFIGS_ALL_SKIPPED', synced: 0, skipped: count });
+      res.status(422).json({ error: 'All AI configs were skipped due to missing API keys', code: 'SYNC_AI_CONFIGS_ALL_SKIPPED', synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
     } else {
       res.status(500).json({ error: 'Failed to sync AI configs', code: 'SYNC_AI_CONFIGS_FAILED' });
     }
@@ -319,6 +318,9 @@ router.post('/api/configs/webdav', (req, res) => {
 // PUT /api/configs/webdav/bulk — replace all WebDAV configs (for sync)
 // MUST be registered before :id route to avoid matching 'bulk' as an id
 router.put('/api/configs/webdav/bulk', (req, res) => {
+  // Shared between transaction, response, and error handler
+  const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
+
   try {
     const db = getDb();
     const configs = req.body.configs as Array<{
@@ -335,9 +337,6 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       res.status(400).json({ error: 'configs array required', code: 'INVALID_REQUEST' });
       return;
     }
-
-    // Shared between transaction and response
-    const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
 
     const bulkSync = db.transaction(() => {
       // Read existing passwords BEFORE delete
@@ -405,8 +404,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/webdav/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
-      const count = Array.isArray(req.body?.configs) ? req.body.configs.length : 0;
-      res.status(422).json({ error: 'All WebDAV configs were skipped due to missing passwords', code: 'SYNC_WEBDAV_CONFIGS_ALL_SKIPPED', synced: 0, skipped: count });
+      res.status(422).json({ error: 'All WebDAV configs were skipped due to missing passwords', code: 'SYNC_WEBDAV_CONFIGS_ALL_SKIPPED', synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
     } else {
       res.status(500).json({ error: 'Failed to sync WebDAV configs', code: 'SYNC_WEBDAV_CONFIGS_FAILED' });
     }
