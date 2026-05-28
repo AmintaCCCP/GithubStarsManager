@@ -90,15 +90,33 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     }
     setIsSyncingToBackend(true);
     try {
-      await backend.syncRepositories(repositories);
-      await backend.syncReleases(releases);
-      await backend.syncAIConfigs(aiConfigs);
-      await backend.syncWebDAVConfigs(webdavConfigs);
-      await backend.syncSettings({ hiddenDefaultCategoryIds });
-      toast(t(
-        `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
-        `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
-      ), 'success');
+      // Use allSettled so that one failure doesn't block other syncs
+      const results = await Promise.allSettled([
+        backend.syncRepositories(repositories),
+        backend.syncReleases(releases),
+        backend.syncAIConfigs(aiConfigs),
+        backend.syncWebDAVConfigs(webdavConfigs),
+        backend.syncSettings({ hiddenDefaultCategoryIds }),
+      ]);
+
+      const failures = results.filter(r => r.status === 'rejected');
+      const successes = results.filter(r => r.status === 'fulfilled');
+
+      if (failures.length > 0) {
+        console.warn('Some syncs failed:', failures.map(f => (f as PromiseRejectedResult).reason));
+        toast(
+          t(
+            `同步部分失败：${failures.length} 项失败，${successes.length} 项成功`,
+            `Partial sync failure: ${failures.length} failed, ${successes.length} succeeded`
+          ),
+          'error'
+        );
+      } else {
+        toast(t(
+          `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
+          `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
+        ), 'success');
+      }
     } catch (error) {
       console.error('Sync to backend failed:', error);
       toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
