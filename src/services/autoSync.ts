@@ -150,8 +150,22 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.releases = hashes.releases;
     }
     if (changed.ai && aiResult.status === 'fulfilled') {
-      state.setAIConfigs(aiResult.value);
-      _lastHash.ai = hashes.ai;
+      // Filter out configs with decrypt_failed status — preserve local apiKey values
+      // to prevent backend decryption failures from overwriting valid local data.
+      const backendConfigs = aiResult.value;
+      const localConfigs = state.aiConfigs;
+      const mergedConfigs = backendConfigs.map(bc => {
+        if (bc.apiKeyStatus === 'decrypt_failed' || !bc.apiKey) {
+          const local = localConfigs.find(lc => lc.id === bc.id);
+          if (local && local.apiKey) {
+            console.warn(`[sync] Backend decrypt_failed for AI config "${bc.name}", preserving local apiKey`);
+            return { ...bc, apiKey: local.apiKey, apiKeyStatus: 'ok' as const };
+          }
+        }
+        return bc;
+      });
+      state.setAIConfigs(mergedConfigs);
+      _lastHash.ai = quickHash(mergedConfigs);
     }
     if (changed.webdav && webdavResult.status === 'fulfilled') {
       state.setWebDAVConfigs(webdavResult.value);

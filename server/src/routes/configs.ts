@@ -193,7 +193,10 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/ai/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
-      res.status(422).json({ error: 'All AI configs were skipped due to missing API keys', code: 'SYNC_AI_CONFIGS_ALL_SKIPPED', synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
+      // Transaction rolled back — existing data is preserved.
+      // Return 200 (not 422) so the sync chain is not blocked.
+      // The skipped/errors fields tell the frontend which configs were skipped.
+      res.json({ synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
     } else {
       res.status(500).json({ error: 'Failed to sync AI configs', code: 'SYNC_AI_CONFIGS_FAILED' });
     }
@@ -404,7 +407,9 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/webdav/bulk error:', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
-      res.status(422).json({ error: 'All WebDAV configs were skipped due to missing passwords', code: 'SYNC_WEBDAV_CONFIGS_ALL_SKIPPED', synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
+      // Transaction rolled back — existing data is preserved.
+      // Return 200 (not 422) so the sync chain is not blocked.
+      res.json({ synced: 0, skipped: syncResult.skipped.length, errors: syncResult.skipped });
     } else {
       res.status(500).json({ error: 'Failed to sync WebDAV configs', code: 'SYNC_WEBDAV_CONFIGS_FAILED' });
     }
