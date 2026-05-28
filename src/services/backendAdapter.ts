@@ -347,17 +347,16 @@ class BackendAdapter {
     }, 30000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync AI configs error');
 
-    // Parse response to detect partial failures (some configs skipped due to missing keys).
-    // Log warnings but do not throw — the backend has preserved existing data via rollback,
-    // and throwing would block subsequent syncs of other data types (repos, settings).
+    // Parse response and throw on partial failure so callers don't clear pending changes
     try {
       const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
       if (data.skipped && data.skipped > 0) {
         const reasons = data.errors?.map(e => `${e.name}: ${e.reason}`).join('; ') ?? '';
-        console.warn(`[sync] ${data.skipped} AI config(s) skipped${reasons ? ` (${reasons})` : ''}`);
+        throw new Error(`Sync AI configs partial failure: ${data.skipped} skipped${reasons ? ` (${reasons})` : ''}`);
       }
-    } catch {
-      // Ignore parse errors (empty body, etc.)
+    } catch (err) {
+      // Re-throw our own errors; ignore JSON parse errors from empty responses
+      if (err instanceof Error && err.message.startsWith('Sync AI configs partial failure')) throw err;
     }
   }
 
