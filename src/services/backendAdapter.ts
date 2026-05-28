@@ -340,12 +340,27 @@ class BackendAdapter {
   async syncAIConfigs(configs: AIConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/ai/bulk`, {
+    // Pre-sync validation: warn about configs that will likely be skipped
+    for (const c of configs) {
+      if (!c.apiKey) {
+        console.warn(`[sync] AI config "${c.name}" (${c.id}) has empty apiKey, will be skipped if no existing key on backend`);
+      }
+    }
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/configs/ai/bulk`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configs })
-    });
+    }, 30000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync AI configs error');
+
+    // Parse response for partial failure details
+    try {
+      const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
+      if (data.skipped && data.skipped > 0) {
+        console.warn(`[sync] ${data.skipped} AI config(s) skipped:`, data.errors);
+      }
+    } catch { /* ignore parse errors */ }
   }
 
   async fetchAIConfigs(): Promise<AIConfig[]> {
@@ -361,12 +376,27 @@ class BackendAdapter {
   async syncWebDAVConfigs(configs: WebDAVConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/webdav/bulk`, {
+    // Pre-sync validation: warn about configs that will likely be skipped
+    for (const c of configs) {
+      if (!c.password) {
+        console.warn(`[sync] WebDAV config "${c.name}" (${c.id}) has empty password, will be skipped if no existing password on backend`);
+      }
+    }
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/configs/webdav/bulk`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ configs })
-    });
+    }, 30000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync WebDAV configs error');
+
+    // Parse response for partial failure details
+    try {
+      const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
+      if (data.skipped && data.skipped > 0) {
+        console.warn(`[sync] ${data.skipped} WebDAV config(s) skipped:`, data.errors);
+      }
+    } catch { /* ignore parse errors */ }
   }
 
   async fetchWebDAVConfigs(): Promise<WebDAVConfig[]> {
