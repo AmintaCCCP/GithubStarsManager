@@ -14,7 +14,13 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     releases,
     aiConfigs,
     webdavConfigs,
+    activeAIConfig,
+    activeWebDAVConfig,
     hiddenDefaultCategoryIds,
+    categoryOrder,
+    customCategories,
+    assetFilters,
+    collapsedSidebarCategoryCount,
     backendApiSecret,
     setBackendApiSecret,
     setRepositories,
@@ -96,7 +102,15 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         backend.syncReleases(releases),
         backend.syncAIConfigs(aiConfigs),
         backend.syncWebDAVConfigs(webdavConfigs),
-        backend.syncSettings({ hiddenDefaultCategoryIds }),
+        backend.syncSettings({
+            activeAIConfig,
+            activeWebDAVConfig,
+            hiddenDefaultCategoryIds,
+            categoryOrder,
+            customCategories,
+            assetFilters,
+            collapsedSidebarCategoryCount,
+          }),
       ]);
 
       const failures = results.filter(r => r.status === 'rejected');

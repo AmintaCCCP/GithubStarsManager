@@ -340,6 +340,13 @@ class BackendAdapter {
   async syncAIConfigs(configs: AIConfig[]): Promise<void> {
     if (!this._backendUrl) return;
 
+    // Pre-sync validation: warn about configs that will likely be skipped
+    for (const c of configs) {
+      if (!c.apiKey) {
+        console.warn(`[sync] AI config "${c.name}" (${c.id}) has empty apiKey, will be skipped if no existing key on backend`);
+      }
+    }
+
     const res = await this.fetchWithRetry(`${this._backendUrl}/configs/ai/bulk`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
