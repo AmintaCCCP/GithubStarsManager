@@ -64,9 +64,11 @@ export function maskUrlDomain(url: string): string {
     if (host.length <= 6) return parsed.toString();
     const maskedHost = host[0] + '***' + host.slice(-2);
     parsed.hostname = maskedHost;
-    // Also redact query params
-    for (const key of SENSITIVE_URL_PARAMS) {
-      if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '***');
+    // Also redact query params (case-insensitive)
+    for (const [key] of parsed.searchParams) {
+      if (SENSITIVE_URL_PARAMS.includes(key.toLowerCase())) {
+        parsed.searchParams.set(key, '***');
+      }
     }
     return parsed.toString();
   } catch {
