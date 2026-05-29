@@ -448,7 +448,14 @@ ${repoInfo}
             : (this.language === 'zh' ? '无法生成概述' : 'Unable to generate summary'),
           tags: Array.isArray(parsed.tags) ? parsed.tags.filter((v) => typeof v === 'string').slice(0, 5) : [],
           platforms: Array.isArray(parsed.platforms)
-            ? parsed.platforms.filter((v) => typeof v === 'string' && AIService.VALID_PLATFORMS.includes(v.toLowerCase())).slice(0, 8)
+            ? Array.from(
+                new Set(
+                  parsed.platforms
+                    .filter((v): v is string => typeof v === 'string')
+                    .map((v) => v.trim().toLowerCase())
+                    .filter((v) => AIService.VALID_PLATFORMS.includes(v))
+                )
+              ).slice(0, 8)
             : [],
         };
       }
