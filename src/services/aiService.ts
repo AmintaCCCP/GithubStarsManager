@@ -766,7 +766,7 @@ ${repoInfo}
         logger.info('ai', 'AI semantic search completed', { resultCount: results.length, apiType: this.getApiType(), model: this.config.model, durationMs: Date.now() - startTime });
         return results;
       }
-    } catch (error) {
+    } catch {
       logger.warn('ai', 'AI semantic search failed, falling back to enhanced basic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, durationMs: Date.now() - startTime });
     }
 
