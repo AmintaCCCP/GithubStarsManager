@@ -347,4 +347,22 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.5.9</downloadUrl>
   </version>
+  <version>
+    <number>0.6.0</number>
+    <releaseDate>2026-05-29</releaseDate>
+    <changelog>
+      <item>feat: Added network proxy configuration in Settings for Electron client and backend-connected browser modes, supporting HTTP and SOCKS5 protocols with optional authentication. (PR #163)</item>
+      <item>feat: Replaced top paginator on Releases page with "Show All / Unread Only" dropdown filter and "Mark All as Read" button with backend persistence. (PR #171)</item>
+      <item>feat: Added structured logging system with automatic sensitive data sanitization and "Log Export" UI in Settings for AI-powered debugging. (PR #172)</item>
+      <item>fix: AI API error responses now include full response body details for better diagnostics. (PR #158)</item>
+      <item>fix: Sanitize README and repo description content before inserting into AI prompts to prevent JSON parse errors. (PR #159)</item>
+      <item>fix: AI config "Test Connection" button no longer fails with CORS network error for openai-compatible endpoints. (PR #161)</item>
+      <item>fix: Upgraded frontend Dockerfile from Node 18 to Node 22 for Vite compatibility. (PR #162)</item>
+      <item>fix: Fixed "AI config not found" error when testing connection or analyzing repos in backend mode. (PR #167)</item>
+      <item>fix: Hardened AI/WebDAV config sync to prevent data loss from encryption failures and empty submissions. (PR #168)</item>
+      <item>fix: Tooltips now always show on hover for repository descriptions; added tooltips to Trending page. (PR #170)</item>
+      <item>fix: Optimized default AI prompt to reduce thinking process output and enforce JSON-only responses. (PR #175)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.0</downloadUrl>
+  </version>
 </versions>
