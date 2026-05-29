@@ -70,7 +70,12 @@ class Logger {
   }
 
   errorFromError(module: string, message: string, err: unknown, extra?: unknown): void {
-    this.log('error', module, message, { ...sanitizeError(err), ...(extra !== undefined ? sanitizeForLog(extra) as Record<string, unknown> : {}) });
+    const sanitizedExtra = extra !== undefined && typeof extra === 'object' && extra !== null && !Array.isArray(extra)
+      ? sanitizeForLog(extra) as Record<string, unknown>
+      : extra !== undefined
+        ? { extra: sanitizeForLog(extra) }
+        : {};
+    this.log('error', module, message, { ...sanitizeError(err), ...sanitizedExtra });
   }
 
   private forwardToConsole(entry: LogEntry): void {
