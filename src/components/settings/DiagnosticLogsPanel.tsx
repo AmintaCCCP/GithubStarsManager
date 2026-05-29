@@ -156,13 +156,13 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
           </div>
         );
       case 'requestHeader':
-        return <DataBlock data={entryData?.requestHeaders} t={t} emptyText={t('无请求头数据', 'No request header data')} />;
+        return <DataBlock data={entryData?.requestHeaders} emptyText={t('无请求头数据', 'No request header data')} />;
       case 'requestBody':
-        return <DataBlock data={entryData?.requestBody} t={t} emptyText={t('无请求体数据', 'No request body data')} />;
+        return <DataBlock data={entryData?.requestBody} emptyText={t('无请求体数据', 'No request body data')} />;
       case 'responseHeader':
-        return <DataBlock data={entryData?.responseHeaders} t={t} emptyText={t('无返回头数据', 'No response header data')} />;
+        return <DataBlock data={entryData?.responseHeaders} emptyText={t('无返回头数据', 'No response header data')} />;
       case 'responseBody':
-        return <DataBlock data={entryData?.responseBody ?? entryData?.data} t={t} emptyText={t('无返回体数据（完整数据见概览标签）', 'No response body data (see General tab)')} />;
+        return <DataBlock data={entryData?.responseBody ?? entryData?.data} emptyText={t('无返回体数据（完整数据见概览标签）', 'No response body data (see General tab)')} />;
       default:
         return null;
     }
@@ -218,7 +218,7 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
   </div>
 );
 
-const DataBlock: React.FC<{ data: unknown; t: (zh: string, en: string) => string; emptyText: string }> = ({ data, t, emptyText }) => {
+const DataBlock: React.FC<{ data: unknown; emptyText: string }> = ({ data, emptyText }) => {
   if (data == null) {
     return <p className="text-gray-400 dark:text-text-quaternary text-sm italic">{emptyText}</p>;
   }
@@ -227,30 +227,6 @@ const DataBlock: React.FC<{ data: unknown; t: (zh: string, en: string) => string
     <pre className="text-xs bg-gray-50 dark:bg-white/[0.02] rounded-lg p-3 overflow-auto max-h-[400px] font-mono text-gray-700 dark:text-text-secondary whitespace-pre-wrap break-all">
       {text}
     </pre>
-  );
-};
-
-// ─── Global Debug Indicator ────────────────────────────────────
-interface DebugModeIndicatorProps {
-  frontendDebug: boolean;
-  backendDebug: boolean;
-  onToggleFrontend: () => void;
-  t: (zh: string, en: string) => string;
-}
-
-const DebugModeIndicator: React.FC<DebugModeIndicatorProps> = ({ frontendDebug, backendDebug, onToggleFrontend, t }) => {
-  if (!frontendDebug && !backendDebug) return null;
-  return (
-    <button
-      onClick={onToggleFrontend}
-      className="fixed bottom-6 right-6 z-40 flex items-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors text-sm font-medium"
-      title={t('点击关闭调试模式', 'Click to disable debug mode')}
-    >
-      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-      <span>{t('调试中', 'DEBUG')}</span>
-      {frontendDebug && <span className="text-xs opacity-80">FE</span>}
-      {backendDebug && <span className="text-xs opacity-80">BE</span>}
-    </button>
   );
 };
 
@@ -371,8 +347,8 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
 
   // Merge entries — sorted by timestamp DESCENDING (newest first)
   const allEntries = useMemo(() => {
-    if (selectedScope === 'frontend') return entries;
-    if (selectedScope === 'backend') return backendEntries;
+    if (selectedScope === 'frontend') return [...entries].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    if (selectedScope === 'backend') return [...backendEntries].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     return [...entries, ...backendEntries].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   }, [entries, backendEntries, selectedScope]);
 
@@ -433,12 +409,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
       }
     } catch { /* Backend unreachable */ }
   }, [backendDebug]);
-
-  // Quick disable debug from global indicator
-  const disableAllDebug = useCallback(() => {
-    if (frontendDebug) toggleFrontendDebug();
-    if (backendDebug) toggleBackendDebug();
-  }, [frontendDebug, backendDebug, toggleFrontendDebug, toggleBackendDebug]);
 
   // Clear logs
   const handleClear = useCallback(async () => {
@@ -528,9 +498,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
 
   return (
     <>
-      {/* Global debug indicator (floats on all pages) */}
-      <DebugModeIndicator frontendDebug={frontendDebug} backendDebug={backendDebug} onToggleFrontend={disableAllDebug} t={t} />
-
       {/* Detail modal */}
       {detailEntry && <LogDetailModal entry={detailEntry} language={language} t={t} onClose={() => setDetailEntry(null)} />}
 

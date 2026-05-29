@@ -7,6 +7,7 @@ import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { ForkTimeline } from './components/ForkTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
+import { DebugModeIndicator } from './components/DebugModeIndicator';
 import { DiscoveryView } from './components/DiscoveryView';
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -193,6 +194,7 @@ function App() {
         {currentViewContent}
       </main>
       <BackToTop />
+      <DebugModeIndicator />
     </div>
   );
 }
