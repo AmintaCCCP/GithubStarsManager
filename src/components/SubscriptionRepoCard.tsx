@@ -39,6 +39,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 取消Star确认对话框状态
   const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
   const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
+  const [descTooltip, setDescTooltip] = useState(false);
+  const [aiTooltip, setAiTooltip] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -403,18 +405,44 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Description */}
           {repo.description && (
-            <p className="text-sm text-gray-700 dark:text-text-tertiary mb-3 line-clamp-2">
-              {repo.description}
-            </p>
+            <div
+              className="relative mb-3"
+              onMouseEnter={() => setDescTooltip(true)}
+              onMouseLeave={() => setDescTooltip(false)}
+            >
+              <p className="text-sm text-gray-700 dark:text-text-tertiary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+                {repo.description}
+              </p>
+              {descTooltip && (
+                <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-sm leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[280px] overflow-y-auto scrollbar-auto">
+                  <div className="whitespace-pre-wrap break-words pr-2">
+                    {repo.description}
+                  </div>
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white dark:border-t-surface-3 drop-shadow-sm"></div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* AI Summary */}
           {repo.ai_summary && (
-            <div className="flex items-start gap-1.5 mb-3">
+            <div
+              className="relative flex items-start gap-1.5 mb-3"
+              onMouseEnter={() => setAiTooltip(true)}
+              onMouseLeave={() => setAiTooltip(false)}
+            >
               <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2">
+              <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                 {repo.ai_summary}
               </p>
+              {aiTooltip && (
+                <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-sm leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[280px] overflow-y-auto scrollbar-auto">
+                  <div className="whitespace-pre-wrap break-words pr-2">
+                    {repo.ai_summary}
+                  </div>
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white dark:border-t-surface-3 drop-shadow-sm"></div>
+                </div>
+              )}
             </div>
           )}
 
