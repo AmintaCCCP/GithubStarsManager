@@ -137,6 +137,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const descTriggerRef = useRef<HTMLDivElement>(null);
+  const tooltipHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -175,11 +176,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     return result;
   }, []);
 
-  // Cleanup drag hint timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (dragHintTimeoutRef.current) {
         clearTimeout(dragHintTimeoutRef.current);
+      }
+      if (tooltipHideTimerRef.current) {
+        clearTimeout(tooltipHideTimerRef.current);
       }
     };
   }, []);
@@ -868,10 +872,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div
           ref={descTriggerRef}
           className="relative group"
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          onFocus={() => setShowTooltip(true)}
-          onBlur={() => setShowTooltip(false)}
+          onMouseEnter={() => { clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
+          onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
+          onFocus={() => { clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
+          onBlur={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
           onTouchStart={() => setShowTooltip((v) => !v)}
           tabIndex={0}
         >
@@ -884,7 +888,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             content={highlightSearchTerm(displayContent.content, searchQuery)}
             visible={showTooltip}
             triggerRef={descTriggerRef}
-            onMouseLeave={() => setShowTooltip(false)}
+            onMouseEnter={() => clearTimeout(tooltipHideTimerRef.current)}
+            onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
           />
         </div>
 
