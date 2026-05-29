@@ -32,6 +32,7 @@ class Logger {
   log(level: LogLevel, module: string, message: string, data?: unknown): void {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[this.minLevel]) return;
 
+    const sanitizedMessage = typeof message === 'string' ? sanitizeForLog(message) as string : String(message);
     const sanitizedData = data !== undefined ? sanitizeForLog(data) : undefined;
 
     const entry: LogEntry = {
@@ -39,7 +40,7 @@ class Logger {
       timestamp: new Date().toISOString(),
       level,
       module,
-      message,
+      message: sanitizedMessage,
       data: sanitizedData,
       source: 'backend',
     };

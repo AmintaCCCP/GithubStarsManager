@@ -43,8 +43,10 @@ export function maskEmail(email: string): string {
 export function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    for (const key of SENSITIVE_URL_PARAMS) {
-      if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '***');
+    for (const [key] of parsed.searchParams) {
+      if (SENSITIVE_URL_PARAMS.includes(key.toLowerCase())) {
+        parsed.searchParams.set(key, '***');
+      }
     }
     return parsed.toString();
   } catch {

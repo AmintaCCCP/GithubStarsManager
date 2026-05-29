@@ -27,10 +27,7 @@ function getMaskedSecretResult(params: {
       status: 'ok',
     };
   } catch (error) {
-    const detail = [configId ? `id=${String(configId)}` : '', configName ? `name=${String(configName)}` : '']
-      .filter(Boolean)
-      .join(', ');
-    logger.warn('configs.decrypt', `Failed to decrypt ${kind}${detail ? ` (${detail})` : ''}`, { kind, detail });
+    logger.warn('configs.decrypt', 'Failed to decrypt stored secret', { kind, configId, configName });
     return { decryptedValue: '', status: 'decrypt_failed' };
   }
 }
@@ -148,7 +145,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
           try {
             encryptedKey = encrypt(String(c.apiKey), config.encryptionKey);
           } catch (encErr) {
-            logger.errorFromError('configs.encryptAIKey', `Failed to encrypt API key for config "${c.name}" (${c.id})`, encErr);
+            logger.errorFromError('configs.encryptAIKey', 'Failed to encrypt API key for config', encErr, { configId: c.id, configName: c.name });
             encryptedKey = existingKeys.get(String(c.id)) ?? '';
             if (!encryptedKey) {
               syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
@@ -366,7 +363,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
           try {
             encryptedPwd = encrypt(String(c.password), config.encryptionKey);
           } catch (encErr) {
-            logger.errorFromError('configs.encryptWebDAVPwd', `Failed to encrypt WebDAV password for "${c.name}" (${c.id})`, encErr);
+            logger.errorFromError('configs.encryptWebDAVPwd', 'Failed to encrypt WebDAV password for config', encErr, { configId: c.id, configName: c.name });
             encryptedPwd = existingPwds.get(String(c.id)) ?? '';
             if (!encryptedPwd) {
               syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
