@@ -206,6 +206,8 @@ export class WebDAVService {
       const uploadOperation = async (): Promise<boolean> => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), dynamicTimeout);
+        const sanitizedPath = this.getFullPath(filename).replace(/^https?:\/\/[^/]+/, '');
+        const startTime = Date.now();
 
         try {
           const response = await fetch(this.getFullPath(filename), {
@@ -219,6 +221,10 @@ export class WebDAVService {
           });
 
           clearTimeout(timeoutId);
+
+          if (logger.isDebugMode()) {
+            logger.debug('webdav', 'WebDAV request', { method: 'PUT', path: sanitizedPath, status: response.status, durationMs: Date.now() - startTime });
+          }
 
           if (!response.ok) {
             if (response.status === 401) {
@@ -307,6 +313,8 @@ export class WebDAVService {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+      const sanitizedPath = this.getFullPath(filename).replace(/^https?:\/\/[^/]+/, '');
+      const startTime = Date.now();
 
       try {
         const response = await fetch(this.getFullPath(filename), {
@@ -316,34 +324,38 @@ export class WebDAVService {
           },
           signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
+
+        if (logger.isDebugMode()) {
+          logger.debug('webdav', 'WebDAV request', { method: 'GET', path: sanitizedPath, status: response.status, durationMs: Date.now() - startTime });
+        }
 
         if (response.ok) {
           return await response.text();
         }
-        
+
         if (response.status === 404) {
           return null; // 文件未找到是预期行为
         }
-        
+
         if (response.status === 401) {
           throw new Error('身份验证失败。请检查用户名和密码。');
         }
-        
+
         throw new Error(`下载失败，HTTP状态码 ${response.status}: ${response.statusText}`);
       } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
-        
+
         if ((fetchError as Error).name === 'AbortError') {
           throw new Error('下载超时。请检查网络连接。');
         }
-        
+
         throw fetchError;
       }
     } catch (error: unknown) {
       const err = error as Error;
-      if (err.message.includes('身份验证失败') || 
+      if (err.message.includes('身份验证失败') ||
           err.message.includes('下载超时')) {
         throw error;
       }
