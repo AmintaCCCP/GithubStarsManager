@@ -69,6 +69,9 @@ class BackendAdapter {
     return headers;
   }
   private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
+    const startTime = Date.now();
+    const method = (options?.method || 'GET').toUpperCase();
+    const path = url.replace(/^https?:\/\/[^/]+/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -83,7 +86,16 @@ class BackendAdapter {
     }
 
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      if (logger.isDebugMode()) {
+        logger.debug('backendAdapter', 'Backend request', { method, path, status: response.status, durationMs: Date.now() - startTime });
+      }
+      return response;
+    } catch (err) {
+      if (logger.isDebugMode()) {
+        logger.debug('backendAdapter', 'Backend request', { method, path, error: 'timeout/network error', durationMs: Date.now() - startTime });
+      }
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -94,6 +106,9 @@ class BackendAdapter {
    * Covers browser fetch (Chrome/Firefox/Safari) and Node.js undici fetch.
    */
   private async fetchWithRetry(url: string, options?: RequestInit, timeoutMs = 30000, maxRetries = 3): Promise<Response> {
+    const retryStartTime = Date.now();
+    const method = (options?.method || 'GET').toUpperCase();
+    const path = url.replace(/^https?:\/\/[^/]+/, '');
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -116,7 +131,7 @@ class BackendAdapter {
         if (!isRetryable || attempt === maxRetries) throw lastError;
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
-        logger.warn('backendAdapter', 'Sync request failed, retrying', { attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs: delay });
+        logger.warn('backendAdapter', 'Sync request failed, retrying', { attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs: delay, durationMs: Date.now() - retryStartTime, method, path });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

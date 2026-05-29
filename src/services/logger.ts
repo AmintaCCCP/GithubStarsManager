@@ -52,6 +52,11 @@ class Logger {
 
     // Forward to console for dev experience
     this.forwardToConsole(entry);
+
+    // Notify UI listeners
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('gsm:diagnostic-log-added', { detail: entry }));
+    }
   }
 
   debug(module: string, message: string, data?: unknown): void {
@@ -126,10 +131,25 @@ class Logger {
 
   clear(): void {
     this.buffer = [];
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('gsm:diagnostic-logs-cleared'));
+    }
   }
 
   setLevel(level: LogLevel): void {
     this.minLevel = level;
+  }
+
+  isDebugMode(): boolean {
+    return this.minLevel === 'debug';
+  }
+
+  getModules(): string[] {
+    const modules = new Set<string>();
+    for (const entry of this.buffer) {
+      modules.add(entry.module);
+    }
+    return Array.from(modules).sort();
   }
 
   /**
