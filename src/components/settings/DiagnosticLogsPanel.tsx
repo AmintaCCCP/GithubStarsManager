@@ -78,8 +78,29 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
     }
     return false;
   });
-  const [backendDebug, setBackendDebug] = useState(() => sessionStorage.getItem('gsm:backend-debug') === 'true');
+  const [backendDebug, setBackendDebug] = useState(false);
   const backendAvailable = backend.isAvailable;
+
+  // Initialize backend debug state from server on mount
+  useEffect(() => {
+    if (!backendAvailable) return;
+    const fetchDebugState = async () => {
+      try {
+        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
+        const res = await fetch('/api/logs/debug', {
+          headers: { Authorization: `Bearer ${secret}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setBackendDebug(data.debugMode);
+          sessionStorage.setItem('gsm:backend-debug', String(data.debugMode));
+        }
+      } catch {
+        // Backend unreachable, keep false
+      }
+    };
+    fetchDebugState();
+  }, [backendAvailable]);
 
   // Log entries state
   const [entries, setEntries] = useState<LogEntry[]>(() => logger.getEntries());
@@ -165,15 +186,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
     return Array.from(types).sort();
   }, [allEntries]);
 
-  // Derived: available modules
-  const availableModules = useMemo(() => {
-    const mods = new Set<string>();
-    for (const entry of allEntries) {
-      mods.add(entry.module);
-    }
-    return Array.from(mods).sort();
-  }, [allEntries]);
-
   // Filter entries
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
@@ -204,11 +216,9 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   // Toggle backend debug mode
   const toggleBackendDebug = useCallback(async () => {
     const next = !backendDebug;
-    setBackendDebug(next);
-    sessionStorage.setItem('gsm:backend-debug', String(next));
     try {
       const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-      await fetch('/api/logs/debug', {
+      const res = await fetch('/api/logs/debug', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,8 +226,13 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         },
         body: JSON.stringify({ enabled: next }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        setBackendDebug(data.debugMode);
+        sessionStorage.setItem('gsm:backend-debug', String(data.debugMode));
+      }
     } catch {
-      // Backend unreachable
+      // Backend unreachable, don't update state
     }
   }, [backendDebug]);
 
@@ -271,9 +286,9 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
       const minLevel = selectedLevels.size > 0
         ? (Object.entries(levelOrder).find(([l]) => selectedLevels.has(l as LogLevel))?.[1] ?? 3)
         : 3;
-      const minLevelName = (Object.entries(levelOrder).find(([_, v]) => v === minLevel)?.[0] as LogLevel) || 'info';
+      const minLevelName = (Object.entries(levelOrder).find(([, v]) => v === minLevel)?.[0] as LogLevel) || 'info';
 
-      let frontendLogs = selectedScope !== 'backend'
+      const frontendLogs = selectedScope !== 'backend'
         ? logger.getEntries({ level: minLevelName }).filter(e => selectedLevels.has(e.level))
         : [];
       let backendLogs: LogEntry[] = [];
@@ -461,7 +476,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-gray-900 dark:text-text-primary">{t('级别', 'Level')}:</span>
           {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => {
-            const disabled = level === 'debug' && !frontendDebug && selectedScope !== 'backend';
+            const disabled = level === 'debug' && !frontendDebug && !(selectedScope === 'backend' || (selectedScope === 'all' && backendDebug));
             const selected = selectedLevels.has(level);
             return (
               <button
