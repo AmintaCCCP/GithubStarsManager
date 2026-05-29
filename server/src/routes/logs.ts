@@ -3,12 +3,28 @@ import { logger, LogLevel } from '../services/logger.js';
 
 const router = Router();
 
+const ALLOWED_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error'];
+
 // GET /api/logs — returns recent backend log entries
 router.get('/api/logs', (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 1000, 2000);
-    const level = req.query.level as LogLevel | undefined;
-    const since = req.query.since as string | undefined;
+
+    // Validate level parameter
+    const rawLevel = typeof req.query.level === 'string' ? req.query.level : undefined;
+    if (rawLevel && !ALLOWED_LEVELS.includes(rawLevel as LogLevel)) {
+      res.status(400).json({ error: 'Invalid log level', code: 'INVALID_LOG_LEVEL' });
+      return;
+    }
+    const level = rawLevel as LogLevel | undefined;
+
+    // Validate since parameter
+    const rawSince = typeof req.query.since === 'string' ? req.query.since : undefined;
+    if (rawSince && Number.isNaN(Date.parse(rawSince))) {
+      res.status(400).json({ error: 'Invalid since value', code: 'INVALID_SINCE' });
+      return;
+    }
+    const since = rawSince;
 
     // Get all matching entries first for count, then apply limit
     const allEntries = logger.getEntries({ level, since });
