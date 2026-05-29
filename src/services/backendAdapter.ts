@@ -327,6 +327,17 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Sync releases error');
   }
 
+  async markAllReleasesAsRead(): Promise<{ updated: number }> {
+    if (!this._backendUrl) return { updated: 0 };
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/releases/mark-all-read`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Mark all read error');
+    return res.json() as Promise<{ updated: number }>;
+  }
+
   async fetchReleases(): Promise<{ releases: Release[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 

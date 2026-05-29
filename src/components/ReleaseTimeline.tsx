@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown } from 'lucide-react';
+import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
+import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -21,6 +22,7 @@ export const ReleaseTimeline: React.FC = () => {
     assetFilters,
     addReleases,
     markReleaseAsRead,
+    markAllReleasesAsRead,
     batchUnsubscribeReleases,
     removeReleasesByRepoId,
     updateRepository,
@@ -51,6 +53,9 @@ export const ReleaseTimeline: React.FC = () => {
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
   // 视图切换下拉菜单状态（本地UI状态）
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
+  const [releaseShowMode, setReleaseShowMode] = useState<'all' | 'unread'>('all');
+  const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
@@ -205,7 +210,7 @@ export const ReleaseTimeline: React.FC = () => {
     });
   }, [subscribedReleases, getDownloadLinks, selectedFilters, matchesActiveFilters]);
 
-  const filteredReleases = useMemo(() => {
+  const preUnreadFilteredReleases = useMemo(() => {
     let filtered = releasesWithLinks;
 
     // 搜索过滤
@@ -235,6 +240,18 @@ export const ReleaseTimeline: React.FC = () => {
         displayLinks: selectedFilters.length > 0 ? filteredLinks : allLinks
       }));
   }, [releasesWithLinks, searchQuery, selectedFilters]);
+
+  // 未读模式过滤
+  const filteredReleases = useMemo(() => {
+    if (releaseShowMode === 'unread') {
+      return preUnreadFilteredReleases.filter(({ release }) => !readReleases.has(release.id));
+    }
+    return preUnreadFilteredReleases;
+  }, [preUnreadFilteredReleases, releaseShowMode, readReleases]);
+
+  const unreadCount = useMemo(() => {
+    return subscribedReleases.filter(r => !readReleases.has(r.id)).length;
+  }, [subscribedReleases, readReleases]);
 
   // 按仓库分组的 Release 数据
   const repositoryGroups = useMemo(() => {
@@ -366,6 +383,25 @@ export const ReleaseTimeline: React.FC = () => {
       toast(errorMessage, 'error');
     } finally {
       setReleaseIsRefreshing(false);
+    }
+  };
+
+  const handleShowModeChange = (mode: 'all' | 'unread') => {
+    setReleaseShowMode(mode);
+    setCurrentPage(1);
+    setIsShowModeDropdownOpen(false);
+  };
+
+  const handleMarkAllRead = async () => {
+    setIsMarkingAllRead(true);
+    try {
+      markAllReleasesAsRead();
+      await backend.markAllReleasesAsRead();
+      toast(t('已全部标记为已读', 'All marked as read'), 'success');
+    } catch (error) {
+      toast(t('标记全部已读失败', 'Failed to mark all as read'), 'error');
+    } finally {
+      setIsMarkingAllRead(false);
     }
   };
 
@@ -695,7 +731,10 @@ export const ReleaseTimeline: React.FC = () => {
             {/* View Mode Toggle Dropdown */}
             <div className="relative">
               <button
-                onClick={() => setIsViewDropdownOpen(!isViewDropdownOpen)}
+                onClick={() => {
+                  setIsViewDropdownOpen(!isViewDropdownOpen);
+                  setIsShowModeDropdownOpen(false);
+                }}
                 className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
                 title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
               >
@@ -757,21 +796,36 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
         </div>
 
-        {/* Results Info and Pagination Controls */}
+        {/* Results Info and Controls */}
         <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-gray-700 dark:text-text-tertiary">
               {viewMode === 'timeline'
-                ? t(
-                    `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
-                    `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
-                  )
-                : t(
-                    `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个仓库`,
-                    `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} repositories`
-                  )
+                ? releaseShowMode === 'unread'
+                  ? t(
+                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个未读 (总计 ${preUnreadFilteredReleases.length})`,
+                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} unread (total: ${preUnreadFilteredReleases.length})`
+                    )
+                  : t(
+                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
+                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
+                    )
+                : releaseShowMode === 'unread'
+                  ? t(
+                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个未读仓库 (总计 ${preUnreadFilteredReleases.length})`,
+                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} unread repos (total: ${preUnreadFilteredReleases.length})`
+                    )
+                  : t(
+                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个仓库`,
+                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} repositories`
+                    )
               }
             </span>
+            {releaseShowMode === 'all' && unreadCount > 0 && (
+              <span className="text-sm text-brand-violet dark:text-brand-violet">
+                ({unreadCount} {t('未读', 'unread')})
+              </span>
+            )}
             {(searchQuery || selectedFilters.length > 0) && (
               <span className="text-sm text-brand-violet dark:text-brand-violet">
                 ({t('已筛选', 'filtered')})
@@ -779,7 +833,57 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Show Mode Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsShowModeDropdownOpen(!isShowModeDropdownOpen);
+                  setIsViewDropdownOpen(false);
+                }}
+                className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
+              >
+                <Filter className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
+                <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                  {releaseShowMode === 'all' ? t('全部', 'All') : t('仅未读', 'Unread')}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-text-tertiary transition-transform ${isShowModeDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isShowModeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsShowModeDropdownOpen(false)} />
+                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-lg shadow-lg border border-black/[0.06] dark:border-white/[0.04] z-50 py-1">
+                    <button
+                      onClick={() => handleShowModeChange('all')}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
+                        releaseShowMode === 'all' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      }`}
+                    >
+                      <Filter className={`w-4 h-4 ${releaseShowMode === 'all' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('显示全部', 'Show All')}</div>
+                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('显示所有Release', 'Show all releases')}</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleShowModeChange('unread')}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
+                        releaseShowMode === 'unread' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      }`}
+                    >
+                      <Filter className={`w-4 h-4 ${releaseShowMode === 'unread' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
+                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('只显示未读的Release', 'Only show unread releases')}</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Items per page selector */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700 dark:text-text-tertiary">{t('每页:', 'Per page:')}</span>
@@ -798,57 +902,16 @@ export const ReleaseTimeline: React.FC = () => {
               </select>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center space-x-1 overflow-x-auto pb-1">
-                <button
-                  onClick={() => handlePageChange(1)}
-                  disabled={clampedPage === 1}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(clampedPage - 1)}
-                  disabled={clampedPage === 1}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                
-                {getPageNumbers().map((page, index) => (
-                  <button
-                    key={index}
-                    onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
-                    disabled={typeof page !== 'number'}
-                    className={`px-3 py-2 rounded-lg text-sm ${
-                      page === clampedPage
-                        ? 'bg-brand-indigo text-white'
-                        : typeof page === 'number'
-                        ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10'
-                        : 'text-gray-400 cursor-default'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                
-                <button
-                  onClick={() => handlePageChange(clampedPage + 1)}
-                  disabled={clampedPage === totalPages}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(totalPages)}
-                  disabled={clampedPage === totalPages}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            {/* Mark All Read button */}
+            <button
+              onClick={handleMarkAllRead}
+              disabled={isMarkingAllRead || unreadCount === 0}
+              className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title={t('全部标记为已读', 'Mark all as read')}
+            >
+              {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">{t('全部已读', 'Mark All Read')}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -859,14 +922,26 @@ export const ReleaseTimeline: React.FC = () => {
            <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06]-alt dark:border-white/[0.04]">
             <Package className="w-12 h-12 text-gray-400 dark:text-text-secondarymx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
-              {t('无符合条件的结果', 'No matching results')}
+              {releaseShowMode === 'unread'
+                ? t('没有未读的 Release', 'No unread releases')
+                : t('无符合条件的结果', 'No matching results')}
             </h3>
             <p className="text-sm text-gray-500 dark:text-text-tertiary">
-              {selectedFilters.length > 0
-                ? t('当前过滤器没有匹配到任何资产，请尝试其他过滤条件', 'No assets match the current filters. Try different filter criteria.')
-                : t('没有找到匹配的 Release', 'No matching releases found.')}
+              {releaseShowMode === 'unread'
+                ? t('所有 Release 都已标记为已读', 'All releases have been marked as read')
+                : selectedFilters.length > 0
+                  ? t('当前过滤器没有匹配到任何资产，请尝试其他过滤条件', 'No assets match the current filters. Try different filter criteria.')
+                  : t('没有找到匹配的 Release', 'No matching releases found.')}
             </p>
-            {selectedFilters.length > 0 && (
+            {releaseShowMode === 'unread' && (
+              <button
+                onClick={() => handleShowModeChange('all')}
+                className="mt-4 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm"
+              >
+                {t('查看全部', 'Show All')}
+              </button>
+            )}
+            {selectedFilters.length > 0 && releaseShowMode !== 'unread' && (
               <button
                 onClick={handleClearFilters}
                 className="mt-4 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm"
