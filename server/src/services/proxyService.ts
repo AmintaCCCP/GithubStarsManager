@@ -1,4 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import { logger } from './logger.js';
+import { redactUrl } from './logSanitizer.js';
 
 export interface ProxyConfig {
   enabled: boolean;
@@ -22,18 +24,6 @@ export interface ProxyResponse {
   status: number;
   headers: Record<string, string>;
   data: unknown;
-}
-
-function redactUrl(rawUrl: string): string {
-  try {
-    const url = new URL(rawUrl);
-    for (const key of ['key', 'api_key', 'apikey', 'token', 'access_token', 'secret', 'client_secret', 'password', 'auth']) {
-      if (url.searchParams.has(key)) url.searchParams.set(key, '***');
-    }
-    return url.toString();
-  } catch {
-    return rawUrl;
-  }
 }
 
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254']);
@@ -73,7 +63,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
   try {
     validateUrl(url);
-    console.log(`[Proxy] ${method} ${redactUrl(url)}`);
+    logger.info('proxy.request', `${method} ${redactUrl(url)}`);
 
     const axiosConfig: AxiosRequestConfig = {
       url,
@@ -124,7 +114,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
     const response = await axios(axiosConfig);
 
-    console.log(`[Proxy] ${method} ${redactUrl(url)} -> ${response.status}`);
+    logger.info('proxy.response', `${method} ${redactUrl(url)} -> ${response.status}`);
 
     const responseHeaders: Record<string, string> = {};
     if (response.headers) {
@@ -168,7 +158,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
         };
       }
     }
-    console.error(`[Proxy] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.errorFromError('proxy.error', 'Proxy request failed', error);
     return { status: 502, headers: {}, data: { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: error instanceof Error ? error.message : 'Unknown error' } };
   }
 }
