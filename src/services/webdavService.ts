@@ -1,4 +1,5 @@
 import { WebDAVConfig } from '../types';
+import { logger } from './logger';
 
 export class WebDAVService {
   private config: WebDAVConfig;
@@ -13,7 +14,7 @@ export class WebDAVService {
       const data = JSON.parse(content);
       return JSON.stringify(data);
     } catch (e) {
-      console.warn('JSON压缩失败，使用原始内容:', e);
+      logger.warn('webdav', 'JSON压缩失败，使用原始内容', e);
       return content;
     }
   }
@@ -63,7 +64,7 @@ export class WebDAVService {
           throw lastError;
         }
 
-        console.warn(`上传失败，第${attempt}次重试 (${delay}ms后):`, errMsg);
+        logger.warn('webdav', `上传失败，第${attempt}次重试`, { attempt, errMsg, delay });
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; // 指数退避
       }
@@ -83,7 +84,7 @@ export class WebDAVService {
   }
 
   private handleNetworkError(error: unknown, operation: string): never {
-    console.error(`WebDAV ${operation} failed:`, error);
+    logger.error('webdav', `WebDAV ${operation} failed`, error);
     
     const err = error as Error;
     const isCorsError = (
@@ -189,10 +190,10 @@ export class WebDAVService {
       const compressedContent = this.compressData(content);
 
       if (fileAnalysis.isLarge) {
-        console.warn(`大文件备份 (${fileAnalysis.sizeKB}KB):`, fileAnalysis.suggestions.join(', '));
+        logger.warn('webdav', '大文件备份', { sizeKB: fileAnalysis.sizeKB, suggestions: fileAnalysis.suggestions });
       }
 
-      console.log(`文件大小: ${fileAnalysis.sizeKB}KB，压缩后: ${Math.round(compressedContent.length / 1024)}KB`);
+      logger.info('webdav', '文件大小', { sizeKB: fileAnalysis.sizeKB, compressedKB: Math.round(compressedContent.length / 1024) });
 
       // 确保目录存在
       await this.ensureDirectoryExists();
@@ -200,7 +201,7 @@ export class WebDAVService {
       // 动态计算超时时间：基于压缩后文件大小，最小60秒，最大300秒
       const finalSizeKB = Math.round(compressedContent.length / 1024);
       const dynamicTimeout = Math.max(60000, Math.min(300000, finalSizeKB * 100)); // 每KB 100ms
-      console.log(`设置超时时间: ${dynamicTimeout}ms`);
+      logger.info('webdav', '设置超时时间', { dynamicTimeout });
 
       const uploadOperation = async (): Promise<boolean> => {
         const controller = new AbortController();
@@ -287,17 +288,17 @@ export class WebDAVService {
           if (!res.ok && res.status !== 405) {
             // 某些服务器对已存在目录返回 409 Conflict
             if (res.status !== 409) {
-              console.warn(`无法创建目录 ${currentPath}，状态码: ${res.status}`);
+              logger.warn('webdav', '无法创建目录', { currentPath, status: res.status });
               break; // 不再继续往下建
             }
           }
         } catch (e) {
-          console.warn(`创建目录 ${currentPath} 发生异常:`, e);
+          logger.warn('webdav', '创建目录发生异常', { currentPath, error: e });
           break;
         }
       }
     } catch (error) {
-      console.warn('目录创建检查失败:', error);
+      logger.warn('webdav', '目录创建检查失败', error);
       // 不在这里抛出错误，因为目录可能已经存在
     }
   }
@@ -369,7 +370,7 @@ export class WebDAVService {
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
-      console.error('WebDAV文件检查失败:', error);
+      logger.error('webdav', 'WebDAV文件检查失败', error);
       return false;
     }
   }
@@ -529,7 +530,7 @@ export class WebDAVService {
         };
       }
     } catch (error) {
-      console.warn('无法获取服务器信息:', error);
+      logger.warn('webdav', '无法获取服务器信息', error);
     }
     
     return {};

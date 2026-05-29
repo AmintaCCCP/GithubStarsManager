@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { logger } from '../services/logger.js';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ function getMaskedSecretResult(params: {
     const detail = [configId ? `id=${String(configId)}` : '', configName ? `name=${String(configName)}` : '']
       .filter(Boolean)
       .join(', ');
-    console.warn(`[configs] Failed to decrypt ${kind}${detail ? ` (${detail})` : ''}:`, error);
+    logger.warn('configs.decrypt', `Failed to decrypt ${kind}${detail ? ` (${detail})` : ''}`, { kind, detail });
     return { decryptedValue: '', status: 'decrypt_failed' };
   }
 }
@@ -73,7 +74,7 @@ router.get('/api/configs/ai', (req, res) => {
     });
     res.json(configs);
   } catch (err) {
-    console.error('GET /api/configs/ai error:', err);
+    logger.errorFromError('configs.getAI', 'GET /api/configs/ai error', err);
     res.status(500).json({ error: 'Failed to fetch AI configs', code: 'FETCH_AI_CONFIGS_FAILED' });
   }
 });
@@ -95,7 +96,7 @@ router.post('/api/configs/ai', (req, res) => {
 
     res.status(201).json({ id: result.lastInsertRowid, name, apiType, model, baseUrl, apiKey: maskApiKey(apiKey as string), isActive: !!isActive, reasoningEffort: reasoningEffort ?? null });
   } catch (err) {
-    console.error('POST /api/configs/ai error:', err);
+    logger.errorFromError('configs.createAI', 'POST /api/configs/ai error', err);
     res.status(500).json({ error: 'Failed to create AI config', code: 'CREATE_AI_CONFIG_FAILED' });
   }
 });
@@ -147,7 +148,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
           try {
             encryptedKey = encrypt(String(c.apiKey), config.encryptionKey);
           } catch (encErr) {
-            console.error(`[configs] Failed to encrypt API key for config "${c.name}" (${c.id}), falling back to existing key:`, encErr);
+            logger.errorFromError('configs.encryptAIKey', `Failed to encrypt API key for config "${c.name}" (${c.id})`, encErr);
             encryptedKey = existingKeys.get(String(c.id)) ?? '';
             if (!encryptedKey) {
               syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
@@ -178,7 +179,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
       }
 
       if (syncResult.skipped.length > 0) {
-        console.warn('[configs] Skipped AI configs with missing keys:', syncResult.skipped);
+        logger.warn('configs.bulkAI', 'Skipped AI configs with missing keys', { skippedCount: syncResult.skipped.length, skipped: syncResult.skipped });
       }
 
       // Safety guard: prevent committing an empty database when all configs were skipped
@@ -191,7 +192,7 @@ router.put('/api/configs/ai/bulk', (req, res) => {
     res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('PUT /api/configs/ai/bulk error:', err);
+    logger.errorFromError('configs.bulkAI', 'PUT /api/configs/ai/bulk error', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
       res.status(422).json({
         error: 'All AI configs were skipped — check the errors field for per-config reasons',
@@ -237,7 +238,7 @@ router.put('/api/configs/ai/:id', (req, res) => {
 
     res.json({ id, name, apiType, model, baseUrl, apiKey: maskedKey, isActive: !!isActive, reasoningEffort: reasoningEffort ?? null });
   } catch (err) {
-    console.error('PUT /api/configs/ai error:', err);
+    logger.errorFromError('configs.updateAI', 'PUT /api/configs/ai error', err);
     res.status(500).json({ error: 'Failed to update AI config', code: 'UPDATE_AI_CONFIG_FAILED' });
   }
 });
@@ -254,7 +255,7 @@ router.delete('/api/configs/ai/:id', (req, res) => {
     }
     res.json({ deleted: true });
   } catch (err) {
-    console.error('DELETE /api/configs/ai error:', err);
+    logger.errorFromError('configs.deleteAI', 'DELETE /api/configs/ai error', err);
     res.status(500).json({ error: 'Failed to delete AI config', code: 'DELETE_AI_CONFIG_FAILED' });
   }
 });
@@ -294,7 +295,7 @@ router.get('/api/configs/webdav', (req, res) => {
     });
     res.json(configs);
   } catch (err) {
-    console.error('GET /api/configs/webdav error:', err);
+    logger.errorFromError('configs.getWebDAV', 'GET /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to fetch WebDAV configs', code: 'FETCH_WEBDAV_CONFIGS_FAILED' });
   }
 });
@@ -316,7 +317,7 @@ router.post('/api/configs/webdav', (req, res) => {
 
     res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive });
   } catch (err) {
-    console.error('POST /api/configs/webdav error:', err);
+    logger.errorFromError('configs.createWebDAV', 'POST /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to create WebDAV config', code: 'CREATE_WEBDAV_CONFIG_FAILED' });
   }
 });
@@ -365,7 +366,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
           try {
             encryptedPwd = encrypt(String(c.password), config.encryptionKey);
           } catch (encErr) {
-            console.error(`[configs] Failed to encrypt WebDAV password for "${c.name}" (${c.id}), falling back to existing:`, encErr);
+            logger.errorFromError('configs.encryptWebDAVPwd', `Failed to encrypt WebDAV password for "${c.name}" (${c.id})`, encErr);
             encryptedPwd = existingPwds.get(String(c.id)) ?? '';
             if (!encryptedPwd) {
               syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
@@ -395,7 +396,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       }
 
       if (syncResult.skipped.length > 0) {
-        console.warn('[configs] Skipped WebDAV configs with missing passwords:', syncResult.skipped);
+        logger.warn('configs.bulkWebDAV', 'Skipped WebDAV configs with missing passwords', { skippedCount: syncResult.skipped.length });
       }
 
       // Safety guard: prevent committing an empty database when all configs were skipped
@@ -408,7 +409,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
     res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('PUT /api/configs/webdav/bulk error:', err);
+    logger.errorFromError('configs.bulkWebDAV', 'PUT /api/configs/webdav/bulk error', err);
     if (errMsg === 'ALL_CONFIGS_SKIPPED') {
       res.status(422).json({
         error: 'All WebDAV configs were skipped — check the errors field for per-config reasons',
@@ -453,7 +454,7 @@ router.put('/api/configs/webdav/:id', (req, res) => {
 
     res.json({ id, name, url, username, password: maskedPwd, path, isActive: !!isActive });
   } catch (err) {
-    console.error('PUT /api/configs/webdav error:', err);
+    logger.errorFromError('configs.updateWebDAV', 'PUT /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to update WebDAV config', code: 'UPDATE_WEBDAV_CONFIG_FAILED' });
   }
 });
@@ -470,7 +471,7 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
     }
     res.json({ deleted: true });
   } catch (err) {
-    console.error('DELETE /api/configs/webdav error:', err);
+    logger.errorFromError('configs.deleteWebDAV', 'DELETE /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to delete WebDAV config', code: 'DELETE_WEBDAV_CONFIG_FAILED' });
   }
 });
@@ -503,7 +504,7 @@ router.get('/api/settings', (_req, res) => {
 
     res.json(settings);
   } catch (err) {
-    console.error('GET /api/settings error:', err);
+    logger.errorFromError('configs.getSettings', 'GET /api/settings error', err);
     res.status(500).json({ error: 'Failed to fetch settings', code: 'FETCH_SETTINGS_FAILED' });
   }
 });
@@ -543,7 +544,7 @@ router.put('/api/settings', (req, res) => {
     upsert();
     res.json({ updated: true });
   } catch (err) {
-    console.error('PUT /api/settings error:', err);
+    logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });
   }
 });

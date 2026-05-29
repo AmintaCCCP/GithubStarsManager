@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
+import { logger } from '../services/logger.js';
 
 let db: Database.Database | null = null;
 
@@ -24,7 +25,7 @@ export function getDb(): Database.Database {
 
     return db;
   } catch (error) {
-    console.error('Failed to initialize database:', error);
+    logger.errorFromError('db.connection', 'Failed to initialize database', error);
     throw new Error('Database initialization failed');
   }
 }

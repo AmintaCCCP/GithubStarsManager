@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig } from '../services/proxyService.js';
+import { logger } from '../services/logger.js';
 
 function getProxyConfig(): ProxyConfig | null {
   try {
@@ -101,7 +102,7 @@ router.post('/api/proxy/github/*', async (req, res) => {
     const result = await proxyRequest({ url: targetUrl, method, headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
-    console.error('GitHub proxy error:', err);
+    logger.errorFromError('proxy.github', 'GitHub proxy error', err);
     res.status(500).json({ error: 'GitHub proxy failed', code: 'GITHUB_PROXY_FAILED' });
   }
 });
@@ -143,7 +144,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       try {
         const parsed = new URL(baseUrl);
         if (parsed.protocol !== 'https:') {
-          console.warn(`[Proxy] ⚠️ AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
+          logger.warn('proxy.ai', `AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
         }
       } catch { /* invalid URL, will be caught by validateUrl later */ }
     } else if (configId) {
@@ -161,7 +162,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       try {
         const parsed = new URL(baseUrl);
         if (parsed.protocol !== 'https:') {
-          console.warn(`[Proxy] ⚠️ AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
+          logger.warn('proxy.ai', `AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
         }
       } catch { /* invalid URL, will be caught by validateUrl later */ }
     } else {
@@ -220,7 +221,7 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     res.status(result.status).json(result.data);
   } catch (err) {
-    console.error('AI proxy error:', err);
+    logger.errorFromError('proxy.ai', 'AI proxy error', err);
     res.status(500).json({ error: 'AI proxy failed', code: 'AI_PROXY_FAILED' });
   }
 });
@@ -277,7 +278,7 @@ router.post('/api/proxy/webdav', async (req, res) => {
 
     res.status(result.status).json(result.data);
   } catch (err) {
-    console.error('WebDAV proxy error:', err);
+    logger.errorFromError('proxy.webdav', 'WebDAV proxy error', err);
     res.status(500).json({ error: 'WebDAV proxy failed', code: 'WEBDAV_PROXY_FAILED' });
   }
 });
@@ -317,7 +318,7 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
-    console.error('GitHub search repositories proxy error:', err);
+    logger.errorFromError('proxy.github.search', 'GitHub search repositories proxy error', err);
     res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
   }
 });
@@ -357,7 +358,7 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
-    console.error('GitHub search users proxy error:', err);
+    logger.errorFromError('proxy.github.search', 'GitHub search users proxy error', err);
     res.status(500).json({ error: 'GitHub search proxy failed', code: 'GITHUB_SEARCH_PROXY_FAILED' });
   }
 });
@@ -416,7 +417,7 @@ router.put('/api/settings/proxy', (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Failed to save proxy config:', err);
+    logger.errorFromError('proxy.settings', 'Failed to save proxy config', err);
     res.status(500).json({ error: 'Failed to save proxy config' });
   }
 });
