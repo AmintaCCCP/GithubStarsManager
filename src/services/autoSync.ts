@@ -150,11 +150,42 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.releases = hashes.releases;
     }
     if (changed.ai && aiResult.status === 'fulfilled') {
-      state.setAIConfigs(aiResult.value);
+      // Filter out configs with decrypt_failed status — preserve local apiKey values
+      // to prevent backend decryption failures from overwriting valid local data.
+      const backendConfigs = aiResult.value;
+      const localConfigs = state.aiConfigs;
+      const mergedConfigs = backendConfigs.map(bc => {
+        if (bc.apiKeyStatus === 'decrypt_failed' || !bc.apiKey) {
+          const local = localConfigs.find(lc => lc.id === bc.id);
+          if (local && local.apiKey) {
+            console.warn(`[sync] Backend decrypt_failed for AI config "${bc.name}", preserving local apiKey`);
+            return { ...bc, apiKey: local.apiKey, apiKeyStatus: 'ok' as const };
+          }
+        }
+        return bc;
+      });
+      state.setAIConfigs(mergedConfigs);
+      // Store raw backend hash so change detection compares against the same payload.
+      // Using mergedConfigs would cause a mismatch and re-trigger on every poll.
       _lastHash.ai = hashes.ai;
     }
     if (changed.webdav && webdavResult.status === 'fulfilled') {
-      state.setWebDAVConfigs(webdavResult.value);
+      // Filter out configs with decrypt_failed status — preserve local password values
+      // to prevent backend decryption failures from overwriting valid local data.
+      const backendConfigs = webdavResult.value;
+      const localConfigs = state.webdavConfigs;
+      const mergedConfigs = backendConfigs.map(bc => {
+        if (bc.passwordStatus === 'decrypt_failed' || !bc.password) {
+          const local = localConfigs.find(lc => lc.id === bc.id);
+          if (local && local.password) {
+            console.warn(`[sync] Backend decrypt_failed for WebDAV config "${bc.name}", preserving local password`);
+            return { ...bc, password: local.password, passwordStatus: 'ok' as const };
+          }
+        }
+        return bc;
+      });
+      state.setWebDAVConfigs(mergedConfigs);
+      // Store raw backend hash for consistent change detection
       _lastHash.webdav = hashes.webdav;
     }
     // Sync active selections from settings

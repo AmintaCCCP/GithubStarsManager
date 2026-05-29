@@ -103,6 +103,9 @@ router.post('/api/configs/ai', (req, res) => {
 // PUT /api/configs/ai/bulk — replace all AI configs (for sync)
 // MUST be registered before :id route to avoid matching 'bulk' as an id
 router.put('/api/configs/ai/bulk', (req, res) => {
+  // Shared between transaction, response, and error handler
+  const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
+
   try {
     const db = getDb();
     const configs = req.body.configs as Array<{
@@ -138,18 +141,25 @@ router.put('/api/configs/ai/bulk', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      const skippedConfigs: Array<{ id: string; name: string; reason: string }> = [];
-
       for (const c of configs) {
         let encryptedKey = '';
         if (c.apiKey && !c.apiKey.startsWith('***')) {
-          encryptedKey = encrypt(c.apiKey, config.encryptionKey);
+          try {
+            encryptedKey = encrypt(String(c.apiKey), config.encryptionKey);
+          } catch (encErr) {
+            console.error(`[configs] Failed to encrypt API key for config "${c.name}" (${c.id}), falling back to existing key:`, encErr);
+            encryptedKey = existingKeys.get(String(c.id)) ?? '';
+            if (!encryptedKey) {
+              syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
+              continue;
+            }
+          }
         } else {
           encryptedKey = existingKeys.get(String(c.id)) ?? '';
         }
 
         if (!encryptedKey) {
-          skippedConfigs.push({
+          syncResult.skipped.push({
             id: c.id,
             name: c.name ?? '',
             reason: c.apiKey?.startsWith('***')
@@ -164,18 +174,35 @@ router.put('/api/configs/ai/bulk', (req, res) => {
           encryptedKey, c.model ?? '', c.isActive ? 1 : 0,
           c.customPrompt ?? null, c.useCustomPrompt ? 1 : 0, c.concurrency ?? 1, c.reasoningEffort ?? null
         );
+        syncResult.inserted++;
       }
 
-      if (skippedConfigs.length > 0) {
-        console.warn('[configs] Skipped AI configs with missing keys:', skippedConfigs);
+      if (syncResult.skipped.length > 0) {
+        console.warn('[configs] Skipped AI configs with missing keys:', syncResult.skipped);
+      }
+
+      // Safety guard: prevent committing an empty database when all configs were skipped
+      if (syncResult.inserted === 0 && configs.length > 0) {
+        throw new Error('ALL_CONFIGS_SKIPPED');
       }
     });
 
     bulkSync();
-    res.json({ synced: configs.length });
+    res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/ai/bulk error:', err);
-    res.status(500).json({ error: 'Failed to sync AI configs', code: 'SYNC_AI_CONFIGS_FAILED' });
+    if (errMsg === 'ALL_CONFIGS_SKIPPED') {
+      res.status(422).json({
+        error: 'All AI configs were skipped — check the errors field for per-config reasons',
+        code: 'SYNC_AI_CONFIGS_ALL_SKIPPED',
+        synced: 0,
+        skipped: syncResult.skipped.length,
+        errors: syncResult.skipped,
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to sync AI configs', code: 'SYNC_AI_CONFIGS_FAILED' });
+    }
   }
 });
 
@@ -297,6 +324,9 @@ router.post('/api/configs/webdav', (req, res) => {
 // PUT /api/configs/webdav/bulk — replace all WebDAV configs (for sync)
 // MUST be registered before :id route to avoid matching 'bulk' as an id
 router.put('/api/configs/webdav/bulk', (req, res) => {
+  // Shared between transaction, response, and error handler
+  const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
+
   try {
     const db = getDb();
     const configs = req.body.configs as Array<{
@@ -332,22 +362,64 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       for (const c of configs) {
         let encryptedPwd = '';
         if (c.password && !c.password.startsWith('***')) {
-          encryptedPwd = encrypt(c.password, config.encryptionKey);
+          try {
+            encryptedPwd = encrypt(String(c.password), config.encryptionKey);
+          } catch (encErr) {
+            console.error(`[configs] Failed to encrypt WebDAV password for "${c.name}" (${c.id}), falling back to existing:`, encErr);
+            encryptedPwd = existingPwds.get(String(c.id)) ?? '';
+            if (!encryptedPwd) {
+              syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
+              continue;
+            }
+          }
         } else {
           encryptedPwd = existingPwds.get(String(c.id)) ?? '';
         }
+
+        if (!encryptedPwd) {
+          syncResult.skipped.push({
+            id: c.id,
+            name: c.name ?? '',
+            reason: c.password?.startsWith('***')
+              ? 'Password is masked and no existing password found'
+              : 'Password is empty',
+          });
+          continue;
+        }
+
         stmt.run(
           c.id, c.name ?? '', c.url ?? '', c.username ?? '',
           encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
         );
+        syncResult.inserted++;
+      }
+
+      if (syncResult.skipped.length > 0) {
+        console.warn('[configs] Skipped WebDAV configs with missing passwords:', syncResult.skipped);
+      }
+
+      // Safety guard: prevent committing an empty database when all configs were skipped
+      if (syncResult.inserted === 0 && configs.length > 0) {
+        throw new Error('ALL_CONFIGS_SKIPPED');
       }
     });
 
     bulkSync();
-    res.json({ synced: configs.length });
+    res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('PUT /api/configs/webdav/bulk error:', err);
-    res.status(500).json({ error: 'Failed to sync WebDAV configs', code: 'SYNC_WEBDAV_CONFIGS_FAILED' });
+    if (errMsg === 'ALL_CONFIGS_SKIPPED') {
+      res.status(422).json({
+        error: 'All WebDAV configs were skipped — check the errors field for per-config reasons',
+        code: 'SYNC_WEBDAV_CONFIGS_ALL_SKIPPED',
+        synced: 0,
+        skipped: syncResult.skipped.length,
+        errors: syncResult.skipped,
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to sync WebDAV configs', code: 'SYNC_WEBDAV_CONFIGS_FAILED' });
+    }
   }
 });
 
