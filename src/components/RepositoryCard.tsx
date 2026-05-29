@@ -10,6 +10,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
+import { FloatingTooltip } from './FloatingTooltip';
 import { shallow } from 'zustand/shallow';
 import { useDialog } from '../hooks/useDialog';
 
@@ -135,6 +136,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const descTriggerRef = useRef<HTMLDivElement>(null);
   const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -861,9 +863,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
       </div>
 
-      {/* Description with Tooltip - Enhanced for Light Mode */}
+      {/* Description with Tooltip */}
       <div className="mb-4 flex-1">
         <div
+          ref={descTriggerRef}
           className="relative group"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
@@ -877,17 +880,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
-
-          {/* Enhanced Tooltip - Optimized for Light Mode Readability */}
-          {showTooltip && (
-            <div className="absolute z-50 bottom-full left-0 right-0 mb-2 p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[280px] overflow-y-auto scrollbar-auto">
-              <div className="whitespace-pre-wrap break-words pr-2">
-                {highlightSearchTerm(displayContent.content, searchQuery)}
-              </div>
-              {/* Arrow with Light Mode Optimization */}
-              <div className="absolute top-full left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white dark:border-t-surface-3 drop-shadow-sm"></div>
-            </div>
-          )}
+          <FloatingTooltip
+            content={highlightSearchTerm(displayContent.content, searchQuery)}
+            visible={showTooltip}
+            triggerRef={descTriggerRef}
+            onMouseLeave={() => setShowTooltip(false)}
+          />
         </div>
 
         {/* 方案一：同时显示多个状态标签 */}
