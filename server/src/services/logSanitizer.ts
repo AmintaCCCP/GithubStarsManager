@@ -74,9 +74,12 @@ export function sanitizeForLog(input: unknown, seen: WeakSet<object> = new WeakS
   if (typeof input === 'object') {
     if (seen.has(input as object)) return '[Circular]';
     seen.add(input as object);
+    const result = Array.isArray(input)
+      ? input.map((v) => sanitizeForLog(v, seen))
+      : sanitizeObject(input as Record<string, unknown>, seen);
+    seen.delete(input as object);
+    return result;
   }
-  if (Array.isArray(input)) return input.map((v) => sanitizeForLog(v, seen));
-  if (typeof input === 'object') return sanitizeObject(input as Record<string, unknown>, seen);
   return sanitizeString(String(input));
 }
 
