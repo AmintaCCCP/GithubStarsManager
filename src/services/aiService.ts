@@ -430,6 +430,8 @@ ${repoInfo}
     }
   }
 
+  private static readonly VALID_PLATFORMS = ['mac', 'windows', 'linux', 'ios', 'android', 'docker', 'web', 'cli'];
+
   private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
     try {
       const cleaned = content
@@ -445,7 +447,9 @@ ${repoInfo}
             ? parsed.summary.trim()
             : (this.language === 'zh' ? '无法生成概述' : 'Unable to generate summary'),
           tags: Array.isArray(parsed.tags) ? parsed.tags.filter((v) => typeof v === 'string').slice(0, 5) : [],
-          platforms: Array.isArray(parsed.platforms) ? parsed.platforms.filter((v) => typeof v === 'string').slice(0, 8) : [],
+          platforms: Array.isArray(parsed.platforms)
+            ? parsed.platforms.filter((v) => typeof v === 'string' && AIService.VALID_PLATFORMS.includes(v.toLowerCase())).slice(0, 8)
+            : [],
         };
       }
 
