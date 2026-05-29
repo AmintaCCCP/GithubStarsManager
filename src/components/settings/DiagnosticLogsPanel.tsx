@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ScrollText,
   Search,
@@ -116,6 +116,26 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   const [selectedScope, setSelectedScope] = useState<'all' | 'frontend' | 'backend'>('all');
   const [selectedEventTypes, setSelectedEventTypes] = useState<Set<LogEventType>>(new Set());
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
+  const eventTypeRef = useRef<HTMLDivElement>(null);
+
+  // Close event type dropdown on outside click or Escape
+  useEffect(() => {
+    if (!showEventTypeDropdown) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (eventTypeRef.current && !eventTypeRef.current.contains(e.target as Node)) {
+        setShowEventTypeDropdown(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowEventTypeDropdown(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showEventTypeDropdown]);
 
   // Real-time frontend log subscription
   useEffect(() => {
@@ -516,7 +536,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
           </div>
 
           {/* Event type dropdown */}
-          <div className="relative">
+          <div className="relative" ref={eventTypeRef}>
             <button
               onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
               className="px-3 py-1.5 text-sm rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-transparent text-gray-600 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.06] flex items-center space-x-1"
