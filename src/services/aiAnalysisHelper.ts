@@ -3,6 +3,7 @@ import { GitHubApiService } from './githubApi';
 import { AIService } from './aiService';
 import { backend } from './backendAdapter';
 import { resolveCategoryAssignment } from '../utils/categoryUtils';
+import { appLogger } from './appLogger';
 
 export interface AIAnalysisResult {
   summary: string;
@@ -27,8 +28,16 @@ export interface AnalyzeRepositoryOptions {
 
 export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Promise<AIAnalysisResult> => {
   const { repository, githubToken, aiConfig, language, categories, onProgress, signal } = options;
+  const startedAt = Date.now();
 
   onProgress?.('Initializing...');
+  appLogger.info('ai', 'analysis', 'Repository analysis started', {
+    details: {
+      repository: repository.full_name,
+      model: aiConfig.model,
+      apiType: aiConfig.apiType || 'openai',
+    },
+  });
   
   const githubApi = new GitHubApiService(githubToken);
   const aiService = new AIService(aiConfig, language);
@@ -45,13 +54,29 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
     .map(cat => cat.name);
 
   onProgress?.('Analyzing with AI...');
-  const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames, signal);
+  let analysis: { summary: string; tags: string[]; platforms: string[] };
+  try {
+    analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames, signal);
+  } catch (error) {
+    appLogger.error('ai', 'analysis', 'Repository analysis failed', {
+      success: false,
+      durationMs: Date.now() - startedAt,
+      details: {
+        repository: repository.full_name,
+        model: aiConfig.model,
+        apiType: aiConfig.apiType || 'openai',
+        readmeChars: readmeContent.length,
+        error: appLogger.serializeError(error),
+      },
+    });
+    throw error;
+  }
 
   const resolvedCategory = resolveCategoryAssignment(repository as Repository, analysis.tags, categories);
 
   const wasCategoryLocked = !!(repository as Repository).category_locked;
 
-  return {
+  const result = {
     summary: analysis.summary,
     tags: analysis.tags,
     platforms: analysis.platforms,
@@ -60,6 +85,22 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
     analyzed_at: new Date().toISOString(),
     analysis_failed: false,
   };
+
+  appLogger.info('ai', 'analysis', 'Repository analysis completed', {
+    success: true,
+    durationMs: Date.now() - startedAt,
+    details: {
+      repository: repository.full_name,
+      model: aiConfig.model,
+      apiType: aiConfig.apiType || 'openai',
+      readmeChars: readmeContent.length,
+      summaryChars: analysis.summary.length,
+      tagCount: analysis.tags.length,
+      platformCount: analysis.platforms.length,
+    },
+  });
+
+  return result;
 };
 
 export const createFailedAnalysisResult = (error?: string): AIAnalysisResult => ({

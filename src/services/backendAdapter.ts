@@ -2,6 +2,7 @@ import { translateBackendError } from '../utils/backendErrors';
 
 import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { appLogger } from './appLogger';
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
@@ -70,6 +71,8 @@ class BackendAdapter {
   private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const startedAt = Date.now();
+    const method = options?.method || 'GET';
 
     // If the caller provides a signal, forward its abort to our internal controller
     const callerSignal = options?.signal;
@@ -82,7 +85,29 @@ class BackendAdapter {
     }
 
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      appLogger.info('backend', 'request', response.ok ? 'Backend request completed' : 'Backend request returned an error status', {
+        success: response.ok,
+        statusCode: response.status,
+        durationMs: Date.now() - startedAt,
+        details: {
+          method,
+          url: appLogger.sanitizeUrl(url),
+        },
+      });
+      return response;
+    } catch (error) {
+      appLogger.error('backend', 'request', 'Backend request failed before receiving a response', {
+        success: false,
+        durationMs: Date.now() - startedAt,
+        details: {
+          method,
+          url: appLogger.sanitizeUrl(url),
+          timeoutMs,
+          error: appLogger.serializeError(error),
+        },
+      });
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }

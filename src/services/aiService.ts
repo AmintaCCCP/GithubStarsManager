@@ -1,6 +1,7 @@
 import { Repository, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
+import { appLogger } from './appLogger';
 
 interface OpenAIResponseContentPart {
   text?: string;
@@ -114,6 +115,21 @@ export class AIService {
     }
   }
 
+  private recordAIRequestSuccess(apiType: AIApiType, startedAt: number, content: string, requestChars: number): string {
+    appLogger.info('ai', 'request', 'AI request completed', {
+      success: true,
+      durationMs: Date.now() - startedAt,
+      details: {
+        apiType,
+        model: this.config.model,
+        provider: backend.isAvailable ? 'backend-proxy' : 'direct',
+        requestChars,
+        responseChars: content.length,
+      },
+    });
+    return content;
+  }
+
   private async requestText(options: {
     system: string;
     user: string;
@@ -123,6 +139,10 @@ export class AIService {
   }): Promise<string> {
     const apiType = this.getApiType();
     const reasoning = this.getOpenAIReasoningPayload();
+    const startedAt = Date.now();
+    const requestChars = options.system.length + options.user.length;
+
+    try {
 
     if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
       const messages = [
@@ -177,7 +197,7 @@ export class AIService {
       if (apiType === 'openai-responses') {
         const typedData = data as OpenAIResponse;
         const outputText = typedData.output_text;
-        if (outputText) return outputText;
+        if (outputText) return this.recordAIRequestSuccess(apiType, startedAt, outputText, requestChars);
 
         const output = typedData.output;
         if (Array.isArray(output)) {
@@ -185,17 +205,17 @@ export class AIService {
             .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
             .map((part) => part?.text || '')
             .join('');
-          if (text) return text;
+          if (text) return this.recordAIRequestSuccess(apiType, startedAt, text, requestChars);
         }
       } else {
         const typedData = data as { choices?: OpenAIResponseChoice[] };
         const choices = typedData.choices;
         const message = choices?.[0]?.message;
         const content = message?.content;
-        if (content) return content;
+        if (content) return this.recordAIRequestSuccess(apiType, startedAt, content, requestChars);
 
         const reasoningContent = message?.reasoning_content;
-        if (reasoningContent) return reasoningContent;
+        if (reasoningContent) return this.recordAIRequestSuccess(apiType, startedAt, reasoningContent, requestChars);
       }
 
       throw new Error('No content received from AI service');
@@ -242,7 +262,7 @@ export class AIService {
             return block.type === 'text' && typeof block.text === 'string' ? block.text : '';
           })
           .join('');
-        if (text) return text;
+        if (text) return this.recordAIRequestSuccess(apiType, startedAt, text, requestChars);
       }
       throw new Error('No content received from AI service');
     }
@@ -303,10 +323,24 @@ ${options.user}` : options.user;
             return typeof part.text === 'string' ? part.text : '';
           })
           .join('');
-        if (text) return text;
+        if (text) return this.recordAIRequestSuccess(apiType, startedAt, text, requestChars);
       }
     }
     throw new Error('No content received from AI service');
+    } catch (error) {
+      appLogger.error('ai', 'request', 'AI request failed', {
+        success: false,
+        durationMs: Date.now() - startedAt,
+        details: {
+          apiType,
+          model: this.config.model,
+          provider: backend.isAvailable ? 'backend-proxy' : 'direct',
+          requestChars,
+          error: appLogger.serializeError(error),
+        },
+      });
+      throw error;
+    }
   }
 
   async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], signal?: AbortSignal): Promise<{

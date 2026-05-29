@@ -169,6 +169,23 @@ export interface ProxyConfig {
   password?: string;
 }
 
+export type AppLogLevel = 'info' | 'warn' | 'error';
+
+export type AppLogSource = 'github' | 'ai' | 'backend' | 'app';
+
+export interface AppLogEntry {
+  id: string;
+  timestamp: string;
+  level: AppLogLevel;
+  source: AppLogSource;
+  operation: string;
+  message: string;
+  success?: boolean;
+  statusCode?: number;
+  durationMs?: number;
+  details?: Record<string, string | number | boolean | null | undefined>;
+}
+
 export interface SearchFilters {
   query: string;
   tags: string[];

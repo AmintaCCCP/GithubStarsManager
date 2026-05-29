@@ -16,6 +16,7 @@ import {
   ForkRepo,
   WorkflowDefinition,
 } from '../types';
+import { appLogger } from './appLogger';
 
 interface GitHubStarredItem {
   starred_at?: string;
@@ -57,11 +58,21 @@ export class GitHubApiService {
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+    const startedAt = Date.now();
+    const method = options.method || 'GET';
+
     // Check rate limit before making request
     if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
       const waitMs = (this.rateLimitReset * 1000) - Date.now();
       if (waitMs > 0) {
         console.log(`Rate limit low (${this.rateLimitRemaining}), waiting ${Math.ceil(waitMs / 1000)}s for reset...`);
+        appLogger.warn('github', 'rate-limit-wait', 'GitHub rate limit is low; waiting for reset', {
+          durationMs: waitMs,
+          details: {
+            remaining: this.rateLimitRemaining,
+            resetAt: this.rateLimitReset,
+          },
+        });
         // Honor abort signal during rate limit wait
         await new Promise<void>((resolve, reject) => {
           const timeoutId = setTimeout(() => resolve(), waitMs + 1000);
@@ -82,16 +93,30 @@ export class GitHubApiService {
       }
     }
 
-    const response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
-      ...options,
-      signal,
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...options.headers,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
+        ...options,
+        signal,
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...options.headers,
+        },
+      });
+    } catch (error) {
+      appLogger.error('github', 'request', 'GitHub request failed before receiving a response', {
+        success: false,
+        durationMs: Date.now() - startedAt,
+        details: {
+          method,
+          endpoint,
+          error: appLogger.serializeError(error),
+        },
+      });
+      throw error;
+    }
 
     // Parse rate limit headers
     const remaining = response.headers.get('X-RateLimit-Remaining');
@@ -104,6 +129,17 @@ export class GitHubApiService {
     }
 
     if (!response.ok) {
+      appLogger.error('github', 'request', 'GitHub request returned an error status', {
+        success: false,
+        statusCode: response.status,
+        durationMs: Date.now() - startedAt,
+        details: {
+          method,
+          endpoint,
+          statusText: response.statusText,
+          rateLimitRemaining: this.rateLimitRemaining,
+        },
+      });
       if (response.status === 401) {
         throw new Error('GitHub token expired or invalid');
       }
@@ -117,6 +153,19 @@ export class GitHubApiService {
     }
 
     const data = response.status === 204 ? null : await response.json();
+    const itemCount = Array.isArray(data) ? data.length : undefined;
+
+    appLogger.info('github', 'request', 'GitHub request completed', {
+      success: true,
+      statusCode: response.status,
+      durationMs: Date.now() - startedAt,
+      details: {
+        method,
+        endpoint,
+        itemCount,
+        rateLimitRemaining: this.rateLimitRemaining,
+      },
+    });
 
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
