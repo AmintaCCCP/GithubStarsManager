@@ -113,6 +113,9 @@ function sanitizeString(value: string): string {
   // GitHub token pattern
   if (isGitHubToken(value)) return maskSecret(value);
 
+  // Plain-string secrets (e.g., sk-..., long base64-like strings)
+  if (looksLikeSecret(value)) return maskSecret(value);
+
   // Email pattern
   if (EMAIL_RE.test(value)) return maskEmail(value);
 

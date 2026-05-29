@@ -78,6 +78,7 @@ export function sanitizeForLog(input: unknown): unknown {
 
 function sanitizeString(value: string): string {
   if (isGitHubToken(value)) return maskSecret(value);
+  if (looksLikeSecret(value)) return maskSecret(value);
   if (EMAIL_RE.test(value)) return maskEmail(value);
   if (value.startsWith('http://') || value.startsWith('https://')) return redactUrl(value);
   if (value.startsWith('Bearer ') || value.startsWith('bearer ')) return value.slice(0, 7) + maskSecret(value.slice(7));
