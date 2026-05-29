@@ -239,45 +239,47 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const defaultPrompt = useMemo(() => {
     if (language === 'zh') {
-      return `请分析这个GitHub仓库并提供：
+      return `请分析以下GitHub仓库信息，并只输出合法JSON对象。不要输出思考过程、Markdown、代码块标记、解释或任何额外文本。
 
-1. 一个简洁的中文概述（不超过50字），说明这个仓库的主要功能和用途
-2. 3-5个相关的应用类型标签（用中文，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等）
-3. 支持的平台类型（从以下选择：mac、windows、linux、ios、android、docker、web、cli）
+要求：
+- summary：中文概述，说明仓库的主要功能和用途，不超过50字。
+- tags：3-5个中文应用类型标签，请优先从提供的分类中选择。
+{CATEGORIES_INFO}
+- platforms：只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择；无法判断则为 []。
 
-重要：请严格使用中文进行分析和回复，无论原始README是什么语言。
-
-请以JSON格式回复：
+输出格式：
 {
-  "summary": "你的中文概述",
-  "tags": ["标签1", "标签2", "标签3", "标签4", "标签5"],
-  "platforms": ["platform1", "platform2", "platform3"]
+  "summary": "中文概述",
+  "tags": ["标签1", "标签2", "标签3"],
+  "platforms": ["web", "cli"]
 }
+
+平台线索：
+Dockerfile/docker-compose=docker；CLI/命令行/终端=cli；浏览器/前端/API=web；iOS/Swift/Xcode=ios；Android/Kotlin/Gradle=android；macOS/Homebrew=mac；Windows/.exe/MSI=windows；Linux/systemd/apt=linux。
 
 仓库信息：
-{REPO_INFO}
-
-重点关注实用性和准确的分类，帮助用户快速理解仓库的用途和支持的平台。`;
+{REPO_INFO}`;
     } else {
-      return `Please analyze this GitHub repository and provide:
+      return `Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
-1. A concise English overview (no more than 50 words) explaining the main functionality and purpose of this repository
-2. 3-5 relevant application type tags (in English, similar to app store categories, such as: development tools, web apps, mobile apps, database, AI tools, etc.)
-3. Supported platform types (choose from: mac, windows, linux, ios, android, docker, web, cli)
+Requirements:
+- summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
+- tags: 3-5 English application type tags, please prioritize from the provided categories.
+{CATEGORIES_INFO}
+- platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
 
-Important: Please strictly use English for analysis and response, regardless of the original README language.
-
-Please reply in JSON format:
+Output format:
 {
-  "summary": "Your English overview",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "platforms": ["platform1", "platform2", "platform3"]
+  "summary": "English overview",
+  "tags": ["tag1", "tag2", "tag3"],
+  "platforms": ["web", "cli"]
 }
 
-Repository information:
-{REPO_INFO}
+Platform hints:
+Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/frontend/API=web; iOS/Swift/Xcode=ios; Android/Kotlin/Gradle=android; macOS/Homebrew=mac; Windows/.exe/MSI=windows; Linux/systemd/apt=linux.
 
-Focus on practicality and accurate categorization to help users quickly understand the repository's purpose and supported platforms.`;
+Repository information:
+{REPO_INFO}`;
     }
   }, [language]);
 
