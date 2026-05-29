@@ -22,7 +22,7 @@ export function createApp(): express.Express {
 
   // Middleware
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({ exposedHeaders: ['X-Log-Count'] }));
   app.use(morgan('combined', { stream: morganLoggerStream }));
   app.use(express.json({ limit: '50mb' }));
 

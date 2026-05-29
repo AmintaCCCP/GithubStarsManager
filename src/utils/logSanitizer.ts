@@ -101,12 +101,16 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
  * Walks objects and arrays, masking sensitive field values,
  * token patterns, email addresses, and URLs.
  */
-export function sanitizeForLog(input: unknown): unknown {
+export function sanitizeForLog(input: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (input === null || input === undefined) return input;
   if (typeof input === 'string') return sanitizeString(input);
   if (typeof input === 'number' || typeof input === 'boolean') return input;
-  if (Array.isArray(input)) return input.map(sanitizeForLog);
-  if (typeof input === 'object') return sanitizeObject(input as Record<string, unknown>);
+  if (typeof input === 'object') {
+    if (seen.has(input as object)) return '[Circular]';
+    seen.add(input as object);
+  }
+  if (Array.isArray(input)) return input.map((v) => sanitizeForLog(v, seen));
+  if (typeof input === 'object') return sanitizeObject(input as Record<string, unknown>, seen);
   // Functions, Symbols, etc. — convert to string and sanitize
   return sanitizeString(String(input));
 }
@@ -140,7 +144,7 @@ function sanitizeString(value: string): string {
   return value;
 }
 
-function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+function sanitizeObject(obj: Record<string, unknown>, seen: WeakSet<object>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
@@ -163,24 +167,24 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
 
     // Header objects: mask Authorization values
     if (typeof value === 'object' && value !== null && (lowerKey === 'headers' || lowerKey === 'header')) {
-      result[key] = sanitizeHeaders(value as Record<string, unknown>);
+      result[key] = sanitizeHeaders(value as Record<string, unknown>, seen);
       continue;
     }
 
     // Recurse into nested objects/arrays
-    result[key] = sanitizeForLog(value);
+    result[key] = sanitizeForLog(value, seen);
   }
   return result;
 }
 
-function sanitizeHeaders(headers: Record<string, unknown>): Record<string, unknown> {
+function sanitizeHeaders(headers: Record<string, unknown>, seen: WeakSet<object>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(headers)) {
     const lowerKey = key.toLowerCase();
     if (lowerKey === 'authorization' || lowerKey === 'x-api-key') {
       result[key] = typeof value === 'string' ? sanitizeString(value) : '****';
     } else {
-      result[key] = sanitizeForLog(value);
+      result[key] = sanitizeForLog(value, seen);
     }
   }
   return result;
