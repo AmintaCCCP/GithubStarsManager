@@ -867,6 +867,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           className="relative group"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
+          onFocus={() => setShowTooltip(true)}
+          onBlur={() => setShowTooltip(false)}
+          onTouchStart={() => setShowTooltip((v) => !v)}
+          tabIndex={0}
         >
           <p
             className="text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"

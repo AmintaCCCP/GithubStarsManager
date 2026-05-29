@@ -409,6 +409,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               className="relative mb-3"
               onMouseEnter={() => setDescTooltip(true)}
               onMouseLeave={() => setDescTooltip(false)}
+              onFocus={() => setDescTooltip(true)}
+              onBlur={() => setDescTooltip(false)}
+              onTouchStart={() => setDescTooltip((v) => !v)}
+              tabIndex={0}
             >
               <p className="text-sm text-gray-700 dark:text-text-tertiary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                 {repo.description}
@@ -430,6 +434,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               className="relative flex items-start gap-1.5 mb-3"
               onMouseEnter={() => setAiTooltip(true)}
               onMouseLeave={() => setAiTooltip(false)}
+              onFocus={() => setAiTooltip(true)}
+              onBlur={() => setAiTooltip(false)}
+              onTouchStart={() => setAiTooltip((v) => !v)}
+              tabIndex={0}
             >
               <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary flex-shrink-0 mt-0.5" />
               <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
