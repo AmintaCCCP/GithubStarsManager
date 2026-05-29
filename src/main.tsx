@@ -7,8 +7,9 @@ import App from './App.tsx';
 import './index.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { DialogProvider } from './hooks/useDialog';
+import { logger } from './services/logger';
 
-console.log('Main.tsx loading...');
+logger.info('app', 'Main.tsx loading');
 
 try {
   const rootElement = document.getElementById('root');
@@ -16,7 +17,7 @@ try {
     throw new Error('Root element not found');
   }
 
-  console.log('Root element found, creating React root...');
+  logger.info('app', 'Root element found, creating React root');
 
   const root = createRoot(rootElement);
   root.render(
@@ -29,9 +30,9 @@ try {
     </StrictMode>
   );
 
-  console.log('React app rendered');
+  logger.info('app', 'React app rendered');
 } catch (error) {
-  console.error('Failed to render React app:', error);
+  logger.error('app', 'Failed to render React app', error);
   const strings = (() => {
     const lang = navigator.language?.startsWith('zh') ? 'zh' : 'en';
     return {

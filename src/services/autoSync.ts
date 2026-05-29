@@ -1,6 +1,7 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
+import { logger } from './logger';
 
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
@@ -158,7 +159,7 @@ export async function syncFromBackend(): Promise<void> {
         if (bc.apiKeyStatus === 'decrypt_failed' || !bc.apiKey) {
           const local = localConfigs.find(lc => lc.id === bc.id);
           if (local && local.apiKey) {
-            console.warn(`[sync] Backend decrypt_failed for AI config "${bc.name}", preserving local apiKey`);
+            logger.warn('sync.decryptFailed', `Backend decrypt_failed for AI config "${bc.name}", preserving local apiKey`);
             return { ...bc, apiKey: local.apiKey, apiKeyStatus: 'ok' as const };
           }
         }
@@ -178,7 +179,7 @@ export async function syncFromBackend(): Promise<void> {
         if (bc.passwordStatus === 'decrypt_failed' || !bc.password) {
           const local = localConfigs.find(lc => lc.id === bc.id);
           if (local && local.password) {
-            console.warn(`[sync] Backend decrypt_failed for WebDAV config "${bc.name}", preserving local password`);
+            logger.warn('sync.decryptFailed', `Backend decrypt_failed for WebDAV config "${bc.name}", preserving local password`);
             return { ...bc, password: local.password, passwordStatus: 'ok' as const };
           }
         }
@@ -226,9 +227,9 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.settings = hashes.settings;
     }
 
-    console.log('✅ Synced from backend (data changed)');
+    logger.info('sync.pullFromBackend', 'Synced from backend (data changed)', changed);
   } catch (err) {
-    console.error('Failed to sync from backend:', err);
+    logger.errorFromError('sync.pullFromBackend', 'Failed to sync from backend', err);
   } finally {
     setRepositorySyncVisualState(false);
     _isSyncingFromBackend = false;
@@ -280,10 +281,10 @@ export async function syncToBackend(): Promise<void> {
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
-      console.warn(`⚠️ Synced to backend with ${failures.length} error(s):`, failures.map(f => (f as PromiseRejectedResult).reason));
+      logger.warn('sync.pushToBackend', `Synced to backend with ${failures.length} error(s)`, { failureCount: failures.length });
       _hasPendingLocalChanges = true;
     } else {
-      console.log('✅ Synced to backend');
+      logger.info('sync.pushToBackend', 'Synced to backend');
       _hasPendingLocalChanges = false;
     }
 
@@ -304,7 +305,7 @@ export async function syncToBackend(): Promise<void> {
       });
     }
   } catch (err) {
-    console.error('Failed to sync to backend:', err);
+    logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err);
   } finally {
     setRepositorySyncVisualState(false);
     _isPushingToBackend = false;
@@ -385,7 +386,7 @@ export function startAutoSync(): () => void {
     syncFromBackend();
   }, POLL_INTERVAL);
 
-  console.log('🔄 Auto-sync started (push debounce: 2s, poll: 5s)');
+  logger.info('sync.start', 'Auto-sync started (push debounce: 2s, poll: 5s)');
   return unsubscribe;
 }
 
@@ -413,5 +414,5 @@ export function stopAutoSync(unsubscribe: () => void): void {
   _isSyncingFromBackend = false;
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
-  console.log('🔄 Auto-sync stopped');
+  logger.info('sync.stop', 'Auto-sync stopped');
 }

@@ -7,6 +7,7 @@ export interface VersionInfo {
 
 import { PROJECT_REPO_URL } from '../constants/project';
 import { version } from '../../package.json';
+import { logger } from './logger';
 
 const REPO_OWNER = PROJECT_REPO_URL.split('/').slice(-2).join('/');
 const VERSION_INFO_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/main/versions/version-info.xml`;
@@ -53,7 +54,7 @@ export class UpdateService {
         latestVersion: hasUpdate ? latestVersion : undefined
       };
     } catch (error) {
-      console.error('检查更新失败:', error);
+      logger.error('update', '检查更新失败', error);
       throw error;
     }
   }

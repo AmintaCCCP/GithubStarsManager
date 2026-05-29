@@ -1,4 +1,5 @@
 import { translateBackendError } from '../utils/backendErrors';
+import { logger } from './logger';
 
 import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -29,7 +30,7 @@ class BackendAdapter {
             const data = await res.json();
             if (data.status === 'ok') {
               this._backendUrl = baseUrl;
-              console.log(`✅ Backend connected: ${baseUrl}`);
+              logger.info('backendAdapter', 'Backend connected', { url: baseUrl });
               return;
             }
           }
@@ -41,10 +42,10 @@ class BackendAdapter {
       }
 
       this._backendUrl = null;
-      console.log('ℹ️ Backend not available, using local-only mode');
+      logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } catch {
       this._backendUrl = null;
-      console.log('ℹ️ Backend not available, using local-only mode');
+      logger.info('backendAdapter', 'Backend not available, using local-only mode');
     }
   }
 
@@ -115,7 +116,7 @@ class BackendAdapter {
         if (!isRetryable || attempt === maxRetries) throw lastError;
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
-        console.warn(`⚠️ Sync request failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`, lastError.message);
+        logger.warn('backendAdapter', 'Sync request failed, retrying', { attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs: delay });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -354,7 +355,7 @@ class BackendAdapter {
     // Pre-sync validation: warn about configs that will likely be skipped
     for (const c of configs) {
       if (!c.apiKey) {
-        console.warn(`[sync] AI config "${c.name}" (${c.id}) has empty apiKey, will be skipped if no existing key on backend`);
+        logger.warn('backendAdapter', 'AI config has empty apiKey, will be skipped', { name: c.name, id: c.id });
       }
     }
 
@@ -394,7 +395,7 @@ class BackendAdapter {
     // Pre-sync validation: warn about configs that will likely be skipped
     for (const c of configs) {
       if (!c.password) {
-        console.warn(`[sync] WebDAV config "${c.name}" (${c.id}) has empty password, will be skipped if no existing password on backend`);
+        logger.warn('backendAdapter', 'WebDAV config has empty password, will be skipped', { name: c.name, id: c.id });
       }
     }
 

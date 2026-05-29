@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { initializeSchema } from './schema.js';
+import { logger } from '../services/logger.js';
 
 const migrations: Record<number, (db: Database.Database) => void> = {
   1: (db) => {
@@ -31,10 +32,10 @@ export function runMigrations(db: Database.Database): void {
     for (let v = currentVersion + 1; v <= targetVersion; v++) {
       const migration = migrations[v];
       if (migration) {
-        console.log(`Applying migration v${v}...`);
+        logger.info('db.migration', `Applying migration v${v}...`);
         migration(db);
         db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)').run(v);
-        console.log(`Migration v${v} applied.`);
+        logger.info('db.migration', `Migration v${v} applied.`);
       }
     }
   });
