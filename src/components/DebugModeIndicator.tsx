@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { logger } from '../services/logger';
 import { backend } from '../services/backendAdapter';
+import { useAppStore } from '../store/useAppStore';
 
 /**
  * Global debug mode indicator — fixed bottom-right corner.
  * Reads debug state from sessionStorage; visible across all pages.
- * Click to quickly disable all debug modes.
+ * Click to disable all debug modes and navigate to diagnostic logs.
  */
 export const DebugModeIndicator: React.FC = () => {
   const [frontendDebug, setFrontendDebug] = useState(() => sessionStorage.getItem('gsm:frontend-debug') === 'true');
   const [backendDebug, setBackendDebug] = useState(() => sessionStorage.getItem('gsm:backend-debug') === 'true');
+  const setCurrentView = useAppStore(s => s.setCurrentView);
 
   // Sync with sessionStorage changes (e.g. from DiagnosticLogsPanel)
   useEffect(() => {
@@ -27,7 +29,7 @@ export const DebugModeIndicator: React.FC = () => {
     };
   }, []);
 
-  const disableAll = useCallback(async () => {
+  const handleClick = useCallback(async () => {
     // Disable frontend debug
     logger.setLevel('info');
     sessionStorage.setItem('gsm:frontend-debug', 'false');
@@ -46,15 +48,20 @@ export const DebugModeIndicator: React.FC = () => {
     }
     sessionStorage.setItem('gsm:backend-debug', 'false');
     setBackendDebug(false);
-  }, []);
+
+    // Navigate to settings → logs tab
+    setCurrentView('settings');
+    // Notify SettingsPanel to switch to logs tab
+    window.dispatchEvent(new CustomEvent('gsm:navigate-to-settings-tab', { detail: { tab: 'logs' } }));
+  }, [setCurrentView]);
 
   if (!frontendDebug && !backendDebug) return null;
 
   return (
     <button
-      onClick={disableAll}
+      onClick={handleClick}
       className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors text-sm font-medium cursor-pointer"
-      title="Click to disable debug mode / 点击关闭调试模式"
+      title="Click to disable debug mode and open logs / 点击关闭调试并打开日志"
     >
       <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
       <span>DEBUG</span>

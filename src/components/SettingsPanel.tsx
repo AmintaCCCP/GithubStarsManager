@@ -252,6 +252,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
   }, []);
 
+  // Listen for external tab navigation requests (e.g. from DebugModeIndicator)
+  useEffect(() => {
+    const onNavigate = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: SettingsTab }>).detail?.tab;
+      if (tab) handleTabChange(tab);
+    };
+    window.addEventListener('gsm:navigate-to-settings-tab', onNavigate);
+    return () => window.removeEventListener('gsm:navigate-to-settings-tab', onNavigate);
+  }, [handleTabChange]);
+
   const tabs: SettingsTabItem[] = [
     {
       id: 'general',
