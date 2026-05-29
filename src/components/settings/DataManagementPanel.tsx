@@ -239,25 +239,34 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         return;
       }
 
+      if (selectedScopes.length === 0) {
+        showError(t('请至少选择一个日志范围', 'Please select at least one log scope'));
+        setIsExportingLogs(false);
+        return;
+      }
+
       // Determine min level for filtering
       const levelOrder: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
       const minLevel = selectedLevels.reduce((min, lvl) => Math.min(min, levelOrder[lvl]), 3);
       const minLevelName = (Object.entries(levelOrder).find(([_, v]) => v === minLevel)?.[0] as LogLevel) || 'debug';
 
       // Fetch frontend logs
-      const frontendLogs = selectedScopes.includes('frontend')
+      let frontendLogs = selectedScopes.includes('frontend')
         ? logger.getEntries({ level: minLevelName })
         : [];
+      // Filter by explicit membership to honor exact level selection
+      frontendLogs = frontendLogs.filter((e) => selectedLevels.includes(e.level));
 
       // Fetch backend logs
-      let backendLogs = [];
+      let backendLogs: Array<{ level: string }> = [];
       if (selectedScopes.includes('backend') && backendAvailable) {
         try {
           const res = await fetch(`/api/logs?limit=2000&level=${minLevelName}`, {
             headers: { Authorization: `Bearer ${sessionStorage.getItem('github-stars-manager-backend-secret')}` },
           });
           if (res.ok) {
-            backendLogs = await res.json();
+            const raw = await res.json();
+            backendLogs = Array.isArray(raw) ? raw.filter((e: { level: string }) => selectedLevels.includes(e.level as LogLevel)) : [];
           }
         } catch {
           // Backend unreachable — skip

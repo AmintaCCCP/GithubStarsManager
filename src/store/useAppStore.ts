@@ -779,7 +779,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Auth actions
       setUser: (user) => {
-        logger.info('store.setUser', 'Setting user', { hasUser: !!user, login: user?.login });
+        logger.info('store.setUser', 'Setting user', { hasUser: !!user });
         set({ user, isAuthenticated: !!user });
       },
       setGitHubToken: (token) => {
