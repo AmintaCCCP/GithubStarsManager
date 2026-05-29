@@ -16,6 +16,7 @@ import {
   ForkRepo,
   WorkflowDefinition,
 } from '../types';
+import { logger } from './logger';
 
 interface GitHubStarredItem {
   starred_at?: string;
@@ -61,7 +62,7 @@ export class GitHubApiService {
     if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
       const waitMs = (this.rateLimitReset * 1000) - Date.now();
       if (waitMs > 0) {
-        console.log(`Rate limit low (${this.rateLimitRemaining}), waiting ${Math.ceil(waitMs / 1000)}s for reset...`);
+        logger.warn('githubApi', 'Rate limit low, waiting for reset', { remaining: this.rateLimitRemaining, resetTime: this.rateLimitReset });
         // Honor abort signal during rate limit wait
         await new Promise<void>((resolve, reject) => {
           const timeoutId = setTimeout(() => resolve(), waitMs + 1000);
@@ -191,7 +192,7 @@ export class GitHubApiService {
       }
       return response.content;
     } catch (error) {
-      console.warn(`Failed to fetch README for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to fetch README for ${owner}/${repo}`, error);
       return '';
     }
   }
@@ -220,7 +221,7 @@ export class GitHubApiService {
         },
       }));
     } catch (error) {
-      console.warn(`Failed to fetch releases for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to fetch releases for ${owner}/${repo}`, error);
       throw error; // Re-throw to let caller handle
     }
   }
@@ -402,7 +403,7 @@ export class GitHubApiService {
 
       return mappedReleases;
     } catch (error) {
-      console.warn(`Failed to fetch incremental releases for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to fetch incremental releases for ${owner}/${repo}`, error);
       return [];
     }
   }
@@ -550,7 +551,7 @@ export class GitHubApiService {
               r.description = data.description;
             }
           } catch (e) {
-            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+            logger.warn('githubApi', `Failed to fetch repo details for ${r.full_name}`, e);
           }
           // 避免 GitHub API 限流
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -559,7 +560,7 @@ export class GitHubApiService {
 
       return repos;
     } catch (error) {
-      console.error('Failed to fetch trending from RSS:', error);
+      logger.error('githubApi', 'Failed to fetch trending from RSS', error);
       return [];
     }
   }
@@ -770,7 +771,7 @@ export class GitHubApiService {
               r.description = data.description;
             }
           } catch (e) {
-            console.warn(`Failed to fetch repo details for ${r.full_name}:`, e);
+            logger.warn('githubApi', `Failed to fetch repo details for ${r.full_name}`, e);
           }
           // Avoid GitHub API rate limiting
           await new Promise(resolve => setTimeout(resolve, 80));
@@ -787,7 +788,7 @@ export class GitHubApiService {
         totalCount: items.length,
       };
     } catch (error) {
-      console.error('Failed to fetch trending from RSS:', error);
+      logger.error('githubApi', 'Failed to fetch trending from RSS', error);
       return { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
     }
   }
@@ -974,7 +975,7 @@ async getUserForks(): Promise<ForkRepo[]> {
 
       return allForks;
     } catch (error) {
-      console.warn('Failed to fetch user forks:', error);
+      logger.warn('githubApi', 'Failed to fetch user forks', error);
       throw error;
     }
   }
@@ -1034,7 +1035,7 @@ async getUserForks(): Promise<ForkRepo[]> {
         parentHtmlUrl: resultParentHtmlUrl
       };
     } catch (error) {
-      console.warn(`Failed to check sync status for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to check sync status for ${owner}/${repo}`, error);
       return { needsSync: false };
     }
   }
@@ -1044,7 +1045,7 @@ async getUserForks(): Promise<ForkRepo[]> {
       const branches = await this.makeRequest<{ name: string }[]>(`/repos/${owner}/${repo}/branches?per_page=100`);
       return branches.map(b => b.name);
     } catch (error) {
-      console.warn(`Failed to fetch branches for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to fetch branches for ${owner}/${repo}`, error);
       return [];
     }
   }
@@ -1057,7 +1058,7 @@ async getUserForks(): Promise<ForkRepo[]> {
       );
       return data.workflows || [];
     } catch (error) {
-      console.warn(`Failed to fetch workflows for ${owner}/${repo}:`, error);
+      logger.warn('githubApi', `Failed to fetch workflows for ${owner}/${repo}`, error);
       return [];
     }
   }

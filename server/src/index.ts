@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { logger, morganLoggerStream } from './services/logger.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
 import healthRouter from './routes/health.js';
@@ -14,6 +15,7 @@ import categoriesRouter from './routes/categories.js';
 import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
+import logsRouter from './routes/logs.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -21,7 +23,7 @@ export function createApp(): express.Express {
   // Middleware
   app.use(helmet());
   app.use(cors());
-  app.use(morgan('combined'));
+  app.use(morgan('combined', { stream: morganLoggerStream }));
   app.use(express.json({ limit: '50mb' }));
 
   // Auth middleware for all /api/* except /api/health
@@ -40,6 +42,9 @@ export function createApp(): express.Express {
   // Wave 3: Proxy routes
   app.use(proxyRouter);
 
+  // Wave 4: Logs route
+  app.use(logsRouter);
+
   // Global error handler
   app.use(errorHandler);
 
@@ -50,23 +55,23 @@ function startServer(): void {
   // Initialize database
   const db = getDb();
   runMigrations(db);
-  console.log('✅ Database initialized');
+  logger.info('server.init', 'Database initialized');
 
   const app = createApp();
 
   const server = app.listen(config.port, () => {
-    console.log(`🚀 Server running on port ${config.port}`);
+    logger.info('server.start', `Server running on port ${config.port}`);
     if (!config.apiSecret) {
-      console.warn('⚠️  Running without API_SECRET — auth is disabled');
+      logger.warn('server.auth', 'Running without API_SECRET — auth is disabled');
     }
   });
 
   // Graceful shutdown
   const shutdown = () => {
-    console.log('\n🛑 Shutting down...');
+    logger.info('server.shutdown', 'Shutting down...');
     server.close(() => {
       closeDb();
-      console.log('👋 Server stopped');
+      logger.info('server.shutdown', 'Server stopped');
       process.exit(0);
     });
   };

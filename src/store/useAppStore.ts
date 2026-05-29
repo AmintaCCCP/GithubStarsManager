@@ -27,6 +27,7 @@ import {
   defaultSubscriptionChannels
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
+import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
@@ -54,7 +55,7 @@ const debouncedPersistStorage: PersistStorage<any> = {
           const str = JSON.stringify(latestValue);
           indexedDBStorage.setItem(name, str);
         } catch (e) {
-          console.error('Failed to stringify state for persistence', e);
+          logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
         }
       }, 1000);
     };
@@ -778,11 +779,11 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Auth actions
       setUser: (user) => {
-        console.log('Setting user:', user);
+        logger.info('store.setUser', 'Setting user', { hasUser: !!user, login: user?.login });
         set({ user, isAuthenticated: !!user });
       },
       setGitHubToken: (token) => {
-        console.log('Setting GitHub token:', !!token);
+        logger.info('store.setGitHubToken', 'Setting GitHub token', { hasToken: !!token });
         set({ githubToken: token });
       },
       logout: () => set({
@@ -1644,7 +1645,7 @@ export const useAppStore = create<AppState & AppActions>()(
           currentState as AppState & AppActions
         );
 
-        console.log('Store rehydrated:', {
+        logger.info('store.hydrate', 'Store rehydrated', {
           isAuthenticated: normalized.isAuthenticated,
           repositoriesCount: normalized.repositories?.length || 0,
           lastSync: normalized.lastSync,
@@ -1658,13 +1659,17 @@ export const useAppStore = create<AppState & AppActions>()(
           ...normalized,
         };
       },
-      onRehydrateStorage: (state) => (_rehydratedState, error) => {
-        if (error) {
-          console.error('Store hydration failed', error);
-        } else {
-          console.log('Store hydration complete');
-        }
-        state.setHasHydrated(true);
+      onRehydrateStorage: (state) => {
+        const hydrationStart = Date.now();
+        return (_rehydratedState, error) => {
+          const elapsedMs = Date.now() - hydrationStart;
+          if (error) {
+            logger.errorFromError('store.hydrate', 'Store hydration failed', error, { elapsedMs });
+          } else {
+            logger.info('store.hydrate', 'Store hydration complete', { elapsedMs });
+          }
+          state.setHasHydrated(true);
+        };
       },
     }
   )

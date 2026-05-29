@@ -1,6 +1,7 @@
 import { Repository, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
+import { logger } from './logger';
 
 interface OpenAIResponseContentPart {
   text?: string;
@@ -333,7 +334,7 @@ ${options.user}` : options.user;
 
       return this.parseAIResponse(content);
     } catch (error) {
-      console.error('AI analysis failed:', error);
+      logger.errorFromError('ai', 'AI analysis failed', error, { configId: this.config.id });
       // 抛出错误，让调用方处理失败状态
       throw error;
     }
@@ -452,7 +453,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         platforms: [],
       };
     } catch (error) {
-      console.error('Failed to parse AI response:', error);
+      logger.errorFromError('ai', 'Failed to parse AI response', error);
       return {
         summary: this.language === 'zh' ? '分析失败' : 'Analysis failed',
         tags: [],
@@ -656,7 +657,7 @@ Focus on practicality and accurate categorization to help users quickly understa
         return this.performEnhancedSearch(repositories, query, searchTerms);
       }
     } catch (error) {
-      console.warn('AI search failed, falling back to basic search:', error);
+      logger.warn('ai', 'AI search failed, falling back to basic search', { configId: this.config.id });
     }
 
     // Fallback to basic search
@@ -674,11 +675,11 @@ Focus on practicality and accurate categorization to help users quickly understa
    * @returns Filtered and ranked repositories matching the query
    */
   async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
-    console.log('🤖 AI Service: Starting enhanced search for:', query);
+    logger.info('ai', 'Starting enhanced search', { query });
     if (!query.trim()) return repositories;
 
     try {
-      console.log('🚀 AI Service: Calling configured AI service for semantic search');
+      logger.info('ai', 'Calling configured AI service for semantic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id });
       const searchPrompt = this.createSearchPrompt(query);
       const system = this.language === 'zh'
         ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
@@ -694,16 +695,16 @@ Focus on practicality and accurate categorization to help users quickly understa
       if (content) {
         const searchTerms = this.parseSearchResponse(content);
         const results = this.performEnhancedSearch(repositories, query, searchTerms);
-        console.log('✨ AI Service: AI semantic search completed, results:', results.length);
+        logger.info('ai', 'AI semantic search completed', { resultCount: results.length, apiType: this.getApiType(), model: this.config.model });
         return results;
       }
     } catch (error) {
-      console.warn('❌ AI Service: AI semantic search failed, falling back to enhanced basic search:', error);
+      logger.warn('ai', 'AI semantic search failed, falling back to enhanced basic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id });
     }
 
-    console.log('🔄 AI Service: Using enhanced basic search with intelligent ranking');
+    logger.info('ai', 'Using enhanced basic search with intelligent ranking');
     const fallbackResults = this.performEnhancedBasicSearch(repositories, query);
-    console.log('✨ AI Service: Enhanced search completed, results:', fallbackResults.length);
+    logger.info('ai', 'Enhanced search completed', { resultCount: fallbackResults.length });
 
     return fallbackResults;
   }
@@ -828,7 +829,7 @@ Reply in JSON format:
         return allTerms.filter(term => typeof term === 'string' && term.length > 0);
       }
     } catch (error) {
-      console.warn('Failed to parse AI search response:', error);
+      logger.warn('ai', 'Failed to parse AI search response', { error: String(error) });
     }
     return [];
   }

@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { PROJECT_ISSUES_URL } from '../constants/project';
+import { logger } from '../services/logger';
 
 interface Props {
   children: ReactNode;
@@ -41,8 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error);
-    console.error('[ErrorBoundary] Error info:', errorInfo);
+    logger.errorFromError('ui.errorBoundary', 'Caught error', error, { message: error.message, componentStack: errorInfo.componentStack });
     this.setState({ error, errorInfo });
   }
 
@@ -73,7 +73,7 @@ export class ErrorBoundary extends Component<Props, State> {
     try {
       await navigator.clipboard.writeText(errorText);
     } catch (e) {
-      console.error('Failed to copy:', e);
+      logger.errorFromError('ui.errorBoundary', 'Failed to copy', e);
     }
   };
 
