@@ -63,6 +63,7 @@ export async function syncFromBackend(): Promise<void> {
 
   _isSyncingFromBackendActive = true;
 
+  const startTime = Date.now();
   try {
     const [reposResult, releasesResult, aiResult, webdavResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
@@ -227,9 +228,9 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.settings = hashes.settings;
     }
 
-    logger.info('sync.pullFromBackend', 'Synced from backend (data changed)', changed);
+    logger.info('sync.pullFromBackend', 'Synced from backend (data changed)', { ...changed, durationMs: Date.now() - startTime });
   } catch (err) {
-    logger.errorFromError('sync.pullFromBackend', 'Failed to sync from backend', err);
+    logger.errorFromError('sync.pullFromBackend', 'Failed to sync from backend', err, { durationMs: Date.now() - startTime });
   } finally {
     setRepositorySyncVisualState(false);
     _isSyncingFromBackend = false;
@@ -259,6 +260,7 @@ export async function syncToBackend(): Promise<void> {
   _isPushingToBackend = true;
   _hasPendingPush = false;
   setRepositorySyncVisualState(true);
+  const pushStartTime = Date.now();
   try {
     const state = useAppStore.getState();
 
@@ -281,10 +283,10 @@ export async function syncToBackend(): Promise<void> {
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
-      logger.warn('sync.pushToBackend', `Synced to backend with ${failures.length} error(s)`, { failureCount: failures.length });
+      logger.warn('sync.pushToBackend', `Synced to backend with ${failures.length} error(s)`, { failureCount: failures.length, durationMs: Date.now() - pushStartTime });
       _hasPendingLocalChanges = true;
     } else {
-      logger.info('sync.pushToBackend', 'Synced to backend');
+      logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
       _hasPendingLocalChanges = false;
     }
 
@@ -305,7 +307,7 @@ export async function syncToBackend(): Promise<void> {
       });
     }
   } catch (err) {
-    logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err);
+    logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
   } finally {
     setRepositorySyncVisualState(false);
     _isPushingToBackend = false;
