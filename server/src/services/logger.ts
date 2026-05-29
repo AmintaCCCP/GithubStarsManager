@@ -127,6 +127,22 @@ class Logger {
   setLevel(level: LogLevel): void {
     this.minLevel = level;
   }
+
+  getLevel(): LogLevel {
+    return this.minLevel;
+  }
+
+  isDebugMode(): boolean {
+    return this.minLevel === 'debug';
+  }
+
+  getModules(): string[] {
+    const modules = new Set<string>();
+    for (const entry of this.buffer) {
+      modules.add(entry.module);
+    }
+    return Array.from(modules).sort();
+  }
 }
 
 export const logger = new Logger();

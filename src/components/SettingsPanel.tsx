@@ -10,6 +10,7 @@ import {
   X,
   Trash2,
   Wifi,
+  ScrollText,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { isElectron } from '../services/electronProxy';
@@ -23,9 +24,10 @@ import {
   CategoryPanel,
   DataManagementPanel,
   NetworkPanel,
+  DiagnosticLogsPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data' | 'network';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data' | 'logs' | 'network';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -250,6 +252,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
   }, []);
 
+  // Listen for external tab navigation requests (e.g. from DebugModeIndicator)
+  useEffect(() => {
+    const onNavigate = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: SettingsTab }>).detail?.tab;
+      if (tab) handleTabChange(tab);
+    };
+    window.addEventListener('gsm:navigate-to-settings-tab', onNavigate);
+    return () => window.removeEventListener('gsm:navigate-to-settings-tab', onNavigate);
+  }, [handleTabChange]);
+
   const tabs: SettingsTabItem[] = [
     {
       id: 'general',
@@ -286,6 +298,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('数据管理', 'Data Management'),
       icon: <Trash2 className="w-5 h-5" />,
     },
+    {
+      id: 'logs',
+      label: t('诊断日志', 'Diagnostic Logs'),
+      icon: <ScrollText className="w-5 h-5" />,
+    },
     ...((isElectron() || backend.isAvailable) ? [{
       id: 'network' as SettingsTab,
       label: t('网络设置', 'Network'),
@@ -310,6 +327,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <CategoryPanel t={t} />;
         case 'data':
           return <DataManagementPanel t={t} />;
+        case 'logs':
+          return <DiagnosticLogsPanel t={t} />;
         case 'network':
           return <NetworkPanel t={t} />;
         default:

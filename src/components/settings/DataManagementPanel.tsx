@@ -21,14 +21,10 @@ import {
   HardDrive,
   RefreshCw,
   Rss,
-  FileText,
-  ShieldCheck,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
-import { logger, LogLevel } from '../../services/logger';
 import { backend } from '../../services/backendAdapter';
-import { maskUrlDomain } from '../../utils/logSanitizer';
 import { version as appVersion } from '../../../package.json';
 import type { 
   Repository, 
@@ -151,7 +147,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const [, setSearchHistoryVersion] = useState(0);
   const [showErrorMessage, setShowErrorMessage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingLogs, setIsExportingLogs] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<{
     data: ExportData | null;
@@ -170,158 +165,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     setOperationLogs((prev) => [newLog, ...prev].slice(0, 50));
   }, []);
 
-  // Log export: counts and state
-  const [frontendLogCount, setFrontendLogCount] = useState(0);
-  const [backendLogCount, setBackendLogCount] = useState(0);
-  const [logCounts, setLogCounts] = useState<Record<LogLevel, number>>({ debug: 0, info: 0, warn: 0, error: 0 });
   const backendAvailable = backend.isAvailable;
-
-  useEffect(() => {
-    const updateCounts = () => {
-      const counts = logger.getCounts();
-      setFrontendLogCount(counts.total);
-      setLogCounts({ debug: counts.debug, info: counts.info, warn: counts.warn, error: counts.error });
-    };
-    updateCounts();
-    const interval = setInterval(updateCounts, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!backendAvailable) {
-      setBackendLogCount(0);
-      return;
-    }
-    const fetchBackendCount = async () => {
-      try {
-        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-        const res = await fetch('/api/logs?limit=1', {
-          headers: { Authorization: `Bearer ${secret}` },
-        });
-        if (res.ok) {
-          // Use the total count from the response header
-          const totalHeader = res.headers.get('X-Log-Count');
-          if (totalHeader) {
-            setBackendLogCount(parseInt(totalHeader) || 0);
-          } else {
-            // Fallback: fetch all logs to count (heavy but works)
-            const allRes = await fetch('/api/logs?limit=2000', {
-              headers: { Authorization: `Bearer ${secret}` },
-            });
-            if (allRes.ok) {
-              const logs = await allRes.json();
-              setBackendLogCount(Array.isArray(logs) ? logs.length : 0);
-            }
-          }
-        }
-      } catch {
-        // Backend not reachable — keep count at 0
-      }
-    };
-    fetchBackendCount();
-    const interval = setInterval(fetchBackendCount, 10000);
-    return () => clearInterval(interval);
-  }, [backendAvailable]);
-
-  const handleExportLogs = async () => {
-    setIsExportingLogs(true);
-    try {
-      // Gather selected scopes
-      const scopeCheckboxes = document.querySelectorAll('.log-scope-checkbox:checked');
-      const selectedScopes = Array.from(scopeCheckboxes).map(cb => (cb as HTMLInputElement).dataset.scope as string);
-      // Gather selected levels
-      const levelCheckboxes = document.querySelectorAll('.log-level-checkbox:checked');
-      const selectedLevels = Array.from(levelCheckboxes).map(cb => (cb as HTMLInputElement).dataset.level as LogLevel);
-
-      if (selectedLevels.length === 0) {
-        showError(t('请至少选择一个日志级别', 'Please select at least one log level'));
-        setIsExportingLogs(false);
-        return;
-      }
-
-      if (selectedScopes.length === 0) {
-        showError(t('请至少选择一个日志范围', 'Please select at least one log scope'));
-        setIsExportingLogs(false);
-        return;
-      }
-
-      // Determine min level for filtering
-      const levelOrder: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-      const minLevel = selectedLevels.reduce((min, lvl) => Math.min(min, levelOrder[lvl]), 3);
-      const minLevelName = (Object.entries(levelOrder).find(([_, v]) => v === minLevel)?.[0] as LogLevel) || 'debug';
-
-      // Fetch frontend logs
-      let frontendLogs = selectedScopes.includes('frontend')
-        ? logger.getEntries({ level: minLevelName })
-        : [];
-      // Filter by explicit membership to honor exact level selection
-      frontendLogs = frontendLogs.filter((e) => selectedLevels.includes(e.level));
-
-      // Fetch backend logs
-      let backendLogs: Array<{ level: string }> = [];
-      if (selectedScopes.includes('backend') && backendAvailable) {
-        try {
-          const res = await fetch(`/api/logs?limit=2000&level=${minLevelName}`, {
-            headers: { Authorization: `Bearer ${sessionStorage.getItem('github-stars-manager-backend-secret')}` },
-          });
-          if (res.ok) {
-            const raw = await res.json();
-            backendLogs = Array.isArray(raw) ? raw.filter((e: { level: string }) => selectedLevels.includes(e.level as LogLevel)) : [];
-          }
-        } catch {
-          // Backend unreachable — skip
-        }
-      }
-
-      // Build environment info
-      const state = useAppStore.getState();
-      const isElectron = typeof window !== 'undefined' && window.electronAPI;
-      const environment = {
-        platform: isElectron ? 'electron' : 'web',
-        deployMode: isElectron ? 'electron' : 'web',
-        electronVersion: isElectron ? navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] ?? 'unknown' : null,
-        osPlatform: navigator.platform,
-        screenResolution: `${screen.width}x${screen.height}`,
-        backendAvailable: backendAvailable,
-        backendUrl: backendAvailable ? maskUrlDomain(backend.backendUrl || '') : null,
-        language: state.language,
-        repoCount: state.repositories?.length ?? 0,
-        aiConfigCount: state.aiConfigs?.length ?? 0,
-        webdavConfigCount: state.webdavConfigs?.length ?? 0,
-        storeHydrated: true,
-        lastSyncTime: state.lastSync ?? null,
-        appVersion,
-      };
-
-      const exportData = {
-        format: 'github-stars-manager-logs-v1',
-        exportDate: new Date().toISOString(),
-        appVersion,
-        environment,
-        sanitizationNote: t('所有 Token、API Key、密码、邮箱已脱敏为 ***格式', 'All tokens, API keys, passwords, and emails have been masked as ***<last4>'),
-        frontendLogs,
-        backendLogs,
-      };
-
-      // Download
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `github-stars-manager-logs-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      addLog(t('导出日志', 'Export logs'), true);
-    } catch (err) {
-      addLog(t('导出日志', 'Export logs'), false, String(err));
-      showError(t('导出日志失败', 'Failed to export logs'));
-    } finally {
-      setIsExportingLogs(false);
-    }
-  };
 
   const showSuccess = useCallback((message: string) => {
     setShowSuccessMessage(message);
@@ -1445,104 +1289,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </label>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Log Export */}
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <FileText className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
-          {t('日志导出', 'Log Export')}
-        </h3>
-        <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 dark:text-text-primary">{t('导出应用日志', 'Export App Logs')}</h4>
-              <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('导出日志用于问题排查，所有敏感信息已自动脱敏', 'Export logs for troubleshooting. All sensitive info is automatically sanitized.')}</p>
-            </div>
-          </div>
-
-          {/* Log scope */}
-          <div className="mb-4">
-            <p className="text-sm font-medium text-gray-900 dark:text-text-primary mb-2">{t('日志范围', 'Log Scope')}</p>
-            <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-sm text-gray-900 dark:text-text-secondary">
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="log-scope-checkbox rounded border-black/[0.06] dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet"
-                  data-scope="frontend"
-                />
-                <span>{t('前端日志', 'Frontend Logs')}</span>
-                <span className="text-xs text-gray-500 dark:text-text-tertiary">({frontendLogCount} {t('条', 'entries')})</span>
-              </label>
-              <label className={`flex items-center space-x-2 text-sm ${backendAvailable ? 'text-gray-900 dark:text-text-secondary' : 'text-gray-400 dark:text-text-quaternary'}`}>
-                <input
-                  type="checkbox"
-                  defaultChecked={backendAvailable}
-                  disabled={!backendAvailable}
-                  className="log-scope-checkbox rounded border-black/[0.06] dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet disabled:opacity-50"
-                  data-scope="backend"
-                />
-                <span>{t('后端日志', 'Backend Logs')}</span>
-                <span className="text-xs text-gray-500 dark:text-text-tertiary">
-                  {backendAvailable ? `(${backendLogCount} ${t('条', 'entries')})` : t('后端未连接', 'Backend not connected')}
-                </span>
-              </label>
-            </div>
-          </div>
-
-          {/* Log level */}
-          <div className="mb-4">
-            <p className="text-sm font-medium text-gray-900 dark:text-text-primary mb-2">{t('日志级别', 'Log Level')}</p>
-            <div className="flex flex-wrap gap-3">
-              {([
-                { level: 'info' as LogLevel, label: t('Info', 'Info'), defaultChecked: true },
-                { level: 'warn' as LogLevel, label: t('Warn', 'Warn'), defaultChecked: true },
-                { level: 'error' as LogLevel, label: t('Error', 'Error'), defaultChecked: true },
-                { level: 'debug' as LogLevel, label: t('Debug', 'Debug'), defaultChecked: false },
-              ]).map((item) => (
-                <label key={item.level} className="flex items-center space-x-2 text-sm text-gray-900 dark:text-text-secondary">
-                  <input
-                    type="checkbox"
-                    defaultChecked={item.defaultChecked}
-                    className="log-level-checkbox rounded border-black/[0.06] dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet"
-                    data-level={item.level}
-                  />
-                  <span>{item.label}</span>
-                  <span className="text-xs text-gray-500 dark:text-text-tertiary">({logCounts[item.level]})</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Sanitization notice */}
-          <div className="flex items-center space-x-2 mb-4 text-xs text-gray-500 dark:text-text-tertiary">
-            <ShieldCheck className="w-4 h-4" />
-            <span>{t('所有敏感信息（Token、API Key、密码、邮箱等）已自动脱敏为 ***格式', 'All sensitive info (Token, API Key, password, email) is automatically masked as ***')}</span>
-          </div>
-
-          {/* Export button */}
-          <button
-            onClick={handleExportLogs}
-            disabled={isExportingLogs}
-            className="w-full px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-          >
-            {isExportingLogs ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{t('导出中...', 'Exporting...')}</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>{t('导出日志文件', 'Export Log File')}</span>
-              </>
-            )}
-          </button>
         </div>
       </section>
 

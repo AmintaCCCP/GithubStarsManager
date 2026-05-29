@@ -68,6 +68,23 @@ export class AIService {
   }
 
   /**
+   * Log AI request details at debug level (only logged when debug mode is on).
+   */
+  private logAIRequestDebug(
+    startTime: number,
+    context: { apiType: string; model: string; configId: string },
+    result: { responseLength: number } | { error: string }
+  ): void {
+    if (logger.isDebugMode()) {
+      logger.debug('ai', 'AI request', {
+        ...context,
+        durationMs: Date.now() - startTime,
+        ...result,
+      });
+    }
+  }
+
+  /**
    * 清理用户内容中可能导致 JSON 序列化问题的字符
    * - 移除 null 字节和控制字符（保留 \n \r \t）
    * - 替换孤立代理项（lone surrogates），避免某些 JSON 解析器报错
@@ -122,7 +139,10 @@ export class AIService {
     maxTokens: number;
     signal?: AbortSignal;
   }): Promise<string> {
+    const startTime = Date.now();
     const apiType = this.getApiType();
+    const model = this.config.model;
+    const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
     if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
@@ -170,6 +190,7 @@ export class AIService {
         });
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
@@ -178,7 +199,10 @@ export class AIService {
       if (apiType === 'openai-responses') {
         const typedData = data as OpenAIResponse;
         const outputText = typedData.output_text;
-        if (outputText) return outputText;
+        if (outputText) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: outputText.length });
+          return outputText;
+        }
 
         const output = typedData.output;
         if (Array.isArray(output)) {
@@ -186,19 +210,29 @@ export class AIService {
             .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
             .map((part) => part?.text || '')
             .join('');
-          if (text) return text;
+          if (text) {
+            this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+            return text;
+          }
         }
       } else {
         const typedData = data as { choices?: OpenAIResponseChoice[] };
         const choices = typedData.choices;
         const message = choices?.[0]?.message;
         const content = message?.content;
-        if (content) return content;
+        if (content) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: content.length });
+          return content;
+        }
 
         const reasoningContent = message?.reasoning_content;
-        if (reasoningContent) return reasoningContent;
+        if (reasoningContent) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length });
+          return reasoningContent;
+        }
       }
 
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
       throw new Error('No content received from AI service');
     }
 
@@ -229,6 +263,7 @@ export class AIService {
         });
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
@@ -243,14 +278,18 @@ export class AIService {
             return block.type === 'text' && typeof block.text === 'string' ? block.text : '';
           })
           .join('');
-        if (text) return text;
+        if (text) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+          return text;
+        }
       }
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
       throw new Error('No content received from AI service');
     }
 
     // gemini
     const rawModel = this.config.model.trim();
-    const model = rawModel.startsWith('models/') ? rawModel.slice('models/'.length) : rawModel;
+    const geminiModel = rawModel.startsWith('models/') ? rawModel.slice('models/'.length) : rawModel;
     const prompt = options.system ? `${options.system}
 
 ${options.user}` : options.user;
@@ -271,7 +310,7 @@ ${options.user}` : options.user;
     if (backend.isAvailable) {
       data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
     } else {
-      const path = `v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const path = `v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
       const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
       urlObj.searchParams.set('key', this.config.apiKey);
       const response = await fetch(urlObj.toString(), {
@@ -285,6 +324,7 @@ ${options.user}` : options.user;
       });
       if (!response.ok) {
         const errorDetail = await this.extractErrorDetail(response);
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
         throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
       data = await response.json();
@@ -304,9 +344,13 @@ ${options.user}` : options.user;
             return typeof part.text === 'string' ? part.text : '';
           })
           .join('');
-        if (text) return text;
+        if (text) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+          return text;
+        }
       }
     }
+    this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
     throw new Error('No content received from AI service');
   }
 
@@ -315,10 +359,17 @@ ${options.user}` : options.user;
     tags: string[];
     platforms: string[];
   }> {
+    const startTime = Date.now();
+    const configId = this.config.id;
+    const { full_name } = repository;
+    const owner = full_name.split('/')[0] || '';
+    const repo = full_name.split('/')[1] || full_name;
+    logger.info('ai', 'AI analysis started', { owner, repo, configId });
+
     const prompt = this.config.useCustomPrompt && this.config.customPrompt
       ? this.createCustomAnalysisPrompt(repository, readmeContent, customCategories)
       : this.createAnalysisPrompt(repository, readmeContent, customCategories);
-    
+
     try {
       const system = this.language === 'zh'
         ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。只输出合法JSON，不要输出思考过程、Markdown、代码块标记或任何额外文本。'
@@ -332,9 +383,11 @@ ${options.user}` : options.user;
         signal,
       });
 
-      return this.parseAIResponse(content);
+      const result = this.parseAIResponse(content);
+      logger.info('ai', 'AI analysis completed', { owner, repo, configId, durationMs: Date.now() - startTime });
+      return result;
     } catch (error) {
-      logger.errorFromError('ai', 'AI analysis failed', error, { configId: this.config.id });
+      logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
       // 抛出错误，让调用方处理失败状态
       throw error;
     }
@@ -648,6 +701,7 @@ ${repoInfo}
   }
 
   async searchRepositories(repositories: Repository[], query: string): Promise<Repository[]> {
+    const startTime = Date.now();
     if (!query.trim()) return repositories;
 
     try {
@@ -670,7 +724,7 @@ ${repoInfo}
         return this.performEnhancedSearch(repositories, query, searchTerms);
       }
     } catch (error) {
-      logger.warn('ai', 'AI search failed, falling back to basic search', { configId: this.config.id });
+      logger.warn('ai', 'AI search failed, falling back to basic search', { configId: this.config.id, durationMs: Date.now() - startTime });
     }
 
     // Fallback to basic search
@@ -688,6 +742,7 @@ ${repoInfo}
    * @returns Filtered and ranked repositories matching the query
    */
   async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
+    const startTime = Date.now();
     logger.info('ai', 'Starting enhanced search', { query });
     if (!query.trim()) return repositories;
 
@@ -708,11 +763,11 @@ ${repoInfo}
       if (content) {
         const searchTerms = this.parseSearchResponse(content);
         const results = this.performEnhancedSearch(repositories, query, searchTerms);
-        logger.info('ai', 'AI semantic search completed', { resultCount: results.length, apiType: this.getApiType(), model: this.config.model });
+        logger.info('ai', 'AI semantic search completed', { resultCount: results.length, apiType: this.getApiType(), model: this.config.model, durationMs: Date.now() - startTime });
         return results;
       }
-    } catch (error) {
-      logger.warn('ai', 'AI semantic search failed, falling back to enhanced basic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id });
+    } catch {
+      logger.warn('ai', 'AI semantic search failed, falling back to enhanced basic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, durationMs: Date.now() - startTime });
     }
 
     logger.info('ai', 'Using enhanced basic search with intelligent ranking');

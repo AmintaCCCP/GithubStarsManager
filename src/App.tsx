@@ -7,11 +7,13 @@ import { CategorySidebar } from './components/CategorySidebar';
 import { ReleaseTimeline } from './components/ReleaseTimeline';
 import { ForkTimeline } from './components/ForkTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
+import { DebugModeIndicator } from './components/DebugModeIndicator';
 import { DiscoveryView } from './components/DiscoveryView';
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './components/UpdateChecker';
+import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
@@ -100,6 +102,14 @@ function App() {
   } = useAppStore();
 
   useAutoUpdateCheck();
+
+  // Restore persisted frontend debug level at startup so capture is active
+  // app-wide, not only after DiagnosticLogsPanel mounts.
+  useEffect(() => {
+    if (sessionStorage.getItem('gsm:frontend-debug') === 'true') {
+      logger.setLevel('debug');
+    }
+  }, []);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -193,6 +203,7 @@ function App() {
         {currentViewContent}
       </main>
       <BackToTop />
+      <DebugModeIndicator />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft,
 import { ForkRepo, WorkflowDefinition } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
+import { logger } from '../services/logger';
 import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
 import { useDialog } from '../hooks/useDialog';
@@ -158,10 +159,12 @@ export const ForkTimeline: React.FC = () => {
       return;
     }
 
+    const startTime = Date.now();
     setForkIsRefreshing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
       const newForks = await githubApi.getUserForks();
+      logger.info('githubApi', 'Refresh forks completed', { forkCount: newForks.length, durationMs: Date.now() - startTime });
 
       // Merge with existing forks, preserving read status
       const existingForkMap = new Map(forks.map(f => [f.id, f]));
@@ -266,6 +269,7 @@ export const ForkTimeline: React.FC = () => {
       }
     } catch (error) {
       console.error('Fork refresh failed:', error);
+      logger.error('githubApi', 'Refresh forks failed', { error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startTime });
       toast(language === 'zh'
         ? 'Fork刷新失败，请检查网络连接。'
         : 'Fork refresh failed. Please check your network connection.',
@@ -352,13 +356,15 @@ export const ForkTimeline: React.FC = () => {
     if (!fork) return;
 
     const { owner, repo, branch } = syncModal;
+    const syncStartTime = Date.now();
 
     setSyncModal(prev => ({ ...prev, isOpen: false }));
     setSyncingForks(prev => new Set(prev).add(fork.id));
-    
+
     try {
       const githubApi = new GitHubApiService(githubToken);
       const result = await githubApi.syncFork(owner, repo, branch);
+      logger.info('githubApi', 'Sync fork completed', { repo: fork.full_name, mergeType: result.mergeType, durationMs: Date.now() - syncStartTime });
 
       // Mark fork as up-to-date in UI
       setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
@@ -378,6 +384,7 @@ export const ForkTimeline: React.FC = () => {
       }
     } catch (error) {
       console.error('Sync failed:', error);
+      logger.error('githubApi', 'Sync fork failed', { repo: fork.full_name, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - syncStartTime });
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg === 'NOT_A_FORK') {
         toast(language === 'zh'
@@ -417,11 +424,13 @@ export const ForkTimeline: React.FC = () => {
     if (!fork) return;
 
     const branch = fork.default_branch || 'main';
+    const workflowStartTime = Date.now();
     setRunningWorkflows(prev => new Set(prev).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
       const githubApi = new GitHubApiService(githubToken);
       await githubApi.triggerWorkflowRun(owner, repo, workflowPath, branch);
+      logger.info('githubApi', 'Trigger workflow completed', { repo: fork.full_name, workflow: workflowName, branch, durationMs: Date.now() - workflowStartTime });
 
       toast(language === 'zh'
         ? `已触发工作流 "${workflowName}" 在 ${branch} 分支。`
@@ -433,6 +442,7 @@ export const ForkTimeline: React.FC = () => {
       await loadWorkflows(forkId);
     } catch (error) {
       console.error('Failed to run workflow:', error);
+      logger.error('githubApi', 'Trigger workflow failed', { repo: fork.full_name, workflow: workflowName, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - workflowStartTime });
       toast(language === 'zh'
         ? `运行工作流失败。`
         : `Failed to run workflow.`,
