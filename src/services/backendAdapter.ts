@@ -85,15 +85,67 @@ class BackendAdapter {
       }
     }
 
+    // Capture request details for debug logging
+    let requestHeaders: Record<string, string> | undefined;
+    let requestBody: string | undefined;
+    if (logger.isDebugMode()) {
+      if (options?.headers) {
+        if (options.headers instanceof Headers) {
+          requestHeaders = {};
+          options.headers.forEach((v, k) => { requestHeaders![k] = k.toLowerCase() === 'authorization' ? '***' : v; });
+        } else if (Array.isArray(options.headers)) {
+          requestHeaders = {};
+          for (const [k, v] of options.headers) {
+            requestHeaders[k] = k.toLowerCase() === 'authorization' ? '***' : v;
+          }
+        } else {
+          requestHeaders = {};
+          for (const [k, v] of Object.entries(options.headers as Record<string, string>)) {
+            requestHeaders[k] = k.toLowerCase() === 'authorization' ? '***' : v;
+          }
+        }
+      }
+      if (typeof options?.body === 'string') {
+        try {
+          const parsed = JSON.parse(options.body);
+          // Mask any apiKey/password fields recursively
+          requestBody = JSON.stringify(parsed, (key, val) => {
+            if (/api[_-]?key|password|secret|token|authorization/i.test(key)) return '***';
+            return val;
+          }, 2);
+        } catch {
+          requestBody = options.body.slice(0, 2000);
+        }
+      }
+    }
+
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       if (logger.isDebugMode()) {
-        logger.debug('backendAdapter', 'Backend request', { method, path, status: response.status, durationMs: Date.now() - startTime });
+        // Capture response headers
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((v, k) => { responseHeaders[k] = v; });
+        // Capture response body preview (clone to avoid consuming)
+        let responseBody: string | undefined;
+        try {
+          const cloned = response.clone();
+          const text = await cloned.text();
+          if (text.length > 0) {
+            responseBody = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+          }
+        } catch { /* body not readable */ }
+        logger.debug('backendAdapter', 'Backend request', {
+          method, path, status: response.status, durationMs: Date.now() - startTime,
+          requestHeaders, requestBody, responseHeaders, responseBody,
+        });
       }
       return response;
     } catch (err) {
       if (logger.isDebugMode()) {
-        logger.debug('backendAdapter', 'Backend request', { method, path, error: 'timeout/network error', durationMs: Date.now() - startTime });
+        logger.debug('backendAdapter', 'Backend request', {
+          method, path, error: 'timeout/network error', durationMs: Date.now() - startTime,
+          requestHeaders, requestBody,
+        });
       }
       throw err;
     } finally {

@@ -5,6 +5,8 @@ export type LogEventType =
   | 'githubApi'
   | 'trending'
   | 'release'
+  | 'fork'
+  | 'workflow'
   | 'backendSync'
   | 'webdav'
   | 'update'
@@ -20,6 +22,8 @@ export const EVENT_TYPE_LABELS: Record<LogEventType, { zh: string; en: string }>
   githubApi:     { zh: 'GitHub API', en: 'GitHub API' },
   trending:      { zh: '刷新趋势', en: 'Refresh Trending' },
   release:       { zh: '更新 Release', en: 'Update Releases' },
+  fork:          { zh: '刷新复刻', en: 'Refresh Forks' },
+  workflow:      { zh: '执行 Workflow', en: 'Run Workflow' },
   backendSync:   { zh: '后端同步', en: 'Backend Sync' },
   webdav:        { zh: 'WebDAV 备份', en: 'WebDAV Backup' },
   update:        { zh: '应用更新', en: 'App Update' },
@@ -35,6 +39,8 @@ export function inferEventType(module: string, message: string): LogEventType {
   if (module === 'ai' && /search/i.test(message)) return 'aiSearch';
   if (module === 'githubApi' && /trending/i.test(message)) return 'trending';
   if (module === 'githubApi' && /release/i.test(message)) return 'release';
+  if (module === 'githubApi' && /fork/i.test(message)) return 'fork';
+  if (module === 'githubApi' && /workflow/i.test(message)) return 'workflow';
   if (module === 'backendAdapter') return 'backendSync';
   if (module === 'webdav') return 'webdav';
   if (module === 'update') return 'update';

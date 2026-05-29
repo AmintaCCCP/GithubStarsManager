@@ -132,7 +132,30 @@ export class GitHubApiService {
     }
 
     if (logger.isDebugMode()) {
-      logger.debug('githubApi', 'API request', { method, endpoint, status: response.status, durationMs: Date.now() - startTime, rateLimitRemaining: response.headers.get('x-ratelimit-remaining') });
+      // Capture request headers (mask auth)
+      const requestHeaders: Record<string, string> = {
+        'Authorization': 'Bearer ***',
+        'Accept': 'application/vnd.github.v3+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(options.headers as Record<string, string> || {}),
+      };
+      // Capture response headers
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((v, k) => { responseHeaders[k] = v; });
+      // Capture response body preview (clone to avoid consuming)
+      let responseBody: string | undefined;
+      try {
+        const cloned = response.clone();
+        const text = await cloned.text();
+        if (text.length > 0) {
+          responseBody = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+        }
+      } catch { /* body not readable */ }
+      logger.debug('githubApi', 'API request', {
+        method, endpoint, status: response.status, durationMs: Date.now() - startTime,
+        rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
+        requestHeaders, responseHeaders, responseBody,
+      });
     }
 
     const data = response.status === 204 ? null : await response.json();
