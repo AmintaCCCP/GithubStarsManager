@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Settings,
   Globe,
@@ -252,15 +252,54 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
   }, []);
 
+  // Valid SettingsTab values for runtime validation
+  const VALID_TABS: ReadonlySet<string> = useMemo(
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'data', 'logs', 'network']),
+    []
+  );
+
+  // Ref to hold a pending tab navigation request (handles race condition
+  // where the event fires before the component mounts / handleTabChange is ready)
+  const pendingTabRef = useRef<SettingsTab | null>(null);
+
+  // Check sessionStorage for a pending tab (set by DebugModeIndicator before
+  // the view switch, so it survives the SettingsPanel remount)
+  useEffect(() => {
+    const stored = sessionStorage.getItem('gsm:pending-settings-tab');
+    if (stored && VALID_TABS.has(stored)) {
+      sessionStorage.removeItem('gsm:pending-settings-tab');
+      handleTabChange(stored as SettingsTab);
+    } else if (stored) {
+      sessionStorage.removeItem('gsm:pending-settings-tab');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount to read pending tab from sessionStorage
+
   // Listen for external tab navigation requests (e.g. from DebugModeIndicator)
   useEffect(() => {
     const onNavigate = (e: Event) => {
       const tab = (e as CustomEvent<{ tab: SettingsTab }>).detail?.tab;
-      if (tab) handleTabChange(tab);
+      if (!tab || !VALID_TABS.has(tab)) return;
+      // If handleTabChange is ready (not transitioning), apply immediately
+      if (!isTransitioning) {
+        handleTabChange(tab);
+      } else {
+        // Store in ref so the second useEffect can pick it up
+        pendingTabRef.current = tab;
+      }
     };
     window.addEventListener('gsm:navigate-to-settings-tab', onNavigate);
     return () => window.removeEventListener('gsm:navigate-to-settings-tab', onNavigate);
-  }, [handleTabChange]);
+  }, [handleTabChange, isTransitioning, VALID_TABS]);
+
+  // Apply any pending tab navigation captured before the listener was ready
+  useEffect(() => {
+    if (pendingTabRef.current && !isTransitioning) {
+      const tab = pendingTabRef.current;
+      pendingTabRef.current = null;
+      handleTabChange(tab);
+    }
+  }, [handleTabChange, isTransitioning]);
 
   const tabs: SettingsTabItem[] = [
     {
