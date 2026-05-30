@@ -40,6 +40,8 @@ export const ReleaseTimeline: React.FC = () => {
     setReleaseIsRefreshing,
     includePreRelease,
     setIncludePreRelease,
+    releaseShowMode,
+    setReleaseShowMode,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -53,7 +55,6 @@ export const ReleaseTimeline: React.FC = () => {
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
   // 视图切换下拉菜单状态（本地UI状态）
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
-  const [releaseShowMode, setReleaseShowMode] = useState<'all' | 'unread'>('all');
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
