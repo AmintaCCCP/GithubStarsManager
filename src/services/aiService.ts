@@ -73,13 +73,21 @@ export class AIService {
   private logAIRequestDebug(
     startTime: number,
     context: { apiType: string; model: string; configId: string },
-    result: { responseLength: number } | { error: string }
+    result: { responseLength: number } | { error: string },
+    httpDetails?: {
+      requestHeaders?: Record<string, string>;
+      requestBody?: unknown;
+      responseHeaders?: Record<string, string>;
+      responseBody?: string;
+      status?: number;
+    }
   ): void {
     if (logger.isDebugMode()) {
       logger.debug('ai', 'AI request', {
         ...context,
         durationMs: Date.now() - startTime,
         ...result,
+        ...(httpDetails || {}),
       });
     }
   }
@@ -174,6 +182,16 @@ export class AIService {
           };
 
       let data: Record<string, unknown>;
+      // HTTP details captured in debug mode
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ***',
+      };
+      let responseHeaders: Record<string, string> | undefined;
+      let responseBodyPreview: string | undefined;
+      let responseStatus: number | undefined;
+
       if (backend.isAvailable) {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
       } else {
@@ -188,19 +206,37 @@ export class AIService {
           body: JSON.stringify(requestBody),
           signal: options.signal,
         });
+        // Capture response headers
+        responseHeaders = {};
+        response.headers.forEach((v, k) => { responseHeaders![k] = v; });
+        responseStatus = response.status;
+        // Capture response body preview (clone to avoid consuming)
+        try {
+          const cloned = response.clone();
+          const text = await cloned.text();
+          if (text.length > 0) {
+            responseBodyPreview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+          }
+        } catch { /* body not readable */ }
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
+            requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+          });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
       }
 
+      const httpDetails = logger.isDebugMode() ? {
+        requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+      } : undefined;
+
       if (apiType === 'openai-responses') {
         const typedData = data as OpenAIResponse;
         const outputText = typedData.output_text;
         if (outputText) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: outputText.length });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: outputText.length }, httpDetails);
           return outputText;
         }
 
@@ -211,7 +247,7 @@ export class AIService {
             .map((part) => part?.text || '')
             .join('');
           if (text) {
-            this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+            this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
             return text;
           }
         }
@@ -221,18 +257,18 @@ export class AIService {
         const message = choices?.[0]?.message;
         const content = message?.content;
         if (content) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: content.length });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: content.length }, httpDetails);
           return content;
         }
 
         const reasoningContent = message?.reasoning_content;
         if (reasoningContent) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length }, httpDetails);
           return reasoningContent;
         }
       }
 
-      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
     }
 
@@ -246,6 +282,17 @@ export class AIService {
       };
 
       let data: unknown;
+      // HTTP details captured in debug mode
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-api-key': '***',
+        'anthropic-version': '2023-06-01',
+      };
+      let responseHeaders: Record<string, string> | undefined;
+      let responseBodyPreview: string | undefined;
+      let responseStatus: number | undefined;
+
       if (backend.isAvailable) {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
       } else {
@@ -261,13 +308,31 @@ export class AIService {
           body: JSON.stringify(requestBody),
           signal: options.signal,
         });
+        // Capture response headers
+        responseHeaders = {};
+        response.headers.forEach((v, k) => { responseHeaders![k] = v; });
+        responseStatus = response.status;
+        // Capture response body preview
+        try {
+          const cloned = response.clone();
+          const text = await cloned.text();
+          if (text.length > 0) {
+            responseBodyPreview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+          }
+        } catch { /* body not readable */ }
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
+            requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+          });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
         data = await response.json();
       }
+
+      const httpDetails = logger.isDebugMode() ? {
+        requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+      } : undefined;
 
       const contentBlocks = (data as { content?: unknown }).content;
       if (Array.isArray(contentBlocks)) {
@@ -279,11 +344,11 @@ export class AIService {
           })
           .join('');
         if (text) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
           return text;
         }
       }
-      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
     }
 
@@ -307,6 +372,15 @@ ${options.user}` : options.user;
     };
 
     let data: unknown;
+    // HTTP details captured in debug mode
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    let responseHeaders: Record<string, string> | undefined;
+    let responseBodyPreview: string | undefined;
+    let responseStatus: number | undefined;
+
     if (backend.isAvailable) {
       data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
     } else {
@@ -322,13 +396,31 @@ ${options.user}` : options.user;
         body: JSON.stringify(requestBody),
         signal: options.signal,
       });
+      // Capture response headers
+      responseHeaders = {};
+      response.headers.forEach((v, k) => { responseHeaders![k] = v; });
+      responseStatus = response.status;
+      // Capture response body preview
+      try {
+        const cloned = response.clone();
+        const text = await cloned.text();
+        if (text.length > 0) {
+          responseBodyPreview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+        }
+      } catch { /* body not readable */ }
       if (!response.ok) {
         const errorDetail = await this.extractErrorDetail(response);
-        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
+          requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+        });
         throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
       data = await response.json();
     }
+
+    const httpDetails = logger.isDebugMode() ? {
+      requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+    } : undefined;
 
     const candidates = (data as { candidates?: unknown }).candidates;
     if (Array.isArray(candidates) && candidates.length > 0) {
@@ -345,12 +437,12 @@ ${options.user}` : options.user;
           })
           .join('');
         if (text) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length });
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
           return text;
         }
       }
     }
-    this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' });
+    this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
     throw new Error('No content received from AI service');
   }
 

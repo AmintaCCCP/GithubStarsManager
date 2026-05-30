@@ -57,9 +57,10 @@ export class GitHubApiService {
     this.token = token;
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+  private async makeRequest<T>(endpoint: string, options: RequestInit & { operationTag?: string } = {}, signal?: AbortSignal): Promise<T> {
     const startTime = Date.now();
     const method = (options.method || 'GET') as string;
+    const operationTag = options.operationTag;
 
     // Check rate limit before making request
     if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
@@ -155,6 +156,7 @@ export class GitHubApiService {
         method, endpoint, status: response.status, durationMs: Date.now() - startTime,
         rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
         requestHeaders, responseHeaders, responseBody,
+        ...(operationTag ? { operationTag } : {}),
       });
     }
 
@@ -241,7 +243,8 @@ export class GitHubApiService {
   async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Release[]> {
     try {
       const releases = await this.makeRequest<Release[]>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`
+        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`,
+        { operationTag: 'release' }
       );
 
       return releases.map(release => ({
@@ -277,7 +280,8 @@ export class GitHubApiService {
 
     while (true) {
       const batch = await this.makeRequest<Release[]>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=30`
+        `/repos/${owner}/${repo}/releases?page=${page}&per_page=30`,
+        { operationTag: 'release' }
       );
 
       if (batch.length === 0) break;
@@ -417,7 +421,7 @@ export class GitHubApiService {
     try {
       const endpoint = `/repos/${owner}/${repo}/releases?per_page=${perPage}`;
 
-      const releases = await this.makeRequest<Release[]>(endpoint);
+      const releases = await this.makeRequest<Release[]>(endpoint, { operationTag: 'release' });
 
       const mappedReleases = releases.map(release => ({
         id: release.id,
@@ -588,7 +592,7 @@ export class GitHubApiService {
               forks_count: number;
               language: string | null;
               description: string | null;
-            }>(`/repos/${owner}/${repo}`);
+            }>(`/repos/${owner}/${repo}`, { operationTag: 'trending' });
             r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
             r.forks_count = data.forks_count ?? r.forks_count;
             r.language = data.language;
@@ -804,7 +808,7 @@ export class GitHubApiService {
               created_at: string;
               updated_at: string;
               pushed_at: string;
-            }>(`/repos/${owner}/${repo}`);
+            }>(`/repos/${owner}/${repo}`, { operationTag: 'trending' });
             r.id = data.id;
             r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
             r.forks_count = data.forks_count ?? r.forks_count;
@@ -1014,7 +1018,8 @@ async getUserForks(): Promise<ForkRepo[]> {
 
       while (true) {
         const forks = await this.makeRequest<ForkRepo[]>(
-          `/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`
+          `/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`,
+          { operationTag: 'fork' }
         );
         allForks = [...allForks, ...forks];
         if (forks.length < perPage) break;
@@ -1038,6 +1043,7 @@ async getUserForks(): Promise<ForkRepo[]> {
         {
           method: 'POST',
           body: JSON.stringify({ branch }),
+          operationTag: 'fork',
         }
       );
       return {
@@ -1068,7 +1074,7 @@ async getUserForks(): Promise<ForkRepo[]> {
       if (parentFullName) {
         parentOwner = parentFullName.split('/')[0];
       } else {
-        const repoData = await this.makeRequest<{ parent?: { owner: { login: string }, full_name: string, html_url: string } }>(`/repos/${owner}/${repo}`);
+        const repoData = await this.makeRequest<{ parent?: { owner: { login: string }, full_name: string, html_url: string } }>(`/repos/${owner}/${repo}`, { operationTag: 'fork' });
         if (!repoData.parent) return { needsSync: false };
         parentOwner = repoData.parent.owner.login;
         resultParentFullName = repoData.parent.full_name;
@@ -1076,7 +1082,8 @@ async getUserForks(): Promise<ForkRepo[]> {
       }
 
       const compareData = await this.makeRequest<{ behind_by: number }>(
-        `/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`
+        `/repos/${owner}/${repo}/compare/${parentOwner}:${branch}...${owner}:${branch}`,
+        { operationTag: 'fork' }
       );
       
       return { 
@@ -1104,7 +1111,8 @@ async getUserForks(): Promise<ForkRepo[]> {
     try {
       // GET /repos/{owner}/{repo}/actions/workflows lists workflow files (definitions), not runs
       const data = await this.makeRequest<{ workflows: WorkflowDefinition[] }>(
-        `/repos/${owner}/${repo}/actions/workflows?per_page=100`
+        `/repos/${owner}/${repo}/actions/workflows?per_page=100`,
+        { operationTag: 'workflow' }
       );
       return data.workflows || [];
     } catch (error) {
@@ -1121,6 +1129,7 @@ async getUserForks(): Promise<ForkRepo[]> {
       {
         method: 'POST',
         body: JSON.stringify({ ref: branch }),
+        operationTag: 'workflow',
       }
     );
   }
