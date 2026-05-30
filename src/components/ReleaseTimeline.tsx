@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -40,6 +40,8 @@ export const ReleaseTimeline: React.FC = () => {
     setReleaseIsRefreshing,
     includePreRelease,
     setIncludePreRelease,
+    releaseShowMode,
+    setReleaseShowMode,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -53,7 +55,6 @@ export const ReleaseTimeline: React.FC = () => {
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
   // 视图切换下拉菜单状态（本地UI状态）
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
-  const [releaseShowMode, setReleaseShowMode] = useState<'all' | 'unread'>('all');
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
@@ -194,6 +195,24 @@ export const ReleaseTimeline: React.FC = () => {
     [releases, releaseSubscriptions, includePreRelease]
   );
 
+  // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
+  // 不依赖 readReleases，避免标记已读时重建快照导致列表项立即消失
+  const unreadSnapshotRef = useRef<Set<number>>(new Set());
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
+  useEffect(() => {
+    const state = useAppStore.getState();
+    const ids = new Set<number>();
+    releases.forEach(r => {
+      if (releaseSubscriptions.has(r.repository.id) &&
+          (includePreRelease || !r.prerelease) &&
+          !state.readReleases.has(r.id)) {
+        ids.add(r.id);
+      }
+    });
+    unreadSnapshotRef.current = ids;
+    setSnapshotVersion(v => v + 1);
+  }, [releases, releaseSubscriptions, includePreRelease, releaseShowMode]);
+
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
     return subscribedReleases.map(release => {
@@ -241,13 +260,15 @@ export const ReleaseTimeline: React.FC = () => {
       }));
   }, [releasesWithLinks, searchQuery, selectedFilters]);
 
-  // 未读模式过滤
+  // 未读模式过滤（使用快照，标记已读后不会立即消失，刷新页面后才更新）
   const filteredReleases = useMemo(() => {
     if (releaseShowMode === 'unread') {
-      return preUnreadFilteredReleases.filter(({ release }) => !readReleases.has(release.id));
+      return preUnreadFilteredReleases.filter(({ release }) => unreadSnapshotRef.current.has(release.id));
     }
     return preUnreadFilteredReleases;
-  }, [preUnreadFilteredReleases, releaseShowMode, readReleases]);
+    // snapshotVersion 触发快照更新后重算；readReleases 不在此处以避免标记已读立即消失
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preUnreadFilteredReleases, releaseShowMode, snapshotVersion]);
 
   const unreadCount = useMemo(() => {
     return subscribedReleases.filter(r => !readReleases.has(r.id)).length;
@@ -920,7 +941,7 @@ export const ReleaseTimeline: React.FC = () => {
        <div className="space-y-2">
          {paginatedReleases.length === 0 ? (
            <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06]-alt dark:border-white/[0.04]">
-            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondarymx-auto mb-3" />
+            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
               {releaseShowMode === 'unread'
                 ? t('没有未读的 Release', 'No unread releases')
