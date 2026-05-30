@@ -60,7 +60,7 @@ export class GitHubApiService {
   private async makeRequest<T>(endpoint: string, options: RequestInit & { operationTag?: string } = {}, signal?: AbortSignal): Promise<T> {
     const startTime = Date.now();
     const method = (options.method || 'GET') as string;
-    const operationTag = options.operationTag;
+    const { operationTag, ...fetchOptions } = options;
 
     // Check rate limit before making request
     if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
@@ -90,13 +90,13 @@ export class GitHubApiService {
     let response: Response;
     try {
       response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
-        ...options,
+        ...fetchOptions,
         signal,
         headers: {
           'Authorization': `Bearer ${this.token}`,
           'Accept': 'application/vnd.github.v3+json',
           'X-GitHub-Api-Version': '2022-11-28',
-          ...options.headers,
+          ...fetchOptions.headers,
         },
       });
     } catch (fetchError) {
