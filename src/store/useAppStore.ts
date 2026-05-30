@@ -174,6 +174,7 @@ interface AppActions {
 
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
+  setReleaseShowMode: (mode: 'all' | 'unread') => void;
   setReleaseSelectedFilters: (filters: string[]) => void;
   toggleReleaseSelectedFilter: (filterId: string) => void;
   clearReleaseSelectedFilters: () => void;

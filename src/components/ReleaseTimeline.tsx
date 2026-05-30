@@ -209,7 +209,7 @@ export const ReleaseTimeline: React.FC = () => {
       }
     });
     unreadSnapshotRef.current = ids;
-  }, [releases, releaseSubscriptions, includePreRelease, readReleases]);
+  }, [releases, releaseSubscriptions, includePreRelease, releaseShowMode]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
