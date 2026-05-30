@@ -264,7 +264,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       sessionStorage.removeItem('gsm:pending-settings-tab');
       handleTabChange(stored as SettingsTab);
     }
-  }, [handleTabChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount to read pending tab from sessionStorage
 
   // Listen for external tab navigation requests (e.g. from DebugModeIndicator)
   useEffect(() => {
