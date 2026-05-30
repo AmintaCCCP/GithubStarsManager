@@ -111,6 +111,11 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             <Row label={t('时间', 'Timestamp')}>
               <span className="font-mono text-xs">{entry.timestamp}</span>
             </Row>
+            {(entryData?.url || entryData?.endpoint || entryData?.path) && (
+              <Row label={t('请求地址', 'URL')}>
+                <span className="font-mono text-xs break-all">{String(entryData.url ?? entryData.endpoint ?? entryData.path)}</span>
+              </Row>
+            )}
             {entryData?.status && (
               <Row label={t('状态码', 'Status')}>
                 <span className={`font-bold ${getStatusColor(entryData.status)}`}>{String(entryData.status)}</span>

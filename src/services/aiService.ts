@@ -75,6 +75,7 @@ export class AIService {
     context: { apiType: string; model: string; configId: string },
     result: { responseLength: number } | { error: string },
     httpDetails?: {
+      url?: string;
       requestHeaders?: Record<string, string>;
       requestBody?: unknown;
       responseHeaders?: Record<string, string>;
@@ -183,6 +184,7 @@ export class AIService {
 
       let data: Record<string, unknown>;
       // HTTP details captured in debug mode
+      const requestUrl = buildFinalApiUrl(this.config.baseUrl, apiType);
       const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -195,8 +197,7 @@ export class AIService {
       if (backend.isAvailable) {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
       } else {
-        const url = buildFinalApiUrl(this.config.baseUrl, apiType);
-        const response = await fetch(url, {
+        const response = await fetch(requestUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -221,7 +222,7 @@ export class AIService {
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
-            requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+            url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
           });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
@@ -229,7 +230,7 @@ export class AIService {
       }
 
       const httpDetails = logger.isDebugMode() ? {
-        requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+        url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
       } : undefined;
 
       if (apiType === 'openai-responses') {
@@ -283,6 +284,7 @@ export class AIService {
 
       let data: unknown;
       // HTTP details captured in debug mode
+      const requestUrl = buildApiUrl(this.config.baseUrl, 'v1/messages');
       const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -296,8 +298,7 @@ export class AIService {
       if (backend.isAvailable) {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
       } else {
-        const url = buildApiUrl(this.config.baseUrl, 'v1/messages');
-        const response = await fetch(url, {
+        const response = await fetch(requestUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -323,7 +324,7 @@ export class AIService {
         if (!response.ok) {
           const errorDetail = await this.extractErrorDetail(response);
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
-            requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+            url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
           });
           throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
         }
@@ -331,7 +332,7 @@ export class AIService {
       }
 
       const httpDetails = logger.isDebugMode() ? {
-        requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+        url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
       } : undefined;
 
       const contentBlocks = (data as { content?: unknown }).content;
@@ -373,6 +374,10 @@ ${options.user}` : options.user;
 
     let data: unknown;
     // HTTP details captured in debug mode
+    const path = `v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
+    const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
+    urlObj.searchParams.set('key', this.config.apiKey);
+    const requestUrl = urlObj.toString();
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -384,10 +389,7 @@ ${options.user}` : options.user;
     if (backend.isAvailable) {
       data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
     } else {
-      const path = `v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
-      const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
-      urlObj.searchParams.set('key', this.config.apiKey);
-      const response = await fetch(urlObj.toString(), {
+      const response = await fetch(requestUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -411,7 +413,7 @@ ${options.user}` : options.user;
       if (!response.ok) {
         const errorDetail = await this.extractErrorDetail(response);
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
-          requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+          url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
         });
         throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
@@ -419,7 +421,7 @@ ${options.user}` : options.user;
     }
 
     const httpDetails = logger.isDebugMode() ? {
-      requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+      url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
     } : undefined;
 
     const candidates = (data as { candidates?: unknown }).candidates;

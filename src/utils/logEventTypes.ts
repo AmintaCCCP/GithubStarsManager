@@ -46,6 +46,7 @@ export function inferEventType(module: string, message: string, data?: unknown):
   if (module.startsWith('sync')) return 'sync';
   if (module === 'ai' && /analysis|analyze/i.test(message)) return 'aiAnalysis';
   if (module === 'ai' && /search/i.test(message)) return 'aiSearch';
+  if (module === 'ai' && /request/i.test(message)) return 'aiAnalysis';
   if (module === 'githubApi' && /trending/i.test(message)) return 'trending';
   if (module === 'githubApi' && /release/i.test(message)) return 'release';
   if (module === 'githubApi' && /fork/i.test(message)) return 'fork';
