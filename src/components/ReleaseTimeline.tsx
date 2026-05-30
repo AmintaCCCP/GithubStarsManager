@@ -195,15 +195,20 @@ export const ReleaseTimeline: React.FC = () => {
   );
 
   // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
+  // 依赖项变化时自动重建快照（releases 刷新、标记已读等）
   const unreadSnapshotRef = useRef<Set<number>>(new Set());
-  const updateUnreadSnapshot = useCallback(() => {
+  useEffect(() => {
     const state = useAppStore.getState();
     const ids = new Set<number>();
-    subscribedReleases.forEach(r => {
-      if (!state.readReleases.has(r.id)) ids.add(r.id);
+    releases.forEach(r => {
+      if (releaseSubscriptions.has(r.repository.id) &&
+          (includePreRelease || !r.prerelease) &&
+          !state.readReleases.has(r.id)) {
+        ids.add(r.id);
+      }
     });
     unreadSnapshotRef.current = ids;
-  }, [subscribedReleases]);
+  }, [releases, releaseSubscriptions, includePreRelease, readReleases]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
@@ -386,11 +391,6 @@ export const ReleaseTimeline: React.FC = () => {
       }
 
       toast(message, actuallyNewCount > 0 ? 'success' : 'info');
-
-      // 刷新后更新未读快照，以便"仅未读"模式显示最新状态
-      if (releaseShowMode === 'unread') {
-        updateUnreadSnapshot();
-      }
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
@@ -403,9 +403,6 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const handleShowModeChange = (mode: 'all' | 'unread') => {
-    if (mode === 'unread') {
-      updateUnreadSnapshot();
-    }
     setReleaseShowMode(mode);
     setCurrentPage(1);
     setIsShowModeDropdownOpen(false);
