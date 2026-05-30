@@ -29,6 +29,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
 }) => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const updatePosition = useCallback(() => {
     if (!triggerRef.current || !tooltipRef.current || !visible) return;
@@ -77,32 +78,49 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
   // (e.g., portal gap, fast mouse movement, scroll repositioning).
   // Uses a debounce so the pointer can travel through the gap between
   // trigger and tooltip without premature dismissal.
+  // Also re-checks on scroll/resize using the last known pointer coordinates,
+  // so a stationary pointer that scrolls out of range still triggers dismissal.
   useEffect(() => {
     if (!visible) return;
 
     let rafId = 0;
     let awayTimer = 0;
-    const handlePointerMove = (e: PointerEvent) => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const nearTrigger = isPointerNear(triggerRef.current, e.clientX, e.clientY, 10);
-        const nearTooltip = isPointerNear(tooltipRef.current, e.clientX, e.clientY, 10);
-        if (!nearTrigger && !nearTooltip) {
-          if (!awayTimer) {
-            awayTimer = window.setTimeout(() => onMouseLeave(), 100);
-          }
-        } else {
-          clearTimeout(awayTimer);
-          awayTimer = 0;
+
+    const checkPointer = (x: number, y: number) => {
+      const nearTrigger = isPointerNear(triggerRef.current, x, y, 10);
+      const nearTooltip = isPointerNear(tooltipRef.current, x, y, 10);
+      if (!nearTrigger && !nearTooltip) {
+        if (!awayTimer) {
+          awayTimer = window.setTimeout(() => onMouseLeave(), 100);
         }
-      });
+      } else {
+        clearTimeout(awayTimer);
+        awayTimer = 0;
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => checkPointer(e.clientX, e.clientY));
+    };
+
+    const handleViewportChange = () => {
+      const point = lastPointerRef.current;
+      if (!point) return;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => checkPointer(point.x, point.y));
     };
 
     document.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
     return () => {
       cancelAnimationFrame(rafId);
       clearTimeout(awayTimer);
       document.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
     };
   }, [visible, onMouseLeave, triggerRef]);
 
