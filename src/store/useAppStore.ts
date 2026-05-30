@@ -174,6 +174,7 @@ interface AppActions {
 
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
+  setReleaseShowMode: (mode: 'all' | 'unread') => void;
   setReleaseSelectedFilters: (filters: string[]) => void;
   toggleReleaseSelectedFilter: (filterId: string) => void;
   clearReleaseSelectedFilters: () => void;
@@ -262,6 +263,7 @@ type PersistedAppState = Partial<
     | 'forkSearchQuery'
     | 'forkExpandedRepositories'
     | 'releaseViewMode'
+    | 'releaseShowMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
     | 'includePreRelease'
@@ -381,6 +383,7 @@ const normalizePersistedState = (
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
+    releaseShowMode: safePersisted.releaseShowMode === 'unread' ? 'unread' : 'all',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
     discoveryChannels: (() => {
@@ -738,6 +741,7 @@ export const useAppStore = create<AppState & AppActions>()(
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       releaseViewMode: 'timeline',
+      releaseShowMode: 'all',
       releaseSelectedFilters: [],
       releaseSearchQuery: '',
       releaseExpandedRepositories: new Set<number>(),
@@ -1265,6 +1269,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Release Timeline View actions
       setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
+      setReleaseShowMode: (releaseShowMode) => set({ releaseShowMode }),
       setReleaseSelectedFilters: (releaseSelectedFilters) => set({ releaseSelectedFilters }),
       toggleReleaseSelectedFilter: (filterId) => set((state) => ({
         releaseSelectedFilters: state.releaseSelectedFilters.includes(filterId)
@@ -1474,6 +1479,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         // 持久化Release页面视图设置
         releaseViewMode: state.releaseViewMode,
+        releaseShowMode: state.releaseShowMode,
         releaseSelectedFilters: state.releaseSelectedFilters,
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),
