@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useLayoutEffect, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface FloatingTooltipProps {
@@ -7,6 +7,17 @@ interface FloatingTooltipProps {
   triggerRef: React.RefObject<HTMLElement | null>;
   onMouseLeave: () => void;
   onMouseEnter?: () => void;
+}
+
+function isPointerNear(el: HTMLElement | null, x: number, y: number, padding: number): boolean {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return (
+    x >= rect.left - padding &&
+    x <= rect.right + padding &&
+    y >= rect.top - padding &&
+    y <= rect.bottom + padding
+  );
 }
 
 export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
@@ -60,6 +71,40 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
       };
     }
   }, [visible, updatePosition]);
+
+  // Safety net: detect when pointer is far from both trigger and tooltip,
+  // covering edge cases where mouseenter/mouseleave events don't fire correctly
+  // (e.g., portal gap, fast mouse movement, scroll repositioning).
+  // Uses a debounce so the pointer can travel through the gap between
+  // trigger and tooltip without premature dismissal.
+  useEffect(() => {
+    if (!visible) return;
+
+    let rafId = 0;
+    let awayTimer = 0;
+    const handlePointerMove = (e: PointerEvent) => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const nearTrigger = isPointerNear(triggerRef.current, e.clientX, e.clientY, 10);
+        const nearTooltip = isPointerNear(tooltipRef.current, e.clientX, e.clientY, 10);
+        if (!nearTrigger && !nearTooltip) {
+          if (!awayTimer) {
+            awayTimer = window.setTimeout(() => onMouseLeave(), 100);
+          }
+        } else {
+          clearTimeout(awayTimer);
+          awayTimer = 0;
+        }
+      });
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(awayTimer);
+      document.removeEventListener('pointermove', handlePointerMove);
+    };
+  }, [visible, onMouseLeave, triggerRef]);
 
   if (!visible) return null;
 
