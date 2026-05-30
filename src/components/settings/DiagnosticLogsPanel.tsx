@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Check,
   X,
 } from 'lucide-react';
 import { logger, LogLevel, LogEntry } from '../../services/logger';
@@ -75,7 +76,7 @@ interface LogDetailModalProps {
 
 const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onClose }) => {
   const [activeTab, setActiveTab] = useState<ModalTab>('general');
-  const eventType = inferEventType(entry.module, entry.message);
+  const eventType = inferEventType(entry.module, entry.message, entry.data);
   const entryData = entry.data as Record<string, unknown> | undefined;
 
   // Escape to close
@@ -355,7 +356,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   // Derived: available event types
   const availableEventTypes = useMemo(() => {
     const types = new Set<LogEventType>();
-    for (const entry of allEntries) types.add(inferEventType(entry.module, entry.message));
+    for (const entry of allEntries) types.add(inferEventType(entry.module, entry.message, entry.data));
     return Array.from(types).sort();
   }, [allEntries]);
 
@@ -363,7 +364,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
       if (!selectedLevels.has(entry.level)) return false;
-      if (selectedEventTypes.size > 0 && !selectedEventTypes.has(inferEventType(entry.module, entry.message))) return false;
+      if (selectedEventTypes.size > 0 && !selectedEventTypes.has(inferEventType(entry.module, entry.message, entry.data))) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!entry.module.toLowerCase().includes(q) && !entry.message.toLowerCase().includes(q)) return false;
@@ -567,8 +568,9 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <span className="text-sm font-medium text-gray-900 dark:text-text-primary">{t('级别', 'Level')}:</span>
             {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
               <button key={level} onClick={() => toggleLevel(level)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-text-tertiary bg-transparent'}`}>
-                {level}
+                className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer flex items-center space-x-1 ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-text-tertiary bg-transparent'}`}>
+                {selectedLevels.has(level) && <Check className="w-3 h-3" />}
+                <span>{level}</span>
               </button>
             ))}
           </div>
@@ -635,7 +637,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <>
               <div className="max-h-[520px] overflow-y-auto divide-y divide-black/[0.04] dark:divide-white/[0.02]">
                 {visibleEntries.map(entry => {
-                  const eventType = inferEventType(entry.module, entry.message);
+                  const eventType = inferEventType(entry.module, entry.message, entry.data);
                   const entryData = entry.data as Record<string, unknown> | undefined;
                   const statusColor = entryData?.status ? getStatusColor(entryData.status) : '';
                   const hasHttpDetail = entryData?.method || entryData?.status || entryData?.durationMs;

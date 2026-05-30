@@ -33,7 +33,16 @@ export const EVENT_TYPE_LABELS: Record<LogEventType, { zh: string; en: string }>
   other:         { zh: '其他', en: 'Other' },
 };
 
-export function inferEventType(module: string, message: string): LogEventType {
+export function inferEventType(module: string, message: string, data?: unknown): LogEventType {
+  // Check for explicit operationTag first (set by makeRequest callers)
+  const operationTag = (data as Record<string, unknown>)?.operationTag;
+  if (typeof operationTag === 'string') {
+    if (operationTag === 'trending') return 'trending';
+    if (operationTag === 'release') return 'release';
+    if (operationTag === 'fork') return 'fork';
+    if (operationTag === 'workflow') return 'workflow';
+  }
+
   if (module.startsWith('sync')) return 'sync';
   if (module === 'ai' && /analysis|analyze/i.test(message)) return 'aiAnalysis';
   if (module === 'ai' && /search/i.test(message)) return 'aiSearch';

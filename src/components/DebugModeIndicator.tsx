@@ -50,8 +50,11 @@ export const DebugModeIndicator: React.FC = () => {
     setBackendDebug(false);
 
     // Navigate to settings → logs tab
+    // Store in sessionStorage BEFORE switching view so the new SettingsPanel
+    // instance can pick it up after remount (event may fire before listener is ready)
+    sessionStorage.setItem('gsm:pending-settings-tab', 'logs');
     setCurrentView('settings');
-    // Notify SettingsPanel to switch to logs tab
+    // Also dispatch event as a backup for same-instance navigation
     window.dispatchEvent(new CustomEvent('gsm:navigate-to-settings-tab', { detail: { tab: 'logs' } }));
   }, [setCurrentView]);
 
