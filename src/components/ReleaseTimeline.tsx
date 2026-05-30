@@ -196,8 +196,9 @@ export const ReleaseTimeline: React.FC = () => {
   );
 
   // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
-  // 依赖项变化时自动重建快照（releases 刷新、标记已读等）
+  // 不依赖 readReleases，避免标记已读时重建快照导致列表项立即消失
   const unreadSnapshotRef = useRef<Set<number>>(new Set());
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
   useEffect(() => {
     const state = useAppStore.getState();
     const ids = new Set<number>();
@@ -209,6 +210,7 @@ export const ReleaseTimeline: React.FC = () => {
       }
     });
     unreadSnapshotRef.current = ids;
+    setSnapshotVersion(v => v + 1);
   }, [releases, releaseSubscriptions, includePreRelease, releaseShowMode]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
@@ -264,7 +266,9 @@ export const ReleaseTimeline: React.FC = () => {
       return preUnreadFilteredReleases.filter(({ release }) => unreadSnapshotRef.current.has(release.id));
     }
     return preUnreadFilteredReleases;
-  }, [preUnreadFilteredReleases, releaseShowMode]);
+    // snapshotVersion 触发快照更新后重算；readReleases 不在此处以避免标记已读立即消失
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preUnreadFilteredReleases, releaseShowMode, snapshotVersion]);
 
   const unreadCount = useMemo(() => {
     return subscribedReleases.filter(r => !readReleases.has(r.id)).length;
