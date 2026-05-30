@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -56,6 +56,16 @@ export const ReleaseTimeline: React.FC = () => {
   const [releaseShowMode, setReleaseShowMode] = useState<'all' | 'unread'>('all');
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
+
+  // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
+  const unreadSnapshotRef = useRef<Set<number>>(new Set());
+  const updateUnreadSnapshot = useCallback(() => {
+    const ids = new Set<number>();
+    subscribedReleases.forEach(r => {
+      if (!readReleases.has(r.id)) ids.add(r.id);
+    });
+    unreadSnapshotRef.current = ids;
+  }, [subscribedReleases, readReleases]);
 
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
@@ -241,13 +251,13 @@ export const ReleaseTimeline: React.FC = () => {
       }));
   }, [releasesWithLinks, searchQuery, selectedFilters]);
 
-  // 未读模式过滤
+  // 未读模式过滤（使用快照，标记已读后不会立即消失，刷新页面后才更新）
   const filteredReleases = useMemo(() => {
     if (releaseShowMode === 'unread') {
-      return preUnreadFilteredReleases.filter(({ release }) => !readReleases.has(release.id));
+      return preUnreadFilteredReleases.filter(({ release }) => unreadSnapshotRef.current.has(release.id));
     }
     return preUnreadFilteredReleases;
-  }, [preUnreadFilteredReleases, releaseShowMode, readReleases]);
+  }, [preUnreadFilteredReleases, releaseShowMode]);
 
   const unreadCount = useMemo(() => {
     return subscribedReleases.filter(r => !readReleases.has(r.id)).length;
@@ -375,6 +385,18 @@ export const ReleaseTimeline: React.FC = () => {
       }
 
       toast(message, actuallyNewCount > 0 ? 'success' : 'info');
+
+      // 刷新后更新未读快照，以便"仅未读"模式显示最新状态
+      if (releaseShowMode === 'unread') {
+        const state = useAppStore.getState();
+        const snapshot = new Set<number>();
+        state.releases.forEach(r => {
+          if (releaseSubscriptions.has(r.repository?.id) && !state.readReleases.has(r.id)) {
+            snapshot.add(r.id);
+          }
+        });
+        unreadSnapshotRef.current = snapshot;
+      }
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
@@ -387,6 +409,9 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const handleShowModeChange = (mode: 'all' | 'unread') => {
+    if (mode === 'unread') {
+      updateUnreadSnapshot();
+    }
     setReleaseShowMode(mode);
     setCurrentPage(1);
     setIsShowModeDropdownOpen(false);
@@ -920,7 +945,7 @@ export const ReleaseTimeline: React.FC = () => {
        <div className="space-y-2">
          {paginatedReleases.length === 0 ? (
            <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06]-alt dark:border-white/[0.04]">
-            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondarymx-auto mb-3" />
+            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
               {releaseShowMode === 'unread'
                 ? t('没有未读的 Release', 'No unread releases')
