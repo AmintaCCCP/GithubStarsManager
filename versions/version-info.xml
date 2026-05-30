@@ -365,4 +365,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.0</downloadUrl>
   </version>
+  <version>
+    <number>0.6.1</number>
+    <releaseDate>2026-05-30</releaseDate>
+    <changelog>
+      <item>feat: Added Diagnostic Logs panel in Settings with in-app log viewer and debug capture mode, supporting frontend/backend debug toggles, event type filtering, real-time updates, HTTP request details, and log management (search, filter, clear, export). (PR #176)</item>
+      <item>fix: Diagnostic Logs — AI analysis now logs detailed request/response content across OpenAI, Claude, and Gemini providers; fixed debug log event type classification with operationTag mapping; level filter pills show checkmark when selected; debug indicator click navigates to logs tab. (PR #177)</item>
+      <item>fix: Fixed Release page empty-state icon not centered due to missing className space; items in unread-only mode no longer disappear immediately after marking as read via snapshot-based filtering. (PR #178)</item>
+      <item>fix: Fixed tooltips stuck on hover with pointermove listener and debounce; fixed dual-tooltip overlap on Trends page by splitting shared hide timer into independent timers. (PR #179)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.1</downloadUrl>
+  </version>
 </versions>
