@@ -195,6 +195,8 @@ export class AIService {
       let responseStatus: number | undefined;
 
       if (backend.isAvailable) {
+        // Note: backend proxy does not return HTTP-level details (headers, body preview).
+        // httpDetails will contain only url/requestHeaders/requestBody; response fields stay undefined.
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
       } else {
         const response = await fetch(requestUrl, {
@@ -296,6 +298,7 @@ export class AIService {
       let responseStatus: number | undefined;
 
       if (backend.isAvailable) {
+        // Note: backend proxy does not return HTTP-level details (headers, body preview).
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
       } else {
         const response = await fetch(requestUrl, {
@@ -378,6 +381,8 @@ ${options.user}` : options.user;
     const urlObj = new URL(buildApiUrl(this.config.baseUrl, path));
     urlObj.searchParams.set('key', this.config.apiKey);
     const requestUrl = urlObj.toString();
+    // Mask API key in URL for debug logging
+    const maskedUrl = requestUrl.replace(/([?&]key=)[^&]+/, '$1***');
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -387,6 +392,7 @@ ${options.user}` : options.user;
     let responseStatus: number | undefined;
 
     if (backend.isAvailable) {
+      // Note: backend proxy does not return HTTP-level details (headers, body preview).
       data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
     } else {
       const response = await fetch(requestUrl, {
@@ -413,7 +419,7 @@ ${options.user}` : options.user;
       if (!response.ok) {
         const errorDetail = await this.extractErrorDetail(response);
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
-          url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+          url: maskedUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
         });
         throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
@@ -421,7 +427,7 @@ ${options.user}` : options.user;
     }
 
     const httpDetails = logger.isDebugMode() ? {
-      url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+      url: maskedUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
     } : undefined;
 
     const candidates = (data as { candidates?: unknown }).candidates;

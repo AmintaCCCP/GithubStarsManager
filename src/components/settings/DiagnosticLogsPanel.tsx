@@ -573,6 +573,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <span className="text-sm font-medium text-gray-900 dark:text-text-primary">{t('级别', 'Level')}:</span>
             {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
               <button key={level} onClick={() => toggleLevel(level)}
+                aria-pressed={selectedLevels.has(level)}
                 className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer flex items-center space-x-1 ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-text-tertiary bg-transparent'}`}>
                 {selectedLevels.has(level) && <Check className="w-3 h-3" />}
                 <span>{level}</span>
@@ -645,7 +646,17 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                   const eventType = inferEventType(entry.module, entry.message, entry.data);
                   const entryData = entry.data as Record<string, unknown> | undefined;
                   const statusColor = entryData?.status ? getStatusColor(entryData.status) : '';
-                  const hasHttpDetail = entryData?.method || entryData?.status || entryData?.durationMs;
+                  const hasHttpDetail =
+                    entryData?.method != null ||
+                    entryData?.status != null ||
+                    entryData?.durationMs != null ||
+                    entryData?.url != null ||
+                    entryData?.endpoint != null ||
+                    entryData?.path != null ||
+                    entryData?.requestHeaders != null ||
+                    entryData?.requestBody != null ||
+                    entryData?.responseHeaders != null ||
+                    entryData?.responseBody != null;
 
                   return (
                     <div key={entry.id}

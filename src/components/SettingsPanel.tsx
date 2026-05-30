@@ -252,6 +252,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
   }, []);
 
+  // Valid SettingsTab values for runtime validation
+  const VALID_TABS: ReadonlySet<string> = useMemo(
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'data', 'logs', 'network']),
+    []
+  );
+
   // Ref to hold a pending tab navigation request (handles race condition
   // where the event fires before the component mounts / handleTabChange is ready)
   const pendingTabRef = useRef<SettingsTab | null>(null);
@@ -260,9 +266,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // the view switch, so it survives the SettingsPanel remount)
   useEffect(() => {
     const stored = sessionStorage.getItem('gsm:pending-settings-tab');
-    if (stored) {
+    if (stored && VALID_TABS.has(stored)) {
       sessionStorage.removeItem('gsm:pending-settings-tab');
       handleTabChange(stored as SettingsTab);
+    } else if (stored) {
+      sessionStorage.removeItem('gsm:pending-settings-tab');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount to read pending tab from sessionStorage
@@ -271,7 +279,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   useEffect(() => {
     const onNavigate = (e: Event) => {
       const tab = (e as CustomEvent<{ tab: SettingsTab }>).detail?.tab;
-      if (!tab) return;
+      if (!tab || !VALID_TABS.has(tab)) return;
       // If handleTabChange is ready (not transitioning), apply immediately
       if (!isTransitioning) {
         handleTabChange(tab);
@@ -282,7 +290,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
     window.addEventListener('gsm:navigate-to-settings-tab', onNavigate);
     return () => window.removeEventListener('gsm:navigate-to-settings-tab', onNavigate);
-  }, [handleTabChange, isTransitioning]);
+  }, [handleTabChange, isTransitioning, VALID_TABS]);
 
   // Apply any pending tab navigation captured before the listener was ready
   useEffect(() => {
