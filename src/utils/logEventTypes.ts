@@ -35,7 +35,9 @@ export const EVENT_TYPE_LABELS: Record<LogEventType, { zh: string; en: string }>
 
 export function inferEventType(module: string, message: string, data?: unknown): LogEventType {
   // Check for explicit operationTag first (set by makeRequest callers)
-  const operationTag = (data as Record<string, unknown>)?.operationTag;
+  const operationTag = (data && typeof data === 'object' && !Array.isArray(data))
+    ? (data as Record<string, unknown>).operationTag
+    : undefined;
   if (typeof operationTag === 'string') {
     if (operationTag === 'trending') return 'trending';
     if (operationTag === 'release') return 'release';
