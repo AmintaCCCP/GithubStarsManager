@@ -57,16 +57,6 @@ export const ReleaseTimeline: React.FC = () => {
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-  // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
-  const unreadSnapshotRef = useRef<Set<number>>(new Set());
-  const updateUnreadSnapshot = useCallback(() => {
-    const ids = new Set<number>();
-    subscribedReleases.forEach(r => {
-      if (!readReleases.has(r.id)) ids.add(r.id);
-    });
-    unreadSnapshotRef.current = ids;
-  }, [subscribedReleases, readReleases]);
-
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
   const selectedFilters = releaseSelectedFilters;
@@ -203,6 +193,17 @@ export const ReleaseTimeline: React.FC = () => {
     ),
     [releases, releaseSubscriptions, includePreRelease]
   );
+
+  // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
+  const unreadSnapshotRef = useRef<Set<number>>(new Set());
+  const updateUnreadSnapshot = useCallback(() => {
+    const state = useAppStore.getState();
+    const ids = new Set<number>();
+    subscribedReleases.forEach(r => {
+      if (!state.readReleases.has(r.id)) ids.add(r.id);
+    });
+    unreadSnapshotRef.current = ids;
+  }, [subscribedReleases]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
@@ -388,14 +389,7 @@ export const ReleaseTimeline: React.FC = () => {
 
       // 刷新后更新未读快照，以便"仅未读"模式显示最新状态
       if (releaseShowMode === 'unread') {
-        const state = useAppStore.getState();
-        const snapshot = new Set<number>();
-        state.releases.forEach(r => {
-          if (releaseSubscriptions.has(r.repository?.id) && !state.readReleases.has(r.id)) {
-            snapshot.add(r.id);
-          }
-        });
-        unreadSnapshotRef.current = snapshot;
+        updateUnreadSnapshot();
       }
     } catch (error) {
       console.error('Refresh failed:', error);
