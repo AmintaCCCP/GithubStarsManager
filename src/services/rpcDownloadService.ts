@@ -1,4 +1,5 @@
 import type { RpcDownloadConfig } from '../types';
+import { backend } from './backendAdapter';
 
 interface RpcTestResult {
   success: boolean;
@@ -20,18 +21,31 @@ function getAuthHeaders(apiSecret?: string): Record<string, string> {
   return headers;
 }
 
+async function getBaseUrl(): Promise<string> {
+  // Ensure backendAdapter has probed for the backend URL
+  if (!backend.isAvailable) {
+    await backend.init();
+  }
+  if (!backend.backendUrl) {
+    throw new Error('Backend not available');
+  }
+  return backend.backendUrl;
+}
+
 export async function testRpcDownload(
   config: RpcDownloadConfig,
   apiSecret?: string,
 ): Promise<RpcTestResult> {
   try {
-    const resp = await fetch('/api/settings/rpc-download/test', {
+    const base = await getBaseUrl();
+    const resp = await fetch(`${base}/settings/rpc-download/test`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({
         host: config.host,
         port: config.port,
-        secret: config.secret,
+        // Only send secret if user typed one; omit to let backend use stored value
+        ...(config.secret ? { secret: config.secret } : {}),
       }),
     });
     if (!resp.ok) {
@@ -52,7 +66,8 @@ export async function sendToRpcDownload(
   apiSecret?: string,
 ): Promise<RpcDownloadResult> {
   try {
-    const resp = await fetch('/api/download/rpc', {
+    const base = await getBaseUrl();
+    const resp = await fetch(`${base}/download/rpc`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({ url, filename }),
