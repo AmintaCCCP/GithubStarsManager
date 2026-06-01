@@ -37,7 +37,6 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipEl = tooltipRef.current;
 
-    tooltipEl.style.maxHeight = '280px';
     const tooltipHeight = tooltipEl.offsetHeight;
     const tooltipWidth = triggerRect.width;
 
@@ -131,7 +130,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
       ref={tooltipRef}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[280px] overflow-y-auto scrollbar-auto"
+      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in"
       style={{ pointerEvents: 'auto' }}
     >
       <div className="whitespace-pre-wrap break-words pr-2">
