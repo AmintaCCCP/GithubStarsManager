@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
-import { proxyRequest, ProxyConfig } from '../services/proxyService.js';
+import { proxyRequest, ProxyConfig, validateUrl } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
 
 function getProxyConfig(): ProxyConfig | null {
@@ -547,6 +547,238 @@ router.post('/api/settings/proxy/test', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.json({ success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+// --- RPC Download endpoints ---
+
+function getRpcDownloadConfig(): { host: string; port: number; secret: string } | null {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+    if (!row?.value) return null;
+    const parsed = JSON.parse(row.value);
+    if (parsed && parsed.enabled && parsed.host && parsed.port) {
+      let secret = '';
+      if (parsed.secret_encrypted) {
+        secret = decrypt(parsed.secret_encrypted, config.encryptionKey);
+      }
+      return { host: parsed.host, port: parsed.port, secret };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/settings/rpc-download
+router.get('/api/settings/rpc-download', (_req, res) => {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+    if (!row?.value) {
+      res.json({ enabled: false, host: '', port: 6800 });
+      return;
+    }
+    const parsed = JSON.parse(row.value);
+    if (parsed.secret_encrypted) {
+      parsed.hasSecret = true;
+    }
+    delete parsed.secret_encrypted;
+    delete parsed.secret;
+    res.json(parsed);
+  } catch {
+    res.json({ enabled: false, host: '', port: 6800 });
+  }
+});
+
+// PUT /api/settings/rpc-download
+router.put('/api/settings/rpc-download', (req, res) => {
+  try {
+    const db = getDb();
+    const { enabled, host, port, secret } = req.body;
+    const secretProvided = 'secret' in req.body;
+
+    const configToStore: Record<string, unknown> = { enabled, host, port };
+    if (secretProvided && secret) {
+      configToStore.secret_encrypted = encrypt(secret, config.encryptionKey);
+    } else if (secretProvided && !secret) {
+      // Explicitly empty secret - clear stored secret
+    } else {
+      // Secret field omitted - preserve existing encrypted secret
+      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+      if (existing?.value) {
+        try {
+          const parsed = JSON.parse(existing.value);
+          if (parsed.secret_encrypted) {
+            configToStore.secret_encrypted = parsed.secret_encrypted;
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+      .run('rpc_download_config', JSON.stringify(configToStore));
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.errorFromError('rpc.settings', 'Failed to save RPC download config', err);
+    res.status(500).json({ error: 'Failed to save RPC download config' });
+  }
+});
+
+// Helper: fetch with timeout using AbortController (compatible with older Node)
+async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+  const { timeoutMs = 5000, ...fetchInit } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...fetchInit, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// POST /api/settings/rpc-download/test
+router.post('/api/settings/rpc-download/test', async (req, res) => {
+  const { host, port, secret: requestSecret } = req.body;
+  if (!host || !port) {
+    res.json({ success: false, error: 'Host and port are required' });
+    return;
+  }
+
+  // Fall back to stored secret only when field is omitted, not when empty
+  const secretProvided = Object.prototype.hasOwnProperty.call(req.body, 'secret');
+  let secret = secretProvided ? requestSecret : undefined;
+  if (!secretProvided) {
+    const stored = getRpcDownloadConfig();
+    if (stored && stored.secret) {
+      secret = stored.secret;
+    }
+  }
+
+  try {
+    const rpcUrl = `http://${host}:${port}/jsonrpc`;
+    const params = secret ? [`token:${secret}`] : [];
+
+    logger.info('rpc.test', `Testing connection to ${host}:${port}`);
+
+    const response = await fetchWithTimeout(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'test',
+        method: 'aria2.getVersion',
+        params,
+      }),
+      timeoutMs: 5000,
+    });
+
+    if (!response.ok) {
+      logger.warn('rpc.test', `aria2 returned HTTP ${response.status}`);
+      res.json({ success: false, error: `aria2 returned HTTP ${response.status}` });
+      return;
+    }
+
+    const data = await response.json() as Record<string, unknown>;
+    if (data.error) {
+      const error = data.error as { message?: string };
+      logger.warn('rpc.test', 'aria2 RPC error', error);
+      res.json({ success: false, error: error.message || 'RPC error' });
+      return;
+    }
+    const result = data.result as Record<string, unknown> | undefined;
+    logger.info('rpc.test', `Connected to aria2 v${result?.version || 'unknown'}`);
+    res.json({
+      success: true,
+      version: result?.version || 'unknown',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Connection failed';
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    const isConnRefused = message.includes('ECONNREFUSED') || message.includes('fetch failed');
+    const errorMsg = isAbort
+      ? `Connection timeout (${host}:${port})`
+      : isConnRefused
+        ? 'RPC service not running'
+        : message;
+    logger.errorFromError('rpc.test', `Test connection failed: ${errorMsg}`, err, { host, port });
+    res.json({ success: false, error: errorMsg });
+  }
+});
+
+// POST /api/download/rpc
+router.post('/api/download/rpc', async (req, res) => {
+  const rpcConfig = getRpcDownloadConfig();
+  if (!rpcConfig) {
+    res.status(400).json({ success: false, error: 'RPC download not configured or disabled' });
+    return;
+  }
+
+  try {
+    const { url, filename } = req.body;
+    if (!url) {
+      res.status(400).json({ success: false, error: 'URL is required' });
+      return;
+    }
+
+    // SSRF protection: validate the download URL
+    try {
+      validateUrl(url);
+    } catch (e) {
+      res.status(400).json({ success: false, error: e instanceof Error ? e.message : 'Invalid URL' });
+      return;
+    }
+
+    const rpcUrl = `http://${rpcConfig.host}:${rpcConfig.port}/jsonrpc`;
+    const params: unknown[] = rpcConfig.secret
+      ? [`token:${rpcConfig.secret}`, [url]]
+      : [[url]];
+    if (filename) {
+      params.push({ out: filename });
+    }
+
+    logger.info('rpc.download', `Sending to aria2: ${filename || url}`);
+
+    const response = await fetchWithTimeout(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'download',
+        method: 'aria2.addUri',
+        params,
+      }),
+      timeoutMs: 10000,
+    });
+
+    if (!response.ok) {
+      logger.warn('rpc.download', `aria2 returned HTTP ${response.status}`);
+      res.json({ success: false, error: `aria2 returned HTTP ${response.status}` });
+      return;
+    }
+
+    const data = await response.json() as Record<string, unknown>;
+    if (data.error) {
+      const error = data.error as { message?: string };
+      logger.warn('rpc.download', 'aria2 RPC error', error);
+      res.json({ success: false, error: error.message || 'RPC error' });
+      return;
+    }
+    logger.info('rpc.download', `Download queued, GID: ${data.result}`);
+    res.json({ success: true, gid: data.result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Connection failed';
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    const isConnRefused = message.includes('ECONNREFUSED') || message.includes('fetch failed');
+    const errorMsg = isAbort
+      ? `Connection timeout (${rpcConfig?.host}:${rpcConfig?.port})`
+      : isConnRefused
+        ? 'RPC service not running'
+        : message;
+    logger.errorFromError('rpc.download', `Download failed: ${errorMsg}`, err);
+    res.json({ success: false, error: errorMsg });
   }
 });
 
