@@ -641,10 +641,19 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: n
 
 // POST /api/settings/rpc-download/test
 router.post('/api/settings/rpc-download/test', async (req, res) => {
-  const { host, port, secret } = req.body;
+  const { host, port, secret: requestSecret } = req.body;
   if (!host || !port) {
     res.json({ success: false, error: 'Host and port are required' });
     return;
+  }
+
+  // Fall back to stored secret if not provided in request
+  let secret = requestSecret;
+  if (!secret) {
+    const stored = getRpcDownloadConfig();
+    if (stored && stored.secret) {
+      secret = stored.secret;
+    }
   }
 
   try {
