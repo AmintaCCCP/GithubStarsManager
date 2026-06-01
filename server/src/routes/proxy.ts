@@ -627,19 +627,33 @@ router.put('/api/settings/rpc-download', (req, res) => {
   }
 });
 
+// Helper: fetch with timeout using AbortController (compatible with older Node)
+async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+  const { timeoutMs = 5000, ...fetchInit } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...fetchInit, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // POST /api/settings/rpc-download/test
 router.post('/api/settings/rpc-download/test', async (req, res) => {
-  try {
-    const { host, port, secret } = req.body;
-    if (!host || !port) {
-      res.json({ success: false, error: 'Host and port are required' });
-      return;
-    }
+  const { host, port, secret } = req.body;
+  if (!host || !port) {
+    res.json({ success: false, error: 'Host and port are required' });
+    return;
+  }
 
+  try {
     const rpcUrl = `http://${host}:${port}/jsonrpc`;
     const params = secret ? [`token:${secret}`] : [];
 
-    const response = await fetch(rpcUrl, {
+    logger.info('rpc.test', `Testing connection to ${host}:${port}`);
+
+    const response = await fetchWithTimeout(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -648,39 +662,51 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
         method: 'aria2.getVersion',
         params,
       }),
-      signal: AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
+
+    if (!response.ok) {
+      logger.warn('rpc.test', `aria2 returned HTTP ${response.status}`);
+      res.json({ success: false, error: `aria2 returned HTTP ${response.status}` });
+      return;
+    }
 
     const data = await response.json() as Record<string, unknown>;
     if (data.error) {
       const error = data.error as { message?: string };
+      logger.warn('rpc.test', 'aria2 RPC error', error);
       res.json({ success: false, error: error.message || 'RPC error' });
       return;
     }
     const result = data.result as Record<string, unknown> | undefined;
+    logger.info('rpc.test', `Connected to aria2 v${result?.version || 'unknown'}`);
     res.json({
       success: true,
       version: result?.version || 'unknown',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Connection failed';
+    const isAbort = err instanceof Error && err.name === 'AbortError';
     const isConnRefused = message.includes('ECONNREFUSED') || message.includes('fetch failed');
-    res.json({
-      success: false,
-      error: isConnRefused ? 'RPC service not running' : message,
-    });
+    const errorMsg = isAbort
+      ? `Connection timeout (${host}:${port})`
+      : isConnRefused
+        ? 'RPC service not running'
+        : message;
+    logger.errorFromError('rpc.test', `Test connection failed: ${errorMsg}`, err, { host, port });
+    res.json({ success: false, error: errorMsg });
   }
 });
 
 // POST /api/download/rpc
 router.post('/api/download/rpc', async (req, res) => {
-  try {
-    const rpcConfig = getRpcDownloadConfig();
-    if (!rpcConfig) {
-      res.status(400).json({ success: false, error: 'RPC download not configured or disabled' });
-      return;
-    }
+  const rpcConfig = getRpcDownloadConfig();
+  if (!rpcConfig) {
+    res.status(400).json({ success: false, error: 'RPC download not configured or disabled' });
+    return;
+  }
 
+  try {
     const { url, filename } = req.body;
     if (!url) {
       res.status(400).json({ success: false, error: 'URL is required' });
@@ -703,7 +729,9 @@ router.post('/api/download/rpc', async (req, res) => {
       params.push({ out: filename });
     }
 
-    const response = await fetch(rpcUrl, {
+    logger.info('rpc.download', `Sending to aria2: ${filename || url}`);
+
+    const response = await fetchWithTimeout(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -712,23 +740,35 @@ router.post('/api/download/rpc', async (req, res) => {
         method: 'aria2.addUri',
         params,
       }),
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     });
+
+    if (!response.ok) {
+      logger.warn('rpc.download', `aria2 returned HTTP ${response.status}`);
+      res.json({ success: false, error: `aria2 returned HTTP ${response.status}` });
+      return;
+    }
 
     const data = await response.json() as Record<string, unknown>;
     if (data.error) {
       const error = data.error as { message?: string };
+      logger.warn('rpc.download', 'aria2 RPC error', error);
       res.json({ success: false, error: error.message || 'RPC error' });
       return;
     }
+    logger.info('rpc.download', `Download queued, GID: ${data.result}`);
     res.json({ success: true, gid: data.result });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Connection failed';
+    const isAbort = err instanceof Error && err.name === 'AbortError';
     const isConnRefused = message.includes('ECONNREFUSED') || message.includes('fetch failed');
-    res.json({
-      success: false,
-      error: isConnRefused ? 'RPC service not running' : message,
-    });
+    const errorMsg = isAbort
+      ? `Connection timeout (${rpcConfig?.host}:${rpcConfig?.port})`
+      : isConnRefused
+        ? 'RPC service not running'
+        : message;
+    logger.errorFromError('rpc.download', `Download failed: ${errorMsg}`, err);
+    res.json({ success: false, error: errorMsg });
   }
 });
 
