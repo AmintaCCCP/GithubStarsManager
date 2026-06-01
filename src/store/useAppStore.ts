@@ -8,6 +8,7 @@ import {
   AIConfig,
   WebDAVConfig,
   ProxyConfig,
+  RpcDownloadConfig,
   SearchFilters,
   GitHubUser,
   Category,
@@ -172,6 +173,9 @@ interface AppActions {
   // Proxy actions
   setProxyConfig: (updates: Partial<ProxyConfig>) => void;
 
+  // RPC Download actions
+  setRpcDownloadConfig: (updates: Partial<RpcDownloadConfig>) => void;
+
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
   setReleaseShowMode: (mode: 'all' | 'unread') => void;
@@ -279,6 +283,7 @@ type PersistedAppState = Partial<
     | 'discoverySortBy'
     | 'discoverySortOrder'
     | 'proxyConfig'
+    | 'rpcDownloadConfig'
     | 'subscriptionRepos'
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
@@ -550,6 +555,20 @@ const normalizePersistedState = (
       }
       return { enabled: false, type: 'http' as const, host: '', port: 7890 };
     })(),
+    rpcDownloadConfig: (() => {
+      const r = (safePersisted as Record<string, unknown>).rpcDownloadConfig;
+      if (r && typeof r === 'object') {
+        const obj = r as Record<string, unknown>;
+        return {
+          enabled: typeof obj.enabled === 'boolean' ? obj.enabled : false,
+          host: typeof obj.host === 'string' ? obj.host : '',
+          port: typeof obj.port === 'number' && Number.isFinite(obj.port) ? obj.port : 6800,
+          // secret 不从持久化恢复，仅在内存中
+          secret: '',
+        };
+      }
+      return { enabled: false, host: '', port: 6800, secret: '' };
+    })(),
   };
 };
 
@@ -738,6 +757,7 @@ export const useAppStore = create<AppState & AppActions>()(
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
       proxyConfig: { enabled: false, type: 'http', host: '', port: 7890 },
+      rpcDownloadConfig: { enabled: false, host: '', port: 6800, secret: '' },
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       releaseViewMode: 'timeline',
@@ -1266,6 +1286,9 @@ export const useAppStore = create<AppState & AppActions>()(
       setProxyConfig: (updates) => set((state) => ({
         proxyConfig: { ...state.proxyConfig, ...updates }
       })),
+      setRpcDownloadConfig: (updates) => set((state) => ({
+        rpcDownloadConfig: { ...state.rpcDownloadConfig, ...updates }
+      })),
 
       // Release Timeline View actions
       setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
@@ -1517,6 +1540,13 @@ export const useAppStore = create<AppState & AppActions>()(
         username: state.proxyConfig.username,
         // password 不持久化，仅保留在内存中
       },
+      // 持久化 RPC 下载配置，但排除密钥（安全考虑）
+      rpcDownloadConfig: {
+        enabled: state.rpcDownloadConfig.enabled,
+        host: state.rpcDownloadConfig.host,
+        port: state.rpcDownloadConfig.port,
+        // secret 不持久化，仅保留在内存中
+      },
       }),
       migrate: (persistedState) => {
         // 版本升级适配处理
@@ -1641,6 +1671,11 @@ export const useAppStore = create<AppState & AppActions>()(
   // v5→v6: 初始化 proxyConfig
   if (state && !(state as Record<string, unknown>).proxyConfig) {
     (state as Record<string, unknown>).proxyConfig = { enabled: false, type: 'http', host: '', port: 7890 };
+  }
+
+  // 初始化 rpcDownloadConfig
+  if (state && !(state as Record<string, unknown>).rpcDownloadConfig) {
+    (state as Record<string, unknown>).rpcDownloadConfig = { enabled: false, host: '', port: 6800, secret: '' };
   }
 
         return state as PersistedAppState;
