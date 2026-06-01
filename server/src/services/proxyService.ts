@@ -29,7 +29,7 @@ export interface ProxyResponse {
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254']);
 const PRIVATE_IP_PATTERNS = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./];
 
-function validateUrl(rawUrl: string): void {
+export function validateUrl(rawUrl: string): void {
   const parsed = new URL(rawUrl);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(`Blocked proxy request: unsupported protocol '${parsed.protocol}'`);
