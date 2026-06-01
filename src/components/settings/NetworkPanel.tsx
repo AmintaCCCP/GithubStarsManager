@@ -131,12 +131,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     setRpcSaving(true);
     setRpcTestResult(null);
     try {
-      if (backend.isAvailable) {
+      if (backend.isAvailable && backend.backendUrl) {
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        const resp = await fetch('/api/settings/rpc-download', {
+        const resp = await fetch(`${backend.backendUrl}/settings/rpc-download`, {
           method: 'PUT',
           headers: authHeaders,
           body: JSON.stringify(rpcForm),
@@ -173,13 +173,13 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
     setRpcForm(newForm);
     setRpcDownloadConfig(newForm);
-    if (backend.isAvailable) {
+    if (backend.isAvailable && backend.backendUrl) {
       try {
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        await fetch('/api/settings/rpc-download', {
+        await fetch(`${backend.backendUrl}/settings/rpc-download`, {
           method: 'PUT',
           headers: authHeaders,
           body: JSON.stringify(newForm),

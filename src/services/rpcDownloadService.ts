@@ -1,4 +1,5 @@
 import type { RpcDownloadConfig } from '../types';
+import { backend } from './backendAdapter';
 
 interface RpcTestResult {
   success: boolean;
@@ -24,8 +25,12 @@ export async function testRpcDownload(
   config: RpcDownloadConfig,
   apiSecret?: string,
 ): Promise<RpcTestResult> {
+  const baseUrl = backend.backendUrl;
+  if (!baseUrl) {
+    return { success: false, error: 'Backend not available' };
+  }
   try {
-    const resp = await fetch('/api/settings/rpc-download/test', {
+    const resp = await fetch(`${baseUrl}/settings/rpc-download/test`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({
@@ -51,8 +56,12 @@ export async function sendToRpcDownload(
   filename: string,
   apiSecret?: string,
 ): Promise<RpcDownloadResult> {
+  const baseUrl = backend.backendUrl;
+  if (!baseUrl) {
+    return { success: false, error: 'Backend not available' };
+  }
   try {
-    const resp = await fetch('/api/download/rpc', {
+    const resp = await fetch(`${baseUrl}/download/rpc`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({ url, filename }),
