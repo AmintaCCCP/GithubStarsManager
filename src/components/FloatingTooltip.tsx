@@ -130,7 +130,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
       ref={tooltipRef}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in"
+      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[300px] overflow-y-auto scrollbar-auto"
       style={{ pointerEvents: 'auto' }}
     >
       <div className="whitespace-pre-wrap break-words pr-2">
