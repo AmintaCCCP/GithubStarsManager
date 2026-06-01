@@ -120,11 +120,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           aria-checked={form.enabled}
           aria-label={t('启用网络代理', 'Enable network proxy')}
           onClick={async () => {
-            const newEnabled = !form.enabled;
-            const newForm = { ...form, enabled: newEnabled };
+            const newForm = { ...form, enabled: !form.enabled };
             setForm(newForm);
-            // 立即持久化 enabled 状态，无需用户手动点击保存
-            setProxyConfig({ enabled: newEnabled });
+            // 立即持久化，无需用户手动点击保存
+            setProxyConfig(newForm);
             // 同步到后端
             if (backend.isAvailable) {
               try {
@@ -135,7 +134,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 await fetch('/api/settings/proxy', {
                   method: 'PUT',
                   headers: authHeaders,
-                  body: JSON.stringify({ ...proxyConfig, enabled: newEnabled }),
+                  body: JSON.stringify(newForm),
                 });
               } catch { /* best effort */ }
             }
