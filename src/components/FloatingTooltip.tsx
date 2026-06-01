@@ -38,10 +38,8 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
     const tooltipEl = tooltipRef.current;
 
     const tooltipHeight = tooltipEl.offsetHeight;
-    const tooltipWidth = triggerRect.width;
 
     const top = triggerRect.top - tooltipHeight - 8;
-    const left = triggerRect.left;
 
     if (top < 8) {
       tooltipEl.style.top = `${triggerRect.bottom + 8}px`;
@@ -51,8 +49,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
       tooltipEl.style.bottom = 'auto';
     }
 
-    tooltipEl.style.left = `${left}px`;
-    tooltipEl.style.width = `${tooltipWidth}px`;
+    tooltipEl.style.left = `${triggerRect.left}px`;
   }, [triggerRef, visible]);
 
   useLayoutEffect(() => {
@@ -130,7 +127,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
       ref={tooltipRef}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-h-[300px] overflow-y-auto scrollbar-auto"
+      className="fixed z-[9999] p-4 bg-white dark:bg-surface-3 text-gray-900 dark:text-text-primary text-[13px] leading-[1.625] rounded-xl shadow-dialog border border-gray-200/80 dark:border-white/[0.04] animate-fade-in max-w-[480px]"
       style={{ pointerEvents: 'auto' }}
     >
       <div className="whitespace-pre-wrap break-words pr-2">
