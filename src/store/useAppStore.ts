@@ -564,10 +564,9 @@ const normalizePersistedState = (
           host: typeof obj.host === 'string' ? obj.host : '',
           port: typeof obj.port === 'number' && Number.isFinite(obj.port) ? obj.port : 6800,
           // secret 不从持久化恢复，仅在内存中
-          secret: '',
         };
       }
-      return { enabled: false, host: '', port: 6800, secret: '' };
+      return { enabled: false, host: '', port: 6800 };
     })(),
   };
 };
@@ -757,7 +756,7 @@ export const useAppStore = create<AppState & AppActions>()(
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
       proxyConfig: { enabled: false, type: 'http', host: '', port: 7890 },
-      rpcDownloadConfig: { enabled: false, host: '', port: 6800, secret: '' },
+      rpcDownloadConfig: { enabled: false, host: '', port: 6800 },
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       releaseViewMode: 'timeline',
@@ -1675,7 +1674,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
   // 初始化 rpcDownloadConfig
   if (state && !(state as Record<string, unknown>).rpcDownloadConfig) {
-    (state as Record<string, unknown>).rpcDownloadConfig = { enabled: false, host: '', port: 6800, secret: '' };
+    (state as Record<string, unknown>).rpcDownloadConfig = { enabled: false, host: '', port: 6800 };
   }
 
         return state as PersistedAppState;

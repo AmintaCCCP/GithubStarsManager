@@ -34,6 +34,9 @@ export async function testRpcDownload(
         secret: config.secret,
       }),
     });
+    if (!resp.ok) {
+      return { success: false, error: `Server returned ${resp.status}` };
+    }
     return await resp.json();
   } catch (e) {
     return {
@@ -54,6 +57,9 @@ export async function sendToRpcDownload(
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({ url, filename }),
     });
+    if (!resp.ok) {
+      return { success: false, error: `Server returned ${resp.status}` };
+    }
     return await resp.json();
   } catch (e) {
     return {

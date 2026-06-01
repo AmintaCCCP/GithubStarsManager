@@ -173,7 +173,7 @@ export interface RpcDownloadConfig {
   enabled: boolean;
   host: string;
   port: number;
-  secret: string;
+  secret?: string;
 }
 
 export interface SearchFilters {

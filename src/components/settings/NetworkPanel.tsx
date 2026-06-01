@@ -465,8 +465,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               <div className="relative">
                 <input
                   type={showSecret ? 'text' : 'password'}
-                  value={rpcForm.secret}
-                  onChange={(e) => setRpcForm({ ...rpcForm, secret: e.target.value })}
+                  value={rpcForm.secret || ''}
+                  onChange={(e) => setRpcForm({ ...rpcForm, secret: e.target.value || undefined })}
                   placeholder={t('可选，对应 aria2 的 --rpc-secret', 'Optional, aria2 --rpc-secret')}
                   className="w-full px-3 py-2 pr-10 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
                 />
