@@ -35,7 +35,9 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: true
+      // Disable webSecurity to allow cross-origin requests to local services (aria2 RPC, etc.)
+      // Safe for desktop app: only loads local files, no arbitrary web content
+      webSecurity: false
     },
     icon: path.join(__dirname, '../dist/icon.svg'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
