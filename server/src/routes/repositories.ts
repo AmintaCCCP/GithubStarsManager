@@ -120,7 +120,7 @@ router.put('/api/repositories', (req, res) => {
     }
 
     const stmt = db.prepare(`
-      INSERT OR REPLACE INTO repositories (
+      INSERT INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,
         created_at, updated_at, pushed_at, starred_at,
         owner_login, owner_avatar_url, topics,
@@ -128,6 +128,31 @@ router.put('/api/repositories', (req, res) => {
         custom_description, custom_tags, custom_category, category_locked, last_edited,
         subscribed_to_releases
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        full_name = excluded.full_name,
+        description = excluded.description,
+        html_url = excluded.html_url,
+        stargazers_count = excluded.stargazers_count,
+        language = excluded.language,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        pushed_at = excluded.pushed_at,
+        starred_at = excluded.starred_at,
+        owner_login = excluded.owner_login,
+        owner_avatar_url = excluded.owner_avatar_url,
+        topics = excluded.topics,
+        ai_summary = CASE WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.ai_summary ELSE repositories.ai_summary END,
+        ai_tags = CASE WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN excluded.ai_tags ELSE repositories.ai_tags END,
+        ai_platforms = CASE WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms ELSE repositories.ai_platforms END,
+        analyzed_at = CASE WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at ELSE repositories.analyzed_at END,
+        analysis_failed = excluded.analysis_failed,
+        custom_description = CASE WHEN excluded.custom_description IS NOT NULL AND excluded.custom_description != '' THEN excluded.custom_description ELSE repositories.custom_description END,
+        custom_tags = CASE WHEN excluded.custom_tags IS NOT NULL AND excluded.custom_tags != '[]' THEN excluded.custom_tags ELSE repositories.custom_tags END,
+        custom_category = CASE WHEN excluded.custom_category IS NOT NULL AND excluded.custom_category != '' THEN excluded.custom_category ELSE repositories.custom_category END,
+        category_locked = excluded.category_locked,
+        last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
+        subscribed_to_releases = excluded.subscribed_to_releases
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
