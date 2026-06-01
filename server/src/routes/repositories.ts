@@ -3,7 +3,7 @@ import { getDb } from '../db/connection.js';
 
 const router = Router();
 
-// Helper to parse JSON columns safely
+/** Parse a JSON string column from the database, returning an empty array on failure. */
 function parseJsonColumn(value: unknown): unknown[] {
   if (typeof value !== 'string' || !value) return [];
   try {
@@ -12,7 +12,7 @@ function parseJsonColumn(value: unknown): unknown[] {
   } catch { return []; }
 }
 
-// Helper to transform DB row to API response
+/** Transform a database row into the API response shape, parsing JSON columns. */
 function transformRepo(row: Record<string, unknown>) {
   return {
     id: row.id,

@@ -10,6 +10,7 @@ interface Config {
   nodeEnv: string;
 }
 
+/** Resolve the data directory path, creating it if it doesn't exist. */
 function resolveDataDir(): string {
   const dataDir = path.resolve(process.cwd(), 'data');
   if (!fs.existsSync(dataDir)) {
@@ -45,6 +46,10 @@ export function normalizeEncryptionKey(key: string): string {
   return crypto.createHash('sha256').update(trimmed, 'utf8').digest('hex');
 }
 
+/**
+ * Resolve the AES-256 encryption key from env var, key file, or auto-generation.
+ * All non-standard formats are normalized to a 64-char hex string (32 bytes).
+ */
 function resolveEncryptionKey(dataDir: string): string {
   const envKey = process.env.ENCRYPTION_KEY;
   if (envKey) {
@@ -69,6 +74,7 @@ function resolveEncryptionKey(dataDir: string): string {
   return newKey;
 }
 
+/** Load all server configuration from environment variables and defaults. */
 function loadConfig(): Config {
   const dataDir = resolveDataDir();
 
