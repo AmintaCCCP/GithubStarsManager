@@ -51,12 +51,17 @@ describe('normalizeEncryptionKey', () => {
     expect(normalizeEncryptionKey(paddedKey)).toBe(validKey);
   });
 
-  it('should truncate a too-long hex string to 64 chars', () => {
+  it('should derive key from too-long hex string via SHA-256 (not truncate)', () => {
     const longHex = 'a'.repeat(80); // 80 hex chars
     const result = normalizeEncryptionKey(longHex);
 
     expect(result).toHaveLength(64);
-    expect(result).toBe('a'.repeat(64));
+    expect(/^[0-9a-fA-F]{64}$/.test(result)).toBe(true);
+
+    // Should be SHA-256 derived, NOT truncated
+    const expected = crypto.createHash('sha256').update(longHex, 'utf8').digest('hex');
+    expect(result).toBe(expected);
+    expect(result).not.toBe('a'.repeat(64)); // not a truncation
   });
 
   it('should handle the openssl rand -hex 16 scenario (32 chars)', () => {
@@ -88,5 +93,26 @@ describe('normalizeEncryptionKey', () => {
       const keyBuffer = Buffer.from(result, 'hex');
       expect(keyBuffer.length).toBe(32);
     }
+  });
+
+  it('should handle empty string input', () => {
+    const result = normalizeEncryptionKey('');
+    expect(result).toHaveLength(64);
+    expect(/^[0-9a-fA-F]{64}$/.test(result)).toBe(true);
+
+    // Deterministic
+    expect(normalizeEncryptionKey('')).toBe(result);
+  });
+
+  it('should handle 64-char non-hex string (e.g. contains invalid hex chars)', () => {
+    const nonHex64 = 'a'.repeat(63) + 'g'; // 64 chars but 'g' is not hex
+    const result = normalizeEncryptionKey(nonHex64);
+
+    expect(result).toHaveLength(64);
+    expect(/^[0-9a-fA-F]{64}$/.test(result)).toBe(true);
+
+    // Should be SHA-256 derived (not treated as valid hex)
+    const expected = crypto.createHash('sha256').update(nonHex64, 'utf8').digest('hex');
+    expect(result).toBe(expected);
   });
 });
