@@ -84,10 +84,6 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   const canUseProxy = isElectron() || backend.isAvailable;
 
-  if (!canUseProxy) {
-    return null;
-  }
-
   // --- Proxy handlers ---
 
   const isFormValid = !form.enabled || (form.host.trim() && form.port >= 1 && form.port <= 65535);
@@ -172,35 +168,37 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     setRpcSaving(true);
     setRpcTestResult(null);
     try {
-      const base = await getRpcBaseUrl();
-      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (backendApiSecret) {
-        authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-      }
-      // Only send secret when user explicitly typed one
-      const body: Record<string, unknown> = {
-        enabled: rpcForm.enabled,
-        host: rpcForm.host,
-        port: rpcForm.port,
-      };
-      if (rpcForm.secret) {
-        body.secret = rpcForm.secret;
+      // Sync to backend if available
+      if (backend.isAvailable) {
+        const base = await getRpcBaseUrl();
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        const body: Record<string, unknown> = {
+          enabled: rpcForm.enabled,
+          host: rpcForm.host,
+          port: rpcForm.port,
+        };
+        if (rpcForm.secret) {
+          body.secret = rpcForm.secret;
+        }
+
+        const resp = await fetch(`${base}/settings/rpc-download`, {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
+        }
       }
 
-      const resp = await fetch(`${base}/settings/rpc-download`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) {
-        throw new Error(`Backend returned ${resp.status}`);
-      }
-
+      // Always persist to local store
+      setRpcDownloadConfig(rpcForm);
       if (rpcForm.secret) {
         setHasStoredSecret(true);
       }
-
-      setRpcDownloadConfig(rpcForm);
     } catch (e) {
       setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
     } finally {
@@ -227,23 +225,26 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
     setRpcForm(newForm);
     setRpcDownloadConfig(newForm);
-    try {
-      const base = await getRpcBaseUrl();
-      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (backendApiSecret) {
-        authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-      }
-      await fetch(`${base}/settings/rpc-download`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(newForm),
-      });
-    } catch { /* best effort */ }
+    if (backend.isAvailable) {
+      try {
+        const base = await getRpcBaseUrl();
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        await fetch(`${base}/settings/rpc-download`, {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify(newForm),
+        });
+      } catch { /* best effort */ }
+    }
   };
 
   return (
     <div className="space-y-4">
-      {/* Network Proxy Card */}
+      {/* Network Proxy Card — only available with backend or Electron */}
+      {canUseProxy && (
       <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
@@ -454,6 +455,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           </div>
         )}
       </div>
+      )}
 
       {/* RPC Download Card */}
       <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
