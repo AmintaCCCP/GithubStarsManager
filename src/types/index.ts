@@ -169,6 +169,13 @@ export interface ProxyConfig {
   password?: string;
 }
 
+export interface RpcDownloadConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secret: string;
+}
+
 export interface SearchFilters {
   query: string;
   tags: string[];

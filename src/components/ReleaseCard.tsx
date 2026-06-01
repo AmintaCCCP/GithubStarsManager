@@ -1,8 +1,11 @@
-import React, { memo, useCallback } from 'react';
-import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2 } from 'lucide-react';
+import React, { memo, useCallback, useRef, useState } from 'react';
+import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2 } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useAppStore } from '../store/useAppStore';
+import { useDialog } from '../hooks/useDialog';
+import { sendToRpcDownload } from '../services/rpcDownloadService';
 
 interface DownloadLink {
   name: string;
@@ -50,6 +53,40 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   formatFileSize,
 }) => {
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+
+  // RPC download support — use refs to avoid stale closure in async handler
+  const { rpcDownloadConfig, backendApiSecret } = useAppStore();
+  const { toast } = useDialog();
+  const downloadingRef = useRef<Record<string, boolean>>({});
+  const downloadedRef = useRef<Record<string, boolean>>({});
+  const [, forceUpdate] = useState(0);
+
+  const handleRpcDownload = useCallback(async (link: DownloadLink) => {
+    const key = link.url;
+    if (downloadingRef.current[key] || downloadedRef.current[key]) return;
+
+    downloadingRef.current = { ...downloadingRef.current, [key]: true };
+    forceUpdate(n => n + 1);
+    try {
+      const result = await sendToRpcDownload(link.url, link.name, backendApiSecret || undefined);
+      if (result.success) {
+        downloadedRef.current = { ...downloadedRef.current, [key]: true };
+        toast(t('已发送到远程下载器', 'Sent to remote downloader'), 'success');
+      } else {
+        toast(
+          result.error === 'RPC service not running'
+            ? t('远程下载服务未运行，请检查配置', 'Remote download service not running, please check config')
+            : result.error || t('发送失败', 'Send failed'),
+          'error'
+        );
+      }
+    } catch {
+      toast(t('远程下载服务未运行，请检查配置', 'Remote download service not running, please check config'), 'error');
+    } finally {
+      downloadingRef.current = { ...downloadingRef.current, [key]: false };
+      forceUpdate(n => n + 1);
+    }
+  }, [backendApiSecret, toast, t]);
 
   // 判断是否有任何内容展开
   const isAnyExpanded = isAssetsExpanded || isReleaseNotesExpanded;
@@ -203,37 +240,82 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               </div>
 
               <div className="bg-gray-50 dark:bg-[#121314] rounded border border-black/[0.06] dark:border-white/[0.04] max-h-72 overflow-y-auto">
-                {downloadLinks.map((link, index) => (
-                  <a
-                    key={index}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
-                      link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
-                    }`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                      {link.isSourceCode ? (
-                        <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
-                      )}
-                      <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
-                        {link.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
-                      {link.size > 0 && (
-                        <span>{formatFileSize(link.size)}</span>
-                      )}
-                      {link.downloadCount > 0 && (
-                        <span>{link.downloadCount.toLocaleString()} {t('下载', 'downloads')}</span>
-                      )}
-                    </div>
-                  </a>
-                ))}
+                {downloadLinks.map((link, index) => {
+                  const isRpcEnabled = rpcDownloadConfig.enabled;
+                  const isDownloading = downloadingRef.current[link.url];
+                  const isDownloaded = downloadedRef.current[link.url];
+
+                  if (isRpcEnabled) {
+                    return (
+                      <button
+                        key={index}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRpcDownload(link);
+                        }}
+                        disabled={isDownloading || isDownloaded}
+                        className={`flex items-center justify-between px-4 py-3 w-full text-left hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 disabled:opacity-60 ${
+                          link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                          {isDownloaded ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          ) : isDownloading ? (
+                            <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin flex-shrink-0" />
+                          ) : link.isSourceCode ? (
+                            <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
+                          )}
+                          <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                            {link.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                          {link.size > 0 && (
+                            <span>{formatFileSize(link.size)}</span>
+                          )}
+                          {link.downloadCount > 0 && (
+                            <span>{link.downloadCount.toLocaleString()} {t('下载', 'downloads')}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <a
+                      key={index}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
+                        link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                        {link.isSourceCode ? (
+                          <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
+                        )}
+                        <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                          {link.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                        {link.size > 0 && (
+                          <span>{formatFileSize(link.size)}</span>
+                        )}
+                        {link.downloadCount > 0 && (
+                          <span>{link.downloadCount.toLocaleString()} {t('下载', 'downloads')}</span>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
