@@ -1,6 +1,5 @@
 import type { RpcDownloadConfig } from '../types';
 import { backend } from './backendAdapter';
-import { isElectron } from './electronProxy';
 
 interface RpcTestResult {
   success: boolean;
