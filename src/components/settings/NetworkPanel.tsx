@@ -119,7 +119,31 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           role="switch"
           aria-checked={form.enabled}
           aria-label={t('启用网络代理', 'Enable network proxy')}
-          onClick={() => setForm({ ...form, enabled: !form.enabled })}
+          onClick={async () => {
+            const newEnabled = !form.enabled;
+            const newForm = { ...form, enabled: newEnabled };
+            setForm(newForm);
+            // 立即持久化 enabled 状态，无需用户手动点击保存
+            setProxyConfig({ enabled: newEnabled });
+            // 同步到后端
+            if (backend.isAvailable) {
+              try {
+                const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+                if (backendApiSecret) {
+                  authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+                }
+                await fetch('/api/settings/proxy', {
+                  method: 'PUT',
+                  headers: authHeaders,
+                  body: JSON.stringify({ ...proxyConfig, enabled: newEnabled }),
+                });
+              } catch { /* best effort */ }
+            }
+            // 同步到 Electron
+            if (isElectron()) {
+              try { await electronProxy.setProxy(newForm); } catch { /* best effort */ }
+            }
+          }}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.enabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
         >
           <span
