@@ -24,8 +24,7 @@ function resolveDataDir(): string {
  * Backward compatibility:
  * - Valid 64-char hex string → returned as-is (no change for existing users)
  * - Short hex (e.g. 32 chars from `openssl rand -hex 16`) → SHA-256 derived
- * - Non-hex input (base64, plain text) → SHA-256 derived
- * - Too-long hex → truncated to 64 chars
+ * - Non-hex input (base64, plain text, too-long hex) → SHA-256 derived
  */
 export function normalizeEncryptionKey(key: string): string {
   const trimmed = key.trim();
@@ -37,10 +36,6 @@ export function normalizeEncryptionKey(key: string): string {
 
   // Hex string but wrong length — derive via SHA-256 for deterministic 32-byte result
   if (/^[0-9a-fA-F]+$/.test(trimmed)) {
-    if (trimmed.length > 64) {
-      console.warn(`[config] ENCRYPTION_KEY is ${trimmed.length} hex chars, truncating to 64.`);
-      return trimmed.slice(0, 64);
-    }
     console.warn(`[config] ENCRYPTION_KEY is ${trimmed.length} hex chars (expected 64). Deriving 32-byte key via SHA-256. Previously encrypted data may need re-encryption.`);
     return crypto.createHash('sha256').update(trimmed, 'utf8').digest('hex');
   }
@@ -59,7 +54,13 @@ function resolveEncryptionKey(dataDir: string): string {
   const keyFilePath = path.join(dataDir, '.encryption-key');
   if (fs.existsSync(keyFilePath)) {
     const fileKey = fs.readFileSync(keyFilePath, 'utf-8').trim();
-    return normalizeEncryptionKey(fileKey);
+    const normalized = normalizeEncryptionKey(fileKey);
+    // Persist normalized key so future startups (even without normalization) use the correct format
+    if (normalized !== fileKey) {
+      fs.writeFileSync(keyFilePath, normalized, { mode: 0o600 });
+      console.log('[config] Normalized encryption key written back to data/.encryption-key');
+    }
+    return normalized;
   }
 
   const newKey = crypto.randomBytes(32).toString('hex');
