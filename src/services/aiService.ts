@@ -538,7 +538,7 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
 请分析以下GitHub仓库信息，并只输出合法JSON对象。不要输出思考过程、Markdown、代码块标记、解释或任何额外文本。
 
 要求：
-- summary：中文概述，说明仓库的主要功能和用途，不超过50字。
+- summary：中文概述，说明仓库的主要功能和用途，不超过200字。
 - tags：3-5个中文应用类型标签${customCategories && customCategories.length > 0 ? '，请优先从上方的可用分类中选择' : '，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等'}。${categoriesLine}
 - platforms：只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择；无法判断则为 []。
 
@@ -563,7 +563,7 @@ ${repoInfo}
 Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
 Requirements:
-- summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
+- summary: A concise English overview explaining the main functionality and purpose, no more than 200 words.
 - tags: 3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.${categoriesLine}
 - platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
 
@@ -614,7 +614,7 @@ ${repoInfo}
       }
 
       return {
-        summary: cleaned.substring(0, 50) + (cleaned.length > 50 ? '...' : ''),
+        summary: cleaned.substring(0, 500) + (cleaned.length > 500 ? '...' : ''),
         tags: [],
         platforms: [],
       };
