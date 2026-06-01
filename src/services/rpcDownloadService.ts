@@ -21,16 +21,18 @@ function getAuthHeaders(apiSecret?: string): Record<string, string> {
   return headers;
 }
 
+/** Resolve API base: use backendUrl if probed, else fall back to relative path (same-origin) */
+function resolveBaseUrl(): string {
+  return backend.backendUrl || '/api';
+}
+
 export async function testRpcDownload(
   config: RpcDownloadConfig,
   apiSecret?: string,
 ): Promise<RpcTestResult> {
-  const baseUrl = backend.backendUrl;
-  if (!baseUrl) {
-    return { success: false, error: 'Backend not available' };
-  }
+  const base = resolveBaseUrl();
   try {
-    const resp = await fetch(`${baseUrl}/settings/rpc-download/test`, {
+    const resp = await fetch(`${base}/settings/rpc-download/test`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({
@@ -56,12 +58,9 @@ export async function sendToRpcDownload(
   filename: string,
   apiSecret?: string,
 ): Promise<RpcDownloadResult> {
-  const baseUrl = backend.backendUrl;
-  if (!baseUrl) {
-    return { success: false, error: 'Backend not available' };
-  }
+  const base = resolveBaseUrl();
   try {
-    const resp = await fetch(`${baseUrl}/download/rpc`, {
+    const resp = await fetch(`${base}/download/rpc`, {
       method: 'POST',
       headers: getAuthHeaders(apiSecret),
       body: JSON.stringify({ url, filename }),

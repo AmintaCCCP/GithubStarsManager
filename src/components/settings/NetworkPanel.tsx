@@ -24,6 +24,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   // --- RPC Download state ---
   const [rpcForm, setRpcForm] = useState<RpcDownloadConfig>(rpcDownloadConfig);
   const [showSecret, setShowSecret] = useState(false);
+  const [hasStoredSecret, setHasStoredSecret] = useState(false);
   const [rpcTesting, setRpcTesting] = useState(false);
   const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
   const [rpcSaving, setRpcSaving] = useState(false);
@@ -40,6 +41,35 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   useEffect(() => {
     setRpcForm(rpcDownloadConfig);
   }, [rpcDownloadConfig]);
+
+  // Load RPC config from backend on mount (to get hasSecret flag)
+  useEffect(() => {
+    if (!backend.isAvailable) return;
+    const loadRpcConfig = async () => {
+      try {
+        const authHeaders: Record<string, string> = {};
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        const resp = await fetch('/api/settings/rpc-download', { headers: authHeaders });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.hasSecret) {
+            setHasStoredSecret(true);
+          }
+          // Merge backend state into store (enabled/host/port)
+          if (data.enabled !== undefined || data.host || data.port) {
+            setRpcDownloadConfig({
+              enabled: data.enabled ?? rpcDownloadConfig.enabled,
+              host: data.host || rpcDownloadConfig.host,
+              port: data.port || rpcDownloadConfig.port,
+            });
+          }
+        }
+      } catch { /* best effort */ }
+    };
+    loadRpcConfig();
+  }, [backend.isAvailable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canUseProxy = isElectron() || backend.isAvailable;
 
@@ -131,18 +161,34 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     setRpcSaving(true);
     setRpcTestResult(null);
     try {
-      if (backend.isAvailable && backend.backendUrl) {
+      if (backend.isAvailable) {
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        const resp = await fetch(`${backend.backendUrl}/settings/rpc-download`, {
+        // Don't send empty secret — let backend preserve the stored one
+        const body: Record<string, unknown> = {
+          enabled: rpcForm.enabled,
+          host: rpcForm.host,
+          port: rpcForm.port,
+        };
+        if (rpcForm.secret) {
+          body.secret = rpcForm.secret;
+        } else {
+          body.secret = ''; // explicitly empty = clear
+        }
+
+        const resp = await fetch('/api/settings/rpc-download', {
           method: 'PUT',
           headers: authHeaders,
-          body: JSON.stringify(rpcForm),
+          body: JSON.stringify(body),
         });
         if (!resp.ok) {
           throw new Error(`Backend returned ${resp.status}`);
+        }
+
+        if (rpcForm.secret) {
+          setHasStoredSecret(true);
         }
       }
 
@@ -173,13 +219,13 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
     setRpcForm(newForm);
     setRpcDownloadConfig(newForm);
-    if (backend.isAvailable && backend.backendUrl) {
+    if (backend.isAvailable) {
       try {
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        await fetch(`${backend.backendUrl}/settings/rpc-download`, {
+        await fetch('/api/settings/rpc-download', {
           method: 'PUT',
           headers: authHeaders,
           body: JSON.stringify(newForm),
@@ -466,8 +512,13 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 <input
                   type={showSecret ? 'text' : 'password'}
                   value={rpcForm.secret || ''}
-                  onChange={(e) => setRpcForm({ ...rpcForm, secret: e.target.value || undefined })}
-                  placeholder={t('可选，对应 aria2 的 --rpc-secret', 'Optional, aria2 --rpc-secret')}
+                  onChange={(e) => {
+                    setRpcForm({ ...rpcForm, secret: e.target.value || undefined });
+                    if (e.target.value) setHasStoredSecret(false);
+                  }}
+                  placeholder={hasStoredSecret
+                    ? t('已保存密钥，留空则保留', 'Secret saved, leave blank to keep')
+                    : t('可选，对应 aria2 的 --rpc-secret', 'Optional, aria2 --rpc-secret')}
                   className="w-full px-3 py-2 pr-10 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
                 />
                 <button
