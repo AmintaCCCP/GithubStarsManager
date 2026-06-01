@@ -647,9 +647,10 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
     return;
   }
 
-  // Fall back to stored secret if not provided in request
-  let secret = requestSecret;
-  if (!secret) {
+  // Fall back to stored secret only when field is omitted, not when empty
+  const secretProvided = Object.prototype.hasOwnProperty.call(req.body, 'secret');
+  let secret = secretProvided ? requestSecret : undefined;
+  if (!secretProvided) {
     const stored = getRpcDownloadConfig();
     if (stored && stored.secret) {
       secret = stored.secret;

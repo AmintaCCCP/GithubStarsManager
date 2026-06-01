@@ -29,6 +29,17 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
   const [rpcSaving, setRpcSaving] = useState(false);
 
+  // Ensure backend is initialized, then return base URL
+  const getRpcBaseUrl = async (): Promise<string> => {
+    if (!backend.isAvailable) {
+      await backend.init();
+    }
+    if (!backend.backendUrl) {
+      throw new Error('Backend not available');
+    }
+    return backend.backendUrl;
+  };
+
   // Sync proxy form when store changes externally
   useEffect(() => {
     setForm(proxyConfig);
@@ -44,14 +55,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   // Load RPC config from backend on mount (to get hasSecret flag)
   useEffect(() => {
-    if (!backend.isAvailable) return;
     const loadRpcConfig = async () => {
       try {
+        const base = await getRpcBaseUrl();
         const authHeaders: Record<string, string> = {};
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        const resp = await fetch('/api/settings/rpc-download', { headers: authHeaders });
+        const resp = await fetch(`${base}/settings/rpc-download`, { headers: authHeaders });
         if (resp.ok) {
           const data = await resp.json();
           if (data.hasSecret) {
@@ -69,7 +80,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
       } catch { /* best effort */ }
     };
     loadRpcConfig();
-  }, [backend.isAvailable]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canUseProxy = isElectron() || backend.isAvailable;
 
@@ -161,35 +172,32 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     setRpcSaving(true);
     setRpcTestResult(null);
     try {
-      if (backend.isAvailable) {
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        // Don't send empty secret — let backend preserve the stored one
-        const body: Record<string, unknown> = {
-          enabled: rpcForm.enabled,
-          host: rpcForm.host,
-          port: rpcForm.port,
-        };
-        if (rpcForm.secret) {
-          body.secret = rpcForm.secret;
-        } else {
-          body.secret = ''; // explicitly empty = clear
-        }
+      const base = await getRpcBaseUrl();
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (backendApiSecret) {
+        authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+      }
+      // Only send secret when user explicitly typed one
+      const body: Record<string, unknown> = {
+        enabled: rpcForm.enabled,
+        host: rpcForm.host,
+        port: rpcForm.port,
+      };
+      if (rpcForm.secret) {
+        body.secret = rpcForm.secret;
+      }
 
-        const resp = await fetch('/api/settings/rpc-download', {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-          throw new Error(`Backend returned ${resp.status}`);
-        }
+      const resp = await fetch(`${base}/settings/rpc-download`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        throw new Error(`Backend returned ${resp.status}`);
+      }
 
-        if (rpcForm.secret) {
-          setHasStoredSecret(true);
-        }
+      if (rpcForm.secret) {
+        setHasStoredSecret(true);
       }
 
       setRpcDownloadConfig(rpcForm);
@@ -219,19 +227,18 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
     setRpcForm(newForm);
     setRpcDownloadConfig(newForm);
-    if (backend.isAvailable) {
-      try {
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        await fetch('/api/settings/rpc-download', {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(newForm),
-        });
-      } catch { /* best effort */ }
-    }
+    try {
+      const base = await getRpcBaseUrl();
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (backendApiSecret) {
+        authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+      }
+      await fetch(`${base}/settings/rpc-download`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify(newForm),
+      });
+    } catch { /* best effort */ }
   };
 
   return (
