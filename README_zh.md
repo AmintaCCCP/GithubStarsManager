@@ -248,10 +248,26 @@ docker-compose up -d
 
 #### 快速启动（推荐使用 Docker）
 ```bash
-docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker-compose up -d
 ```
 前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。
+
+#### 仅后端（docker run）
+```bash
+# 基础运行 — 无认证，端口 3000
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+
+# 自定义密钥和端口
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  -e API_SECRET="your-secret" \
+  -e ENCRYPTION_KEY="your-key" \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+```
 
 #### 手动启动
 ```bash
