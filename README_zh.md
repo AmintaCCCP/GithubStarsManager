@@ -236,6 +236,8 @@ docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker-compose up -d
 ```
 
+> 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
+
 请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
 
 ### 🖥️ 后端服务器（可选）

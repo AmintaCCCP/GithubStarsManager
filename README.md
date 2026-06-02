@@ -178,6 +178,8 @@ docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker-compose up -d
 ```
 
+> If the package is private, run `docker login ghcr.io` first (use a [PAT](https://github.com/settings/tokens) with `read:packages` scope).
+
 See [DOCKER.md](DOCKER.md) for detailed instructions. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
 
 ### 🖥️ Backend Server (Optional)
