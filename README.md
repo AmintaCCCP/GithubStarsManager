@@ -171,7 +171,14 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ### 🐳 Run With Docker
 
-You can also run this application using Docker. See [DOCKER.md](DOCKER.md) for detailed instructions on how to build and deploy using Docker. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
+Pre-built backend image is available on GHCR — no local build required:
+
+```bash
+docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker-compose up -d
+```
+
+See [DOCKER.md](DOCKER.md) for detailed instructions. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
 
 ### 🖥️ Backend Server (Optional)
 
@@ -182,7 +189,8 @@ The app works fully without a backend (pure frontend, localStorage). An optional
 
 #### Quick Start (Docker — recommended)
 ```bash
-docker-compose up --build
+docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker-compose up -d
 ```
 Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
 

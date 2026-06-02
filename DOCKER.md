@@ -7,18 +7,38 @@ This application can be deployed using Docker with minimal configuration. The Do
 - Docker installed on your system
 - Docker Compose (optional, but recommended)
 
-## Building and Running with Docker
+## Quick Start (Using Pre-built Images from GHCR)
 
-### Using Docker Compose (Recommended)
+The fastest way to get started — no build required:
 
 ```bash
-# Build and start the container
+# Pull the latest backend image
+docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+
+# Using Docker Compose (pulls images automatically)
 docker-compose up -d
 
 # The application will be available at http://localhost:8080
 ```
 
-### Using Docker directly
+Available image tags:
+- `latest` — latest build from the `main` branch
+- `v0.6.2`, `0.6.2` — specific version tags
+- `sha-abc1234` — specific commit builds
+
+## Building Locally with Docker
+
+### Using Docker Compose (local build)
+
+Edit `docker-compose.yml` — comment out the `image:` line and uncomment `build: ./server`, then:
+
+```bash
+docker-compose up -d --build
+
+# The application will be available at http://localhost:8080
+```
+
+### Using Docker directly (frontend only)
 
 ```bash
 # Build the image
