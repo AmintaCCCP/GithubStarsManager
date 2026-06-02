@@ -24,7 +24,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   // --- RPC Download state ---
   const [rpcForm, setRpcForm] = useState<RpcDownloadConfig>(rpcDownloadConfig);
   const [showSecret, setShowSecret] = useState(false);
-  const [hasStoredSecret, setHasStoredSecret] = useState(false);
+  const [hasStoredSecret, setHasStoredSecret] = useState(() => !!rpcDownloadConfig.secret);
   const [rpcTesting, setRpcTesting] = useState(false);
   const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
   const [rpcSaving, setRpcSaving] = useState(false);

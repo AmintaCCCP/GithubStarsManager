@@ -563,7 +563,7 @@ const normalizePersistedState = (
           enabled: typeof obj.enabled === 'boolean' ? obj.enabled : false,
           host: typeof obj.host === 'string' ? obj.host : '',
           port: typeof obj.port === 'number' && Number.isFinite(obj.port) ? obj.port : 6800,
-          // secret 不从持久化恢复，仅在内存中
+          secret: typeof obj.secret === 'string' ? obj.secret : undefined,
         };
       }
       return { enabled: false, host: '', port: 6800 };
@@ -1539,12 +1539,12 @@ export const useAppStore = create<AppState & AppActions>()(
         username: state.proxyConfig.username,
         // password 不持久化，仅保留在内存中
       },
-      // 持久化 RPC 下载配置，但排除密钥（安全考虑）
+      // 持久化 RPC 下载配置（含密钥，确保重启后不丢失）
       rpcDownloadConfig: {
         enabled: state.rpcDownloadConfig.enabled,
         host: state.rpcDownloadConfig.host,
         port: state.rpcDownloadConfig.port,
-        // secret 不持久化，仅保留在内存中
+        secret: state.rpcDownloadConfig.secret,
       },
       }),
       migrate: (persistedState) => {
