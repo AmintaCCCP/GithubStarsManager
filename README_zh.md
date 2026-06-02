@@ -228,7 +228,17 @@ npm run build
 - 自建服务器
 
 ### Docker 部署
-您也可以使用 Docker 来运行此应用程序。请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
+
+GHCR 上有预构建的后端镜像，无需本地构建：
+
+```bash
+docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker-compose up -d
+```
+
+> 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
+
+请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
 
 ### 🖥️ 后端服务器（可选）
 
@@ -240,9 +250,33 @@ npm run build
 
 #### 快速启动（推荐使用 Docker）
 ```bash
-docker-compose up --build
+docker-compose up -d
 ```
 前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。
+
+自定义配置，创建 `.env` 文件：
+```bash
+API_SECRET=your-secret
+ENCRYPTION_KEY=your-key
+BACKEND_IMAGE_TAG=v0.6.2   # 固定版本（默认：latest）
+```
+
+#### 仅后端（docker run）
+```bash
+# 基础运行 — 无认证，端口 3000
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+
+# 自定义密钥和端口
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  -e API_SECRET="your-secret" \
+  -e ENCRYPTION_KEY="your-key" \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+```
 
 #### 手动启动
 ```bash
