@@ -32,6 +32,10 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | **Release Tracking** | Subscribe to repos and see new versions in one unified timeline |
 | **One‑click Downloads** | Expand release assets and download instantly |
 | **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
+| **Fork Management** | View, sync upstream, and trigger GitHub Actions workflows on forked repos |
+| **Network Proxy** | HTTP / SOCKS5 proxy with protocol-level connection testing |
+| **Remote Download (aria2)** | Send release assets to aria2 for download via JSON-RPC |
+| **Diagnostic Logs** | Unified frontend/backend log viewer with debug capture mode |
 | **Bilingual Wiki Jump** | Deepwiki (EN) or zread (ZH) based on repository language |
 | **Packaged Client** | No environment setup required—download and run |
 
@@ -42,6 +46,8 @@ Deploy an Express + SQLite backend for:
 - **Cross-device Sync** — Share data between browsers and devices
 - **CORS-free API Proxying** — AI and WebDAV calls route through the server
 - **Encrypted Token Storage** — API keys stored securely, never exposed to browser
+- **Network Proxy Forwarding** — Route all outbound requests (GitHub, AI, WebDAV) through HTTP/SOCKS5 proxy
+- **RPC Download Proxy** — Forward aria2 download requests through the server with encrypted secret storage
 
 ---
 
@@ -101,7 +107,21 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 4. Search & Filters
+### 4. Fork Management (`Forks` View)
+
+**Features:**
+- **Fork Listing** — Automatically fetches all your forked repos with upstream update detection
+- **One-click Sync** — Merge upstream changes into any branch with conflict handling
+- **GitHub Actions** — View and trigger workflow runs directly from fork cards
+- **Read/Unread Tracking** — Pulse indicator for forks with new upstream commits
+- **Search & Pagination** — Full-text search, configurable page sizes
+
+**Screenshot:**
+![Fork](upload/fork.png)
+
+---
+
+### 5. Search & Filters
 
 **Features:**
 - **Multi-dimensional Search** — Keyword search, repo status filter, tag filter, language filter, platform filter
@@ -117,7 +137,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 5. Settings Panel
+### 6. Settings Panel
 
 **Settings Groups:**
 
@@ -128,6 +148,7 @@ Deploy an Express + SQLite backend for:
 | **WebDAV** | Backup config for Jianguoyun, Nextcloud, ownCloud, and standard WebDAV services |
 | **Backup** | Backup history, manual backup/restore, incremental backup |
 | **Backend Server** | Connect to self-hosted backend, API key authentication, sync status indicator |
+| **Network** | HTTP/SOCKS5 proxy config with protocol-level testing; aria2 RPC remote download setup |
 | **Category** | Category management, category sorting, default category override rules |
 | **Data Management** | Data import/export, clear local data, reset all data |
 
@@ -136,7 +157,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 6. Custom AI Models
+### 7. Custom AI Models
 
 **Features:**
 - **Multi AI Provider Support** — OpenAI (GPT-3.5/GPT-4), Anthropic (Claude), Ollama (local models), any OpenAI-compatible API
@@ -250,6 +271,29 @@ The app supports multiple AI providers. Configure yours in the Settings panel:
 - **Any OpenAI-compatible API**: custom endpoint + key
 
 Steps: open Settings, add an AI config, enter your endpoint and key, pick a model, then test the connection.
+
+## 🌐 Network Proxy Configuration
+
+The app supports routing all outbound requests through a proxy:
+
+- **HTTP Proxy** — Standard HTTP CONNECT tunneling with optional authentication
+- **SOCKS5 Proxy** — Full SOCKS5 support including username/password auth (RFC 1929)
+- **Protocol-level Testing** — Connection test performs actual protocol handshakes, not just TCP connect
+- **Encrypted Storage** — Proxy passwords are encrypted at rest with AES-256-GCM
+
+Configure in Settings → Network tab (available in Electron client or with backend server).
+
+## ⬇️ Remote Download (aria2 RPC)
+
+Send release download links directly to an aria2 daemon:
+
+1. Start aria2 with RPC enabled: `aria2c --enable-rpc --rpc-listen-port=6800`
+2. Open Settings → Network → Remote Download
+3. Enter host, port, and optional secret
+4. Test connection, then save
+5. Release asset buttons will now queue downloads to aria2
+
+Works in both backend-proxied mode and client-only mode (direct browser→aria2 connection).
 
 ## 💾 WebDAV Backup Configuration
 
