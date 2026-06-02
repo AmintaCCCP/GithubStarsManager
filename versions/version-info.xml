@@ -376,4 +376,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.1</downloadUrl>
   </version>
+  <version>
+    <number>0.6.2</number>
+    <releaseDate>2026-06-02</releaseDate>
+    <changelog>
+      <item>feat: Added aria2 remote RPC download integration in Settings > Network, with configurable RPC host/port/secret, connection testing, SSRF protection, and download routing. (PR #186)</item>
+      <item>fix: Fixed proxy toggle in Network Settings reverting after page navigation — changes now sync immediately to Zustand store, backend, and Electron process. (PR #185)</item>
+      <item>fix: Fixed AI config sync returning 422 when ENCRYPTION_KEY is a short hex string — keys are now auto-normalized to 32 bytes via SHA-256 derivation. (PR #187)</item>
+      <item>fix: Fixed AI tags disappearing after backend sync — empty arrays no longer overwrite existing AI analysis data during repository updates. (PR #187)</item>
+      <item>fix: Fixed RPC download secret being lost after app restart by persisting it in Zustand IndexedDB storage. (PR #189)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.2</downloadUrl>
+  </version>
 </versions>
