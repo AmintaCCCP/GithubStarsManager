@@ -98,13 +98,27 @@ Then `docker-compose up -d` reads them automatically.
 
 ### Using Docker Compose (local build)
 
-Edit `docker-compose.yml` — comment out the `image:` line and uncomment `build: ./server`, then:
+**Option A — Edit `docker-compose.yml` directly:**
+
+Comment out the `image:` line and uncomment `build: ./server`, then:
 
 ```bash
 docker-compose up -d --build
-
-# The application will be available at http://localhost:8080
 ```
+
+**Option B — Use an override file (no editing needed):**
+
+Create `docker-compose.override.yml` in the project root:
+
+```yaml
+services:
+  backend:
+    build: ./server
+```
+
+Then run `docker-compose up -d --build`. The override file takes precedence automatically. To switch back to GHCR images, simply delete the override file.
+
+> **Note:** Do NOT commit the override file to git — it would force local builds for all users.
 
 ### Using Docker directly (frontend only)
 
