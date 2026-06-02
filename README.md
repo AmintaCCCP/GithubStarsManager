@@ -189,10 +189,26 @@ The app works fully without a backend (pure frontend, localStorage). An optional
 
 #### Quick Start (Docker — recommended)
 ```bash
-docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker-compose up -d
 ```
 Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
+
+#### Backend only (docker run)
+```bash
+# Basic — no auth, port 3000
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+
+# With custom secret and encryption key
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  -e API_SECRET="your-secret" \
+  -e ENCRYPTION_KEY="your-key" \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+```
 
 #### Manual Setup
 ```bash
