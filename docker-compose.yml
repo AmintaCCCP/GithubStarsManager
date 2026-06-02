@@ -10,7 +10,9 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./server
+    image: ghcr.io/amintacccp/github-stars-manager-server:${BACKEND_IMAGE_TAG:-latest}
+    # Uncomment below (and comment out 'image') to build locally instead:
+    # build: ./server
     expose:
       - "3000"
     environment:

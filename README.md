@@ -171,7 +171,16 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ### 🐳 Run With Docker
 
-You can also run this application using Docker. See [DOCKER.md](DOCKER.md) for detailed instructions on how to build and deploy using Docker. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
+Pre-built backend image is available on GHCR — no local build required:
+
+```bash
+docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker-compose up -d
+```
+
+> If the package is private, run `docker login ghcr.io` first (use a [PAT](https://github.com/settings/tokens) with `read:packages` scope).
+
+See [DOCKER.md](DOCKER.md) for detailed instructions. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
 
 ### 🖥️ Backend Server (Optional)
 
@@ -182,9 +191,33 @@ The app works fully without a backend (pure frontend, localStorage). An optional
 
 #### Quick Start (Docker — recommended)
 ```bash
-docker-compose up --build
+docker-compose up -d
 ```
 Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
+
+To customize, create a `.env` file:
+```bash
+API_SECRET=your-secret
+ENCRYPTION_KEY=your-key
+BACKEND_IMAGE_TAG=v0.6.2   # pin a specific version (default: latest)
+```
+
+#### Backend only (docker run)
+```bash
+# Basic — no auth, port 3000
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+
+# With custom secret and encryption key
+docker run -d --name github-stars-backend \
+  -v github-stars-data:/app/data \
+  -p 3000:3000 \
+  -e API_SECRET="your-secret" \
+  -e ENCRYPTION_KEY="your-key" \
+  ghcr.io/amintacccp/github-stars-manager-server:latest
+```
 
 #### Manual Setup
 ```bash
