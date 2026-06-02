@@ -193,6 +193,13 @@ docker-compose up -d
 ```
 Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
 
+To customize, create a `.env` file:
+```bash
+API_SECRET=your-secret
+ENCRYPTION_KEY=your-key
+BACKEND_IMAGE_TAG=v0.6.2   # pin a specific version (default: latest)
+```
+
 #### Backend only (docker run)
 ```bash
 # Basic — no auth, port 3000

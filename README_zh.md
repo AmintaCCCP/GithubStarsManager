@@ -252,6 +252,13 @@ docker-compose up -d
 ```
 前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。
 
+自定义配置，创建 `.env` 文件：
+```bash
+API_SECRET=your-secret
+ENCRYPTION_KEY=your-key
+BACKEND_IMAGE_TAG=v0.6.2   # 固定版本（默认：latest）
+```
+
 #### 仅后端（docker run）
 ```bash
 # 基础运行 — 无认证，端口 3000

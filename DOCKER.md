@@ -18,10 +18,22 @@ docker-compose up -d
 # The application will be available at http://localhost:8080
 ```
 
+> **Note:** If the GHCR package is set to private, you must authenticate before pulling:
+> ```bash
+> docker login ghcr.io -u YOUR_GITHUB_USERNAME
+> ```
+> Use a [Personal Access Token](https://github.com/settings/tokens) (with `read:packages` scope) as the password.
+
 Available image tags:
 - `latest` — latest build from the `main` branch
 - `v0.6.2`, `0.6.2` — specific version tags
 - `sha-abc1234` — specific commit builds
+
+To pin a specific version in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` in your `.env` file:
+
+```bash
+BACKEND_IMAGE_TAG=v0.6.2
+```
 
 ## Backend Server (docker run)
 
@@ -77,6 +89,7 @@ To customize secrets, create a `.env` file in the project root:
 ```bash
 API_SECRET=my-strong-secret
 ENCRYPTION_KEY=my-encryption-key
+BACKEND_IMAGE_TAG=v0.6.2    # pin backend image version (default: latest)
 ```
 
 Then `docker-compose up -d` reads them automatically.
