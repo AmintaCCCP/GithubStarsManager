@@ -120,7 +120,8 @@ export class AIService {
   }
 
   private isDeepSeekReasonerModel(): boolean {
-    return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
+    const apiType = this.getApiType();
+    return (apiType === 'openai' || apiType === 'openai-compatible') && this.config.model.trim() === 'deepseek-reasoner';
   }
 
   private isMiMoModel(): boolean {
@@ -264,10 +265,17 @@ export class AIService {
           return content;
         }
 
+        // Only fall back to reasoning_content for the dedicated deepseek-reasoner model.
+        // Other DeepSeek models (e.g. deepseek-v4-flash, deepseek-v4-pro) may also return
+        // reasoning_content (the thinking chain), but we must not use it as the final answer.
         const reasoningContent = message?.reasoning_content;
-        if (reasoningContent) {
+        if (reasoningContent && isDeepSeekReasoner) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length }, httpDetails);
           return reasoningContent;
+        }
+
+        if (!content && reasoningContent) {
+          logger.warn('ai', 'Model returned reasoning_content but empty content', { model, configId });
         }
       }
 
@@ -587,8 +595,10 @@ ${repoInfo}
 
   private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
     try {
+      // Strip thinking tags that some models embed in the content field (e.g. <think>...</think>)
       const cleaned = content
         .trim()
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```$/i, '')
         .trim();

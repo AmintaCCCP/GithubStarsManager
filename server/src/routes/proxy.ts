@@ -197,8 +197,11 @@ router.post('/api/proxy/ai', async (req, res) => {
       targetUrl = urlObj.toString();
     }
 
+    // DeepSeek Reasoner does not support the reasoning parameter
+    const isDeepSeekReasoner = model.trim() === 'deepseek-reasoner';
     const effectiveRequestBody = (
       reasoningEffort
+      && !isDeepSeekReasoner
       && typeof requestBody === 'object'
       && requestBody !== null
       && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible')
