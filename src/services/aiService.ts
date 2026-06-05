@@ -137,7 +137,7 @@ export class AIService {
   }
 
   private isMiMoModel(): boolean {
-    return this.config.model.trim().toLowerCase().includes('mimo');
+    return this.getApiType() === 'mimo';
   }
 
   private async extractErrorDetail(response: Response): Promise<string> {
@@ -167,7 +167,7 @@ export class AIService {
     const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]

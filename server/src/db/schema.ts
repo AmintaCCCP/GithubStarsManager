@@ -80,7 +80,8 @@ export function initializeSchema(db: Database.Database): void {
       custom_prompt TEXT,
       use_custom_prompt INTEGER DEFAULT 0,
       concurrency INTEGER DEFAULT 1,
-      reasoning_effort TEXT
+      reasoning_effort TEXT,
+      mimo_plan TEXT
     );
 
     CREATE TABLE IF NOT EXISTS webdav_configs (
@@ -109,6 +110,7 @@ export function initializeSchema(db: Database.Database): void {
   `);
 
   addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
+  addColumnIfMissing(db, 'ai_configs', 'mimo_plan', 'TEXT');
   addColumnIfMissing(db, 'repositories', 'category_locked', 'INTEGER DEFAULT 0');
   addColumnIfMissing(db, 'releases', 'zipball_url', 'TEXT');
   addColumnIfMissing(db, 'releases', 'tarball_url', 'TEXT');

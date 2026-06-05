@@ -67,6 +67,7 @@ export interface AIConfigRow {
   use_custom_prompt: number;
   concurrency: number;
   reasoning_effort: string | null;
+  mimo_plan: string | null;
 }
 
 export interface WebDAVConfigRow {
