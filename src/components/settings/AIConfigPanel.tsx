@@ -64,8 +64,9 @@ function getEndpointHelpText(apiType: AIApiType, t: (zh: string, en: string) => 
     case 'gemini':
       return t('只填到 v1beta 即可，路径会自动生成', 'Only include the version prefix v1beta, the path will be generated automatically');
     case 'deepseek':
+      return t('填写到域名即可（如 https://api.deepseek.com），路径会自动生成', 'Only include the domain (e.g. https://api.deepseek.com), the path will be generated automatically');
     case 'mimo':
-      return t('填写到域名即可，路径会自动生成', 'Only include the domain, the path will be generated automatically');
+      return t('填写到 /v1 即可（如 https://api.xiaomimimo.com/v1），路径会自动生成', 'Only include up to /v1 (e.g. https://api.xiaomimimo.com/v1), the path will be generated automatically');
     default:
       return t('只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages', 'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.');
   }
