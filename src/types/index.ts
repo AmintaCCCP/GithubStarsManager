@@ -127,7 +127,7 @@ export interface GitHubUser {
   email: string | null;
 }
 
-export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'openai-compatible';
+export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'openai-compatible';
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';

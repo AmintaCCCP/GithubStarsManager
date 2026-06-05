@@ -28,6 +28,7 @@ const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
   'openai-responses': 'https://api.openai.com/v1',
   claude: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  deepseek: 'https://api.deepseek.com',
   'openai-compatible': '',
 };
 
@@ -392,6 +393,7 @@ Repository information:
                 <option value="openai-responses">OpenAI (Responses)</option>
                 <option value="claude">Claude</option>
                 <option value="gemini">Gemini</option>
+                <option value="deepseek">DeepSeek</option>
                 <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
               </select>
             </div>
@@ -410,9 +412,11 @@ Repository information:
                     ? 'https://api.openai.com/v1'
                     : form.apiType === 'claude'
                       ? 'https://api.anthropic.com/v1'
-                      : form.apiType === 'openai-compatible'
-                        ? 'https://integrate.api.nvidia.com/v1/chat/completions'
-                        : 'https://generativelanguage.googleapis.com/v1beta'
+                      : form.apiType === 'deepseek'
+                        ? 'https://api.deepseek.com'
+                        : form.apiType === 'openai-compatible'
+                          ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+                          : 'https://generativelanguage.googleapis.com/v1beta'
                 }
               />
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
@@ -426,10 +430,15 @@ Repository information:
                         '只填到 v1beta 即可，路径会自动生成',
                         'Only include the version prefix v1beta, the path will be generated automatically'
                       )
-                    : t(
-                        '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages',
-                        'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.'
-                      )}
+                    : form.apiType === 'deepseek'
+                      ? t(
+                          '填写到域名即可，路径会自动生成',
+                          'Only include the domain, the path will be generated automatically'
+                        )
+                      : t(
+                          '只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages',
+                          'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.'
+                        )}
               </p>
               {form.baseUrl && (
                 <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
