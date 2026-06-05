@@ -176,7 +176,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       'Accept': 'application/json',
     };
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek') {
       // openai-compatible 类型直接使用 baseUrl 作为完整地址
       targetUrl = apiType === 'openai-compatible'
         ? baseUrl.replace(/\/$/, '')
@@ -204,7 +204,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       && !isDeepSeekReasoner
       && typeof requestBody === 'object'
       && requestBody !== null
-      && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible')
+      && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek')
       && !('reasoning' in requestBody)
     )
       ? { ...requestBody, reasoning: { effort: reasoningEffort } }

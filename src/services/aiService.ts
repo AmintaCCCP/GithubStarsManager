@@ -119,9 +119,12 @@ export class AIService {
     return effort ? { effort } : undefined;
   }
 
+  private isDeepSeekModel(): boolean {
+    return this.getApiType() === 'deepseek';
+  }
+
   private isDeepSeekReasonerModel(): boolean {
-    const apiType = this.getApiType();
-    return (apiType === 'openai' || apiType === 'openai-compatible') && this.config.model.trim() === 'deepseek-reasoner';
+    return this.isDeepSeekModel() && this.config.model.trim() === 'deepseek-reasoner';
   }
 
   /**
@@ -130,10 +133,7 @@ export class AIService {
    * We need to explicitly disable thinking for these models.
    */
   private isDeepSeekThinkingModel(): boolean {
-    const model = this.config.model.trim().toLowerCase();
-    return (this.getApiType() === 'openai' || this.getApiType() === 'openai-compatible')
-      && model.startsWith('deepseek-')
-      && model !== 'deepseek-reasoner';
+    return this.isDeepSeekModel() && this.config.model.trim() !== 'deepseek-reasoner';
   }
 
   private isMiMoModel(): boolean {
@@ -167,7 +167,7 @@ export class AIService {
     const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
@@ -609,9 +609,11 @@ ${repoInfo}
   private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
     try {
       // Strip thinking tags that some models embed in the content field (e.g. <think>...</think>)
+      // Also handle truncated tags (dangling <think> without </think>) from token exhaustion
       const cleaned = content
         .trim()
         .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<think>[\s\S]*$/gi, '')
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```$/i, '')
         .trim();
