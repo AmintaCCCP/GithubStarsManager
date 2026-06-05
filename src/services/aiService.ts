@@ -124,6 +124,18 @@ export class AIService {
     return (apiType === 'openai' || apiType === 'openai-compatible') && this.config.model.trim() === 'deepseek-reasoner';
   }
 
+  /**
+   * Check if the model is a DeepSeek model with default thinking enabled (e.g. deepseek-v4-pro, deepseek-v4-flash).
+   * These models consume max_tokens for reasoning, leaving 0 tokens for content if max_tokens is too low.
+   * We need to explicitly disable thinking for these models.
+   */
+  private isDeepSeekThinkingModel(): boolean {
+    const model = this.config.model.trim().toLowerCase();
+    return (this.getApiType() === 'openai' || this.getApiType() === 'openai-compatible')
+      && model.startsWith('deepseek-')
+      && model !== 'deepseek-reasoner';
+  }
+
   private isMiMoModel(): boolean {
     return this.config.model.trim().toLowerCase().includes('mimo');
   }
@@ -163,6 +175,7 @@ export class AIService {
         { role: 'user', content: options.user },
       ];
       const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
+      const isDeepSeekThinking = this.isDeepSeekThinkingModel();
       const isMiMoModel = this.isMiMoModel();
 
       const requestBody = apiType === 'openai-responses'
@@ -172,7 +185,7 @@ export class AIService {
             temperature: options.temperature,
             max_output_tokens: options.maxTokens,
             ...(reasoning ? { reasoning } : {}),
-            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
           }
         : {
             model: this.config.model,
@@ -180,7 +193,7 @@ export class AIService {
             max_tokens: options.maxTokens,
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
             ...(!isDeepSeekReasoner && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
-            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
           };
 
       let data: Record<string, unknown>;
@@ -487,7 +500,7 @@ ${options.user}` : options.user;
         system,
         user: prompt,
         temperature: 0.3,
-        maxTokens: 700,
+        maxTokens: 1000,
         signal,
       });
 
