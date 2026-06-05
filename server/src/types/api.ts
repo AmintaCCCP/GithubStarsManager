@@ -129,6 +129,7 @@ export interface SyncAIConfigsRequest {
     useCustomPrompt?: boolean;
     concurrency?: number;
     reasoningEffort?: string;
+    mimoPlan?: string;
   }>;
 }
 
