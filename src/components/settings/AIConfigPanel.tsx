@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { AIConfig, AIApiType, AIReasoningEffort } from '../../types';
+import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
@@ -21,6 +21,12 @@ type AIFormState = {
   useCustomPrompt: boolean;
   concurrency: number;
   reasoningEffort: '' | AIReasoningEffort;
+  mimoPlan: MiMoPlan;
+};
+
+const MIMO_PLAN_ENDPOINTS: Record<MiMoPlan, string> = {
+  api: 'https://api.xiaomimimo.com/v1',
+  'token-plan': 'https://token-plan-cn.xiaomimimo.com/v1',
 };
 
 const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
@@ -29,6 +35,7 @@ const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
   claude: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   deepseek: 'https://api.deepseek.com',
+  mimo: MIMO_PLAN_ENDPOINTS.api,
   'openai-compatible': '',
 };
 
@@ -80,6 +87,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     useCustomPrompt: false,
     concurrency: 1,
     reasoningEffort: '',
+    mimoPlan: 'api',
   });
 
   // Auto-fill baseUrl when API type changes
@@ -100,6 +108,18 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     }
   }, [form.apiType, form.baseUrl]);
 
+  // Auto-fill baseUrl when MiMo plan changes
+  const prevMimoPlanRef = useRef<MiMoPlan>('api');
+  useEffect(() => {
+    if (form.apiType === 'mimo' && form.mimoPlan !== prevMimoPlanRef.current) {
+      const prevEndpoint = MIMO_PLAN_ENDPOINTS[prevMimoPlanRef.current];
+      if (form.baseUrl === '' || form.baseUrl === prevEndpoint) {
+        setForm(prev => ({ ...prev, baseUrl: MIMO_PLAN_ENDPOINTS[form.mimoPlan] }));
+      }
+      prevMimoPlanRef.current = form.mimoPlan;
+    }
+  }, [form.apiType, form.mimoPlan]);
+
   const resetForm = () => {
     setForm({
       name: '',
@@ -111,6 +131,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       useCustomPrompt: false,
       concurrency: 1,
       reasoningEffort: '',
+      mimoPlan: 'api',
     });
     setShowForm(false);
     setEditingId(null);
@@ -138,6 +159,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
           useCustomPrompt: form.useCustomPrompt,
           concurrency: form.concurrency,
           reasoningEffort: form.reasoningEffort || undefined,
+          mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
           isActive: existingConfig.isActive,
         };
         updateAIConfig(editingId, updates);
@@ -155,6 +177,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
         useCustomPrompt: form.useCustomPrompt,
         concurrency: form.concurrency,
         reasoningEffort: form.reasoningEffort || undefined,
+        mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
       };
       addAIConfig(config);
     }
@@ -165,6 +188,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const handleEdit = (config: AIConfig) => {
     // Sync ref to prevent auto-fill effect from overwriting loaded config
     prevApiTypeRef.current = config.apiType || 'openai';
+    prevMimoPlanRef.current = config.mimoPlan || 'api';
     setForm({
       name: config.name,
       apiType: config.apiType || 'openai',
@@ -175,6 +199,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       useCustomPrompt: config.useCustomPrompt || false,
       concurrency: config.concurrency || 1,
       reasoningEffort: config.reasoningEffort || '',
+      mimoPlan: config.mimoPlan || 'api',
     });
     setEditingId(config.id);
     setShowForm(true);
@@ -394,9 +419,31 @@ Repository information:
                 <option value="claude">Claude</option>
                 <option value="gemini">Gemini</option>
                 <option value="deepseek">DeepSeek</option>
+                <option value="mimo">Xiaomi MiMo</option>
                 <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
               </select>
             </div>
+
+            {form.apiType === 'mimo' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+                  {t('MiMo 渠道', 'MiMo Channel')} *
+                </label>
+                <select
+                  value={form.mimoPlan}
+                  onChange={(e) => setForm(prev => ({ ...prev, mimoPlan: e.target.value as MiMoPlan }))}
+                  className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                >
+                  <option value="api">{t('API（按量付费）', 'API (Pay-as-you-go)')}</option>
+                  <option value="token-plan">{t('Token Plan（订阅制）', 'Token Plan (Subscription)')}</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+                  {form.mimoPlan === 'api'
+                    ? t('API Key 以 sk- 开头，端点 api.xiaomimimo.com', 'API Key starts with sk-, endpoint api.xiaomimimo.com')
+                    : t('API Key 以 tp- 开头，端点 token-plan-cn.xiaomimimo.com', 'API Key starts with tp-, endpoint token-plan-cn.xiaomimimo.com')}
+                </p>
+              </div>
+            )}
             
             <div>
               <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
@@ -414,9 +461,11 @@ Repository information:
                       ? 'https://api.anthropic.com/v1'
                       : form.apiType === 'deepseek'
                         ? 'https://api.deepseek.com'
-                        : form.apiType === 'openai-compatible'
-                          ? 'https://integrate.api.nvidia.com/v1/chat/completions'
-                          : 'https://generativelanguage.googleapis.com/v1beta'
+                        : form.apiType === 'mimo'
+                          ? MIMO_PLAN_ENDPOINTS[form.mimoPlan]
+                          : form.apiType === 'openai-compatible'
+                            ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+                            : 'https://generativelanguage.googleapis.com/v1beta'
                 }
               />
               <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
@@ -430,7 +479,7 @@ Repository information:
                         '只填到 v1beta 即可，路径会自动生成',
                         'Only include the version prefix v1beta, the path will be generated automatically'
                       )
-                    : form.apiType === 'deepseek'
+                    : form.apiType === 'deepseek' || form.apiType === 'mimo'
                       ? t(
                           '填写到域名即可，路径会自动生成',
                           'Only include the domain, the path will be generated automatically'
