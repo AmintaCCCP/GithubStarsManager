@@ -119,12 +119,25 @@ export class AIService {
     return effort ? { effort } : undefined;
   }
 
+  private isDeepSeekModel(): boolean {
+    return this.getApiType() === 'deepseek';
+  }
+
   private isDeepSeekReasonerModel(): boolean {
-    return this.getApiType() === 'openai' && this.config.model.trim() === 'deepseek-reasoner';
+    return this.isDeepSeekModel() && this.config.model.trim() === 'deepseek-reasoner';
+  }
+
+  /**
+   * Check if the model is a DeepSeek model with default thinking enabled (e.g. deepseek-v4-pro, deepseek-v4-flash).
+   * These models consume max_tokens for reasoning, leaving 0 tokens for content if max_tokens is too low.
+   * We need to explicitly disable thinking for these models.
+   */
+  private isDeepSeekThinkingModel(): boolean {
+    return this.isDeepSeekModel() && this.config.model.trim() !== 'deepseek-reasoner';
   }
 
   private isMiMoModel(): boolean {
-    return this.config.model.trim().toLowerCase().includes('mimo');
+    return this.getApiType() === 'mimo';
   }
 
   private async extractErrorDetail(response: Response): Promise<string> {
@@ -154,7 +167,7 @@ export class AIService {
     const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
@@ -162,6 +175,7 @@ export class AIService {
         { role: 'user', content: options.user },
       ];
       const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
+      const isDeepSeekThinking = this.isDeepSeekThinkingModel();
       const isMiMoModel = this.isMiMoModel();
 
       const requestBody = apiType === 'openai-responses'
@@ -171,15 +185,15 @@ export class AIService {
             temperature: options.temperature,
             max_output_tokens: options.maxTokens,
             ...(reasoning ? { reasoning } : {}),
-            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
           }
         : {
             model: this.config.model,
             messages,
             max_tokens: options.maxTokens,
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
-            ...(!isDeepSeekReasoner && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
-            ...(isMiMoModel ? { thinking: { type: 'disabled' } } : {}),
+            ...(!isDeepSeekReasoner && !isDeepSeekThinking && !isMiMoModel && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
           };
 
       let data: Record<string, unknown>;
@@ -264,10 +278,17 @@ export class AIService {
           return content;
         }
 
+        // Only fall back to reasoning_content for the dedicated deepseek-reasoner model.
+        // Other DeepSeek models (e.g. deepseek-v4-flash, deepseek-v4-pro) may also return
+        // reasoning_content (the thinking chain), but we must not use it as the final answer.
         const reasoningContent = message?.reasoning_content;
-        if (reasoningContent) {
+        if (reasoningContent && isDeepSeekReasoner) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length }, httpDetails);
           return reasoningContent;
+        }
+
+        if (!content && reasoningContent) {
+          logger.warn('ai', 'Model returned reasoning_content but empty content', { model, configId });
         }
       }
 
@@ -479,7 +500,7 @@ ${options.user}` : options.user;
         system,
         user: prompt,
         temperature: 0.3,
-        maxTokens: 700,
+        maxTokens: 1000,
         signal,
       });
 
@@ -587,8 +608,12 @@ ${repoInfo}
 
   private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
     try {
+      // Strip thinking tags that some models embed in the content field (e.g. <think>...</think>)
+      // Also handle truncated tags (dangling <think> without </think>) from token exhaustion
       const cleaned = content
         .trim()
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<think>[\s\S]*$/gi, '')
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```$/i, '')
         .trim();

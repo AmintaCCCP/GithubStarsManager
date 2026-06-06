@@ -44,6 +44,7 @@ export function buildFinalApiUrl(baseUrl: string, apiType: AIApiType): string {
     return buildApiUrl(baseUrl, 'v1beta/models/{model}:generateContent');
   }
 
+  // deepseek uses the same Chat Completions endpoint as openai
   const pathWithVersion = apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions';
   return buildApiUrl(baseUrl, pathWithVersion);
 }
