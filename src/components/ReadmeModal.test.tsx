@@ -7,7 +7,10 @@ import type { Repository } from '../types';
 vi.mock('./BilingualMarkdownRenderer', async () => {
   const React = await import('react');
   return {
-    default: React.forwardRef(({ markdown }: { markdown: string }, _ref) => <div>{markdown}</div>),
+    default: React.forwardRef(({ markdown }: { markdown: string }, ref) => {
+      void ref;
+      return <div>{markdown}</div>;
+    }),
   };
 });
 
