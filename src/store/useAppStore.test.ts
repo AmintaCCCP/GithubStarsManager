@@ -5,7 +5,7 @@ let useAppStore: typeof import('./useAppStore').useAppStore;
 
 beforeAll(async () => {
   const { indexedDBStorage } = await vi.importActual<typeof import('../services/indexedDbStorage')>('../services/indexedDbStorage');
-  window.localStorage.removeItem('github-stars-manager');
+  window.localStorage?.removeItem?.('github-stars-manager');
   await indexedDBStorage.removeItem('github-stars-manager');
   ({ useAppStore } = await vi.importActual<typeof import('./useAppStore')>('./useAppStore'));
 });
