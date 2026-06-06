@@ -3,6 +3,17 @@ import { logger } from './logger';
 
 import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
+
+interface GitHubContentResponse {
+  content?: string;
+  encoding?: string;
+}
+
+interface GitHubTreeResponse {
+  tree?: GitHubReadmeCandidateItem[];
+  truncated?: boolean;
+}
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
@@ -244,23 +255,115 @@ class BackendAdapter {
     return res.json() as Promise<Record<string, unknown>>;
   }
 
-  async getRepositoryReadme(owner: string, repo: string): Promise<string> {
+  private decodeContentResponse(data: GitHubContentResponse): string {
+    if (data.encoding === 'base64' && data.content) {
+      const binaryStr = atob(data.content.replace(/\s/g, ''));
+      const bytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+    return data.content || '';
+  }
+
+  private encodeContentPath(path: string): string {
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     try {
       const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/readme`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ method: 'GET' })
+        body: JSON.stringify({ method: 'GET' }),
+        signal,
       });
       if (!res.ok) return '';
-      const data = await res.json() as { encoding?: string; content?: string };
-      if (data.encoding === 'base64' && data.content) {
-        const binaryStr = atob(data.content);
-        const bytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0));
-        return new TextDecoder().decode(bytes);
+      const data = await res.json() as GitHubContentResponse;
+      return this.decodeContentResponse(data);
+    } catch {
+      return '';
+    }
+  }
+
+  async listRepositoryReadmeCandidates(owner: string, repo: string, defaultBranch?: string, signal?: AbortSignal): Promise<GitHubReadmeCandidateItem[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'GET' }),
+        signal,
+      });
+      if (!res.ok) return [];
+      const data = await res.json() as GitHubReadmeCandidateItem[];
+      return data.filter(isReadmeCandidateItem);
+    };
+
+    let branch = defaultBranch;
+    if (!branch) {
+      try {
+        const repoRes = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ method: 'GET' }),
+          signal,
+        });
+        if (repoRes.ok) {
+          const repoDetails = await repoRes.json() as { default_branch?: string };
+          branch = repoDetails.default_branch;
+        }
+      } catch {
+        // Fall back to root contents below
       }
-      return data.content || '';
+    }
+
+    if (!branch) {
+      try {
+        return await fetchRootContents();
+      } catch {
+        return [];
+      }
+    }
+
+    try {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'GET' }),
+        signal,
+      });
+      if (!res.ok) return await fetchRootContents();
+      const data = await res.json() as GitHubTreeResponse;
+      const candidates = (data.tree || []).filter(isReadmeCandidateItem);
+      if (data.truncated) {
+        logger.warn('backendAdapter', 'README candidate tree was truncated', { owner, repo });
+        if (candidates.length === 0) return await fetchRootContents();
+      }
+      return candidates;
+    } catch {
+      try {
+        return await fetchRootContents();
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  async getRepositoryReadmeByPath(owner: string, repo: string, path: string, signal?: AbortSignal): Promise<string> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    try {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents/${this.encodeContentPath(path)}`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ method: 'GET' }),
+        signal,
+      });
+      if (!res.ok) return '';
+      const data = await res.json() as GitHubContentResponse;
+      return this.decodeContentResponse(data);
     } catch {
       return '';
     }

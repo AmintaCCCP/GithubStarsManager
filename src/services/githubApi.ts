@@ -7,8 +7,10 @@ import {
   SortBy,
   SortOrder,
   PaginatedDiscoveryRepositories,
+  DiscoveryRepo,
   DiscoveryChannelId,
   TopicCategory,
+  TrendingTimeRange,
   SubscriptionRepo,
   SubscriptionDev,
   GitHubSearchUserResponse,
@@ -17,6 +19,17 @@ import {
   WorkflowDefinition,
 } from '../types';
 import { logger } from './logger';
+import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
+
+interface GitHubContentResponse {
+  content?: string;
+  encoding?: string;
+}
+
+interface GitHubTreeResponse {
+  tree?: GitHubReadmeCandidateItem[];
+  truncated?: boolean;
+}
 
 interface GitHubStarredItem {
   starred_at?: string;
@@ -216,26 +229,105 @@ export class GitHubApiService {
     return allRepos;
   }
 
+  private decodeContentResponse(response: GitHubContentResponse): string {
+    if (response.encoding === 'base64' && response.content) {
+      // 使用 TextDecoder 正确处理 UTF-8 编码，避免中文乱码
+      const binaryString = atob(response.content.replace(/\s/g, ''));
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+    return response.content || '';
+  }
+
+  private encodeContentPath(path: string): string {
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
   async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
     try {
-      const response = await this.makeRequest<{ content: string; encoding: string }>(
+      const response = await this.makeRequest<GitHubContentResponse>(
         `/repos/${owner}/${repo}/readme`,
         undefined,
         signal
       );
 
-      if (response.encoding === 'base64') {
-        // 使用 TextDecoder 正确处理 UTF-8 编码，避免中文乱码
-        const binaryString = atob(response.content);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        return new TextDecoder('utf-8').decode(bytes);
-      }
-      return response.content;
+      return this.decodeContentResponse(response);
     } catch (error) {
       logger.warn('githubApi', `Failed to fetch README for ${owner}/${repo}`, error);
+      return '';
+    }
+  }
+
+  async listRepositoryReadmeCandidates(owner: string, repo: string, defaultBranch?: string, signal?: AbortSignal): Promise<GitHubReadmeCandidateItem[]> {
+    const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
+      const rootItems = await this.makeRequest<GitHubReadmeCandidateItem[]>(
+        `/repos/${owner}/${repo}/contents`,
+        undefined,
+        signal
+      );
+      return rootItems.filter(isReadmeCandidateItem);
+    };
+
+    let branch = defaultBranch;
+    if (!branch) {
+      try {
+        const repoDetails = await this.makeRequest<{ default_branch?: string }>(
+          `/repos/${owner}/${repo}`,
+          undefined,
+          signal
+        );
+        branch = repoDetails.default_branch;
+      } catch (error) {
+        logger.warn('githubApi', `Failed to fetch default branch for ${owner}/${repo}`, error);
+      }
+    }
+
+    if (!branch) {
+      try {
+        return await fetchRootContents();
+      } catch (error) {
+        logger.warn('githubApi', `Failed to list README candidates for ${owner}/${repo}`, error);
+        return [];
+      }
+    }
+
+    try {
+      const tree = await this.makeRequest<GitHubTreeResponse>(
+        `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+        undefined,
+        signal
+      );
+      const candidates = (tree.tree || []).filter(isReadmeCandidateItem);
+      if (tree.truncated) {
+        logger.warn('githubApi', `README candidate tree was truncated for ${owner}/${repo}`);
+        if (candidates.length === 0) return await fetchRootContents();
+      }
+      return candidates;
+    } catch (error) {
+      logger.warn('githubApi', `Failed to list README candidates from tree for ${owner}/${repo}`, error);
+      try {
+        return await fetchRootContents();
+      } catch (contentsError) {
+        logger.warn('githubApi', `Failed to list README candidates from root contents for ${owner}/${repo}`, contentsError);
+        return [];
+      }
+    }
+  }
+
+  async getRepositoryReadmeByPath(owner: string, repo: string, path: string, signal?: AbortSignal): Promise<string> {
+    try {
+      const response = await this.makeRequest<GitHubContentResponse>(
+        `/repos/${owner}/${repo}/contents/${this.encodeContentPath(path)}`,
+        undefined,
+        signal
+      );
+
+      return this.decodeContentResponse(response);
+    } catch (error) {
+      logger.warn('githubApi', `Failed to fetch README ${path} for ${owner}/${repo}`, error);
       return '';
     }
   }
