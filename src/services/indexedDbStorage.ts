@@ -21,6 +21,14 @@ const safeLocalStorageGet = (key: string): string | null => {
   }
 };
 
+const safeLocalStorageSet = (key: string, value: string): void => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Quota/security errors are expected in some environments; ignore.
+  }
+};
+
 const safeLocalStorageRemove = (key: string): void => {
   try {
     window.localStorage.removeItem(key);
@@ -99,9 +107,10 @@ const idbDelete = async (key: string): Promise<void> => {
 /**
  * IndexedDB-backed Zustand persist storage with seamless migration:
  * - First read from IndexedDB
- * - If empty, fall back to existing localStorage snapshot and migrate to IndexedDB
- * - Writes go to IndexedDB only; localStorage is read as a one-time legacy fallback.
- *   Keeping large repository snapshots out of localStorage avoids synchronous main-thread stalls.
+ * - If empty, migrate an existing localStorage snapshot to IndexedDB and then remove it
+ * - Normal writes go to IndexedDB and clear any legacy localStorage snapshot.
+ * - localStorage is only kept as the current snapshot when IndexedDB is unavailable or a write fails.
+ *   This avoids stale fallback rollbacks while preserving persistence in constrained environments.
  */
 export const indexedDBStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -120,6 +129,7 @@ export const indexedDBStorage: StateStorage = {
       const legacyValue = safeLocalStorageGet(name);
       if (legacyValue !== null) {
         await withTimeout(idbSet(name, legacyValue));
+        safeLocalStorageRemove(name);
         console.info('[storage] migrated state from localStorage to IndexedDB');
       }
       return legacyValue;
@@ -136,11 +146,14 @@ export const indexedDBStorage: StateStorage = {
     if (canUseIndexedDB()) {
       try {
         await withTimeout(idbSet(name, value));
+        safeLocalStorageRemove(name);
+        return;
       } catch (error) {
-        console.warn('[storage] IndexedDB set failed:', error);
+        console.warn('[storage] IndexedDB set failed, fallback to localStorage:', error);
       }
     }
 
+    safeLocalStorageSet(name, value);
   },
 
   removeItem: async (name: string): Promise<void> => {
