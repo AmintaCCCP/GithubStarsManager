@@ -8,19 +8,6 @@ body:
       value: |
         感谢你帮助改进 GithubStarsManager！提交前请先搜索是否已有相同或类似 Issue。
 
-        请在日志、截图和视频中删除敏感信息，例如 GitHub Token、AI API Key、WebDAV 凭据、API Secret、Encryption Key、代理账号密码等。
-
-        如果问题涉及 AI、WebDAV、本地开发 CORS、同步、Docker 后端或远程后端，请在描述或附加信息中说明相关配置方式。
-
-  - type: input
-    id: bug-title
-    attributes:
-      label: 标题
-      description: 用一句话简要描述这个 Bug。
-      placeholder: "例如：启用后端代理后 Release 同步失败"
-    validations:
-      required: true
-
   - type: dropdown
     id: platform
     attributes:
