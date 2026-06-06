@@ -1,0 +1,106 @@
+name: Bug Report
+description: 报告 GithubStarsManager 中可复现的 Bug
+title: "[Bug] "
+labels: ["BUG"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助改进 GithubStarsManager！提交前请先搜索是否已有相同或类似 Issue。
+
+        请在日志、截图和视频中删除敏感信息，例如 GitHub Token、AI API Key、WebDAV 凭据、API Secret、Encryption Key、代理账号密码等。
+
+        如果问题涉及 AI、WebDAV、本地开发 CORS、同步、Docker 后端或远程后端，请在描述或附加信息中说明相关配置方式。
+
+  - type: input
+    id: bug-title
+    attributes:
+      label: 标题
+      description: 用一句话简要描述这个 Bug。
+      placeholder: "例如：启用后端代理后 Release 同步失败"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      description: 你在哪个平台遇到了这个问题？
+      options:
+        - "Desktop: MacOS"
+        - "Desktop: Windows"
+        - "Desktop: Linux"
+        - "Web"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: 后端
+      description: 你遇到问题时使用的后端模式是什么？
+      options:
+        - "未使用后端 / 纯前端 localStorage"
+        - "本地后端 / npm run dev:server"
+        - "Docker / GHCR 后端"
+        - "远程后端"
+        - "不确定"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug 描述
+      description: 请描述发生了什么、你期望发生什么，以及如何复现。
+      placeholder: |
+        发生了什么？
+
+        期望行为是什么？
+
+        复现步骤：
+        1.
+        2.
+        3.
+
+        发生频率：每次 / 偶发 / 仅出现一次
+
+        App 版本：例如 v0.6.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: 附加信息
+      description: 补充任何可能帮助定位问题的信息，例如配置方式、相关 Issue、最近变更、浏览器版本、系统架构等。
+      placeholder: "例如：使用 Docker 后端，浏览器为 Chrome 版本 xxx，最近更新到 v0.6.2 后出现。"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: 粘贴相关日志，或将日志文件拖拽上传到这里。请先删除 GitHub Token、AI API Key、WebDAV 凭据、API Secret、Encryption Key、代理密码等敏感信息。
+      placeholder: "粘贴日志，或拖拽 .log / .txt / .zip 等文件到这里。"
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 将截图拖拽上传到这里，或粘贴图片链接。
+      placeholder: "拖拽截图到这里，或粘贴图片链接。"
+    validations:
+      required: false
+
+  - type: textarea
+    id: video
+    attributes:
+      label: 视频
+      description: 将录屏拖拽上传到这里，或粘贴视频链接。
+      placeholder: "拖拽录屏到这里，或粘贴视频链接。"
+    validations:
+      required: false
