@@ -1,0 +1,42 @@
+name: New Feature
+description: 提出新的功能建议或改进想法
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你为 GithubStarsManager 提出新功能建议！
+
+        请尽量描述真实使用场景、当前遇到的限制，以及你希望功能如何帮助解决问题。清晰的场景会更容易评估优先级和实现方式。
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 场景描述
+      description: 请描述你在什么情况下需要这个功能，以及当前流程中遇到了什么问题或限制。
+      placeholder: |
+        例如：
+        当我管理大量 Star 仓库时，希望能够按最近 Release 活跃度筛选项目，方便快速找到仍在维护的仓库。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: 建议解决方案
+      description: 请描述你期望的功能表现、交互方式或实现思路。
+      placeholder: |
+        例如：
+        在筛选栏中新增“最近 Release 时间”筛选项，支持选择最近 7 天、30 天、90 天或自定义时间范围。
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 附加说明
+      description: 可以补充参考链接、截图、替代方案、相关 Issue，或任何有助于理解该功能建议的信息。
+      placeholder: "例如：相关产品的截图、类似实现的链接、补充说明等。"
+    validations:
+      required: false
