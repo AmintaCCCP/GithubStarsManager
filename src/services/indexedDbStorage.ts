@@ -97,7 +97,7 @@ const idbDelete = async (key: string): Promise<void> => {
 };
 
 /**
- * IndexedDB-backed Zustand persist storage with seamless migration + dual write:
+ * IndexedDB-backed Zustand persist storage with seamless migration:
  * - First read from IndexedDB
  * - If empty, fall back to existing localStorage snapshot and migrate to IndexedDB
  * - Writes go to IndexedDB only; localStorage is read as a one-time legacy fallback.

@@ -54,6 +54,85 @@ const cancelIdleTask = (id: number): void => {
   clearTimeout(id);
 };
 
+let persistTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let persistIdleTaskId: number | null = null;
+let latestPersistName: string | null = null;
+let latestPersistValue: StorageValue<any> | null = null;
+let persistWriteVersion = 0;
+let persistFlushListenersRegistered = false;
+
+const cancelPendingPersistTasks = (): void => {
+  if (persistTimeoutId) {
+    clearTimeout(persistTimeoutId);
+    persistTimeoutId = null;
+  }
+
+  if (persistIdleTaskId !== null) {
+    cancelIdleTask(persistIdleTaskId);
+    persistIdleTaskId = null;
+  }
+};
+
+const writePersistSnapshot = (
+  name: string,
+  value: StorageValue<any>,
+  version: number,
+  source: 'idle' | 'flush'
+): void => {
+  if (latestPersistValue === null || latestPersistName !== name || persistWriteVersion !== version) {
+    return;
+  }
+
+  const startedAt = performance.now();
+  try {
+    const str = JSON.stringify(value);
+    const stringifyMs = Math.round(performance.now() - startedAt);
+    const writeStartedAt = performance.now();
+    void indexedDBStorage.setItem(name, str).then(() => {
+      const writeMs = Math.round(performance.now() - writeStartedAt);
+      if (writeMs > 50) {
+        logger.warn('store.persist', 'Large state IndexedDB write completed', {
+          source,
+          writeMs,
+          bytes: str.length,
+        });
+      }
+    });
+    if (stringifyMs > 50) {
+      logger.warn('store.persist', 'Large state stringify completed', {
+        source,
+        stringifyMs,
+        bytes: str.length,
+      });
+    }
+  } catch (e) {
+    logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
+  }
+};
+
+const flushPendingPersistSnapshot = (): void => {
+  if (latestPersistName === null || latestPersistValue === null) return;
+
+  cancelPendingPersistTasks();
+  writePersistSnapshot(latestPersistName, latestPersistValue, persistWriteVersion, 'flush');
+};
+
+const registerPersistFlushListeners = (): void => {
+  if (persistFlushListenersRegistered || typeof window === 'undefined') return;
+  persistFlushListenersRegistered = true;
+
+  window.addEventListener('pagehide', flushPendingPersistSnapshot);
+  window.addEventListener('beforeunload', flushPendingPersistSnapshot);
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingPersistSnapshot();
+      }
+    });
+  }
+};
+
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
 // which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
 const debouncedPersistStorage: PersistStorage<any> = {
@@ -66,50 +145,27 @@ const debouncedPersistStorage: PersistStorage<any> = {
       return null;
     }
   },
-  setItem: (() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let idleTaskId: number | null = null;
-    let latestValue: StorageValue<any> | null = null;
-    return (name: string, value: StorageValue<any>) => {
-      latestValue = value;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (idleTaskId !== null) {
-        cancelIdleTask(idleTaskId);
-        idleTaskId = null;
-      }
-      timeoutId = setTimeout(() => {
-        timeoutId = null;
-        idleTaskId = scheduleIdleTask(() => {
-          const startedAt = performance.now();
-          try {
-            const str = JSON.stringify(latestValue);
-            const stringifyMs = Math.round(performance.now() - startedAt);
-            const writeStartedAt = performance.now();
-            void indexedDBStorage.setItem(name, str).then(() => {
-              const writeMs = Math.round(performance.now() - writeStartedAt);
-              if (writeMs > 50) {
-                logger.warn('store.persist', 'Large state IndexedDB write completed', {
-                  writeMs,
-                  bytes: str.length,
-                });
-              }
-            });
-            if (stringifyMs > 50) {
-              logger.warn('store.persist', 'Large state stringify completed', {
-                stringifyMs,
-                bytes: str.length,
-              });
-            }
-          } catch (e) {
-            logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
-          } finally {
-            idleTaskId = null;
-          }
-        });
-      }, 1000);
-    };
-  })(),
+  setItem: (name: string, value: StorageValue<any>) => {
+    registerPersistFlushListeners();
+    latestPersistName = name;
+    latestPersistValue = value;
+    persistWriteVersion++;
+    const scheduledVersion = persistWriteVersion;
+
+    cancelPendingPersistTasks();
+    persistTimeoutId = setTimeout(() => {
+      persistTimeoutId = null;
+      persistIdleTaskId = scheduleIdleTask(() => {
+        persistIdleTaskId = null;
+        writePersistSnapshot(name, value, scheduledVersion, 'idle');
+      });
+    }, 1000);
+  },
   removeItem: (name) => {
+    latestPersistName = null;
+    latestPersistValue = null;
+    persistWriteVersion++;
+    cancelPendingPersistTasks();
     indexedDBStorage.removeItem(name);
   }
 };
