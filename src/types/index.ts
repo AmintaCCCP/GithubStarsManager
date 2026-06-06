@@ -127,8 +127,9 @@ export interface GitHubUser {
   email: string | null;
 }
 
-export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'openai-compatible';
+export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'mimo' | 'openai-compatible';
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+export type MiMoPlan = 'api' | 'token-plan';
 
 export type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
@@ -144,6 +145,7 @@ export interface AIConfig {
   useCustomPrompt?: boolean; // 是否使用自定义提示词
   concurrency?: number; // AI分析并发数，默认为1
   reasoningEffort?: AIReasoningEffort; // OpenAI GPT-5/Responses 可选 reasoning 强度
+  mimoPlan?: MiMoPlan; // MiMo 渠道：api（按量付费）或 token-plan（订阅制）
   apiKeyStatus?: SecretStatus;
 }
 
