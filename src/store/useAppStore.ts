@@ -33,6 +33,27 @@ import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
 
+const scheduleIdleTask = (callback: () => void): number => {
+  if (typeof window === 'undefined') {
+    return setTimeout(callback, 0) as unknown as number;
+  }
+
+  if ('requestIdleCallback' in window) {
+    return window.requestIdleCallback(callback, { timeout: 3000 });
+  }
+
+  return window.setTimeout(callback, 0);
+};
+
+const cancelIdleTask = (id: number): void => {
+  if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(id);
+    return;
+  }
+
+  clearTimeout(id);
+};
+
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
 // which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
 const debouncedPersistStorage: PersistStorage<any> = {
@@ -47,17 +68,44 @@ const debouncedPersistStorage: PersistStorage<any> = {
   },
   setItem: (() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleTaskId: number | null = null;
     let latestValue: StorageValue<any> | null = null;
     return (name: string, value: StorageValue<any>) => {
       latestValue = value;
       if (timeoutId) clearTimeout(timeoutId);
+      if (idleTaskId !== null) {
+        cancelIdleTask(idleTaskId);
+        idleTaskId = null;
+      }
       timeoutId = setTimeout(() => {
-        try {
-          const str = JSON.stringify(latestValue);
-          indexedDBStorage.setItem(name, str);
-        } catch (e) {
-          logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
-        }
+        timeoutId = null;
+        idleTaskId = scheduleIdleTask(() => {
+          const startedAt = performance.now();
+          try {
+            const str = JSON.stringify(latestValue);
+            const stringifyMs = Math.round(performance.now() - startedAt);
+            const writeStartedAt = performance.now();
+            void indexedDBStorage.setItem(name, str).then(() => {
+              const writeMs = Math.round(performance.now() - writeStartedAt);
+              if (writeMs > 50) {
+                logger.warn('store.persist', 'Large state IndexedDB write completed', {
+                  writeMs,
+                  bytes: str.length,
+                });
+              }
+            });
+            if (stringifyMs > 50) {
+              logger.warn('store.persist', 'Large state stringify completed', {
+                stringifyMs,
+                bytes: str.length,
+              });
+            }
+          } catch (e) {
+            logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
+          } finally {
+            idleTaskId = null;
+          }
+        });
       }, 1000);
     };
   })(),
@@ -78,6 +126,40 @@ const writeSessionBackendSecret = (secret: string | null): void => {
   } else {
     window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
   }
+};
+
+const areRepositoryRecordsEqual = (a: Repository, b: Repository): boolean => {
+  if (a === b) return true;
+
+  const aRecord = a as Record<string, unknown>;
+  const bRecord = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(aRecord), ...Object.keys(bRecord)]);
+
+  for (const key of keys) {
+    if (!Object.is(aRecord[key], bRecord[key])) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const replaceRepositoryInList = (
+  repositories: Repository[],
+  repo: Repository
+): { repositories: Repository[]; changed: boolean; found: boolean } => {
+  const index = repositories.findIndex((item) => item.id === repo.id);
+  if (index === -1) {
+    return { repositories, changed: false, found: false };
+  }
+
+  if (areRepositoryRecordsEqual(repositories[index], repo)) {
+    return { repositories, changed: false, found: true };
+  }
+
+  const nextRepositories = repositories.slice();
+  nextRepositories[index] = repo;
+  return { repositories: nextRepositories, changed: true, found: true };
 };
 
 interface AppActions {
@@ -827,10 +909,16 @@ export const useAppStore = create<AppState & AppActions>()(
       // Repository actions
       setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
       updateRepository: (repo) => set((state) => {
-        const updatedRepositories = state.repositories.map(r => r.id === repo.id ? repo : r);
+        const repositoriesResult = replaceRepositoryInList(state.repositories, repo);
+        const searchResultsResult = replaceRepositoryInList(state.searchResults, repo);
+
+        if (!repositoriesResult.changed && !searchResultsResult.changed) {
+          return state;
+        }
+
         return {
-          repositories: updatedRepositories,
-          searchResults: state.searchResults.map(r => r.id === repo.id ? repo : r)
+          repositories: repositoriesResult.repositories,
+          searchResults: searchResultsResult.repositories
         };
       }),
       addRepository: (repo) => set((state) => {
@@ -890,6 +978,11 @@ export const useAppStore = create<AppState & AppActions>()(
         };
       }),
       setAnalyzingRepository: (repoId, isAnalyzing) => set((state) => {
+        const alreadyAnalyzing = state.analyzingRepositoryIds.has(repoId);
+        if (alreadyAnalyzing === isAnalyzing) {
+          return state;
+        }
+
         const nextAnalyzingIds = new Set(state.analyzingRepositoryIds);
         if (isAnalyzing) {
           nextAnalyzingIds.add(repoId);
