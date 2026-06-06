@@ -33,6 +33,115 @@ import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
 
+const scheduleIdleTask = (callback: () => void): number => {
+  if (typeof window === 'undefined') {
+    return setTimeout(callback, 0) as unknown as number;
+  }
+
+  if ('requestIdleCallback' in window) {
+    return window.requestIdleCallback(callback, { timeout: 3000 });
+  }
+
+  return window.setTimeout(callback, 0);
+};
+
+const cancelIdleTask = (id: number): void => {
+  if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(id);
+    return;
+  }
+
+  clearTimeout(id);
+};
+
+let persistTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let persistIdleTaskId: number | null = null;
+let latestPersistName: string | null = null;
+let latestPersistValue: StorageValue<any> | null = null;
+let persistWriteVersion = 0;
+let persistFlushListenersRegistered = false;
+
+const cancelPendingPersistTasks = (): void => {
+  if (persistTimeoutId) {
+    clearTimeout(persistTimeoutId);
+    persistTimeoutId = null;
+  }
+
+  if (persistIdleTaskId !== null) {
+    cancelIdleTask(persistIdleTaskId);
+    persistIdleTaskId = null;
+  }
+};
+
+const writePersistSnapshot = (
+  name: string,
+  value: StorageValue<any>,
+  version: number,
+  source: 'idle' | 'flush'
+): void => {
+  if (latestPersistValue === null || latestPersistName !== name || persistWriteVersion !== version) {
+    return;
+  }
+
+  const startedAt = performance.now();
+  try {
+    const str = JSON.stringify(value);
+    const stringifyMs = Math.round(performance.now() - startedAt);
+    const writeStartedAt = performance.now();
+    void indexedDBStorage.setItem(name, str)
+      .then(() => {
+        const writeMs = Math.round(performance.now() - writeStartedAt);
+        if (writeMs > 50) {
+          logger.warn('store.persist', 'Large state IndexedDB write completed', {
+            source,
+            writeMs,
+            bytes: str.length,
+          });
+        }
+      })
+      .catch((error) => {
+        const writeMs = Math.round(performance.now() - writeStartedAt);
+        logger.errorFromError('store.persist', 'IndexedDB write failed', error, {
+          source,
+          writeMs,
+          bytes: str.length,
+        });
+      });
+    if (stringifyMs > 50) {
+      logger.warn('store.persist', 'Large state stringify completed', {
+        source,
+        stringifyMs,
+        bytes: str.length,
+      });
+    }
+  } catch (e) {
+    logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
+  }
+};
+
+const flushPendingPersistSnapshot = (): void => {
+  if (latestPersistName === null || latestPersistValue === null) return;
+
+  cancelPendingPersistTasks();
+  writePersistSnapshot(latestPersistName, latestPersistValue, persistWriteVersion, 'flush');
+};
+
+const registerPersistFlushListeners = (): void => {
+  if (persistFlushListenersRegistered || typeof window === 'undefined') return;
+  persistFlushListenersRegistered = true;
+
+  window.addEventListener('pagehide', flushPendingPersistSnapshot);
+  window.addEventListener('beforeunload', flushPendingPersistSnapshot);
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingPersistSnapshot();
+      }
+    });
+  }
+};
+
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
 // which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
 const debouncedPersistStorage: PersistStorage<any> = {
@@ -45,24 +154,30 @@ const debouncedPersistStorage: PersistStorage<any> = {
       return null;
     }
   },
-  setItem: (() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let latestValue: StorageValue<any> | null = null;
-    return (name: string, value: StorageValue<any>) => {
-      latestValue = value;
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        try {
-          const str = JSON.stringify(latestValue);
-          indexedDBStorage.setItem(name, str);
-        } catch (e) {
-          logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
-        }
-      }, 1000);
-    };
-  })(),
+  setItem: (name: string, value: StorageValue<any>) => {
+    registerPersistFlushListeners();
+    latestPersistName = name;
+    latestPersistValue = value;
+    persistWriteVersion++;
+    const scheduledVersion = persistWriteVersion;
+
+    cancelPendingPersistTasks();
+    persistTimeoutId = setTimeout(() => {
+      persistTimeoutId = null;
+      persistIdleTaskId = scheduleIdleTask(() => {
+        persistIdleTaskId = null;
+        writePersistSnapshot(name, value, scheduledVersion, 'idle');
+      });
+    }, 1000);
+  },
   removeItem: (name) => {
-    indexedDBStorage.removeItem(name);
+    latestPersistName = null;
+    latestPersistValue = null;
+    persistWriteVersion++;
+    cancelPendingPersistTasks();
+    void indexedDBStorage.removeItem(name).catch((error) => {
+      logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
+    });
   }
 };
 
@@ -78,6 +193,40 @@ const writeSessionBackendSecret = (secret: string | null): void => {
   } else {
     window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
   }
+};
+
+const areRepositoryRecordsEqual = (a: Repository, b: Repository): boolean => {
+  if (a === b) return true;
+
+  const aRecord = a as Record<string, unknown>;
+  const bRecord = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(aRecord), ...Object.keys(bRecord)]);
+
+  for (const key of keys) {
+    if (!Object.is(aRecord[key], bRecord[key])) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const replaceRepositoryInList = (
+  repositories: Repository[],
+  repo: Repository
+): { repositories: Repository[]; changed: boolean; found: boolean } => {
+  const index = repositories.findIndex((item) => item.id === repo.id);
+  if (index === -1) {
+    return { repositories, changed: false, found: false };
+  }
+
+  if (areRepositoryRecordsEqual(repositories[index], repo)) {
+    return { repositories, changed: false, found: true };
+  }
+
+  const nextRepositories = repositories.slice();
+  nextRepositories[index] = repo;
+  return { repositories: nextRepositories, changed: true, found: true };
 };
 
 interface AppActions {
@@ -827,10 +976,18 @@ export const useAppStore = create<AppState & AppActions>()(
       // Repository actions
       setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
       updateRepository: (repo) => set((state) => {
-        const updatedRepositories = state.repositories.map(r => r.id === repo.id ? repo : r);
+        const repositoriesResult = replaceRepositoryInList(state.repositories, repo);
+        const searchResultsResult = state.searchResults === state.repositories
+          ? repositoriesResult
+          : replaceRepositoryInList(state.searchResults, repo);
+
+        if (!repositoriesResult.changed && !searchResultsResult.changed) {
+          return state;
+        }
+
         return {
-          repositories: updatedRepositories,
-          searchResults: state.searchResults.map(r => r.id === repo.id ? repo : r)
+          repositories: repositoriesResult.repositories,
+          searchResults: searchResultsResult.repositories
         };
       }),
       addRepository: (repo) => set((state) => {
@@ -890,6 +1047,11 @@ export const useAppStore = create<AppState & AppActions>()(
         };
       }),
       setAnalyzingRepository: (repoId, isAnalyzing) => set((state) => {
+        const alreadyAnalyzing = state.analyzingRepositoryIds.has(repoId);
+        if (alreadyAnalyzing === isAnalyzing) {
+          return state;
+        }
+
         const nextAnalyzingIds = new Set(state.analyzingRepositoryIds);
         if (isAnalyzing) {
           nextAnalyzingIds.add(repoId);

@@ -75,6 +75,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     if (!selectedCategoryObj) return [];
+    const selectedCategoryKeywords = selectedCategoryObj.keywords.map(keyword => keyword.toLowerCase());
 
     return repositories.filter(repo => {
       if (repo.custom_category !== undefined) {
@@ -87,12 +88,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       // 如果没有自定义分类，使用AI标签和关键词匹配
       // 优先使用AI标签进行匹配
       if (repo.ai_tags && repo.ai_tags.length > 0) {
-        return repo.ai_tags.some(tag => 
-          selectedCategoryObj.keywords.some(keyword => 
-            tag.toLowerCase().includes(keyword.toLowerCase()) ||
-            keyword.toLowerCase().includes(tag.toLowerCase())
+        return repo.ai_tags.some(tag => {
+          const tagLower = tag.toLowerCase();
+          return selectedCategoryKeywords.some(keyword =>
+            tagLower.includes(keyword) ||
+            keyword.includes(tagLower)
           )
-        );
+        });
       }
       
       // 如果没有AI标签，使用传统方式匹配
@@ -104,8 +106,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         repo.ai_summary || ''
       ].join(' ').toLowerCase();
       
-      return selectedCategoryObj.keywords.some(keyword => 
-        repoText.includes(keyword.toLowerCase())
+      return selectedCategoryKeywords.some(keyword =>
+        repoText.includes(keyword)
       );
     });
   }, [repositories, selectedCategory, allCategories]);
@@ -164,7 +166,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     return { unanalyzedCount, analyzedCount, failedCount };
   }, [filteredRepositories]);
 
-  const filterResetKey = useMemo(() => JSON.stringify({
+  const filterResetKey = useMemo(() => ({
     selectedCategory,
     query: searchFilters.query,
     languages: searchFilters.languages,
