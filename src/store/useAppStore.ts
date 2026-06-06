@@ -88,16 +88,25 @@ const writePersistSnapshot = (
     const str = JSON.stringify(value);
     const stringifyMs = Math.round(performance.now() - startedAt);
     const writeStartedAt = performance.now();
-    void indexedDBStorage.setItem(name, str).then(() => {
-      const writeMs = Math.round(performance.now() - writeStartedAt);
-      if (writeMs > 50) {
-        logger.warn('store.persist', 'Large state IndexedDB write completed', {
+    void indexedDBStorage.setItem(name, str)
+      .then(() => {
+        const writeMs = Math.round(performance.now() - writeStartedAt);
+        if (writeMs > 50) {
+          logger.warn('store.persist', 'Large state IndexedDB write completed', {
+            source,
+            writeMs,
+            bytes: str.length,
+          });
+        }
+      })
+      .catch((error) => {
+        const writeMs = Math.round(performance.now() - writeStartedAt);
+        logger.errorFromError('store.persist', 'IndexedDB write failed', error, {
           source,
           writeMs,
           bytes: str.length,
         });
-      }
-    });
+      });
     if (stringifyMs > 50) {
       logger.warn('store.persist', 'Large state stringify completed', {
         source,
@@ -166,7 +175,9 @@ const debouncedPersistStorage: PersistStorage<any> = {
     latestPersistValue = null;
     persistWriteVersion++;
     cancelPendingPersistTasks();
-    indexedDBStorage.removeItem(name);
+    void indexedDBStorage.removeItem(name).catch((error) => {
+      logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
+    });
   }
 };
 
@@ -966,7 +977,9 @@ export const useAppStore = create<AppState & AppActions>()(
       setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
       updateRepository: (repo) => set((state) => {
         const repositoriesResult = replaceRepositoryInList(state.repositories, repo);
-        const searchResultsResult = replaceRepositoryInList(state.searchResults, repo);
+        const searchResultsResult = state.searchResults === state.repositories
+          ? repositoriesResult
+          : replaceRepositoryInList(state.searchResults, repo);
 
         if (!repositoriesResult.changed && !searchResultsResult.changed) {
           return state;
