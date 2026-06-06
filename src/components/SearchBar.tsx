@@ -608,7 +608,11 @@ export const SearchBar: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    
+
+    if (!value.trim() && searchFilters.query) {
+      setSearchFilters({ query: '' });
+    }
+
     // Enable real-time search mode when user starts typing
     if (value && !isRealTimeSearch) {
       setIsRealTimeSearch(true);
