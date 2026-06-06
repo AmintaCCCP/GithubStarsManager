@@ -21,11 +21,13 @@ const safeLocalStorageGet = (key: string): string | null => {
   }
 };
 
-const safeLocalStorageSet = (key: string, value: string): void => {
+const safeLocalStorageSet = (key: string, value: string): boolean => {
   try {
     window.localStorage.setItem(key, value);
+    return true;
   } catch {
-    // Quota/security errors are expected in some environments; ignore.
+    // Quota/security errors are expected in some environments; report failure to caller.
+    return false;
   }
 };
 
@@ -153,7 +155,9 @@ export const indexedDBStorage: StateStorage = {
       }
     }
 
-    safeLocalStorageSet(name, value);
+    if (!safeLocalStorageSet(name, value)) {
+      throw new Error('[storage] localStorage fallback write failed');
+    }
   },
 
   removeItem: async (name: string): Promise<void> => {
