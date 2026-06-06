@@ -21,14 +21,6 @@ const safeLocalStorageGet = (key: string): string | null => {
   }
 };
 
-const safeLocalStorageSet = (key: string, value: string): void => {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // Quota/security errors are expected in some environments; ignore.
-  }
-};
-
 const safeLocalStorageRemove = (key: string): void => {
   try {
     window.localStorage.removeItem(key);
@@ -108,7 +100,8 @@ const idbDelete = async (key: string): Promise<void> => {
  * IndexedDB-backed Zustand persist storage with seamless migration + dual write:
  * - First read from IndexedDB
  * - If empty, fall back to existing localStorage snapshot and migrate to IndexedDB
- * - Every write goes to IndexedDB and localStorage (backward compatibility window)
+ * - Writes go to IndexedDB only; localStorage is read as a one-time legacy fallback.
+ *   Keeping large repository snapshots out of localStorage avoids synchronous main-thread stalls.
  */
 export const indexedDBStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -148,8 +141,6 @@ export const indexedDBStorage: StateStorage = {
       }
     }
 
-    // Secondary compatibility backup (best effort only)
-    safeLocalStorageSet(name, value);
   },
 
   removeItem: async (name: string): Promise<void> => {
