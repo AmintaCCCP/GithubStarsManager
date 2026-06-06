@@ -65,6 +65,19 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
   }, []);
 
+  const hideFloatingTooltips = useCallback(() => {
+    if (descHideTimerRef.current) {
+      clearTimeout(descHideTimerRef.current);
+      descHideTimerRef.current = null;
+    }
+    if (aiHideTimerRef.current) {
+      clearTimeout(aiHideTimerRef.current);
+      aiHideTimerRef.current = null;
+    }
+    setDescTooltip(false);
+    setAiTooltip(false);
+  }, []);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -314,8 +327,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   // 点击卡片打开 README
   const handleCardClick = useCallback(() => {
+    hideFloatingTooltips();
     setReadmeModalOpen(true);
-  }, []);
+  }, [hideFloatingTooltips]);
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
 
