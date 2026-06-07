@@ -525,18 +525,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.releaseExpandedRepositories = Array.from(store.releaseExpandedRepositories);
       }
 
-      // 导出特殊配置（网络代理、远程下载、后端密钥）
-      exportDataObj.data.proxyConfig = includeKeys
-        ? store.proxyConfig
-        : { ...store.proxyConfig, password: store.proxyConfig.password ? MASKED_SECRET : '' };
+      // Export special configs (proxy, RPC, backend secret) only when uiSettings is selected
+      if (selectedTypes.includes('uiSettings')) {
+        exportDataObj.data.proxyConfig = includeKeys
+          ? store.proxyConfig
+          : { ...store.proxyConfig, password: store.proxyConfig.password ? MASKED_SECRET : '' };
 
-      exportDataObj.data.rpcDownloadConfig = includeKeys
-        ? store.rpcDownloadConfig
-        : { ...store.rpcDownloadConfig, secret: store.rpcDownloadConfig.secret ? MASKED_SECRET : '' };
+        exportDataObj.data.rpcDownloadConfig = includeKeys
+          ? store.rpcDownloadConfig
+          : { ...store.rpcDownloadConfig, secret: store.rpcDownloadConfig.secret ? MASKED_SECRET : '' };
 
-      exportDataObj.data.backendApiSecret = includeKeys
-        ? store.backendApiSecret
-        : (store.backendApiSecret ? MASKED_SECRET : null);
+        exportDataObj.data.backendApiSecret = includeKeys
+          ? store.backendApiSecret
+          : (store.backendApiSecret ? MASKED_SECRET : null);
+      }
 
       const blob = new Blob([JSON.stringify(exportDataObj, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -589,7 +591,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     try {
       const store = useAppStore.getState();
       const importedData = importPreview.data.data;
-      const wasIncluded = importedData.includeKeysInBackup ?? false;
+      // Legacy compatibility: treat missing flag as true (older exports contained keys)
+      const wasIncluded = importedData.includeKeysInBackup ?? true;
 
       if (mode === 'replace') {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
@@ -689,7 +692,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
 
-        // 导入特殊配置（网络代理、远程下载、后端密钥）
+        // Import special configs (proxy, RPC, backend secret) only if they exist in backup
         if (importedData.proxyConfig) {
           const restoredProxy = {
             ...importedData.proxyConfig,
@@ -711,7 +714,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
 
         if (wasIncluded && importedData.backendApiSecret !== undefined && isRealSecret(importedData.backendApiSecret)) {
-          useAppStore.setState({ backendApiSecret: importedData.backendApiSecret });
+          setBackendApiSecret(importedData.backendApiSecret);
         }
       } else {
         if (selectedTypes.includes('repositories') && importedData.repositories) {

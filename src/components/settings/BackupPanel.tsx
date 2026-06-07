@@ -209,13 +209,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                   useCustomPrompt: cfg.useCustomPrompt,
                   concurrency: cfg.concurrency,
                   reasoningEffort: cfg.reasoningEffort,
-                  apiKey: includeKeysInBackup && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : existing.apiKey,
+                  apiKey: backupIncludedKeys && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : existing.apiKey,
                   isActive: existing.isActive,
                 });
               } else {
                 addAIConfig({
                   ...cfg,
-                  apiKey: includeKeysInBackup && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : '',
+                  apiKey: backupIncludedKeys && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : '',
                   isActive: cfg.isActive,
                 });
               }
@@ -244,13 +244,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                   url: cfg.url,
                   username: cfg.username,
                   path: cfg.path,
-                  password: includeKeysInBackup && cfg.password && cfg.password !== '***' ? cfg.password : existing.password,
+                  password: backupIncludedKeys && cfg.password && cfg.password !== '***' ? cfg.password : existing.password,
                   isActive: existing.isActive,
                 });
               } else {
                 addWebDAVConfig({
                   ...cfg,
-                  password: includeKeysInBackup && cfg.password && cfg.password !== '***' ? cfg.password : '',
+                  password: backupIncludedKeys && cfg.password && cfg.password !== '***' ? cfg.password : '',
                   isActive: false,
                 });
               }
@@ -266,7 +266,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             const backupProxyConfig = backupData.proxyConfig as typeof latestProxyConfig;
             setProxyConfig({
               ...backupProxyConfig,
-              password: includeKeysInBackup && backupProxyConfig.password && backupProxyConfig.password !== '***'
+              password: backupIncludedKeys && backupProxyConfig.password && backupProxyConfig.password !== '***'
                 ? backupProxyConfig.password
                 : latestProxyConfig.password,
             });
@@ -281,7 +281,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             const backupRpcDownloadConfig = backupData.rpcDownloadConfig as typeof latestRpcDownloadConfig;
             setRpcDownloadConfig({
               ...backupRpcDownloadConfig,
-              secret: includeKeysInBackup && backupRpcDownloadConfig.secret && backupRpcDownloadConfig.secret !== '***'
+              secret: backupIncludedKeys && backupRpcDownloadConfig.secret && backupRpcDownloadConfig.secret !== '***'
                 ? backupRpcDownloadConfig.secret
                 : latestRpcDownloadConfig.secret,
             });
@@ -291,7 +291,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         }
 
         try {
-          if (includeKeysInBackup && backupData.backendApiSecret !== undefined && backupData.backendApiSecret !== '***') {
+          if (backupIncludedKeys && backupData.backendApiSecret !== undefined && backupData.backendApiSecret !== '***') {
             setBackendApiSecret(typeof backupData.backendApiSecret === 'string' ? backupData.backendApiSecret : null);
           }
         } catch (e) {
