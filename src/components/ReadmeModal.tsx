@@ -365,9 +365,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       if (abortController.signal.aborted) return;
       console.error('Failed to fetch README:', err);
       setReadmeContent('');
-      setError(variant.isDefault
+      const fallbackMessage = variant.isDefault
         ? (language === 'zh' ? '加载 README 失败，请检查网络连接或稍后重试' : 'Failed to load README. Please check your network connection and try again later')
-        : (language === 'zh' ? '加载所选 README 失败，请稍后重试' : 'Failed to load selected README. Please try again later'));
+        : (language === 'zh' ? '加载所选 README 失败，请稍后重试' : 'Failed to load selected README. Please try again later');
+      setError(err instanceof Error && err.message ? err.message : fallbackMessage);
     } finally {
       if (!abortController.signal.aborted) {
         setLoading(false);

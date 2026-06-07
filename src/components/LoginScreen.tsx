@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Github, Key, ArrowRight, AlertCircle, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
+import { backend } from '../services/backendAdapter';
 import { safeReadText } from '../utils/clipboardUtils';
 
 export const LoginScreen: React.FC = () => {
@@ -27,7 +28,18 @@ export const LoginScreen: React.FC = () => {
       // If successful, save the token and user info
       setGitHubToken(token);
       setUser(user);
-      
+
+      if (backend.isAvailable) {
+        try {
+          await backend.syncSettings({ github_token: token });
+        } catch (backendError) {
+          console.warn('Failed to save GitHub token to backend:', backendError);
+          setError(language === 'zh'
+            ? '已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。'
+            : 'Signed in, but failed to save GitHub token to backend. README and other backend proxy features may be unavailable.');
+        }
+      }
+
       console.log('Successfully authenticated user:', user);
     } catch (error) {
       console.error('Authentication failed:', error);

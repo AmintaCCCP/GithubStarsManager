@@ -57,7 +57,7 @@ const cancelIdleTask = (id: number): void => {
 let persistTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let persistIdleTaskId: number | null = null;
 let latestPersistName: string | null = null;
-let latestPersistValue: StorageValue<any> | null = null;
+let latestPersistValue: StorageValue<unknown> | null = null;
 let persistWriteVersion = 0;
 let persistFlushListenersRegistered = false;
 
@@ -75,7 +75,7 @@ const cancelPendingPersistTasks = (): void => {
 
 const writePersistSnapshot = (
   name: string,
-  value: StorageValue<any>,
+  value: StorageValue<unknown>,
   version: number,
   source: 'idle' | 'flush'
 ): void => {
@@ -144,7 +144,7 @@ const registerPersistFlushListeners = (): void => {
 
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
 // which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
-const debouncedPersistStorage: PersistStorage<any> = {
+const debouncedPersistStorage: PersistStorage<unknown> = {
   getItem: async (name) => {
     const str = await indexedDBStorage.getItem(name);
     if (!str) return null;
@@ -154,7 +154,7 @@ const debouncedPersistStorage: PersistStorage<any> = {
       return null;
     }
   },
-  setItem: (name: string, value: StorageValue<any>) => {
+  setItem: (name: string, value: StorageValue<unknown>) => {
     registerPersistFlushListeners();
     latestPersistName = name;
     latestPersistValue = value;

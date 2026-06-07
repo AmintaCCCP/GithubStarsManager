@@ -37,8 +37,6 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const sourceFullName = fork.source?.full_name || fork.parent?.full_name || '';
-  // A repo is only a fork if it has a parent/source OR the fork boolean is true
-  const isFork = !!fork.parent || !!fork.source || fork.fork === true;
 
   return (
     <div

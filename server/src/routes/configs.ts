@@ -26,7 +26,7 @@ function getMaskedSecretResult(params: {
       decryptedValue: decrypt(encryptedValue, encryptionKey),
       status: 'ok',
     };
-  } catch (error) {
+  } catch {
     logger.warn('configs.decrypt', 'Failed to decrypt stored secret', { kind, configId, configName });
     return { decryptedValue: '', status: 'decrypt_failed' };
   }

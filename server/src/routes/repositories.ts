@@ -35,7 +35,7 @@ function transformRepo(row: Record<string, unknown>) {
     analysis_failed: !!row.analysis_failed,
     custom_description: row.custom_description,
     custom_tags: parseJsonColumn(row.custom_tags),
-    custom_category: row.custom_category,
+    custom_category: row.custom_category ?? undefined,
     category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
@@ -149,7 +149,7 @@ router.put('/api/repositories', (req, res) => {
         analysis_failed = excluded.analysis_failed,
         custom_description = CASE WHEN excluded.custom_description IS NOT NULL AND excluded.custom_description != '' THEN excluded.custom_description ELSE repositories.custom_description END,
         custom_tags = CASE WHEN excluded.custom_tags IS NOT NULL AND excluded.custom_tags != '[]' THEN excluded.custom_tags ELSE repositories.custom_tags END,
-        custom_category = CASE WHEN excluded.custom_category IS NOT NULL AND excluded.custom_category != '' THEN excluded.custom_category ELSE repositories.custom_category END,
+        custom_category = excluded.custom_category,
         category_locked = excluded.category_locked,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases

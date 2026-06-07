@@ -995,7 +995,7 @@ ${repoInfo}
         const searchTerms = this.parseSearchResponse(content);
         return this.performEnhancedSearch(repositories, query, searchTerms);
       }
-    } catch (error) {
+    } catch {
       logger.warn('ai', 'AI search failed, falling back to basic search', { configId: this.config.id, durationMs: Date.now() - startTime });
     }
 
