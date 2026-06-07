@@ -388,4 +388,24 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.2</downloadUrl>
   </version>
+  <version>
+    <number>0.6.3</number>
+    <releaseDate>2026-06-08</releaseDate>
+    <changelog>
+      <item>feat: Published pre-built backend Docker images to GHCR and updated deployment documentation for registry-based installs. (PR #190)</item>
+      <item>fix: Added multi-architecture Docker builds for linux/amd64 and linux/arm64, improving support for Apple Silicon and ARM servers. (PR #191)</item>
+      <item>fix: Added official DeepSeek and MiMo AI provider handling and prevented reasoning/thinking output from leaking into analysis results. (PR #193)</item>
+      <item>fix: Reduced repository-card AI analysis jank with narrower subscriptions, local loading state, idle persistence, and faster filtering. Thanks to external contributor @xinvxueyuan. (PR #199)</item>
+      <item>fix: Clearing the repository search input now resets stale search state before sorting or filtering. (PR #202)</item>
+      <item>fix: README preview now dismisses stale tooltips before opening modals. (PR #203)</item>
+      <item>docs: Added standardized GitHub issue templates for bug reports and feature requests. (PR #204)</item>
+      <item>feat: Added multilingual README detection and switching with backend proxy support and cached variant loading. (PR #205)</item>
+      <item>fix: Improved AI summary validation and retry handling so prompt-like summaries are no longer saved. Thanks to external contributor @Chenpeel. (PR #208)</item>
+      <item>feat: Added a secure backup/export toggle for including sensitive keys, with masked defaults and safer import behavior. (PR #209)</item>
+      <item>fix: Improved Markdown code block rendering, preserving layout and translated code tag attributes. (PR #210)</item>
+      <item>feat: Added personal and organization fork owner selection with owner-scoped refresh, counts, search, pagination, and empty states. (PR #211)</item>
+      <item>fix: Resolved AI category sync and README proxy errors, including clearer README proxy messages and restored code block line numbers. (PR #212)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.3</downloadUrl>
+  </version>
 </versions>
