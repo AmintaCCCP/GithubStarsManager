@@ -34,6 +34,17 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+type RepositoryAnalysisResult = {
+  summary: string;
+  tags: string[];
+  platforms: string[];
+};
+
+type ParsedAIResponse = RepositoryAnalysisResult & {
+  isValid: boolean;
+  invalidReason?: string;
+};
+
 function getStatusCodeMeaning(statusCode: number, language: string): string {
   const meanings: Record<number, { zh: string; en: string }> = {
     400: { zh: '请求参数错误', en: 'Bad Request' },
@@ -61,6 +72,7 @@ function getErrorTypeFromStatus(statusCode: number): ConnectionTestResult['error
 export class AIService {
   private config: AIConfig;
   private language: string;
+  private static readonly ANALYSIS_MAX_ATTEMPTS = 3;
 
   constructor(config: AIConfig, language: string = 'zh') {
     this.config = config;
@@ -475,11 +487,7 @@ ${options.user}` : options.user;
     throw new Error('No content received from AI service');
   }
 
-  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], signal?: AbortSignal): Promise<{
-    summary: string;
-    tags: string[];
-    platforms: string[];
-  }> {
+  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], signal?: AbortSignal): Promise<RepositoryAnalysisResult> {
     const startTime = Date.now();
     const configId = this.config.id;
     const { full_name } = repository;
@@ -493,25 +501,103 @@ ${options.user}` : options.user;
 
     try {
       const system = this.language === 'zh'
-        ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。只输出合法JSON，不要输出思考过程、Markdown、代码块标记或任何额外文本。'
-        : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text.';
+        ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。只输出合法JSON，不要输出思考过程、Markdown、代码块标记或任何额外文本。summary字段只能描述仓库功能，不得复述提示词、输出格式或“只输出JSON”等要求。'
+        : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.';
 
-      const content = await this.requestText({
-        system,
-        user: prompt,
-        temperature: 0.3,
-        maxTokens: 1000,
-        signal,
-      });
+      let lastContent = '';
+      let lastInvalidReason = '';
 
-      const result = this.parseAIResponse(content);
-      logger.info('ai', 'AI analysis completed', { owner, repo, configId, durationMs: Date.now() - startTime });
-      return result;
+      for (let attempt = 1; attempt <= AIService.ANALYSIS_MAX_ATTEMPTS; attempt++) {
+        const content = await this.requestText({
+          system,
+          user: attempt === 1
+            ? prompt
+            : this.createAnalysisRetryPrompt(prompt, lastContent, lastInvalidReason),
+          temperature: attempt === 1 ? 0.3 : 0.1,
+          maxTokens: 1000,
+          signal,
+        });
+
+        const result = this.parseAIResponse(content);
+        if (result.isValid) {
+          logger.info('ai', 'AI analysis completed', {
+            owner,
+            repo,
+            configId,
+            attempts: attempt,
+            durationMs: Date.now() - startTime,
+          });
+          return {
+            summary: result.summary,
+            tags: result.tags,
+            platforms: result.platforms,
+          };
+        }
+
+        lastContent = content;
+        lastInvalidReason = result.invalidReason || (this.language === 'zh' ? '返回内容不符合要求' : 'Response did not meet requirements');
+
+        if (attempt < AIService.ANALYSIS_MAX_ATTEMPTS) {
+          logger.warn('ai', 'AI analysis response invalid, retrying', {
+            owner,
+            repo,
+            configId,
+            attempt,
+            invalidReason: lastInvalidReason,
+          });
+        }
+      }
+
+      throw new Error(this.language === 'zh'
+        ? `AI返回内容不符合要求，已重试${AIService.ANALYSIS_MAX_ATTEMPTS - 1}次：${lastInvalidReason}`
+        : `AI response did not meet requirements after ${AIService.ANALYSIS_MAX_ATTEMPTS - 1} retries: ${lastInvalidReason}`);
     } catch (error) {
       logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
       // 抛出错误，让调用方处理失败状态
       throw error;
     }
+  }
+
+  private createAnalysisRetryPrompt(originalPrompt: string, previousContent: string, invalidReason: string): string {
+    const previousOutput = this.sanitizeForPrompt(previousContent).slice(0, 1200);
+
+    if (this.language === 'zh') {
+      return `
+上一次 AI 输出不符合要求，原因：${invalidReason}
+
+请基于同一仓库信息重新生成结果。必须只输出一个合法 JSON 对象，不要 Markdown、代码块、解释或任何额外文本。
+
+强制要求：
+- summary 必须是仓库功能和用途的中文概述，不超过50字。
+- summary 禁止复述提示词、输出格式、字段名或“只输出JSON”等要求。
+- tags 必须是字符串数组。
+- platforms 只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择。
+
+原始分析任务：
+${originalPrompt}
+
+上一次错误输出（仅用于纠错，不要复述）：
+${previousOutput}
+      `.trim();
+    }
+
+    return `
+The previous AI output did not meet the requirements. Reason: ${invalidReason}
+
+Regenerate the result for the same repository information. Output exactly one valid JSON object. Do not output Markdown, code fences, explanations, or any extra text.
+
+Mandatory requirements:
+- summary must describe the repository functionality and purpose in no more than 50 words.
+- summary must not restate the prompt, output format, field names, or JSON-only requirements.
+- tags must be a string array.
+- platforms must only use ["mac","windows","linux","ios","android","docker","web","cli"].
+
+Original analysis task:
+${originalPrompt}
+
+Previous invalid output for correction only. Do not restate it:
+${previousOutput}
+    `.trim();
   }
 
   private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
@@ -560,6 +646,7 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
 
 要求：
 - summary：中文概述，说明仓库的主要功能和用途，不超过50字。
+  禁止出现“我们被要求”“只输出JSON”“根据仓库信息”“summary/tags/platforms”等提示词复述。
 - tags：3-5个中文应用类型标签${customCategories && customCategories.length > 0 ? '，请优先从上方的可用分类中选择' : '，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等'}。${categoriesLine}
 - platforms：只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择；无法判断则为 []。
 
@@ -585,6 +672,7 @@ Please analyze the following GitHub repository information and only output a val
 
 Requirements:
 - summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
+  Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
 - tags: 3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.${categoriesLine}
 - platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
 
@@ -606,7 +694,46 @@ ${repoInfo}
 
   private static readonly VALID_PLATFORMS = ['mac', 'windows', 'linux', 'ios', 'android', 'docker', 'web', 'cli'];
 
-  private parseAIResponse(content: string): { summary: string; tags: string[]; platforms: string[] } {
+  /**
+   * 校验 summary 是否为真实仓库概述。
+   * 命中提示词复述时直接判为无效，由上层触发重新生成。
+   */
+  private sanitizeSummary(raw: string): string | null {
+    if (!raw) return null;
+
+    const cleaned = raw
+      .trim()
+      .replace(/^["'“”]+|["'“”]+$/g, '')
+      .trim();
+
+    if (cleaned.length < 3) return null;
+
+    if (/^[\s.,;:!?，。；：！？、]+$/.test(cleaned)) return null;
+
+    const promptRestatementPatterns: RegExp[] = [
+      /^(?:我们|我)被要求(?:只?输出|分析|评估|总结|概述|介绍|提供|生成|返回)/i,
+      /^(?:根据|按照|基于)(?:给定的?)?(?:要求|提示|指示|任务|prompt|instruction)[，,。.\s]/i,
+      /^(?:根据|按照|基于)(?:给定的?)?(?:仓库|项目|repo|repository)(?:信息|描述)?[，,。.\s]*(?:需要|应|要)?(?:提供|输出|生成|返回)(?:\s*summary|\s*摘要|\s*tags?|\s*platforms?)/i,
+      /(?:^|[。！？.!?]\s*)(?:只输出|输出)\s*(?:一个)?(?:合法)?\s*JSON(?:对象)?(?:[，,。.!?]|$)/i,
+      /(?:不要|不应|不能)(?:输出)?(?:任何)?(?:思考过程|Markdown|代码块|解释|额外文本)/i,
+      /(?:需要|要求)(?:提供|输出|生成|返回)\s*(?:summary|摘要)[、,，\s]*(?:tags?)[、,，\s]*(?:和|与|and)?\s*platforms?/i,
+      /\bsummary\b[、,，/\s]*(?:tags?)[、,，/\s]*(?:和|与|and)?\s*platforms?\b/i,
+      /^(?:I|we)\s*(?:(?:have been|was|were|am)\s*)?(?:asked|instructed|told|requested)\b/i,
+      /^(?:based|according)\s+(?:on|to)\s+(?:the\s+)?(?:request|prompt|instruction|task)[.,:;\s]/i,
+      /^(?:based|according)\s+(?:on|to)\s+(?:the\s+)?(?:repository|repo|project)\s+(?:information|description)[.,:;\s]*(?:we\s+)?(?:need|should|must|will)?\s*(?:provide|output|generate|return)/i,
+      /(?:^|[.!?]\s*)(?:only\s+output|output\s+only)\s+(?:one\s+)?(?:valid\s+)?json(?:\s+object)?(?:[.,!?]|$)/i,
+      /(?:do\s+not|don't)\s+output\s+(?:any\s+)?(?:thinking|markdown|code\s+block|explanation|extra\s+text)/i,
+      /(?:need|required|asked)\s+to\s+(?:provide|output|generate|return)\s+summary/i,
+      /^(?:here|this)\s+(?:is|are)\s+(?:the|my|a)\s+(?:analysis|summary|result|overview)[.,:;\s]/i,
+      /^(?:analysis|summary|overview)\s*(?:result|of)?[.:]\s*/i,
+    ];
+
+    if (promptRestatementPatterns.some((pattern) => pattern.test(cleaned))) return null;
+
+    return cleaned;
+  }
+
+  private parseAIResponse(content: string): ParsedAIResponse {
     try {
       // Strip thinking tags that some models embed in the content field (e.g. <think>...</think>)
       // Also handle truncated tags (dangling <think> without </think>) from token exhaustion
@@ -620,35 +747,55 @@ ${repoInfo}
 
       const parsed = this.extractAndParseAIJson(cleaned);
       if (parsed) {
+        const rawSummary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+        const summary = this.sanitizeSummary(rawSummary);
+        const tags = Array.isArray(parsed.tags) ? parsed.tags.filter((v) => typeof v === 'string').slice(0, 5) : [];
+        const platforms = Array.isArray(parsed.platforms)
+          ? Array.from(
+              new Set(
+                parsed.platforms
+                  .filter((v): v is string => typeof v === 'string')
+                  .map((v) => v.trim().toLowerCase())
+                  .filter((v) => AIService.VALID_PLATFORMS.includes(v))
+              )
+            ).slice(0, 8)
+          : [];
+
+        if (!summary) {
+          return {
+            summary: '',
+            tags,
+            platforms,
+            isValid: false,
+            invalidReason: rawSummary
+              ? (this.language === 'zh' ? 'summary包含提示词复述或不是仓库概述' : 'summary contains prompt restatement or is not a repository overview')
+              : (this.language === 'zh' ? 'summary缺失或为空' : 'summary is missing or empty'),
+          };
+        }
+
         return {
-          summary: typeof parsed.summary === 'string' && parsed.summary.trim()
-            ? parsed.summary.trim()
-            : (this.language === 'zh' ? '无法生成概述' : 'Unable to generate summary'),
-          tags: Array.isArray(parsed.tags) ? parsed.tags.filter((v) => typeof v === 'string').slice(0, 5) : [],
-          platforms: Array.isArray(parsed.platforms)
-            ? Array.from(
-                new Set(
-                  parsed.platforms
-                    .filter((v): v is string => typeof v === 'string')
-                    .map((v) => v.trim().toLowerCase())
-                    .filter((v) => AIService.VALID_PLATFORMS.includes(v))
-                )
-              ).slice(0, 8)
-            : [],
+          summary,
+          tags,
+          platforms,
+          isValid: true,
         };
       }
 
       return {
-        summary: cleaned.substring(0, 50) + (cleaned.length > 50 ? '...' : ''),
+        summary: '',
         tags: [],
         platforms: [],
+        isValid: false,
+        invalidReason: this.language === 'zh' ? '未返回合法JSON对象' : 'No valid JSON object returned',
       };
     } catch (error) {
       logger.errorFromError('ai', 'Failed to parse AI response', error);
       return {
-        summary: this.language === 'zh' ? '分析失败' : 'Analysis failed',
+        summary: '',
         tags: [],
         platforms: [],
+        isValid: false,
+        invalidReason: this.language === 'zh' ? '解析AI返回失败' : 'Failed to parse AI response',
       };
     }
   }
