@@ -16,7 +16,6 @@ export const ForkTimeline: React.FC = () => {
     readForks,
     githubToken,
     language,
-    setForks,
     markForkAsRead,
     forkSearchQuery,
     forkIsRefreshing,
@@ -74,6 +73,7 @@ export const ForkTimeline: React.FC = () => {
   useEffect(() => {
     setSelectedForkOwner(personalOwnerLogin);
     setCurrentPage(1);
+    setLoadedForkOwners(new Set());
   }, [personalOwnerLogin]);
 
   useEffect(() => {
@@ -232,62 +232,59 @@ export const ForkTimeline: React.FC = () => {
       const newForks = fetchedForks.filter(fork => fork.fork === true && fork.owner.login === ownerLogin);
       logger.info('githubApi', 'Refresh forks completed', { owner: ownerLogin, forkCount: newForks.length, durationMs: Date.now() - startTime });
 
-      // Merge with existing forks, preserving read status
-      const currentForks = useAppStore.getState().forks;
-      const existingForkMap = new Map(currentForks.map(f => [f.id, f]));
-      const mergedForks: ForkRepo[] = newForks.map(newFork => {
-        const existing = existingForkMap.get(newFork.id);
-        if (existing) {
-          // Preserve local state
+      // Merge with existing forks, preserving read status from the latest store state
+      let updatedForks: ForkRepo[] = [];
+      let newCount = 0;
+      useAppStore.setState(state => {
+        const existingForkMap = new Map(state.forks.map(f => [f.id, f]));
+        const nextReadForks = new Set(state.readForks);
+        newCount = newForks.filter(f => !existingForkMap.has(f.id)).length;
+
+        updatedForks = newForks.map(newFork => {
+          const existing = existingForkMap.get(newFork.id);
+          if (!existing) {
+            // New fork — mark as unread if upstream has updates
+            return {
+              ...newFork,
+              has_unread: false,
+              upstream_updated_at: newFork.source?.updated_at,
+            };
+          }
+
+          const prevUpstreamTime = existing.upstream_updated_at;
+          const currentUpstreamTime = newFork.source?.updated_at;
+          const hasNewUpdates = !!prevUpstreamTime && !!currentUpstreamTime
+            && new Date(currentUpstreamTime) > new Date(prevUpstreamTime);
+
+          if (hasNewUpdates) {
+            nextReadForks.delete(newFork.id);
+            return {
+              ...newFork,
+              has_unread: existing.has_unread,
+              upstream_updated_at: currentUpstreamTime,
+            };
+          }
+
           return {
             ...newFork,
             has_unread: existing.has_unread,
-            upstream_updated_at: existing.upstream_updated_at,
+            upstream_updated_at: existing.upstream_updated_at || currentUpstreamTime,
           };
-        }
-        // New fork — mark as unread if upstream has updates
+        });
+
         return {
-          ...newFork,
-          has_unread: false,
-          upstream_updated_at: newFork.source?.updated_at,
+          forks: [
+            ...state.forks.filter(fork => fork.owner.login !== ownerLogin || fork.fork !== true),
+            ...updatedForks,
+          ],
+          readForks: nextReadForks,
         };
       });
-
-      // Check for upstream updates on existing forks - mark as unread if source has newer commits
-      const updatedForks = mergedForks.map(fork => {
-        const existing = existingForkMap.get(fork.id);
-        if (existing) {
-          // Compare: if source updated since last check, mark as unread
-          const prevUpstreamTime = existing.upstream_updated_at;
-          const currentUpstreamTime = fork.source?.updated_at;
-          if (prevUpstreamTime && currentUpstreamTime) {
-            const hasNewUpdates = new Date(currentUpstreamTime) > new Date(prevUpstreamTime);
-            if (hasNewUpdates) {
-              // Mark as unread by removing from readForks
-              useAppStore.setState(state => {
-                const newReadForks = new Set(state.readForks);
-                newReadForks.delete(fork.id);
-                return { readForks: newReadForks };
-              });
-              return {
-                ...fork,
-                upstream_updated_at: currentUpstreamTime,
-              };
-            }
-          }
-          return {
-            ...fork,
-            upstream_updated_at: existing.upstream_updated_at || fork.source?.updated_at,
-          };
-        }
-        return fork;
+      setLoadedForkOwners(prev => {
+        const next = new Set(prev);
+        next.add(ownerLogin);
+        return next;
       });
-
-      setForks([
-        ...currentForks.filter(fork => fork.owner.login !== ownerLogin || fork.fork !== true),
-        ...updatedForks,
-      ]);
-      setLoadedForkOwners(prev => new Set(prev).add(ownerLogin));
       const now = new Date().toISOString();
       setLastRefreshTime(now);
 
@@ -306,16 +303,17 @@ export const ForkTimeline: React.FC = () => {
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: result.needsSync }));
 
           if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
-            const latestForks = useAppStore.getState().forks;
-            setForks(latestForks.map(f => f.id === fork.id ? {
-              ...f,
-              parent: {
-                id: 0,
-                full_name: result.parentFullName as string,
-                name: (result.parentFullName as string).split('/')[1],
-                html_url: result.parentHtmlUrl as string
-              }
-            } : f));
+            useAppStore.setState(state => ({
+              forks: state.forks.map(f => f.id === fork.id ? {
+                ...f,
+                parent: {
+                  id: 0,
+                  full_name: result.parentFullName as string,
+                  name: (result.parentFullName as string).split('/')[1],
+                  html_url: result.parentHtmlUrl as string
+                }
+              } : f)
+            }));
           }
         } catch {
           setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
@@ -323,8 +321,6 @@ export const ForkTimeline: React.FC = () => {
       });
       await Promise.all(syncChecks);
 
-      // Count new forks for the refreshed owner
-      const newCount = newForks.filter(f => !existingForkMap.has(f.id)).length;
       if (newCount > 0) {
         toast(language === 'zh'
           ? `刷新完成！发现 ${newCount} 个新Fork。`
@@ -349,7 +345,7 @@ export const ForkTimeline: React.FC = () => {
     } finally {
       setForkIsRefreshing(false);
     }
-  }, [githubToken, language, personalOwnerLogin, setForkIsRefreshing, setForks, toast]);
+  }, [githubToken, language, personalOwnerLogin, setForkIsRefreshing, toast]);
 
   const handleRefresh = () => {
     loadForksForOwner(activeForkOwner);

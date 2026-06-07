@@ -150,22 +150,16 @@ describe('ForkTimeline owner filtering', () => {
   });
 
   it('filters personal refresh results to the personal owner before caching', async () => {
-    const setForks = vi.fn((forks: ForkRepo[]) => {
-      storeState.forks = forks;
-    });
     storeState.forks = [];
-    storeState.setForks = setForks;
 
     render(<ForkTimeline />);
 
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
     await waitFor(() => {
-      expect(setForks).toHaveBeenCalled();
+      expect(storeState.forks).toHaveLength(1);
     });
-    const refreshedForks = setForks.mock.calls[0][0] as ForkRepo[];
-    expect(refreshedForks).toHaveLength(1);
-    expect(refreshedForks[0]).toMatchObject({
+    expect(storeState.forks[0]).toMatchObject({
       id: personalFork.id,
       full_name: personalFork.full_name,
       owner: { login: 'tamina' },
