@@ -303,6 +303,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
 要求：
 - summary：中文概述，说明仓库的主要功能和用途，不超过50字。
+  禁止出现“我们被要求”“只输出JSON”“根据仓库信息”“summary/tags/platforms”等提示词复述。
 - tags：3-5个中文应用类型标签，请优先从提供的分类中选择。
 {CATEGORIES_INFO}
 - platforms：只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择；无法判断则为 []。
@@ -324,6 +325,7 @@ Dockerfile/docker-compose=docker；CLI/命令行/终端=cli；浏览器/前端/A
 
 Requirements:
 - summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
+  Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
 - tags: 3-5 English application type tags, please prioritize from the provided categories.
 {CATEGORIES_INFO}
 - platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
