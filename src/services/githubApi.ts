@@ -15,6 +15,7 @@ import {
   SubscriptionDev,
   GitHubSearchUserResponse,
   GitHubUserDetail,
+  GitHubOrganization,
   ForkRepo,
   WorkflowDefinition,
 } from '../types';
@@ -1101,28 +1102,55 @@ export class GitHubApiService {
 
 
 
-async getUserForks(): Promise<ForkRepo[]> {
+  async getUserOrganizations(): Promise<GitHubOrganization[]> {
+    try {
+      return await this.getPaginatedFromEndpoint<GitHubOrganization>('/user/orgs', 'fork');
+    } catch (error) {
+      logger.warn('githubApi', 'Failed to fetch user organizations', error);
+      throw error;
+    }
+  }
+
+  private async getPaginatedFromEndpoint<T>(endpoint: string, operationTag: string): Promise<T[]> {
+    let allItems: T[] = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (true) {
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const items = await this.makeRequest<T[]>(
+        `${endpoint}${separator}per_page=${perPage}&page=${page}`,
+        { operationTag }
+      );
+      allItems = [...allItems, ...items];
+      if (items.length < perPage) break;
+      page++;
+      // Rate limiting protection
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allItems;
+  }
+
+  private async getForksFromEndpoint(endpoint: string): Promise<ForkRepo[]> {
+    return this.getPaginatedFromEndpoint<ForkRepo>(endpoint, 'fork');
+  }
+
+  async getUserForks(): Promise<ForkRepo[]> {
     try {
       // Use /user/repos?type=forks to get only repositories the user has forked
-      let allForks: ForkRepo[] = [];
-      let page = 1;
-      const perPage = 100;
-
-      while (true) {
-        const forks = await this.makeRequest<ForkRepo[]>(
-          `/user/repos?type=forks&sort=updated&per_page=${perPage}&page=${page}`,
-          { operationTag: 'fork' }
-        );
-        allForks = [...allForks, ...forks];
-        if (forks.length < perPage) break;
-        page++;
-        // Rate limiting protection
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      return allForks;
+      return await this.getForksFromEndpoint('/user/repos?type=forks&sort=updated');
     } catch (error) {
       logger.warn('githubApi', 'Failed to fetch user forks', error);
+      throw error;
+    }
+  }
+
+  async getOrganizationForks(orgLogin: string): Promise<ForkRepo[]> {
+    try {
+      return await this.getForksFromEndpoint(`/orgs/${encodeURIComponent(orgLogin)}/repos?type=forks&sort=updated`);
+    } catch (error) {
+      logger.warn('githubApi', 'Failed to fetch organization forks', { orgLogin, error });
       throw error;
     }
   }
