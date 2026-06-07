@@ -234,7 +234,8 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-gray-600 dark:text-text-tertiary text-sm leading-relaxed';
 
         if (segments[i].hasInlineCode) {
-          const codeRegex = /<code>([\s\S]*?)<\/code>/g;
+          // 修改正则以支持带属性的 code 标签（如 <code class="...">）
+          const codeRegex = /<code(?:\s+[^>]*)?>([\s\S]*?)<\/code>/g;
           let lastIndex = 0;
           let match: RegExpExecArray | null;
           while ((match = codeRegex.exec(translatedTexts[i])) !== null) {
