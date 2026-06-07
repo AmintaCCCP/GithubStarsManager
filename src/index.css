@@ -194,7 +194,7 @@
   .prose pre {
     overflow-x: auto;
     white-space: pre;
-    word-wrap: normal;
+    overflow-wrap: normal;
     word-break: normal;
   }
 
@@ -207,9 +207,26 @@
     tab-size: 2;
     -moz-tab-size: 2;
     white-space: pre;
-    word-wrap: normal;
+    overflow-wrap: normal;
     word-break: normal;
     overflow-x: auto;
+  }
+
+  /* 纯 pre 标签样式（如字符画、ASCII art），不包含 code 子元素 */
+  .prose pre:not(:has(code)) {
+    padding: 1rem;
+    background-color: #f8fafc;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .dark .prose pre:not(:has(code)) {
+    background-color: #1e293b;
+    border-color: rgba(255, 255, 255, 0.04);
+    color: #e6edf3;
   }
 
   .prose :not(pre) > code {
