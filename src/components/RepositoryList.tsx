@@ -10,7 +10,7 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
-import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory } from '../utils/categoryUtils';
+import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
 
@@ -75,41 +75,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     if (!selectedCategoryObj) return [];
-    const selectedCategoryKeywords = selectedCategoryObj.keywords.map(keyword => keyword.toLowerCase());
-
-    return repositories.filter(repo => {
-      if (repo.custom_category !== undefined) {
-        if (repo.custom_category === '') {
-          return false;
-        }
-        return repo.custom_category === selectedCategoryObj.name;
-      }
-      
-      // 如果没有自定义分类，使用AI标签和关键词匹配
-      // 优先使用AI标签进行匹配
-      if (repo.ai_tags && repo.ai_tags.length > 0) {
-        return repo.ai_tags.some(tag => {
-          const tagLower = tag.toLowerCase();
-          return selectedCategoryKeywords.some(keyword =>
-            tagLower.includes(keyword) ||
-            keyword.includes(tagLower)
-          )
-        });
-      }
-      
-      // 如果没有AI标签，使用传统方式匹配
-      const repoText = [
-        repo.name,
-        repo.description || '',
-        repo.language || '',
-        ...(repo.topics || []),
-        repo.ai_summary || ''
-      ].join(' ').toLowerCase();
-      
-      return selectedCategoryKeywords.some(keyword =>
-        repoText.includes(keyword)
-      );
-    });
+    return repositories.filter(repo => matchesCategory(repo, selectedCategoryObj));
   }, [repositories, selectedCategory, allCategories]);
 
   // 根据当前筛选的仓库中是否有AI分析内容来动态设置默认显示模式

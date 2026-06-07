@@ -198,7 +198,7 @@ class BackendAdapter {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    throw lastError!; // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript control flow can't prove this is unreachable
+    throw lastError!;
   }
   private async throwTranslatedError(res: Response, fallbackPrefix: string): Promise<never> {
     let code: string | undefined;
@@ -271,19 +271,16 @@ class BackendAdapter {
   async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    try {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/readme`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ method: 'GET' }),
-        signal,
-      });
-      if (!res.ok) return '';
-      const data = await res.json() as GitHubContentResponse;
-      return this.decodeContentResponse(data);
-    } catch {
-      return '';
-    }
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/readme`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ method: 'GET' }),
+      signal,
+    });
+    if (res.status === 404) return '';
+    if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy error');
+    const data = await res.json() as GitHubContentResponse;
+    return this.decodeContentResponse(data);
   }
 
   async listRepositoryReadmeCandidates(owner: string, repo: string, defaultBranch?: string, signal?: AbortSignal): Promise<GitHubReadmeCandidateItem[]> {
@@ -354,19 +351,16 @@ class BackendAdapter {
   async getRepositoryReadmeByPath(owner: string, repo: string, path: string, signal?: AbortSignal): Promise<string> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    try {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents/${this.encodeContentPath(path)}`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ method: 'GET' }),
-        signal,
-      });
-      if (!res.ok) return '';
-      const data = await res.json() as GitHubContentResponse;
-      return this.decodeContentResponse(data);
-    } catch {
-      return '';
-    }
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents/${this.encodeContentPath(path)}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ method: 'GET' }),
+      signal,
+    });
+    if (res.status === 404) return '';
+    if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy error');
+    const data = await res.json() as GitHubContentResponse;
+    return this.decodeContentResponse(data);
   }
 
   async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Record<string, unknown>[]> {
