@@ -191,6 +191,13 @@
 
 /* ========== Markdown Prose Component Styles ========== */
 @layer components {
+  .prose pre {
+    overflow-x: auto;
+    white-space: pre;
+    word-wrap: normal;
+    word-break: normal;
+  }
+
   .prose pre code {
     display: block;
     padding: 1rem;
@@ -199,6 +206,10 @@
     line-height: 1.5rem;
     tab-size: 2;
     -moz-tab-size: 2;
+    white-space: pre;
+    word-wrap: normal;
+    word-break: normal;
+    overflow-x: auto;
   }
 
   .prose :not(pre) > code {
