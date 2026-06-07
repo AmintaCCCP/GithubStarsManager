@@ -25,6 +25,7 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { backend } from '../../services/backendAdapter';
+import { IncludeKeysToggle } from './IncludeKeysToggle';
 import { version as appVersion } from '../../../package.json';
 import type { 
   Repository, 
@@ -36,7 +37,9 @@ import type {
   DiscoveryRepo,
   SubscriptionRepo,
   SubscriptionChannel,
-  SearchFilters 
+  SearchFilters,
+  ProxyConfig,
+  RpcDownloadConfig
 } from '../../types';
 
 interface DataManagementPanelProps {
@@ -101,6 +104,10 @@ interface ExportData {
     releaseSelectedFilters?: string[];
     releaseSearchQuery?: string;
     releaseExpandedRepositories?: number[];
+    proxyConfig?: ProxyConfig;
+    rpcDownloadConfig?: RpcDownloadConfig;
+    backendApiSecret?: string | null;
+    includeKeysInBackup?: boolean;
   };
 }
 
@@ -115,6 +122,22 @@ interface DataCleanupSuggestion {
   color: string;
   bgColor: string;
 }
+
+const MASKED_SECRET = '***';
+
+const isRealSecret = (value: unknown): value is string => (
+  typeof value === 'string' && value.length > 0 && value !== MASKED_SECRET
+);
+
+const hasMaskedSecrets = (data: ExportData['data']): boolean => {
+  return !!(
+    data.aiConfigs?.some(config => config.apiKey === MASKED_SECRET) ||
+    data.webdavConfigs?.some(config => config.password === MASKED_SECRET) ||
+    data.proxyConfig?.password === MASKED_SECRET ||
+    data.rpcDownloadConfig?.secret === MASKED_SECRET ||
+    data.backendApiSecret === MASKED_SECRET
+  );
+};
 
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
   const {
@@ -440,11 +463,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     setIsExporting(true);
     try {
       const store = useAppStore.getState();
+      const includeKeys = store.includeKeysInBackup;
+
       const exportDataObj: ExportData = {
         version: '1.0',
         exportDate: new Date().toISOString(),
         appVersion: '0.4.0',
-        data: {}
+        data: { includeKeysInBackup: includeKeys }
       };
 
       if (selectedTypes.includes('repositories')) {
@@ -454,10 +479,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.releases = store.releases;
       }
       if (selectedTypes.includes('aiConfigs')) {
-        exportDataObj.data.aiConfigs = store.aiConfigs;
+        exportDataObj.data.aiConfigs = includeKeys
+          ? store.aiConfigs
+          : store.aiConfigs.map(cfg => ({ ...cfg, apiKey: cfg.apiKey ? MASKED_SECRET : '' }));
       }
       if (selectedTypes.includes('webdavConfigs')) {
-        exportDataObj.data.webdavConfigs = store.webdavConfigs;
+        exportDataObj.data.webdavConfigs = includeKeys
+          ? store.webdavConfigs
+          : store.webdavConfigs.map(cfg => ({ ...cfg, password: cfg.password ? MASKED_SECRET : '' }));
       }
       if (selectedTypes.includes('customCategories')) {
         exportDataObj.data.customCategories = store.customCategories;
@@ -495,6 +524,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.releaseSearchQuery = store.releaseSearchQuery;
         exportDataObj.data.releaseExpandedRepositories = Array.from(store.releaseExpandedRepositories);
       }
+
+      // 导出特殊配置（网络代理、远程下载、后端密钥）
+      exportDataObj.data.proxyConfig = includeKeys
+        ? store.proxyConfig
+        : { ...store.proxyConfig, password: store.proxyConfig.password ? MASKED_SECRET : '' };
+
+      exportDataObj.data.rpcDownloadConfig = includeKeys
+        ? store.rpcDownloadConfig
+        : { ...store.rpcDownloadConfig, secret: store.rpcDownloadConfig.secret ? MASKED_SECRET : '' };
+
+      exportDataObj.data.backendApiSecret = includeKeys
+        ? store.backendApiSecret
+        : (store.backendApiSecret ? MASKED_SECRET : null);
 
       const blob = new Blob([JSON.stringify(exportDataObj, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -547,6 +589,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     try {
       const store = useAppStore.getState();
       const importedData = importPreview.data.data;
+      const wasIncluded = importedData.includeKeysInBackup ?? false;
 
       if (mode === 'replace') {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
@@ -556,10 +599,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           store.setReleases(importedData.releases);
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
-          store.setAIConfigs(importedData.aiConfigs);
+          const restoredConfigs = importedData.aiConfigs.map(cfg => ({
+            ...cfg,
+            apiKey: wasIncluded && isRealSecret(cfg.apiKey) ? cfg.apiKey : store.aiConfigs.find(c => c.id === cfg.id)?.apiKey || ''
+          }));
+          store.setAIConfigs(restoredConfigs);
         }
         if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
-          store.setWebDAVConfigs(importedData.webdavConfigs);
+          const restoredConfigs = importedData.webdavConfigs.map(cfg => ({
+            ...cfg,
+            password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : store.webdavConfigs.find(c => c.id === cfg.id)?.password || ''
+          }));
+          store.setWebDAVConfigs(restoredConfigs);
         }
         if (selectedTypes.includes('customCategories')) {
           if (importedData.customCategories) {
@@ -637,6 +688,31 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             useAppStore.setState({ releaseExpandedRepositories: new Set(importedData.releaseExpandedRepositories) });
           }
         }
+
+        // 导入特殊配置（网络代理、远程下载、后端密钥）
+        if (importedData.proxyConfig) {
+          const restoredProxy = {
+            ...importedData.proxyConfig,
+            password: wasIncluded && isRealSecret(importedData.proxyConfig.password)
+              ? importedData.proxyConfig.password
+              : store.proxyConfig.password
+          };
+          useAppStore.setState({ proxyConfig: restoredProxy });
+        }
+
+        if (importedData.rpcDownloadConfig) {
+          const restoredRpc = {
+            ...importedData.rpcDownloadConfig,
+            secret: wasIncluded && isRealSecret(importedData.rpcDownloadConfig.secret)
+              ? importedData.rpcDownloadConfig.secret
+              : store.rpcDownloadConfig.secret
+          };
+          useAppStore.setState({ rpcDownloadConfig: restoredRpc });
+        }
+
+        if (wasIncluded && importedData.backendApiSecret !== undefined && isRealSecret(importedData.backendApiSecret)) {
+          useAppStore.setState({ backendApiSecret: importedData.backendApiSecret });
+        }
       } else {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
           const existingIds = new Set(store.repositories.map(r => r.id));
@@ -650,12 +726,22 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
           const existingIds = new Set(store.aiConfigs.map(c => c.id));
-          const newConfigs = importedData.aiConfigs.filter(c => !existingIds.has(c.id));
+          const newConfigs = importedData.aiConfigs
+            .filter(c => !existingIds.has(c.id))
+            .map(cfg => ({
+              ...cfg,
+              apiKey: wasIncluded && isRealSecret(cfg.apiKey) ? cfg.apiKey : ''
+            }));
           store.setAIConfigs([...store.aiConfigs, ...newConfigs]);
         }
         if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
           const existingIds = new Set(store.webdavConfigs.map(c => c.id));
-          const newConfigs = importedData.webdavConfigs.filter(c => !existingIds.has(c.id));
+          const newConfigs = importedData.webdavConfigs
+            .filter(c => !existingIds.has(c.id))
+            .map(cfg => ({
+              ...cfg,
+              password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : ''
+            }));
           store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
         }
         if (selectedTypes.includes('customCategories') && importedData.customCategories) {
@@ -677,8 +763,17 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
       }
 
+      // 如果导入的数据包含屏蔽的密钥，提示用户
+      if (hasMaskedSecrets(importedData)) {
+        showSuccess(t(
+          '数据导入成功。部分密钥已屏蔽，请在相应配置中重新输入。',
+          'Data imported successfully. Some secrets were masked, please re-enter them in the respective configurations.'
+        ));
+      } else {
+        showSuccess(t('数据导入成功', 'Data imported successfully'));
+      }
+
       addLog(t('导入数据', 'Import data'), true);
-      showSuccess(t('数据导入成功', 'Data imported successfully'));
       setImportPreview({ data: null, isOpen: false, fileName: '' });
     } catch (error) {
       addLog(t('导入数据', 'Import data'), false, String(error));
@@ -1206,6 +1301,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
+            <IncludeKeysToggle t={t} />
+
             <div className="space-y-2 mb-4">
               {[
                 { key: 'repositories', label: t('仓库数据', 'Repositories') },
@@ -1601,6 +1698,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   )}
                 </div>
               </div>
+
+              {/* Warning for masked secrets */}
+              {hasMaskedSecrets(importPreview.data.data) && (
+                <div className="flex items-start space-x-3 text-yellow-700 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm">
+                    {t(
+                      '警告：此备份中的部分密钥已被屏蔽。导入后请在相应配置中重新输入密钥。',
+                      'Warning: Some secrets in this backup are masked. Please re-enter them in the respective configurations after import.'
+                    )}
+                  </p>
+                </div>
+              )}
 
               <div className="flex space-x-3 pt-4">
                 <button

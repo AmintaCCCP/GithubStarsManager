@@ -4,6 +4,7 @@ import { AIConfig, WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { WebDAVService } from '../../services/webdavService';
 import { useDialog } from '../../hooks/useDialog';
+import { IncludeKeysToggle } from './IncludeKeysToggle';
 
 interface BackupPanelProps {
   t: (zh: string, en: string) => string;
@@ -19,6 +20,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     webdavConfigs,
     activeWebDAVConfig,
     lastBackup,
+    proxyConfig,
+    rpcDownloadConfig,
+    backendApiSecret,
+    includeKeysInBackup,
     setLastBackup,
     setRepositories,
     setReleases,
@@ -32,6 +37,9 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     addWebDAVConfig,
     updateWebDAVConfig,
     deleteWebDAVConfig,
+    setProxyConfig,
+    setRpcDownloadConfig,
+    setBackendApiSecret,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -58,12 +66,22 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         hiddenDefaultCategoryIds,
         aiConfigs: aiConfigs.map(config => ({
           ...config,
-          apiKey: config.apiKey ? '***' : ''
+          apiKey: includeKeysInBackup ? config.apiKey : (config.apiKey ? '***' : '')
         })),
         webdavConfigs: webdavConfigs.map(config => ({
           ...config,
-          password: config.password ? '***' : ''
+          password: includeKeysInBackup ? config.password : (config.password ? '***' : '')
         })),
+        proxyConfig: {
+          ...proxyConfig,
+          password: includeKeysInBackup ? proxyConfig.password : (proxyConfig.password ? '***' : ''),
+        },
+        rpcDownloadConfig: {
+          ...rpcDownloadConfig,
+          secret: includeKeysInBackup ? rpcDownloadConfig.secret : (rpcDownloadConfig.secret ? '***' : ''),
+        },
+        backendApiSecret: includeKeysInBackup ? backendApiSecret : (backendApiSecret ? '***' : null),
+        includeKeysInBackup,
         exportedAt: new Date().toISOString(),
         version: '1.0'
       };
@@ -191,13 +209,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                   useCustomPrompt: cfg.useCustomPrompt,
                   concurrency: cfg.concurrency,
                   reasoningEffort: cfg.reasoningEffort,
-                  apiKey: cfg.apiKey || existing.apiKey,
+                  apiKey: includeKeysInBackup && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : existing.apiKey,
                   isActive: existing.isActive,
                 });
               } else {
                 addAIConfig({
                   ...cfg,
-                  apiKey: cfg.apiKey || '',
+                  apiKey: includeKeysInBackup && cfg.apiKey && cfg.apiKey !== '***' ? cfg.apiKey : '',
                   isActive: cfg.isActive,
                 });
               }
@@ -208,7 +226,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         }
 
         try {
-          if (Array.isArray(backupData.webdavConfigs)) {
+          if (backupData.webdavConfigs && Array.isArray(backupData.webdavConfigs)) {
             const latestWebDAVConfigs = useAppStore.getState().webdavConfigs;
             const currentMap = new Map(latestWebDAVConfigs.map((c: WebDAVConfig) => [c.id, c]));
             const backupIdSet = new Set((backupData.webdavConfigs as WebDAVConfig[]).map(cfg => cfg.id).filter(Boolean));
@@ -226,13 +244,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                   url: cfg.url,
                   username: cfg.username,
                   path: cfg.path,
-                  password: cfg.password || existing.password,
+                  password: includeKeysInBackup && cfg.password && cfg.password !== '***' ? cfg.password : existing.password,
                   isActive: existing.isActive,
                 });
               } else {
                 addWebDAVConfig({
                   ...cfg,
-                  password: cfg.password || '',
+                  password: includeKeysInBackup && cfg.password && cfg.password !== '***' ? cfg.password : '',
                   isActive: false,
                 });
               }
@@ -240,6 +258,44 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           }
         } catch (e) {
           console.warn('恢复 WebDAV 配置时发生问题：', e);
+        }
+
+        try {
+          if (backupData.proxyConfig && typeof backupData.proxyConfig === 'object') {
+            const latestProxyConfig = useAppStore.getState().proxyConfig;
+            const backupProxyConfig = backupData.proxyConfig as typeof latestProxyConfig;
+            setProxyConfig({
+              ...backupProxyConfig,
+              password: includeKeysInBackup && backupProxyConfig.password && backupProxyConfig.password !== '***'
+                ? backupProxyConfig.password
+                : latestProxyConfig.password,
+            });
+          }
+        } catch (e) {
+          console.warn('恢复代理配置时发生问题：', e);
+        }
+
+        try {
+          if (backupData.rpcDownloadConfig && typeof backupData.rpcDownloadConfig === 'object') {
+            const latestRpcDownloadConfig = useAppStore.getState().rpcDownloadConfig;
+            const backupRpcDownloadConfig = backupData.rpcDownloadConfig as typeof latestRpcDownloadConfig;
+            setRpcDownloadConfig({
+              ...backupRpcDownloadConfig,
+              secret: includeKeysInBackup && backupRpcDownloadConfig.secret && backupRpcDownloadConfig.secret !== '***'
+                ? backupRpcDownloadConfig.secret
+                : latestRpcDownloadConfig.secret,
+            });
+          }
+        } catch (e) {
+          console.warn('恢复远程下载配置时发生问题：', e);
+        }
+
+        try {
+          if (includeKeysInBackup && backupData.backendApiSecret !== undefined && backupData.backendApiSecret !== '***') {
+            setBackendApiSecret(typeof backupData.backendApiSecret === 'string' ? backupData.backendApiSecret : null);
+          }
+        } catch (e) {
+          console.warn('恢复后端 API 密钥时发生问题：', e);
         }
 
         toast(t(
@@ -291,6 +347,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           </p>
         </div>
       )}
+
+      <IncludeKeysToggle t={t} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-6 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
