@@ -182,22 +182,22 @@ const CodeBlock: React.FC<{
               ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-[#0d1117] dark:to-[#161b22]'
               : 'bg-light-bg dark:bg-[#0d1117]'
       }`}>
-        <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-          <div className={showLineNumbers ? 'flex items-start' : undefined}>
+        <div className={`p-4 overflow-x-auto ${className || ''}`}>
+          <pre className={showLineNumbers ? 'flex items-start' : undefined}>
             {showLineNumbers && (
-              <div className="select-none pr-4 text-right flex-shrink-0" aria-hidden="true">
+              <span className="select-none pr-4 text-right flex-shrink-0" aria-hidden="true">
                 {codeLines.map((_, index) => (
                   <span key={index} className="block text-gray-400 text-sm font-mono leading-6">
                     {index + 1}
                   </span>
                 ))}
-              </div>
+              </span>
             )}
             <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${showLineNumbers ? 'block min-w-0 flex-1' : ''} ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
               {codeText}
             </code>
-          </div>
-        </pre>
+          </pre>
+        </div>
       </div>
     </div>
   );

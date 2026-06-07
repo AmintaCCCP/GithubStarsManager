@@ -260,7 +260,11 @@ router.post('/api/proxy/webdav', async (req, res) => {
     const credentials = Buffer.from(`${username}:${password}`).toString('base64');
 
     const safeHeaders = { ...(extraHeaders || {}) };
-    delete safeHeaders.Authorization;
+    for (const key of Object.keys(safeHeaders)) {
+      if (key.toLowerCase() === 'authorization') {
+        delete safeHeaders[key];
+      }
+    }
     const headers: Record<string, string> = {
       ...safeHeaders,
       'Authorization': `Basic ${credentials}`,
