@@ -419,7 +419,7 @@ export const ReleaseTimeline: React.FC = () => {
       markAllReleasesAsRead();
       await backend.markAllReleasesAsRead();
       toast(t('已全部标记为已读', 'All marked as read'), 'success');
-    } catch (error) {
+    } catch {
       toast(t('标记全部已读失败', 'Failed to mark all as read'), 'error');
     } finally {
       setIsMarkingAllRead(false);

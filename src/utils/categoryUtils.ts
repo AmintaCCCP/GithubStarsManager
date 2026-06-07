@@ -83,7 +83,7 @@ export const computeCustomCategory = (
 export const matchesCategory = (repo: Repository, category: Category): boolean => {
   if (category.id === 'all') return true;
 
-  if (repo.custom_category !== undefined) {
+  if (repo.custom_category != null) {
     if (repo.custom_category === '') {
       return false;
     }

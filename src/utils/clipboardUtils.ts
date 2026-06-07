@@ -107,7 +107,7 @@ export const safeWriteText = async (text: string): Promise<{ success: boolean; e
   try {
     await navigator.clipboard.writeText(text);
     return { success: true };
-  } catch (err) {
+  } catch {
     return {
       success: false,
       error: getClipboardErrorMessage('write'),
@@ -132,7 +132,7 @@ export const safeReadText = async (): Promise<{ success: boolean; text?: string;
   try {
     const text = await navigator.clipboard.readText();
     return { success: true, text };
-  } catch (err) {
+  } catch {
     return {
       success: false,
       error: getClipboardErrorMessage('read'),
