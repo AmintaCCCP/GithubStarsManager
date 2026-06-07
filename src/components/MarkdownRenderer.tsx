@@ -881,7 +881,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       if (React.isValidElement(children) && children.type === 'code') {
         return <>{React.cloneElement(children as React.ReactElement<React.ComponentPropsWithoutRef<'code'>>, { 'data-code-block': true })}</>;
       }
-      return <>{children}</>;
+      // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
+      return <pre>{children}</pre>;
     },
     blockquote: ({ children }) => (
       <blockquote className="border-l-4 border-black/[0.06] dark:border-white/[0.04] pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
