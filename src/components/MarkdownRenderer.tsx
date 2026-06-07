@@ -879,7 +879,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     pre: ({ children }) => {
       // 给 code 子元素添加标记，表明它是代码块而不是行内代码
       if (React.isValidElement(children) && children.type === 'code') {
-        return <>{React.cloneElement(children as React.ReactElement<any>, { 'data-code-block': true })}</>;
+        return <>{React.cloneElement(children as React.ReactElement<React.ComponentPropsWithoutRef<'code'>>, { 'data-code-block': true })}</>;
       }
       return <>{children}</>;
     },
