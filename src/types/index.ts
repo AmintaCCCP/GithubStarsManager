@@ -291,6 +291,9 @@ export interface AppState {
   releaseIsRefreshing: boolean;
   includePreRelease: boolean;  // whether to include pre-release in refresh
 
+  // Backup/Export key inclusion preference
+  includeKeysInBackup: boolean;
+
   // Discovery
   discoveryChannels: DiscoveryChannel[];
   discoveryRepos: Record<DiscoveryChannelId, DiscoveryRepo[]>;
