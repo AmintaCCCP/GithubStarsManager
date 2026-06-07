@@ -64,6 +64,14 @@ export interface Release {
 }
 
 // Fork types
+export interface GitHubOrganization {
+  id: number;
+  login: string;
+  avatar_url: string;
+  description: string | null;
+  html_url: string;
+}
+
 export interface ForkRepo {
   id: number;
   name: string;
