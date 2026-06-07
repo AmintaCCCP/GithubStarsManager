@@ -1292,6 +1292,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <HardDrive className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
+
+        {/* Include Keys Toggle - Independent Container */}
+        <div className="mb-4 p-6 bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
+          <IncludeKeysToggle t={t} />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Export */}
           <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
@@ -1304,7 +1310,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
-            <IncludeKeysToggle t={t} />
 
             <div className="space-y-2 mb-4">
               {[
