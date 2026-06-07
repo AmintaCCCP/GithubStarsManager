@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Trash2,
   AlertTriangle,
@@ -24,9 +24,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
-import { backend } from '../../services/backendAdapter';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
-import { version as appVersion } from '../../../package.json';
 import type { 
   Repository, 
   Release, 
@@ -187,8 +185,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     };
     setOperationLogs((prev) => [newLog, ...prev].slice(0, 50));
   }, []);
-
-  const backendAvailable = backend.isAvailable;
 
   const showSuccess = useCallback((message: string) => {
     setShowSuccessMessage(message);
@@ -355,7 +351,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
   };
 
-  const deleteDiscoveryData = async () => {
+  const deleteDiscoveryData = useCallback(async () => {
     try {
       const emptyDiscoveryRepos = {
         'trending': [],
@@ -364,7 +360,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'topic': [],
         'search': []
       } as Record<string, DiscoveryRepo[]>;
-      useAppStore.setState({ 
+      useAppStore.setState({
         discoveryRepos: emptyDiscoveryRepos,
         discoveryLastRefresh: {
           'trending': null,
@@ -385,7 +381,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       showError(t('删除失败，请重试', 'Delete failed, please try again'));
       throw error;
     }
-  };
+  }, [addLog, showSuccess, showError, t]);
 
   const deleteSubscriptionData = async () => {
     try {

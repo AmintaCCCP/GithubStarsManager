@@ -36,9 +36,14 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   const [owner, name] = repository.full_name.split('/');
   
   onProgress?.('Fetching README...');
-  const readmeContent = backend.isAvailable
-    ? await backend.getRepositoryReadme(owner, name)
-    : await githubApi.getRepositoryReadme(owner, name, signal);
+  let readmeContent = '';
+  try {
+    readmeContent = backend.isAvailable
+      ? await backend.getRepositoryReadme(owner, name)
+      : await githubApi.getRepositoryReadme(owner, name, signal);
+  } catch (error) {
+    console.warn(`Failed to fetch README for ${repository.full_name}, continuing with metadata only:`, error);
+  }
 
   const categoryNames = categories
     .filter(cat => cat.id !== 'all')

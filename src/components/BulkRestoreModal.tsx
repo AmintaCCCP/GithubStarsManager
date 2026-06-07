@@ -70,7 +70,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
     for (const repo of repositories) {
       if (repo.custom_description !== undefined && repo.custom_description !== null) hasCustomDesc++;
       if (repo.custom_tags !== undefined) hasCustomTags++;
-      if (repo.custom_category !== undefined && repo.custom_category !== '') hasCustomCategory++;
+      if (repo.custom_category != null && repo.custom_category !== '') hasCustomCategory++;
       if (repo.ai_summary && repo.ai_summary.trim() !== '') hasAiSummary++;
       if (repo.ai_tags && repo.ai_tags.length > 0) hasAiTags++;
       if (getAICategory(repo, allCategories) !== '') hasAiCategory++;

@@ -35,7 +35,7 @@ function transformRepo(row: Record<string, unknown>) {
     analysis_failed: !!row.analysis_failed,
     custom_description: row.custom_description,
     custom_tags: parseJsonColumn(row.custom_tags),
-    custom_category: row.custom_category,
+    custom_category: row.custom_category ?? undefined,
     category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,

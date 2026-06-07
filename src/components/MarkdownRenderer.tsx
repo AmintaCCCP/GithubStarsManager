@@ -69,6 +69,9 @@ const CodeBlock: React.FC<{
     return String(children).replace(/\n$/, '');
   }, [children]);
 
+  const codeLines = useMemo(() => codeText.split('\n'), [codeText]);
+  const showLineNumbers = codeLines.length > 3;
+
   useEffect(() => {
     if (codeRef.current) {
       try {
@@ -180,9 +183,20 @@ const CodeBlock: React.FC<{
               : 'bg-light-bg dark:bg-[#0d1117]'
       }`}>
         <pre className={`p-4 overflow-x-auto ${className || ''}`}>
-          <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-            {codeText}
-          </code>
+          <div className={showLineNumbers ? 'flex items-start' : undefined}>
+            {showLineNumbers && (
+              <div className="select-none pr-4 text-right flex-shrink-0" aria-hidden="true">
+                {codeLines.map((_, index) => (
+                  <span key={index} className="block text-gray-400 text-sm font-mono leading-6">
+                    {index + 1}
+                  </span>
+                ))}
+              </div>
+            )}
+            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${showLineNumbers ? 'block min-w-0 flex-1' : ''} ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+              {codeText}
+            </code>
+          </div>
         </pre>
       </div>
     </div>
