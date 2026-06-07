@@ -39,9 +39,12 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   let readmeContent = '';
   try {
     readmeContent = backend.isAvailable
-      ? await backend.getRepositoryReadme(owner, name)
+      ? await backend.getRepositoryReadme(owner, name, signal)
       : await githubApi.getRepositoryReadme(owner, name, signal);
   } catch (error) {
+    if (signal?.aborted || (error as { name?: string })?.name === 'AbortError') {
+      throw error;
+    }
     console.warn(`Failed to fetch README for ${repository.full_name}, continuing with metadata only:`, error);
   }
 

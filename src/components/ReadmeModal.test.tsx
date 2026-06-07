@@ -98,12 +98,15 @@ describe('ReadmeModal multilingual README switching', () => {
 
   it('shows backend README errors instead of treating them as missing README', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    (backend.getRepositoryReadme as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('GitHub token not configured'));
+    try {
+      (backend.getRepositoryReadme as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('GitHub token not configured'));
 
-    render(<ReadmeModal isOpen onClose={vi.fn()} repository={mockRepository} />);
+      render(<ReadmeModal isOpen onClose={vi.fn()} repository={mockRepository} />);
 
-    expect(await screen.findByText('GitHub token not configured')).toBeInTheDocument();
-    expect(screen.queryByText('该仓库没有 README 文件')).not.toBeInTheDocument();
-    consoleErrorSpy.mockRestore();
+      expect(await screen.findByText('GitHub token not configured')).toBeInTheDocument();
+      expect(screen.queryByText('该仓库没有 README 文件')).not.toBeInTheDocument();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
