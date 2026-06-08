@@ -70,6 +70,23 @@ describe('releaseSources utilities', () => {
     ]);
   });
 
+  it('skips hidden watch-custom-release repositories during source resolution', () => {
+    const watchRepo = {
+      ...createCustomReleaseRepository('owner/repo', WATCH_CUSTOM_RELEASE_SOURCE_ID)!,
+      release_hidden: true,
+    };
+
+    const resolved = resolveReleaseSources(createState({
+      releaseSourceSettings: {
+        enabledSourceIds: [WATCH_CUSTOM_RELEASE_SOURCE_ID],
+        watchCustomReleaseRepos: [watchRepo],
+        customReleaseRepos: [],
+      },
+    }));
+
+    expect(resolved.repositories).toHaveLength(0);
+  });
+
   it('reports source memberships for unsubscribe prompts', () => {
     const starred = createRepository(1, 'owner/repo');
     const customRepo = createCustomReleaseRepository('owner/repo', CUSTOM_RELEASE_SOURCE_ID)!;

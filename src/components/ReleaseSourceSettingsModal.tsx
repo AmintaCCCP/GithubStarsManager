@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Bell, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomReleaseRepository, ReleaseSourceId } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { Modal } from './Modal';
@@ -28,6 +28,88 @@ interface RepoListEditorProps {
   placeholder: string;
   language: 'zh' | 'en';
 }
+
+interface PaginatedRepoListProps {
+  repos: CustomReleaseRepository[];
+  language: 'zh' | 'en';
+  emptyText: string;
+  renderActions?: (repo: CustomReleaseRepository) => React.ReactNode;
+}
+
+const PAGE_SIZE = 8;
+
+const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, emptyText, renderActions }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [page, setPage] = useState(1);
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const totalPages = Math.max(1, Math.ceil(repos.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleRepos = repos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const goToPage = (nextPage: number) => {
+    setPage(Math.max(1, Math.min(nextPage, totalPages)));
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-gray-600 transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-text-tertiary dark:hover:bg-white/[0.06]"
+      >
+        <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="mt-2 space-y-2">
+          {repos.length === 0 ? (
+            <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-gray-500 dark:text-text-tertiary">
+              {emptyText}
+            </p>
+          ) : visibleRepos.map(repo => (
+            <div
+              key={normalizeRepoKey(repo.full_name)}
+              className={`flex items-center justify-between gap-3 rounded-lg bg-white dark:bg-white/[0.04] px-3 py-2 ${repo.release_hidden ? 'opacity-60' : ''}`}
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">{repo.full_name}</div>
+                <div className="truncate text-xs text-gray-500 dark:text-text-tertiary">{repo.html_url}</div>
+              </div>
+              {renderActions && <div className="flex flex-shrink-0 items-center gap-1">{renderActions(repo)}</div>}
+            </div>
+          ))}
+
+          {repos.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-1 text-xs text-gray-500 dark:text-text-tertiary">
+              <span>{t(`第 ${currentPage}/${totalPages} 页`, `Page ${currentPage}/${totalPages}`)}</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="rounded-md p-1.5 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/[0.08]"
+                  aria-label={t('上一页', 'Previous page')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="rounded-md p-1.5 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/[0.08]"
+                  aria-label={t('下一页', 'Next page')}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RepoListEditor: React.FC<RepoListEditorProps> = ({
   sourceId,
@@ -91,32 +173,22 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
         </button>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {repos.length === 0 ? (
-          <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-gray-500 dark:text-text-tertiary">
-            {t('暂无仓库。', 'No repositories yet.')}
-          </p>
-        ) : repos.map(repo => (
-          <div
-            key={normalizeRepoKey(repo.full_name)}
-            className="flex items-center justify-between gap-3 rounded-lg bg-white dark:bg-white/[0.04] px-3 py-2"
+      <PaginatedRepoList
+        repos={repos}
+        language={language}
+        emptyText={t('暂无仓库。', 'No repositories yet.')}
+        renderActions={(repo) => (
+          <button
+            type="button"
+            onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
+            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-status-red dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-status-red"
+            title={t('移除仓库', 'Remove repository')}
+            aria-label={t('移除仓库', 'Remove repository')}
           >
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">{repo.full_name}</div>
-              <div className="truncate text-xs text-gray-500 dark:text-text-tertiary">{repo.html_url}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
-              className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-status-red dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-status-red"
-              title={t('移除仓库', 'Remove repository')}
-              aria-label={t('移除仓库', 'Remove repository')}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
-      </div>
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      />
     </div>
   );
 };
@@ -129,6 +201,7 @@ interface WatchCustomReleaseSyncPanelProps {
 const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = ({ repos, language }) => {
   const githubToken = useAppStore(state => state.githubToken);
   const setReleaseSourceRepositories = useAppStore(state => state.setReleaseSourceRepositories);
+  const updateReleaseSourceRepository = useAppStore(state => state.updateReleaseSourceRepository);
   const { toast } = useDialog();
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -140,10 +213,12 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
     setIsSyncing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      const watchedRepos = await githubApi.getAllWatchedRepositories();
-      const sourceRepos = watchedRepos.map(repo =>
-        repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID)
-      );
+      const watchedRepos = await githubApi.getAllWatchedRepositoriesForCurrentUser();
+      const hiddenByRepo = new Map(repos.map(repo => [normalizeRepoKey(repo.full_name), repo.release_hidden]));
+      const sourceRepos = watchedRepos.map(repo => ({
+        ...repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID),
+        release_hidden: hiddenByRepo.get(normalizeRepoKey(repo.full_name)) || undefined,
+      }));
       setReleaseSourceRepositories(WATCH_CUSTOM_RELEASE_SOURCE_ID, sourceRepos);
       toast(
         t(
@@ -176,28 +251,32 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
           type="button"
           onClick={handleSync}
           disabled={isSyncing || !githubToken}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 min-w-24 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? t('同步中...', 'Syncing...') : t('同步', 'Sync')}
         </button>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {repos.length === 0 ? (
-          <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-gray-500 dark:text-text-tertiary">
-            {t('暂无已同步仓库。', 'No synced repositories yet.')}
-          </p>
-        ) : repos.map(repo => (
-          <div
-            key={normalizeRepoKey(repo.full_name)}
-            className="rounded-lg bg-white dark:bg-white/[0.04] px-3 py-2"
-          >
-            <div className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">{repo.full_name}</div>
-            <div className="truncate text-xs text-gray-500 dark:text-text-tertiary">{repo.html_url}</div>
-          </div>
-        ))}
-      </div>
+      <PaginatedRepoList
+        repos={repos}
+        language={language}
+        emptyText={t('暂无已同步仓库。', 'No synced repositories yet.')}
+        renderActions={(repo) => {
+          const hidden = !!repo.release_hidden;
+          return (
+            <button
+              type="button"
+              onClick={() => updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, { release_hidden: !hidden })}
+              className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+              title={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
+              aria-label={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
+            >
+              {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          );
+        }}
+      />
     </div>
   );
 };
