@@ -37,8 +37,13 @@ import type {
   SubscriptionChannel,
   SearchFilters,
   ProxyConfig,
-  RpcDownloadConfig
+  RpcDownloadConfig,
+  ReleaseSourceSettings
 } from '../../types';
+import {
+  mergeReleaseSourceSettings,
+  normalizeReleaseSourceSettings,
+} from '../../utils/releaseSources';
 
 interface DataManagementPanelProps {
   t: (zh: string, en: string) => string;
@@ -90,6 +95,7 @@ interface ExportData {
     subscriptionLastRefresh?: Record<string, string | null>;
     subscriptionChannels?: SubscriptionChannel[];
     releaseSubscriptions?: number[];
+    releaseSourceSettings?: ReleaseSourceSettings;
     readReleases?: number[];
     searchFilters?: SearchFilters;
     hiddenDefaultCategoryIds?: string[];
@@ -151,6 +157,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     discoveryRepos,
     subscriptionRepos,
     releaseSubscriptions,
+    releaseSourceSettings,
     readReleases,
     language,
     setRepositories,
@@ -408,8 +415,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteReleaseSubscriptions = async () => {
     try {
-      useAppStore.setState({ 
+      useAppStore.setState({
         releaseSubscriptions: new Set<number>(),
+        releaseSourceSettings: normalizeReleaseSourceSettings(null),
         readReleases: new Set<number>()
       });
       addLog(t('删除 Release 订阅与已读', 'Delete release subscriptions & read'), true);
@@ -506,6 +514,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
       if (selectedTypes.includes('releaseSubscriptions')) {
         exportDataObj.data.releaseSubscriptions = Array.from(store.releaseSubscriptions);
+        exportDataObj.data.releaseSourceSettings = store.releaseSourceSettings;
         exportDataObj.data.readReleases = Array.from(store.readReleases);
       }
       if (selectedTypes.includes('searchFilters')) {
@@ -654,12 +663,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
-          if (importedData.releaseSubscriptions) {
-            useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions) });
-          }
-          if (importedData.readReleases) {
-            useAppStore.setState({ readReleases: new Set(importedData.readReleases) });
-          }
+          useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
+          store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
+          useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
           useAppStore.setState({ searchFilters: importedData.searchFilters });
@@ -755,10 +761,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
           useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
         }
-        if (selectedTypes.includes('releaseSubscriptions') && importedData.releaseSubscriptions) {
-          const existingSubs = store.releaseSubscriptions;
-          const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
-          useAppStore.setState({ releaseSubscriptions: newSubs });
+        if (selectedTypes.includes('releaseSubscriptions')) {
+          if (importedData.releaseSubscriptions) {
+            const existingSubs = store.releaseSubscriptions;
+            const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
+            useAppStore.setState({ releaseSubscriptions: newSubs });
+          }
+          if (importedData.releaseSourceSettings) {
+            store.setReleaseSourceSettings(mergeReleaseSourceSettings(
+              store.releaseSourceSettings,
+              normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
+            ));
+          }
         }
       }
 
@@ -1215,9 +1229,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     {
       key: 'releaseSubscriptions',
       label: t('Release 订阅与已读', 'Release Subscriptions & Read'),
-      description: t('已订阅 Release 的仓库列表和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记。',
-        'Subscribed repo list and read marks for releases. Subscription status and read marks lost after deletion.'),
-      count: releaseSubscriptions.size,
+      description: t('已订阅 Release 的仓库列表、来源设置和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记。',
+        'Subscribed repo list, source settings, and read marks for releases. Subscription status and read marks lost after deletion.'),
+      count: releaseSubscriptions.size + releaseSourceSettings.watchCustomReleaseRepos.length + releaseSourceSettings.customReleaseRepos.length,
       icon: <Eye className="w-5 h-5" />,
       color: 'text-gray-700 dark:text-text-secondary',
       bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
