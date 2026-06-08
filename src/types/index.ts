@@ -63,6 +63,35 @@ export interface Release {
   is_read?: boolean;
 }
 
+export type ReleaseSourceId = 'starred-release-subscription' | 'watch-custom-release' | 'custom-release';
+
+export interface CustomReleaseRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  owner: {
+    login: string;
+    avatar_url: string;
+  };
+  has_fetched_releases?: boolean;
+  last_release_fetch_time?: string;
+  source_added_at?: string;
+  release_hidden?: boolean;
+}
+
+export interface ReleaseSourceSettings {
+  enabledSourceIds: ReleaseSourceId[];
+  watchCustomReleaseRepos: CustomReleaseRepository[];
+  customReleaseRepos: CustomReleaseRepository[];
+}
+
+export const defaultReleaseSourceSettings: ReleaseSourceSettings = {
+  enabledSourceIds: ['starred-release-subscription'],
+  watchCustomReleaseRepos: [],
+  customReleaseRepos: [],
+};
+
 // Fork types
 export interface GitHubOrganization {
   id: number;
@@ -247,6 +276,7 @@ export interface AppState {
   // Releases
   releases: Release[];
   releaseSubscriptions: Set<number>;
+  releaseSourceSettings: ReleaseSourceSettings;
   readReleases: Set<number>; // 新增：已读Release
   
   // Categories

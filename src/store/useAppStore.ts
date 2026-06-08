@@ -25,9 +25,18 @@ import {
   TrendingTimeRange,
   TopicCategory,
   SubscriptionChannel,
-  defaultSubscriptionChannels
+  CustomReleaseRepository,
+  ReleaseSourceId,
+  ReleaseSourceSettings,
+  defaultSubscriptionChannels,
+  defaultReleaseSourceSettings
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
+import {
+  WATCH_CUSTOM_RELEASE_SOURCE_ID,
+  normalizeReleaseSourceSettings,
+  normalizeRepoKey,
+} from '../utils/releaseSources';
 import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
@@ -269,8 +278,16 @@ interface AppActions {
   toggleReleaseSubscription: (repoId: number) => void;
   batchUnsubscribeReleases: (repoIds: number[]) => void;
   removeReleasesByRepoId: (repoId: number) => void;
+  removeReleasesByRepoFullName: (fullName: string) => void;
   markReleaseAsRead: (releaseId: number) => void;
   markAllReleasesAsRead: () => void;
+  setReleaseSourceSettings: (settings: ReleaseSourceSettings) => void;
+  setReleaseEnabledSources: (sourceIds: ReleaseSourceId[]) => void;
+  toggleReleaseSource: (sourceId: ReleaseSourceId) => void;
+  setReleaseSourceRepositories: (sourceId: ReleaseSourceId, repos: CustomReleaseRepository[]) => void;
+  addReleaseSourceRepository: (sourceId: ReleaseSourceId, repo: CustomReleaseRepository) => void;
+  removeReleaseSourceRepository: (sourceId: ReleaseSourceId, fullName: string) => void;
+  updateReleaseSourceRepository: (sourceId: ReleaseSourceId, fullName: string, updates: Partial<CustomReleaseRepository>) => void;
 
   // Fork actions
   setForks: (forks: ForkRepo[]) => void;
@@ -401,6 +418,7 @@ type PersistedAppState = Partial<
     | 'activeWebDAVConfig'
     | 'lastBackup'
     | 'releases'
+    | 'releaseSourceSettings'
     | 'customCategories'
     | 'hiddenDefaultCategoryIds'
     | 'defaultCategoryOverrides'
@@ -506,6 +524,7 @@ const normalizePersistedState = (
     releases,
     searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
+    releaseSourceSettings: normalizeReleaseSourceSettings(safePersisted.releaseSourceSettings),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
     readForks: normalizeNumberSet(safePersisted.readForks),
     forks: Array.isArray(safePersisted.forks) ? safePersisted.forks : [],
@@ -893,6 +912,7 @@ export const useAppStore = create<AppState & AppActions>()(
       searchResults: [],
       releases: [],
       releaseSubscriptions: new Set<number>(),
+      releaseSourceSettings: defaultReleaseSourceSettings,
       readReleases: new Set<number>(),
       customCategories: [],
       hiddenDefaultCategoryIds: [],
@@ -970,6 +990,7 @@ export const useAppStore = create<AppState & AppActions>()(
         repositories: [],
         releases: [],
         releaseSubscriptions: new Set(),
+        releaseSourceSettings: defaultReleaseSourceSettings,
         readReleases: new Set(),
         forks: [],
         readForks: new Set(),
@@ -1155,6 +1176,94 @@ export const useAppStore = create<AppState & AppActions>()(
           releases: filteredReleases,
           readReleases: nextReadReleases,
           releaseExpandedRepositories: nextExpandedRepos,
+        };
+      }),
+      removeReleasesByRepoFullName: (fullName) => set((state) => {
+        const targetKey = normalizeRepoKey(fullName);
+        const filteredReleases = state.releases.filter(release => normalizeRepoKey(release.repository.full_name) !== targetKey);
+        const remainingReleaseIds = new Set(filteredReleases.map(r => r.id));
+        const removedRepoIds = new Set(
+          state.releases
+            .filter(release => normalizeRepoKey(release.repository.full_name) === targetKey)
+            .map(release => release.repository.id)
+        );
+        const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
+        removedRepoIds.forEach(repoId => nextExpandedRepos.delete(repoId));
+        return {
+          releases: filteredReleases,
+          readReleases: new Set(Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))),
+          releaseExpandedRepositories: nextExpandedRepos,
+        };
+      }),
+      setReleaseSourceSettings: (settings) => set({ releaseSourceSettings: normalizeReleaseSourceSettings(settings) }),
+      setReleaseEnabledSources: (sourceIds) => set((state) => ({
+        releaseSourceSettings: normalizeReleaseSourceSettings({
+          ...state.releaseSourceSettings,
+          enabledSourceIds: sourceIds,
+        }),
+      })),
+      toggleReleaseSource: (sourceId) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const enabled = new Set(settings.enabledSourceIds);
+        if (enabled.has(sourceId)) {
+          if (enabled.size === 1) return state;
+          enabled.delete(sourceId);
+        } else {
+          enabled.add(sourceId);
+        }
+        return {
+          releaseSourceSettings: {
+            ...settings,
+            enabledSourceIds: Array.from(enabled),
+          },
+        };
+      }),
+      setReleaseSourceRepositories: (sourceId, repos) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const listKey = sourceId === WATCH_CUSTOM_RELEASE_SOURCE_ID ? 'watchCustomReleaseRepos' : 'customReleaseRepos';
+        return {
+          releaseSourceSettings: normalizeReleaseSourceSettings({
+            ...settings,
+            [listKey]: repos,
+          }),
+        };
+      }),
+      addReleaseSourceRepository: (sourceId, repo) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const listKey = sourceId === WATCH_CUSTOM_RELEASE_SOURCE_ID ? 'watchCustomReleaseRepos' : 'customReleaseRepos';
+        const repoKey = normalizeRepoKey(repo.full_name);
+        if (settings[listKey].some(item => normalizeRepoKey(item.full_name) === repoKey)) {
+          return state;
+        }
+        return {
+          releaseSourceSettings: {
+            ...settings,
+            [listKey]: [...settings[listKey], repo],
+          },
+        };
+      }),
+      removeReleaseSourceRepository: (sourceId, fullName) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const listKey = sourceId === WATCH_CUSTOM_RELEASE_SOURCE_ID ? 'watchCustomReleaseRepos' : 'customReleaseRepos';
+        const repoKey = normalizeRepoKey(fullName);
+        return {
+          releaseSourceSettings: {
+            ...settings,
+            [listKey]: settings[listKey].filter(repo => normalizeRepoKey(repo.full_name) !== repoKey),
+          },
+        };
+      }),
+      updateReleaseSourceRepository: (sourceId, fullName, updates) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const listKey = sourceId === WATCH_CUSTOM_RELEASE_SOURCE_ID ? 'watchCustomReleaseRepos' : 'customReleaseRepos';
+        const repoKey = normalizeRepoKey(fullName);
+        return {
+          releaseSourceSettings: {
+            ...settings,
+            [listKey]: settings[listKey].map(repo =>
+              normalizeRepoKey(repo.full_name) === repoKey ? { ...repo, ...updates } : repo
+            ),
+          },
         };
       }),
       markReleaseAsRead: (releaseId) => set((state) => {
@@ -1612,7 +1721,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 7,
+      version: 8,
       storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -1633,8 +1742,9 @@ export const useAppStore = create<AppState & AppActions>()(
         activeWebDAVConfig: state.activeWebDAVConfig,
         lastBackup: state.lastBackup,
 
-        // 持久化Release订阅和已读状态
+        // 持久化Release订阅、来源和已读状态
         releaseSubscriptions: Array.from(state.releaseSubscriptions),
+        releaseSourceSettings: state.releaseSourceSettings,
         readReleases: Array.from(state.readReleases),
         releases: state.releases,
 
@@ -1719,6 +1829,13 @@ export const useAppStore = create<AppState & AppActions>()(
       migrate: (persistedState) => {
         // 版本升级适配处理
         const state = persistedState as PersistedAppState | undefined;
+
+        if (state && !state.releaseSourceSettings) {
+          console.log('Migrating from old version: initializing releaseSourceSettings');
+          state.releaseSourceSettings = defaultReleaseSourceSettings;
+        } else if (state) {
+          state.releaseSourceSettings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        }
 
         // 从旧版本升级时，确保 categoryOrder 字段存在
         if (state && !Array.isArray(state.categoryOrder)) {
