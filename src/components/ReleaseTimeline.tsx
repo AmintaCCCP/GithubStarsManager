@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter } from 'lucide-react';
+import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter, Settings } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -9,13 +9,25 @@ import { formatDistanceToNow } from 'date-fns';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
+import { ReleaseSourceSettingsModal } from './ReleaseSourceSettingsModal';
 import { useDialog } from '../hooks/useDialog';
+import {
+  STARRED_RELEASE_SOURCE_ID,
+  WATCH_CUSTOM_RELEASE_SOURCE_ID,
+  CUSTOM_RELEASE_SOURCE_ID,
+  getReleaseSourceLabel,
+  getSourcesForReleaseRepository,
+  normalizeRepoKey,
+  releaseBelongsToResolvedSources,
+  resolveReleaseSources,
+} from '../utils/releaseSources';
 
 export const ReleaseTimeline: React.FC = () => {
   const {
     releases,
     repositories,
     releaseSubscriptions,
+    releaseSourceSettings,
     readReleases,
     githubToken,
     language,
@@ -24,8 +36,10 @@ export const ReleaseTimeline: React.FC = () => {
     markReleaseAsRead,
     markAllReleasesAsRead,
     batchUnsubscribeReleases,
-    removeReleasesByRepoId,
+    removeReleasesByRepoFullName,
     updateRepository,
+    removeReleaseSourceRepository,
+    updateReleaseSourceRepository,
     // Release Timeline View State from global store
     releaseViewMode,
     releaseSelectedFilters,
@@ -56,6 +70,7 @@ export const ReleaseTimeline: React.FC = () => {
   // 视图切换下拉菜单状态（本地UI状态）
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
+  const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   // 使用全局状态的别名，保持代码一致性
@@ -63,6 +78,13 @@ export const ReleaseTimeline: React.FC = () => {
   const selectedFilters = releaseSelectedFilters;
   const searchQuery = releaseSearchQuery;
   const expandedRepositories = releaseExpandedRepositories;
+
+  const resolvedReleaseSources = useMemo(() => resolveReleaseSources({
+    repositories,
+    releaseSubscriptions,
+    releaseSourceSettings,
+  }), [repositories, releaseSubscriptions, releaseSourceSettings]);
+  const activeReleaseRepoCount = resolvedReleaseSources.repositories.length;
 
   // Format file size helper function
   const formatFileSize = (bytes: number): string => {
@@ -189,10 +211,10 @@ export const ReleaseTimeline: React.FC = () => {
 
   const subscribedReleases = useMemo(() =>
     releases.filter(release =>
-      releaseSubscriptions.has(release.repository.id) &&
+      releaseBelongsToResolvedSources(release, resolvedReleaseSources) &&
       (includePreRelease || !release.prerelease)
     ),
-    [releases, releaseSubscriptions, includePreRelease]
+    [releases, resolvedReleaseSources, includePreRelease]
   );
 
   // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
@@ -203,7 +225,7 @@ export const ReleaseTimeline: React.FC = () => {
     const state = useAppStore.getState();
     const ids = new Set<number>();
     releases.forEach(r => {
-      if (releaseSubscriptions.has(r.repository.id) &&
+      if (releaseBelongsToResolvedSources(r, resolvedReleaseSources) &&
           (includePreRelease || !r.prerelease) &&
           !state.readReleases.has(r.id)) {
         ids.add(r.id);
@@ -211,7 +233,7 @@ export const ReleaseTimeline: React.FC = () => {
     });
     unreadSnapshotRef.current = ids;
     setSnapshotVersion(v => v + 1);
-  }, [releases, releaseSubscriptions, includePreRelease, releaseShowMode]);
+  }, [releases, resolvedReleaseSources, includePreRelease, releaseShowMode]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
@@ -341,18 +363,24 @@ export const ReleaseTimeline: React.FC = () => {
       return;
     }
 
+    const state = useAppStore.getState();
+    const resolvedSources = resolveReleaseSources(state);
+    const subscribedRepos = resolvedSources.repositories;
+
+    if (resolvedSources.enabledSourceIds.length === 0) {
+      toast(language === 'zh' ? '没有启用的 Release 来源。' : 'No release sources enabled.', 'error');
+      return;
+    }
+
+    if (subscribedRepos.length === 0) {
+      toast(language === 'zh' ? '所选来源中没有可检查的仓库。' : 'No repositories to check in the selected sources.', 'error');
+      return;
+    }
+
     setReleaseIsRefreshing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      // Only fetch releases for repos that are subscribed to releases
-      const subscribedRepos = repositories.filter(repo => releaseSubscriptions.has(repo.id));
 
-      if (subscribedRepos.length === 0) {
-        toast(language === 'zh' ? '没有订阅的仓库。' : 'No subscribed repositories.', 'error');
-        return;
-      }
-
-      // Use the new getMultipleRepositoryReleases with options
       const { releases: newReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
         { includePreRelease }
@@ -361,15 +389,33 @@ export const ReleaseTimeline: React.FC = () => {
       // Update repository sync metadata only for repos that succeeded
       const now = new Date().toISOString();
       const failedRepoIds = new Set(failedRepos.map(repo => repo.repoId));
-      for (const repo of subscribedRepos) {
+      for (const entry of resolvedSources.entries) {
+        const repo = entry.repository;
         if (failedRepoIds.has(repo.id)) {
           continue;
         }
-        updateRepository({
-          ...repo,
-          has_fetched_releases: true,
-          last_release_fetch_time: now,
-        });
+        if (entry.sources.includes(STARRED_RELEASE_SOURCE_ID)) {
+          const starredRepo = state.repositories.find(item => normalizeRepoKey(item.full_name) === normalizeRepoKey(repo.full_name));
+          if (starredRepo) {
+            updateRepository({
+              ...starredRepo,
+              has_fetched_releases: true,
+              last_release_fetch_time: now,
+            });
+          }
+        }
+        if (entry.sources.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
+          updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, {
+            has_fetched_releases: true,
+            last_release_fetch_time: now,
+          });
+        }
+        if (entry.sources.includes(CUSTOM_RELEASE_SOURCE_ID)) {
+          updateReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, repo.full_name, {
+            has_fetched_releases: true,
+            last_release_fetch_time: now,
+          });
+        }
       }
 
       // Filter out existing releases and add new ones
@@ -530,15 +576,42 @@ export const ReleaseTimeline: React.FC = () => {
   }, [paginatedReleases, paginatedRepositoryGroups, getTruncatedBody]);
 
   const handleUnsubscribeRelease = async (repoId: number) => {
-    const repo = repositories.find((item) => item.id === repoId);
-    if (!repo) {
+    const release = releases.find(item => item.repository.id === repoId);
+    const releaseRepo = release?.repository;
+    if (!releaseRepo) {
       toast(t('仓库信息不完整，无法取消订阅。', 'Repository information missing. Cannot unsubscribe.'), 'error');
       return;
     }
 
-    const confirmMessage = language === 'zh'
-      ? `确定取消订阅 "${repo.full_name}" 的 Release 吗？`
-      : `Unsubscribe from releases for "${repo.full_name}"?`;
+    const stateBeforeConfirm = useAppStore.getState();
+    const repoKey = normalizeRepoKey(releaseRepo.full_name);
+    const starredRepo = stateBeforeConfirm.repositories.find(item => normalizeRepoKey(item.full_name) === repoKey);
+    const sourcesToRemove = getSourcesForReleaseRepository(stateBeforeConfirm, releaseRepo);
+    const isOrphanRelease = sourcesToRemove.length === 0;
+    const sourceLabels = sourcesToRemove.map(sourceId => getReleaseSourceLabel(sourceId, language));
+
+    let confirmMessage: string;
+    if (isOrphanRelease) {
+      confirmMessage = language === 'zh'
+        ? `"${releaseRepo.full_name}" 当前不在任何 Release 来源中。确认后仅移除本地已缓存的 Release 记录。`
+        : `"${releaseRepo.full_name}" is not in any release source. Confirming will only remove locally cached releases.`;
+    } else if (sourcesToRemove.length > 1) {
+      confirmMessage = language === 'zh'
+        ? `"${releaseRepo.full_name}" 同时来自多个 Release 来源：${sourceLabels.join('、')}。确认后将从这些来源中一并取消订阅。`
+        : `"${releaseRepo.full_name}" comes from multiple release sources: ${sourceLabels.join(', ')}. Confirming will unsubscribe it from all of these sources.`;
+    } else if (sourcesToRemove[0] === WATCH_CUSTOM_RELEASE_SOURCE_ID) {
+      confirmMessage = language === 'zh'
+        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将一并取消 Watch 仓库来源。`
+        : `Unsubscribe from "${releaseRepo.full_name}"? This will also remove it from Watch repositories.`;
+    } else if (sourcesToRemove[0] === CUSTOM_RELEASE_SOURCE_ID) {
+      confirmMessage = language === 'zh'
+        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将从自定义仓库列表中移除。`
+        : `Unsubscribe from "${releaseRepo.full_name}"? This will remove it from the custom repository list.`;
+    } else {
+      confirmMessage = language === 'zh'
+        ? `确定取消订阅 "${releaseRepo.full_name}" 的 Release 吗？`
+        : `Unsubscribe from releases for "${releaseRepo.full_name}"?`;
+    }
 
     const confirmed = await confirm(
       t('取消订阅确认', 'Unsubscribe Confirmation'),
@@ -549,25 +622,39 @@ export const ReleaseTimeline: React.FC = () => {
       return;
     }
 
-    const removedReleases = releases.filter(r => r.repository.id === repoId);
-    const removedReadIds = new Set(removedReleases.map(r => r.id));
+    const rollbackState = {
+      repositories: stateBeforeConfirm.repositories,
+      searchResults: stateBeforeConfirm.searchResults,
+      releaseSubscriptions: new Set(stateBeforeConfirm.releaseSubscriptions),
+      releaseSourceSettings: stateBeforeConfirm.releaseSourceSettings,
+      releases: stateBeforeConfirm.releases,
+      readReleases: new Set(stateBeforeConfirm.readReleases),
+      releaseExpandedRepositories: new Set(stateBeforeConfirm.releaseExpandedRepositories),
+    };
 
-    const updatedRepo = { ...repo, subscribed_to_releases: false };
-    updateRepository(updatedRepo);
-    batchUnsubscribeReleases([repo.id]);
-    removeReleasesByRepoId(repo.id);
+    if (sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID) && starredRepo) {
+      updateRepository({ ...starredRepo, subscribed_to_releases: false });
+      batchUnsubscribeReleases([starredRepo.id]);
+    }
+    if (sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
+      removeReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
+    }
+    if (sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)) {
+      removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
+    }
+
+    const stateAfterRemoval = useAppStore.getState();
+    const stillActive = resolveReleaseSources(stateAfterRemoval).entries
+      .some(entry => normalizeRepoKey(entry.repository.full_name) === repoKey);
+    if (!stillActive) {
+      removeReleasesByRepoFullName(releaseRepo.full_name);
+    }
 
     try {
       await forceSyncToBackend();
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
-      updateRepository({ ...repo, subscribed_to_releases: true });
-      const state = useAppStore.getState();
-      useAppStore.setState({
-        releaseSubscriptions: new Set([...state.releaseSubscriptions, repo.id]),
-        releases: [...state.releases, ...removedReleases],
-        readReleases: new Set([...state.readReleases, ...removedReadIds]),
-      });
+      useAppStore.setState(rollbackState);
       toast(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'), 'error');
       return;
     }
@@ -576,9 +663,10 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   if (subscribedReleases.length === 0) {
-    const subscribedRepoCount = releaseSubscriptions.size;
-    
+    const subscribedRepoCount = activeReleaseRepoCount;
+
     return (
+      <>
       <div className="text-center py-12">
                <Package className="w-16 h-16 text-gray-500 dark:text-quaternary mx-auto mb-4" />
          <h3 className="text-lg font-medium text-gray-900 dark:text-text-primary mb-2">
@@ -612,15 +700,25 @@ export const ReleaseTimeline: React.FC = () => {
                </span>
              </label>
 
-             {/* Refresh button */}
-             <button
-               onClick={handleRefresh}
-               disabled={releaseIsRefreshing}
-               className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-               <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-               <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
-             </button>
+             <div className="flex flex-wrap items-center justify-center gap-2">
+               {/* Refresh button */}
+               <button
+                 onClick={handleRefresh}
+                 disabled={releaseIsRefreshing}
+                 className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+                 <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
+               </button>
+               <button
+                 onClick={() => setIsReleaseSourceSettingsOpen(true)}
+                 className="flex items-center space-x-2 px-4 py-3 bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-lg hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
+                 title={t('Release 来源设置', 'Release Source Settings')}
+               >
+                 <Settings className="w-5 h-5" />
+                 <span>{t('来源设置', 'Sources')}</span>
+               </button>
+             </div>
             {lastRefreshTime && (
               <p className="text-sm text-gray-500 dark:text-text-tertiary">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
@@ -652,11 +750,29 @@ export const ReleaseTimeline: React.FC = () => {
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
+                <div className="mt-4 rounded-lg bg-white/60 dark:bg-panel-dark/60 p-3 text-sm text-gray-700 dark:text-text-secondary">
+                  <p className="mb-3">
+                    {t('也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。', 'You can also use Watch repository sync or a custom repository list as release sources.')}
+                  </p>
+                  <button
+                    onClick={() => setIsReleaseSourceSettingsOpen(true)}
+                    className="inline-flex items-center space-x-2 rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover"
+                    title={t('Release 来源设置', 'Release Source Settings')}
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>{t('配置 Release 来源', 'Configure Release Sources')}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
+      <ReleaseSourceSettingsModal
+        isOpen={isReleaseSourceSettingsOpen}
+        onClose={() => setIsReleaseSourceSettingsOpen(false)}
+      />
+      </>
     );
   }
 
@@ -670,7 +786,7 @@ export const ReleaseTimeline: React.FC = () => {
               {t('Release时间线', 'Release Timeline')}
             </h2>
             <p className="text-gray-700 dark:text-text-tertiary">
-              {t(`来自您的 ${releaseSubscriptions.size} 个订阅仓库的最新Release`, `Latest releases from your ${releaseSubscriptions.size} subscribed repositories`)}
+              {t(`来自您的 ${activeReleaseRepoCount} 个订阅仓库的最新Release`, `Latest releases from your ${activeReleaseRepoCount} subscribed repositories`)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -707,6 +823,14 @@ export const ReleaseTimeline: React.FC = () => {
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+            </button>
+            <button
+              onClick={() => setIsReleaseSourceSettingsOpen(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+              title={t('Release 来源设置', 'Release Source Settings')}
+            >
+              <Settings className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
+              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">{t('来源', 'Sources')}</span>
             </button>
           </div>
         </div>
@@ -1149,6 +1273,10 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
         </div>
       )}
+      <ReleaseSourceSettingsModal
+        isOpen={isReleaseSourceSettingsOpen}
+        onClose={() => setIsReleaseSourceSettingsOpen(false)}
+      />
     </div>
   );
 };
