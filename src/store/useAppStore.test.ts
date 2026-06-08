@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Repository } from '../types';
+import { Repository, defaultReleaseSourceSettings } from '../types';
+import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
 
@@ -29,6 +30,40 @@ const createRepository = (id: number, overrides: Partial<Repository> = {}): Repo
   },
   topics: ['test'],
   ...overrides,
+});
+
+describe('useAppStore release source settings', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      releaseSourceSettings: defaultReleaseSourceSettings,
+      releaseSubscriptions: new Set<number>(),
+      releases: [],
+      readReleases: new Set<number>(),
+    });
+  });
+
+  it('keeps the starred release subscription source enabled by default', () => {
+    expect(useAppStore.getState().releaseSourceSettings.enabledSourceIds).toEqual(['starred-release-subscription']);
+  });
+
+  it('dedupes custom release repositories by full name', () => {
+    const first = createCustomReleaseRepository('owner/repo', CUSTOM_RELEASE_SOURCE_ID)!;
+    const duplicate = createCustomReleaseRepository('https://github.com/OWNER/repo', CUSTOM_RELEASE_SOURCE_ID)!;
+
+    useAppStore.getState().addReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, first);
+    useAppStore.getState().addReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, duplicate);
+
+    expect(useAppStore.getState().releaseSourceSettings.customReleaseRepos).toHaveLength(1);
+  });
+
+  it('removes custom release repositories by full name', () => {
+    const repo = createCustomReleaseRepository('owner/repo', CUSTOM_RELEASE_SOURCE_ID)!;
+
+    useAppStore.getState().addReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, repo);
+    useAppStore.getState().removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, 'OWNER/repo');
+
+    expect(useAppStore.getState().releaseSourceSettings.customReleaseRepos).toHaveLength(0);
+  });
 });
 
 describe('useAppStore repository performance guards', () => {

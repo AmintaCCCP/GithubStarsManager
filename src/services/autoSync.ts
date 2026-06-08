@@ -222,6 +222,9 @@ export async function syncFromBackend(): Promise<void> {
       if (Array.isArray(settings.assetFilters)) {
         useAppStore.setState({ assetFilters: settings.assetFilters });
       }
+      if (settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object') {
+        state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
+      }
       if (typeof settings.collapsedSidebarCategoryCount === 'number' && settings.collapsedSidebarCategoryCount >= 1) {
         useAppStore.setState({ collapsedSidebarCategoryCount: settings.collapsedSidebarCategoryCount });
       }
@@ -276,6 +279,7 @@ export async function syncToBackend(): Promise<void> {
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
+        releaseSourceSettings: state.releaseSourceSettings,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       }),
     ]);
@@ -303,6 +307,7 @@ export async function syncToBackend(): Promise<void> {
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
+        releaseSourceSettings: state.releaseSourceSettings,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       });
     }
@@ -366,6 +371,7 @@ export function startAutoSync(): () => void {
       state.categoryOrder !== prevState.categoryOrder ||
       state.customCategories !== prevState.customCategories ||
       state.assetFilters !== prevState.assetFilters ||
+      state.releaseSourceSettings !== prevState.releaseSourceSettings ||
       state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount;
 
     if (!changed) return;
