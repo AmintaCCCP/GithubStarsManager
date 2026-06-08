@@ -14,7 +14,7 @@ export const CUSTOM_RELEASE_SOURCE_ID: ReleaseSourceId = 'custom-release';
 
 export const RELEASE_SOURCE_LABELS: Record<ReleaseSourceId, { zh: string; en: string }> = {
   'starred-release-subscription': { zh: '星标订阅', en: 'Starred subscriptions' },
-  'watch-custom-release': { zh: 'watch-custom-release', en: 'GitHub Watch releases' },
+  'watch-custom-release': { zh: 'Watch 仓库', en: 'Watch repositories' },
   'custom-release': { zh: '自定义订阅', en: 'Custom subscriptions' },
 };
 

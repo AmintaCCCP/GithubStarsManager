@@ -222,14 +222,14 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
       setReleaseSourceRepositories(WATCH_CUSTOM_RELEASE_SOURCE_ID, sourceRepos);
       toast(
         t(
-          `已同步 ${sourceRepos.length} 个 GitHub Watch 仓库。GitHub API 暂不区分 Custom 中具体勾选的事件类型。`,
-          `Synced ${sourceRepos.length} GitHub watched repositories. GitHub API does not expose the exact Custom event selections.`
+          `已同步 ${sourceRepos.length} 个 Watch 仓库。`,
+          `Synced ${sourceRepos.length} Watch repositories.`
         ),
         'success'
       );
     } catch (error) {
       console.error('Failed to sync watched repositories:', error);
-      toast(t('同步 GitHub Watch 仓库失败，请检查网络或 Token 权限。', 'Failed to sync GitHub watched repositories. Check network or token permissions.'), 'error');
+      toast(t('同步 Watch 仓库失败，请检查网络或 Token 权限。', 'Failed to sync Watch repositories. Check network or token permissions.'), 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -239,11 +239,11 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
     <div className="rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface/50 dark:bg-white/[0.02] p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">{t('watch-custom-release 同步', 'watch-custom-release sync')}</h4>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">{t('Watch 仓库同步', 'Watch repository sync')}</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-text-tertiary">
             {t(
-              '点击同步会拉取当前 GitHub 账号 Watch 的仓库。GitHub API 目前不返回 Custom → Releases 的事件粒度，因此这里以 Watch 仓库列表作为同步来源。',
-              'Sync pulls repositories watched by the current GitHub account. GitHub API does not expose Custom → Releases event granularity, so this source uses the watched repository list.'
+              '点击同步会拉取当前 GitHub 账号 Watch 的仓库，并作为 Release 来源。',
+              'Sync pulls repositories watched by the current GitHub account and uses them as release sources.'
             )}
           </p>
         </div>
@@ -301,7 +301,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
     {
       id: WATCH_CUSTOM_RELEASE_SOURCE_ID,
       title: RELEASE_SOURCE_LABELS[WATCH_CUSTOM_RELEASE_SOURCE_ID][language],
-      description: t('从 GitHub 官方 Watch 列表同步的 Release 来源。', 'Release source synced from your GitHub Watch list.'),
+      description: t('从 Watch 仓库同步的 Release 来源。', 'Release source synced from Watch repositories.'),
       count: releaseSourceSettings.watchCustomReleaseRepos.length,
     },
     {

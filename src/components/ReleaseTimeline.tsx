@@ -601,8 +601,8 @@ export const ReleaseTimeline: React.FC = () => {
         : `"${releaseRepo.full_name}" comes from multiple release sources: ${sourceLabels.join(', ')}. Confirming will unsubscribe it from all of these sources.`;
     } else if (sourcesToRemove[0] === WATCH_CUSTOM_RELEASE_SOURCE_ID) {
       confirmMessage = language === 'zh'
-        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将一并取消 watch-custom-release 来源。`
-        : `Unsubscribe from "${releaseRepo.full_name}"? This will also remove it from watch-custom-release.`;
+        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将一并取消 Watch 仓库来源。`
+        : `Unsubscribe from "${releaseRepo.full_name}"? This will also remove it from Watch repositories.`;
     } else if (sourcesToRemove[0] === CUSTOM_RELEASE_SOURCE_ID) {
       confirmMessage = language === 'zh'
         ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将从自定义仓库列表中移除。`
@@ -752,7 +752,7 @@ export const ReleaseTimeline: React.FC = () => {
                 </div>
                 <div className="mt-4 rounded-lg bg-white/60 dark:bg-panel-dark/60 p-3 text-sm text-gray-700 dark:text-text-secondary">
                   <p className="mb-3">
-                    {t('也可以通过 GitHub Watch 同步或自定义仓库列表作为 Release 来源。', 'You can also use GitHub Watch sync or a custom repository list as release sources.')}
+                    {t('也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。', 'You can also use Watch repository sync or a custom repository list as release sources.')}
                   </p>
                   <button
                     onClick={() => setIsReleaseSourceSettingsOpen(true)}
