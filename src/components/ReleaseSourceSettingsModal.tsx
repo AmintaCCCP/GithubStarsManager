@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Bell, Plus, Trash2 } from 'lucide-react';
+import { Bell, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomReleaseRepository, ReleaseSourceId } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { Modal } from './Modal';
 import { useDialog } from '../hooks/useDialog';
+import { GitHubApiService } from '../services/githubApi';
 import {
   CUSTOM_RELEASE_SOURCE_ID,
   RELEASE_SOURCE_LABELS,
@@ -11,6 +12,7 @@ import {
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   createCustomReleaseRepository,
   normalizeRepoKey,
+  repositoryToCustomReleaseRepository,
 } from '../utils/releaseSources';
 
 interface ReleaseSourceSettingsModalProps {
@@ -119,6 +121,87 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
   );
 };
 
+interface WatchCustomReleaseSyncPanelProps {
+  repos: CustomReleaseRepository[];
+  language: 'zh' | 'en';
+}
+
+const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = ({ repos, language }) => {
+  const githubToken = useAppStore(state => state.githubToken);
+  const setReleaseSourceRepositories = useAppStore(state => state.setReleaseSourceRepositories);
+  const { toast } = useDialog();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const handleSync = async () => {
+    if (!githubToken || isSyncing) return;
+
+    setIsSyncing(true);
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const watchedRepos = await githubApi.getAllWatchedRepositories();
+      const sourceRepos = watchedRepos.map(repo =>
+        repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID)
+      );
+      setReleaseSourceRepositories(WATCH_CUSTOM_RELEASE_SOURCE_ID, sourceRepos);
+      toast(
+        t(
+          `已同步 ${sourceRepos.length} 个 GitHub Watch 仓库。GitHub API 暂不区分 Custom 中具体勾选的事件类型。`,
+          `Synced ${sourceRepos.length} GitHub watched repositories. GitHub API does not expose the exact Custom event selections.`
+        ),
+        'success'
+      );
+    } catch (error) {
+      console.error('Failed to sync watched repositories:', error);
+      toast(t('同步 GitHub Watch 仓库失败，请检查网络或 Token 权限。', 'Failed to sync GitHub watched repositories. Check network or token permissions.'), 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface/50 dark:bg-white/[0.02] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">{t('watch-custom-release 同步', 'watch-custom-release sync')}</h4>
+          <p className="mt-1 text-xs text-gray-500 dark:text-text-tertiary">
+            {t(
+              '点击同步会拉取当前 GitHub 账号 Watch 的仓库。GitHub API 目前不返回 Custom → Releases 的事件粒度，因此这里以 Watch 仓库列表作为同步来源。',
+              'Sync pulls repositories watched by the current GitHub account. GitHub API does not expose Custom → Releases event granularity, so this source uses the watched repository list.'
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={isSyncing || !githubToken}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? t('同步中...', 'Syncing...') : t('同步', 'Sync')}
+        </button>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {repos.length === 0 ? (
+          <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-gray-500 dark:text-text-tertiary">
+            {t('暂无已同步仓库。', 'No synced repositories yet.')}
+          </p>
+        ) : repos.map(repo => (
+          <div
+            key={normalizeRepoKey(repo.full_name)}
+            className="rounded-lg bg-white dark:bg-white/[0.04] px-3 py-2"
+          >
+            <div className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">{repo.full_name}</div>
+            <div className="truncate text-xs text-gray-500 dark:text-text-tertiary">{repo.html_url}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProps> = ({ isOpen, onClose }) => {
   const language = useAppStore(state => state.language);
   const releaseSourceSettings = useAppStore(state => state.releaseSourceSettings);
@@ -139,7 +222,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
     {
       id: WATCH_CUSTOM_RELEASE_SOURCE_ID,
       title: RELEASE_SOURCE_LABELS[WATCH_CUSTOM_RELEASE_SOURCE_ID][language],
-      description: t('独立的 watch-custom-release 来源，可维护专属仓库列表。', 'Separate watch-custom-release source with its own repository list.'),
+      description: t('从 GitHub 官方 Watch 列表同步的 Release 来源。', 'Release source synced from your GitHub Watch list.'),
       count: releaseSourceSettings.watchCustomReleaseRepos.length,
     },
     {
@@ -204,23 +287,23 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
           })}
         </div>
 
-        <RepoListEditor
-          sourceId={WATCH_CUSTOM_RELEASE_SOURCE_ID}
-          repos={releaseSourceSettings.watchCustomReleaseRepos}
-          title={t('watch-custom-release 仓库列表', 'watch-custom-release repositories')}
-          description={t('这些仓库只属于 watch-custom-release 来源。', 'These repositories belong only to the watch-custom-release source.')}
-          placeholder="owner/repo or https://github.com/owner/repo"
-          language={language}
-        />
+        {enabledSources.has(WATCH_CUSTOM_RELEASE_SOURCE_ID) && (
+          <WatchCustomReleaseSyncPanel
+            repos={releaseSourceSettings.watchCustomReleaseRepos}
+            language={language}
+          />
+        )}
 
-        <RepoListEditor
-          sourceId={CUSTOM_RELEASE_SOURCE_ID}
-          repos={releaseSourceSettings.customReleaseRepos}
-          title={t('自定义仓库列表', 'Custom repositories')}
-          description={t('勾选自定义来源后，刷新会检查此列表中的仓库。', 'When custom source is enabled, refresh checks repositories in this list.')}
-          placeholder="owner/repo or https://github.com/owner/repo"
-          language={language}
-        />
+        {enabledSources.has(CUSTOM_RELEASE_SOURCE_ID) && (
+          <RepoListEditor
+            sourceId={CUSTOM_RELEASE_SOURCE_ID}
+            repos={releaseSourceSettings.customReleaseRepos}
+            title={t('自定义仓库列表', 'Custom repositories')}
+            description={t('勾选自定义来源后，刷新会检查此列表中的仓库。', 'When custom source is enabled, refresh checks repositories in this list.')}
+            placeholder="owner/repo or https://github.com/owner/repo"
+            language={language}
+          />
+        )}
 
         <div className="flex justify-end">
           <button

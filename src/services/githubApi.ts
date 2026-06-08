@@ -230,6 +230,30 @@ export class GitHubApiService {
     return allRepos;
   }
 
+  async getWatchedRepositories(page = 1, perPage = 100): Promise<Repository[]> {
+    return this.makeRequest<Repository[]>(`/user/subscriptions?page=${page}&per_page=${perPage}`);
+  }
+
+  async getAllWatchedRepositories(): Promise<Repository[]> {
+    let allRepos: Repository[] = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (true) {
+      const repos = await this.getWatchedRepositories(page, perPage);
+      if (repos.length === 0) break;
+
+      allRepos = [...allRepos, ...repos];
+
+      if (repos.length < perPage) break;
+      page++;
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allRepos;
+  }
+
   private decodeContentResponse(response: GitHubContentResponse): string {
     if (response.encoding === 'base64' && response.content) {
       // 使用 TextDecoder 正确处理 UTF-8 编码，避免中文乱码

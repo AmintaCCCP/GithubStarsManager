@@ -41,6 +41,7 @@ const createState = (overrides: Partial<AppState>): Pick<AppState, 'repositories
 describe('releaseSources utilities', () => {
   it('normalizes GitHub repo inputs', () => {
     expect(normalizeGitHubRepoInput('owner/repo')).toMatchObject({ full_name: 'owner/repo' });
+    expect(normalizeGitHubRepoInput('github.com/owner/repo')).toMatchObject({ full_name: 'owner/repo' });
     expect(normalizeGitHubRepoInput('https://github.com/owner/repo/')).toMatchObject({ full_name: 'owner/repo' });
     expect(normalizeGitHubRepoInput('https://example.com/owner/repo')).toBeNull();
     expect(normalizeGitHubRepoInput('owner')).toBeNull();
@@ -78,6 +79,27 @@ describe('releaseSources utilities', () => {
       releaseSubscriptions: new Set([1]),
       releaseSourceSettings: {
         enabledSourceIds: [STARRED_RELEASE_SOURCE_ID, CUSTOM_RELEASE_SOURCE_ID],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [customRepo],
+      },
+    }), {
+      id: 1,
+      name: 'repo',
+      full_name: 'owner/repo',
+    });
+
+    expect(sources).toEqual([STARRED_RELEASE_SOURCE_ID, CUSTOM_RELEASE_SOURCE_ID]);
+  });
+
+  it('reports disabled source memberships so unsubscribe removes hidden entries too', () => {
+    const starred = createRepository(1, 'owner/repo');
+    const customRepo = createCustomReleaseRepository('owner/repo', CUSTOM_RELEASE_SOURCE_ID)!;
+
+    const sources = getSourcesForReleaseRepository(createState({
+      repositories: [starred],
+      releaseSubscriptions: new Set([1]),
+      releaseSourceSettings: {
+        enabledSourceIds: [STARRED_RELEASE_SOURCE_ID],
         watchCustomReleaseRepos: [],
         customReleaseRepos: [customRepo],
       },

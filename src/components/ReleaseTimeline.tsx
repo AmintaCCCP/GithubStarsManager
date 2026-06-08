@@ -363,22 +363,23 @@ export const ReleaseTimeline: React.FC = () => {
       return;
     }
 
+    const state = useAppStore.getState();
+    const resolvedSources = resolveReleaseSources(state);
+    const subscribedRepos = resolvedSources.repositories;
+
+    if (resolvedSources.enabledSourceIds.length === 0) {
+      toast(language === 'zh' ? '没有启用的 Release 来源。' : 'No release sources enabled.', 'error');
+      return;
+    }
+
+    if (subscribedRepos.length === 0) {
+      toast(language === 'zh' ? '所选来源中没有可检查的仓库。' : 'No repositories to check in the selected sources.', 'error');
+      return;
+    }
+
     setReleaseIsRefreshing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      const state = useAppStore.getState();
-      const resolvedSources = resolveReleaseSources(state);
-      const subscribedRepos = resolvedSources.repositories;
-
-      if (resolvedSources.enabledSourceIds.length === 0) {
-        toast(language === 'zh' ? '没有启用的 Release 来源。' : 'No release sources enabled.', 'error');
-        return;
-      }
-
-      if (subscribedRepos.length === 0) {
-        toast(language === 'zh' ? '所选来源中没有可检查的仓库。' : 'No repositories to check in the selected sources.', 'error');
-        return;
-      }
 
       const { releases: newReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
@@ -585,12 +586,16 @@ export const ReleaseTimeline: React.FC = () => {
     const stateBeforeConfirm = useAppStore.getState();
     const repoKey = normalizeRepoKey(releaseRepo.full_name);
     const starredRepo = stateBeforeConfirm.repositories.find(item => normalizeRepoKey(item.full_name) === repoKey);
-    const sources = getSourcesForReleaseRepository(stateBeforeConfirm, releaseRepo);
-    const sourcesToRemove = sources.length > 0 ? sources : [STARRED_RELEASE_SOURCE_ID];
+    const sourcesToRemove = getSourcesForReleaseRepository(stateBeforeConfirm, releaseRepo);
+    const isOrphanRelease = sourcesToRemove.length === 0;
     const sourceLabels = sourcesToRemove.map(sourceId => getReleaseSourceLabel(sourceId, language));
 
     let confirmMessage: string;
-    if (sourcesToRemove.length > 1) {
+    if (isOrphanRelease) {
+      confirmMessage = language === 'zh'
+        ? `"${releaseRepo.full_name}" 当前不在任何 Release 来源中。确认后仅移除本地已缓存的 Release 记录。`
+        : `"${releaseRepo.full_name}" is not in any release source. Confirming will only remove locally cached releases.`;
+    } else if (sourcesToRemove.length > 1) {
       confirmMessage = language === 'zh'
         ? `"${releaseRepo.full_name}" 同时来自多个 Release 来源：${sourceLabels.join('、')}。确认后将从这些来源中一并取消订阅。`
         : `"${releaseRepo.full_name}" comes from multiple release sources: ${sourceLabels.join(', ')}. Confirming will unsubscribe it from all of these sources.`;

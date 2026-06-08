@@ -284,6 +284,7 @@ interface AppActions {
   setReleaseSourceSettings: (settings: ReleaseSourceSettings) => void;
   setReleaseEnabledSources: (sourceIds: ReleaseSourceId[]) => void;
   toggleReleaseSource: (sourceId: ReleaseSourceId) => void;
+  setReleaseSourceRepositories: (sourceId: ReleaseSourceId, repos: CustomReleaseRepository[]) => void;
   addReleaseSourceRepository: (sourceId: ReleaseSourceId, repo: CustomReleaseRepository) => void;
   removeReleaseSourceRepository: (sourceId: ReleaseSourceId, fullName: string) => void;
   updateReleaseSourceRepository: (sourceId: ReleaseSourceId, fullName: string, updates: Partial<CustomReleaseRepository>) => void;
@@ -1215,6 +1216,16 @@ export const useAppStore = create<AppState & AppActions>()(
             ...settings,
             enabledSourceIds: Array.from(enabled),
           },
+        };
+      }),
+      setReleaseSourceRepositories: (sourceId, repos) => set((state) => {
+        const settings = normalizeReleaseSourceSettings(state.releaseSourceSettings);
+        const listKey = sourceId === WATCH_CUSTOM_RELEASE_SOURCE_ID ? 'watchCustomReleaseRepos' : 'customReleaseRepos';
+        return {
+          releaseSourceSettings: normalizeReleaseSourceSettings({
+            ...settings,
+            [listKey]: repos,
+          }),
         };
       }),
       addReleaseSourceRepository: (sourceId, repo) => set((state) => {
