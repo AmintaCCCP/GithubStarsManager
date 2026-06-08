@@ -750,6 +750,19 @@ export const ReleaseTimeline: React.FC = () => {
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
+                <div className="mt-4 rounded-lg bg-white/60 dark:bg-panel-dark/60 p-3 text-sm text-gray-700 dark:text-text-secondary">
+                  <p className="mb-3">
+                    {t('也可以通过 GitHub Watch 同步或自定义仓库列表作为 Release 来源。', 'You can also use GitHub Watch sync or a custom repository list as release sources.')}
+                  </p>
+                  <button
+                    onClick={() => setIsReleaseSourceSettingsOpen(true)}
+                    className="inline-flex items-center space-x-2 rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover"
+                    title={t('Release 来源设置', 'Release Source Settings')}
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>{t('配置 Release 来源', 'Configure Release Sources')}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
