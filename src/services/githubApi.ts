@@ -230,17 +230,20 @@ export class GitHubApiService {
     return allRepos;
   }
 
-  async getWatchedRepositories(page = 1, perPage = 100): Promise<Repository[]> {
-    return this.makeRequest<Repository[]>(`/user/subscriptions?page=${page}&per_page=${perPage}`);
+  async getWatchedRepositories(page = 1, perPage = 100, username?: string): Promise<Repository[]> {
+    const endpoint = username
+      ? `/users/${encodeURIComponent(username)}/subscriptions?page=${page}&per_page=${perPage}`
+      : `/user/subscriptions?page=${page}&per_page=${perPage}`;
+    return this.makeRequest<Repository[]>(endpoint);
   }
 
-  async getAllWatchedRepositories(): Promise<Repository[]> {
+  async getAllWatchedRepositories(username?: string): Promise<Repository[]> {
     let allRepos: Repository[] = [];
     let page = 1;
     const perPage = 100;
 
     while (true) {
-      const repos = await this.getWatchedRepositories(page, perPage);
+      const repos = await this.getWatchedRepositories(page, perPage, username);
       if (repos.length === 0) break;
 
       allRepos = [...allRepos, ...repos];
@@ -252,6 +255,19 @@ export class GitHubApiService {
     }
 
     return allRepos;
+  }
+
+  async getAllWatchedRepositoriesForCurrentUser(): Promise<Repository[]> {
+    const currentUser = await this.getCurrentUser();
+    const [privateAware, publicProfile] = await Promise.all([
+      this.getAllWatchedRepositories(),
+      this.getAllWatchedRepositories(currentUser.login),
+    ]);
+    const reposByName = new Map<string, Repository>();
+    [...privateAware, ...publicProfile].forEach(repo => {
+      reposByName.set(repo.full_name.toLowerCase(), repo);
+    });
+    return Array.from(reposByName.values());
   }
 
   private decodeContentResponse(response: GitHubContentResponse): string {

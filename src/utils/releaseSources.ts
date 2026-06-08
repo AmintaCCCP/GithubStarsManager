@@ -181,6 +181,7 @@ const normalizeCustomReleaseRepo = (
     has_fetched_releases: typeof record.has_fetched_releases === 'boolean' ? record.has_fetched_releases : undefined,
     last_release_fetch_time: typeof record.last_release_fetch_time === 'string' ? record.last_release_fetch_time : undefined,
     source_added_at: typeof record.source_added_at === 'string' ? record.source_added_at : undefined,
+    release_hidden: typeof record.release_hidden === 'boolean' ? record.release_hidden : undefined,
   };
 };
 
@@ -272,9 +273,11 @@ export const resolveReleaseSources = (
   }
 
   if (enabled.has(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
-    settings.watchCustomReleaseRepos.forEach(repo => {
-      addRepository(customReleaseRepositoryToRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID), WATCH_CUSTOM_RELEASE_SOURCE_ID);
-    });
+    settings.watchCustomReleaseRepos
+      .filter(repo => !repo.release_hidden)
+      .forEach(repo => {
+        addRepository(customReleaseRepositoryToRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID), WATCH_CUSTOM_RELEASE_SOURCE_ID);
+      });
   }
 
   if (enabled.has(CUSTOM_RELEASE_SOURCE_ID)) {

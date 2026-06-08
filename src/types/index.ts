@@ -77,6 +77,7 @@ export interface CustomReleaseRepository {
   has_fetched_releases?: boolean;
   last_release_fetch_time?: string;
   source_added_at?: string;
+  release_hidden?: boolean;
 }
 
 export interface ReleaseSourceSettings {
