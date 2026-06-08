@@ -14,7 +14,7 @@ export const CUSTOM_RELEASE_SOURCE_ID: ReleaseSourceId = 'custom-release';
 
 export const RELEASE_SOURCE_LABELS: Record<ReleaseSourceId, { zh: string; en: string }> = {
   'starred-release-subscription': { zh: '星标订阅', en: 'Starred subscriptions' },
-  'watch-custom-release': { zh: 'watch-custom-release', en: 'watch-custom-release' },
+  'watch-custom-release': { zh: 'watch-custom-release', en: 'GitHub Watch releases' },
   'custom-release': { zh: '自定义订阅', en: 'Custom subscriptions' },
 };
 
@@ -112,6 +112,21 @@ export const createCustomReleaseRepository = (
     source_added_at: now,
   };
 };
+
+export const repositoryToCustomReleaseRepository = (
+  repository: Repository,
+  sourceId: ReleaseSourceId,
+  now = new Date().toISOString()
+): CustomReleaseRepository => ({
+  id: getLocalReleaseRepoId(repository.full_name, sourceId),
+  name: repository.name,
+  full_name: repository.full_name,
+  html_url: repository.html_url,
+  owner: repository.owner,
+  has_fetched_releases: repository.has_fetched_releases,
+  last_release_fetch_time: repository.last_release_fetch_time,
+  source_added_at: now,
+});
 
 export const customReleaseRepositoryToRepository = (
   repo: CustomReleaseRepository,
