@@ -33,6 +33,10 @@ const getDefaultReadmeVariant = (language: 'zh' | 'en'): ReadmeVariant => ({
   label: language === 'zh' ? '默认 README' : 'Default README',
 });
 
+const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {
+  return Boolean(signal?.aborted || (error as { name?: string })?.name === 'AbortError');
+};
+
 export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   isOpen,
   onClose,
@@ -316,6 +320,68 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     scrollToTop();
   }, [resetTranslationState, scrollToTop]);
 
+  const fetchReadmeContentFromAvailableSource = useCallback(async (
+    owner: string,
+    name: string,
+    variant: ReadmeVariant,
+    signal: AbortSignal
+  ): Promise<string> => {
+    const fetchFromGitHubApi = async () => {
+      if (!githubToken) {
+        throw new Error(language === 'zh' ? '未登录且后端不可用，无法加载 README' : 'Not logged in and backend unavailable, cannot load README');
+      }
+      const githubApi = new GitHubApiService(githubToken);
+      return variant.isDefault || !variant.path
+        ? githubApi.getRepositoryReadme(owner, name, signal)
+        : githubApi.getRepositoryReadmeByPath(owner, name, variant.path, signal);
+    };
+
+    if (!backend.isAvailable) {
+      return fetchFromGitHubApi();
+    }
+
+    try {
+      return variant.isDefault || !variant.path
+        ? await backend.getRepositoryReadme(owner, name, signal)
+        : await backend.getRepositoryReadmeByPath(owner, name, variant.path, signal);
+    } catch (backendError) {
+      if (isAbortError(backendError, signal) || !githubToken) {
+        throw backendError;
+      }
+
+      console.warn('Falling back to direct GitHub README fetch after backend failure:', backendError);
+      return fetchFromGitHubApi();
+    }
+  }, [githubToken, language]);
+
+  const fetchReadmeCandidatesFromAvailableSource = useCallback(async (
+    owner: string,
+    name: string,
+    defaultBranch: string | undefined,
+    signal: AbortSignal
+  ): Promise<GitHubReadmeCandidateItem[]> => {
+    const fetchFromGitHubApi = async () => {
+      if (!githubToken) return [];
+      const githubApi = new GitHubApiService(githubToken);
+      return githubApi.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
+    };
+
+    if (!backend.isAvailable) {
+      return fetchFromGitHubApi();
+    }
+
+    try {
+      return await backend.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
+    } catch (backendError) {
+      if (isAbortError(backendError, signal) || !githubToken) {
+        throw backendError;
+      }
+
+      console.warn('Falling back to direct GitHub README variant detection after backend failure:', backendError);
+      return fetchFromGitHubApi();
+    }
+  }, [githubToken]);
+
   const fetchReadmeContent = useCallback(async (variant: ReadmeVariant) => {
     if (!repository) return;
 
@@ -330,23 +396,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
     try {
       const [owner, name] = repository.full_name.split('/');
-      let content = '';
-
-      if (backend.isAvailable) {
-        content = variant.isDefault || !variant.path
-          ? await backend.getRepositoryReadme(owner, name, abortController.signal)
-          : await backend.getRepositoryReadmeByPath(owner, name, variant.path, abortController.signal);
-      } else if (githubToken) {
-        const githubApi = new GitHubApiService(githubToken);
-        content = variant.isDefault || !variant.path
-          ? await githubApi.getRepositoryReadme(owner, name, abortController.signal)
-          : await githubApi.getRepositoryReadmeByPath(owner, name, variant.path, abortController.signal);
-      } else {
-        setReadmeContent('');
-        setError(language === 'zh' ? '未登录且后端不可用，无法加载 README' : 'Not logged in and backend unavailable, cannot load README');
-        setLoading(false);
-        return;
-      }
+      const content = await fetchReadmeContentFromAvailableSource(owner, name, variant, abortController.signal);
 
       if (abortController.signal.aborted) return;
 
@@ -374,7 +424,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setLoading(false);
       }
     }
-  }, [repository, githubToken, language]);
+  }, [repository, fetchReadmeContentFromAvailableSource, language]);
 
   const fetchReadmeVariants = useCallback(async () => {
     if (!repository) return;
@@ -390,16 +440,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     try {
       const [owner, name] = repository.full_name.split('/');
       const defaultBranch = (repository as Repository & { default_branch?: string }).default_branch;
-      let candidates: GitHubReadmeCandidateItem[] = [];
-
-      if (backend.isAvailable) {
-        candidates = await backend.listRepositoryReadmeCandidates(owner, name, defaultBranch, abortController.signal);
-      } else if (githubToken) {
-        const githubApi = new GitHubApiService(githubToken);
-        candidates = await githubApi.listRepositoryReadmeCandidates(owner, name, defaultBranch, abortController.signal);
-      } else {
-        return;
-      }
+      const candidates = await fetchReadmeCandidatesFromAvailableSource(owner, name, defaultBranch, abortController.signal);
 
       if (abortController.signal.aborted) return;
       setReadmeVariants(buildReadmeVariants(candidates, language));
@@ -413,7 +454,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         setVariantsLoading(false);
       }
     }
-  }, [repository, githubToken, language, defaultReadmeVariant]);
+  }, [repository, fetchReadmeCandidatesFromAvailableSource, language, defaultReadmeVariant]);
 
   const fetchReadme = useCallback(async () => {
     const currentVariant = readmeVariants.find(variant => variant.key === selectedReadmeKey) || defaultReadmeVariant;
