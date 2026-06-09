@@ -41,8 +41,6 @@ mac:
         - arm64
   icon: dist/icon.png
   category: public.app-category.productivity
-  gatekeeperAssess: false
-  asar: false
 
 dmg:
   title: GitHub Stars Manager
