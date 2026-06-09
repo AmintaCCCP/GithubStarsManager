@@ -629,9 +629,7 @@ jobs:
               }
             ],
             icon: 'build/icon.png',
-            category: 'public.app-category.productivity',
-            gatekeeperAssess: false,
-
+            category: 'public.app-category.productivity'
           };
           packageJson.build.dmg = {
             title: 'GitHub Stars Manager',
