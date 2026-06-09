@@ -103,7 +103,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       updateIndicator();
     }, 350);
     return () => clearTimeout(timer);
-  }, [activeTab, scrollToActiveTab]);
+  }, [activeTab, scrollToActiveTab, updateIndicator]);
 
   // 处理滚动状态 - 使用 ref 避免重新创建函数
   const handleScroll = useCallback(() => {

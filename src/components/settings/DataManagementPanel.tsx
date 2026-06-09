@@ -162,6 +162,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     language,
     setRepositories,
     setReleases,
+    setBackendApiSecret,
   } = useAppStore();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
@@ -794,7 +795,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     } finally {
       setIsImporting(false);
     }
-  }, [importPreview, addLog, showSuccess, showError, t]);
+  }, [importPreview, addLog, showSuccess, showError, t, setBackendApiSecret]);
 
   const cleanupSuggestions = useMemo<DataCleanupSuggestion[]>(() => {
     const suggestions: DataCleanupSuggestion[] = [];

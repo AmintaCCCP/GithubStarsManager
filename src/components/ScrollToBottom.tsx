@@ -70,7 +70,7 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
       }
       window.removeEventListener('scroll', checkVisibility);
     };
-  }, [checkVisibility]);
+  }, [checkVisibility, scrollContainerRef]);
 
   return (
     <button

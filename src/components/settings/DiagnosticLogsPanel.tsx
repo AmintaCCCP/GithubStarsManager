@@ -111,12 +111,12 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             <Row label={t('时间', 'Timestamp')}>
               <span className="font-mono text-xs">{entry.timestamp}</span>
             </Row>
-            {(entryData?.url || entryData?.endpoint || entryData?.path) && (
+            {(entryData?.url != null || entryData?.endpoint != null || entryData?.path != null) && (
               <Row label={t('请求地址', 'URL')}>
                 <span className="font-mono text-xs break-all">{String(entryData.url ?? entryData.endpoint ?? entryData.path)}</span>
               </Row>
             )}
-            {entryData?.status && (
+            {entryData?.status != null && (
               <Row label={t('状态码', 'Status')}>
                 <span className={`font-bold ${getStatusColor(entryData.status)}`}>{String(entryData.status)}</span>
               </Row>
@@ -131,22 +131,22 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
                 <span className="font-mono">{String(entryData.durationMs)}ms</span>
               </Row>
             )}
-            {entryData?.method && (
+            {entryData?.method != null && (
               <Row label={t('方法', 'Method')}>
                 <span className="font-mono">{String(entryData.method)}</span>
               </Row>
             )}
-            {(entryData?.endpoint || entryData?.path) && (
+            {(entryData?.endpoint != null || entryData?.path != null) && (
               <Row label={t('路径', 'Path')}>
                 <span className="font-mono break-all">{String(entryData.endpoint ?? entryData.path)}</span>
               </Row>
             )}
-            {entryData?.apiType && (
+            {entryData?.apiType != null && (
               <Row label={t('API 类型', 'API Type')}>
                 <span className="font-mono">{String(entryData.apiType)}</span>
               </Row>
             )}
-            {entryData?.model && (
+            {entryData?.model != null && (
               <Row label={t('模型', 'Model')}>
                 <span className="font-mono">{String(entryData.model)}</span>
               </Row>
@@ -156,7 +156,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
                 <span className="font-mono">{String(entryData.responseLength)} chars</span>
               </Row>
             )}
-            {!entryData?.durationMs && !entryData?.method && (
+            {entryData?.durationMs == null && entryData?.method == null && (
               <p className="text-gray-400 dark:text-text-quaternary italic">{t('无耗时信息（需开启调试模式）', 'No timing info (enable debug mode)')}</p>
             )}
           </div>
@@ -385,7 +385,13 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchQuery, selectedLevels, selectedEventTypes, selectedScope]);
 
   // Frontend counts
-  const frontendCounts = useMemo(() => logger.getCounts(), [entries]);
+  const frontendCounts = useMemo(() => {
+    const counts = { total: entries.length, debug: 0, info: 0, warn: 0, error: 0 };
+    for (const entry of entries) {
+      counts[entry.level]++;
+    }
+    return counts;
+  }, [entries]);
 
   // Toggle frontend debug mode
   const toggleFrontendDebug = useCallback(() => {
@@ -677,9 +683,9 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       <p className="text-sm text-gray-900 dark:text-text-primary mt-1 break-words">{entry.message}</p>
                       {hasHttpDetail && (
                         <div className="text-xs mt-1 font-mono flex items-center space-x-1 text-gray-500 dark:text-text-tertiary">
-                          {entryData?.method && <span className="font-bold">{String(entryData.method)}</span>}
-                          {(entryData?.endpoint || entryData?.path) && <span>{String(entryData.endpoint ?? entryData.path)}</span>}
-                          {entryData?.status && <span className={`font-bold ${statusColor}`}>→ {String(entryData.status)}</span>}
+                          {entryData?.method != null && <span className="font-bold">{String(entryData.method)}</span>}
+                          {(entryData?.endpoint != null || entryData?.path != null) && <span>{String(entryData.endpoint ?? entryData.path)}</span>}
+                          {entryData?.status != null && <span className={`font-bold ${statusColor}`}>→ {String(entryData.status)}</span>}
                           {entryData?.durationMs != null && <span className="text-blue-600 dark:text-blue-400">{String(entryData.durationMs)}ms</span>}
                         </div>
                       )}

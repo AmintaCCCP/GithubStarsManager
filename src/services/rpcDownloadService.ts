@@ -1,4 +1,5 @@
 import type { RpcDownloadConfig } from '../types';
+import { useAppStore } from '../store/useAppStore';
 import { backend } from './backendAdapter';
 
 interface RpcTestResult {
@@ -114,7 +115,7 @@ export async function sendToRpcDownload(
   try {
     // Client-only mode: call aria2 directly
     if (!backend.isAvailable) {
-      const { rpcDownloadConfig } = await import('../store/useAppStore').then(m => m.useAppStore.getState());
+      const { rpcDownloadConfig } = useAppStore.getState();
       if (!rpcDownloadConfig.enabled || !rpcDownloadConfig.host || !rpcDownloadConfig.port) {
         return { success: false, error: 'RPC download not configured' };
       }

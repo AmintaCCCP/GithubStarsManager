@@ -151,7 +151,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       }
       prevMimoPlanRef.current = form.mimoPlan;
     }
-  }, [form.apiType, form.mimoPlan]);
+  }, [form.apiType, form.baseUrl, form.mimoPlan]);
 
   const resetForm = () => {
     setForm({
