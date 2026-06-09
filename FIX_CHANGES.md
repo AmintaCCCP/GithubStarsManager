@@ -123,7 +123,9 @@ dmg:
 ## 验证结果
 
 ### 本地验证环境
-- macOS 26.15.1 (M 系列芯片)
+- macOS 26.5.1 (Tahoe)
+- Apple M4 Pro 芯片
+- 内存 48GB
 - Node.js v26.0.0
 - npm 11.12.1
 - electron-builder 26.15.2
