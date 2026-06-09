@@ -23,7 +23,7 @@ win:
       arch:
         - x64
         - ia32
-  icon: dist/vite.svg
+  icon: dist/icon.png
   
 nsis:
   oneClick: false
@@ -32,19 +32,21 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: GitHub Stars Manager
 
-# macOS配置  
+# macOS配置
 mac:
   target:
     - target: dmg
       arch:
         - x64
         - arm64
-  icon: dist/vite.svg
+  icon: dist/icon.png
   category: public.app-category.productivity
+  gatekeeperAssess: false
+  asar: false
 
 dmg:
   title: GitHub Stars Manager
-  icon: dist/vite.svg
+  icon: dist/icon.png
   window:
     width: 540
     height: 380
@@ -69,7 +71,7 @@ linux:
     - target: rpm
       arch:
         - x64
-  icon: dist/vite.svg
+  icon: dist/icon.png
   category: Office
   synopsis: AI-powered GitHub starred repositories management tool
   description: >

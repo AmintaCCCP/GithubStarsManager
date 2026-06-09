@@ -757,6 +757,52 @@ jobs:
           release/*.msi
         if-no-files-found: ignore
         
+    - name: Fix arm64 dmg file (macOS)
+      if: matrix.os == 'macos-latest' && success()
+      shell: bash
+      run: |
+        echo "Checking arm64 dmg file size..."
+        ls -la release/*.dmg
+        
+        # Check if arm64 dmg is too small (less than 1MB indicates corruption)
+        ARM64_DMG=$(find release/ -name "*-arm64.dmg" -type f 2>/dev/null | head -1)
+        if [ -n "$ARM64_DMG" ]; then
+          FILE_SIZE=$(stat -f%z "$ARM64_DMG" 2>/dev/null || stat -c%s "$ARM64_DMG" 2>/dev/null)
+          echo "arm64 dmg size: $FILE_SIZE bytes"
+          
+          if [ "$FILE_SIZE" -lt 1048576 ]; then
+            echo "arm64 dmg is too small (${FILE_SIZE} bytes), recreating with hdiutil..."
+            
+            # Find the app bundle
+            APP_BUNDLE=$(find release/ -name "*.app" -type d 2>/dev/null | head -1)
+            if [ -n "$APP_BUNDLE" ]; then
+              echo "Found app bundle: $APP_BUNDLE"
+              
+              # Remove corrupted dmg
+              rm -f "$ARM64_DMG"
+              
+              # Create new dmg with hdiutil
+              hdiutil create -volname "GitHub Stars Manager" \
+                -srcfolder "$APP_BUNDLE" \
+                -ov \
+                -format UDZO \
+                "$ARM64_DMG"
+              
+              echo "New arm64 dmg created:"
+              ls -la "$ARM64_DMG"
+            else
+              echo "No app bundle found!"
+            fi
+          else
+            echo "arm64 dmg size is OK"
+          fi
+        else
+          echo "No arm64 dmg found"
+        fi
+        
+        echo "Final dmg files:"
+        ls -la release/*.dmg
+        
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && success()
       uses: actions/upload-artifact@v7
