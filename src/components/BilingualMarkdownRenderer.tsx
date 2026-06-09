@@ -289,7 +289,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       setError(err instanceof Error ? err.message : 'Translation failed');
       updateStatus('error');
     }
-  }, [markdown, language, scan, updateStatus, removeTranslations, onProgress]);
+  }, [language, scan, updateStatus, removeTranslations, onProgress]);
 
   const revert = useCallback(() => {
     if (abortRef.current) {
@@ -318,7 +318,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       }
     }, 150);
     return () => clearTimeout(timer);
-  }, [markdown]);
+  }, [markdown, autoTranslate, revert, scan, translate]);
 
   useEffect(() => {
     return () => {

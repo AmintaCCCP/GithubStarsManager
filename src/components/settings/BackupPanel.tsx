@@ -138,6 +138,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
       try {
         const backupData = JSON.parse(backupContent);
+        const backupIncludedKeys = backupData.includeKeysInBackup ?? true;
 
         if (Array.isArray(backupData.repositories)) {
           setRepositories(backupData.repositories);

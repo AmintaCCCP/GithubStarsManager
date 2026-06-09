@@ -5,6 +5,29 @@ import { Repository } from '../types';
  * 用于验证实时搜索和AI搜索的功能
  */
 
+type CountedSearchQuery = {
+  query: string;
+  expectedCount: number;
+  description: string;
+};
+
+type AiSearchQuery = {
+  query: string;
+  description: string;
+};
+
+type SearchTestCase =
+  | {
+      name: string;
+      type: 'realtime' | 'basic';
+      queries: CountedSearchQuery[];
+    }
+  | {
+      name: string;
+      type: 'ai';
+      queries: AiSearchQuery[];
+    };
+
 // 模拟仓库数据用于测试
 export const mockRepositories: Repository[] = [
   {
@@ -14,6 +37,8 @@ export const mockRepositories: Repository[] = [
     description: 'A declarative, efficient, and flexible JavaScript library for building user interfaces.',
     html_url: 'https://github.com/facebook/react',
     stargazers_count: 220000,
+    forks_count: 45000,
+    forks: 45000,
     language: 'JavaScript',
     created_at: '2013-05-24T16:15:54Z',
     updated_at: '2024-01-15T10:30:00Z',
@@ -34,6 +59,8 @@ export const mockRepositories: Repository[] = [
     description: 'Vue.js is a progressive, incrementally-adoptable JavaScript framework for building UI on the web.',
     html_url: 'https://github.com/vuejs/vue',
     stargazers_count: 207000,
+    forks_count: 34000,
+    forks: 34000,
     language: 'JavaScript',
     created_at: '2013-07-29T03:24:51Z',
     updated_at: '2024-01-14T15:20:00Z',
@@ -54,6 +81,8 @@ export const mockRepositories: Repository[] = [
     description: 'Visual Studio Code',
     html_url: 'https://github.com/microsoft/vscode',
     stargazers_count: 158000,
+    forks_count: 28000,
+    forks: 28000,
     language: 'TypeScript',
     created_at: '2015-09-03T20:23:21Z',
     updated_at: '2024-01-16T09:45:00Z',
@@ -74,6 +103,8 @@ export const mockRepositories: Repository[] = [
     description: 'Sample plugin for Obsidian (https://obsidian.md)',
     html_url: 'https://github.com/obsidianmd/obsidian-sample-plugin',
     stargazers_count: 2500,
+    forks_count: 1000,
+    forks: 1000,
     language: 'TypeScript',
     created_at: '2020-10-15T14:30:00Z',
     updated_at: '2024-01-10T11:15:00Z',
@@ -94,6 +125,8 @@ export const mockRepositories: Repository[] = [
     description: 'An Open Source Machine Learning Framework for Everyone',
     html_url: 'https://github.com/tensorflow/tensorflow',
     stargazers_count: 185000,
+    forks_count: 74000,
+    forks: 74000,
     language: 'C++',
     created_at: '2015-11-07T01:19:20Z',
     updated_at: '2024-01-16T14:20:00Z',
@@ -151,7 +184,7 @@ export function testBasicTextSearch(repositories: Repository[], query: string): 
 /**
  * 测试搜索场景
  */
-export const searchTestCases = [
+export const searchTestCases: SearchTestCase[] = [
   {
     name: '实时搜索 - 仓库名匹配',
     type: 'realtime',

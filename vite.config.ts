@@ -16,7 +16,16 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    rollupOptions: {
+    // The app intentionally ships as a single-screen SPA with legacy browser support.
+    // Keep the warning threshold aligned with the current split chunks so Vite still
+    // reports genuinely outsized future bundles without flagging the expected entry.
+    chunkSizeWarningLimit: 2500,
+    rolldownOptions: {
+      checks: {
+        // The legacy plugin dominates production build time by design; this diagnostic
+        // is useful when profiling, but too noisy for normal release builds.
+        pluginTimings: false,
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
