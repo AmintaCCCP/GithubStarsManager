@@ -156,7 +156,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
                 <span className="font-mono">{String(entryData.responseLength)} chars</span>
               </Row>
             )}
-            {!entryData?.durationMs && !entryData?.method && (
+            {entryData?.durationMs == null && entryData?.method == null && (
               <p className="text-gray-400 dark:text-text-quaternary italic">{t('无耗时信息（需开启调试模式）', 'No timing info (enable debug mode)')}</p>
             )}
           </div>

@@ -80,7 +80,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
   const abortRef = useRef<AbortController | null>(null);
   const statusRef = useRef<TranslationStatus>('idle');
   const onHeadingsTranslatedRef = useRef(onHeadingsTranslated);
+  const onProgressRef = useRef(onProgress);
   onHeadingsTranslatedRef.current = onHeadingsTranslated;
+  onProgressRef.current = onProgress;
 
   const [internalDisplayMode, setInternalDisplayMode] = useState<DisplayMode>(defaultDisplayMode);
   const [status, setStatus] = useState<TranslationStatus>('idle');
@@ -211,7 +213,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           processResults(htmlIndices, htmlResults);
           completedCount += htmlIndices.length;
           setProgress({ current: completedCount, total: segments.length });
-          onProgress?.(completedCount, segments.length);
+          onProgressRef.current?.(completedCount, segments.length);
         }
 
         if (plainTexts.length > 0) {
@@ -219,7 +221,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           processResults(plainIndices, plainResults);
           completedCount += plainIndices.length;
           setProgress({ current: completedCount, total: segments.length });
-          onProgress?.(completedCount, segments.length);
+          onProgressRef.current?.(completedCount, segments.length);
         }
       }
 
@@ -280,7 +282,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
 
       updateStatus('translated');
       setProgress({ current: segments.length, total: segments.length });
-      onProgress?.(segments.length, segments.length);
+      onProgressRef.current?.(segments.length, segments.length);
     } catch (err) {
       if ((err as { name?: string })?.name === 'AbortError') {
         updateStatus('idle');
@@ -289,7 +291,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       setError(err instanceof Error ? err.message : 'Translation failed');
       updateStatus('error');
     }
-  }, [language, scan, updateStatus, removeTranslations, onProgress]);
+  }, [language, scan, updateStatus, removeTranslations]);
 
   const revert = useCallback(() => {
     if (abortRef.current) {
