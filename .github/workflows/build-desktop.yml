@@ -800,7 +800,22 @@ jobs:
         
         echo "Final dmg files:"
         ls -la release/*.dmg
-        
+
+    - name: Remove quarantine attribute from dmg files
+      if: matrix.os == 'macos-latest' && success()
+      shell: bash
+      run: |
+        echo "Removing quarantine attributes from dmg files..."
+        for dmg in release/*.dmg; do
+          if [ -f "$dmg" ]; then
+            echo "Processing: $dmg"
+            xattr -cr "$dmg" 2>/dev/null || true
+            echo "Quarantine attributes removed from: $dmg"
+          fi
+        done
+        echo "Verifying attributes:"
+        xattr -l release/*.dmg
+
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && success()
       uses: actions/upload-artifact@v7
