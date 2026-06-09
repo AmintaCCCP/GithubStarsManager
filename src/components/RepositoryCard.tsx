@@ -117,7 +117,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         updateRepository: state.updateRepository,
         deleteRepository: state.deleteRepository
       }),
-      [repoId]
+      []
     ),
     shallow
   );
@@ -496,7 +496,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       isExplicitlyCleared,
       isCustomized
     };
-  }, [repository.custom_description, repository.description, repository.ai_summary, repository.analysis_failed, repository.analyzed_at, repository.custom_tags, repository.ai_tags, repository.topics, repository.custom_category, repository.category_locked, showAISummary, language, allCategories]);
+  }, [repository, showAISummary, language, allCategories]);
 
   // 使用 useMemo 缓存标签计算
   // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics
@@ -924,9 +924,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div
           ref={descTriggerRef}
           className="relative group"
-          onMouseEnter={() => { clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
+          onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
           onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-          onFocus={() => { clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
+          onFocus={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
           onBlur={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
           onTouchStart={() => setShowTooltip((v) => !v)}
           tabIndex={0}
@@ -940,7 +940,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             content={highlightSearchTerm(displayContent.content, searchQuery)}
             visible={showTooltip}
             triggerRef={descTriggerRef}
-            onMouseEnter={() => clearTimeout(tooltipHideTimerRef.current)}
+            onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); }}
             onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
           />
         </div>

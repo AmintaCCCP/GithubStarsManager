@@ -100,7 +100,7 @@ export const ForkTimeline: React.FC = () => {
             language === 'zh'
               ? '组织列表加载失败，请检查 GitHub token 权限。'
               : 'Failed to load organizations. Please check GitHub token permissions.',
-            'warning'
+            'error'
           );
         }
       } finally {
