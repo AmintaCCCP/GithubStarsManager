@@ -96,7 +96,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     if (categoryChanged && !hasAnalyzedRepos && showAISummary) {
       setShowAISummary(false);
     }
-  }, [hasAnalyzedRepos, selectedCategory]);
+  }, [hasAnalyzedRepos, selectedCategory, showAISummary]);
 
   // Infinite scroll (瀑布流按需加载)
   const LOAD_BATCH = 50;

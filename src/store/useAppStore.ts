@@ -51,7 +51,7 @@ const scheduleIdleTask = (callback: () => void): number => {
     return window.requestIdleCallback(callback, { timeout: 3000 });
   }
 
-  return window.setTimeout(callback, 0);
+  return globalThis.setTimeout(callback, 0) as unknown as number;
 };
 
 const cancelIdleTask = (id: number): void => {
@@ -97,7 +97,7 @@ const writePersistSnapshot = (
     const str = JSON.stringify(value);
     const stringifyMs = Math.round(performance.now() - startedAt);
     const writeStartedAt = performance.now();
-    void indexedDBStorage.setItem(name, str)
+    void Promise.resolve(indexedDBStorage.setItem(name, str))
       .then(() => {
         const writeMs = Math.round(performance.now() - writeStartedAt);
         if (writeMs > 50) {
@@ -108,7 +108,7 @@ const writePersistSnapshot = (
           });
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         const writeMs = Math.round(performance.now() - writeStartedAt);
         logger.errorFromError('store.persist', 'IndexedDB write failed', error, {
           source,
@@ -184,7 +184,7 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
     latestPersistValue = null;
     persistWriteVersion++;
     cancelPendingPersistTasks();
-    void indexedDBStorage.removeItem(name).catch((error) => {
+    void Promise.resolve(indexedDBStorage.removeItem(name)).catch((error: unknown) => {
       logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
     });
   }
@@ -207,12 +207,13 @@ const writeSessionBackendSecret = (secret: string | null): void => {
 const areRepositoryRecordsEqual = (a: Repository, b: Repository): boolean => {
   if (a === b) return true;
 
-  const aRecord = a as Record<string, unknown>;
-  const bRecord = b as Record<string, unknown>;
-  const keys = new Set([...Object.keys(aRecord), ...Object.keys(bRecord)]);
+  const keys = new Set<keyof Repository>([
+    ...(Object.keys(a) as Array<keyof Repository>),
+    ...(Object.keys(b) as Array<keyof Repository>),
+  ]);
 
   for (const key of keys) {
-    if (!Object.is(aRecord[key], bRecord[key])) {
+    if (!Object.is(a[key], b[key])) {
       return false;
     }
   }

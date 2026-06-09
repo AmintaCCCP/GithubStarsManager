@@ -253,6 +253,7 @@ export interface AppState {
   user: GitHubUser | null;
   githubToken: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   
   // Repositories
   repositories: Repository[];
@@ -308,6 +309,7 @@ export interface AppState {
 
   // Network Proxy
   proxyConfig: ProxyConfig;
+  rpcDownloadConfig: RpcDownloadConfig;
 
   // Fork Timeline View
   forks: ForkRepo[];

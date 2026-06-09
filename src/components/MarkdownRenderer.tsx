@@ -893,7 +893,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     pre: ({ children }) => {
       // 给 code 子元素添加标记，表明它是代码块而不是行内代码
       if (React.isValidElement(children) && children.type === 'code') {
-        return <>{React.cloneElement(children as React.ReactElement<React.ComponentPropsWithoutRef<'code'>>, { 'data-code-block': true })}</>;
+        type CodeBlockMarkerProps = React.ComponentPropsWithoutRef<'code'> & { 'data-code-block'?: boolean };
+        return <>{React.cloneElement(children as React.ReactElement<CodeBlockMarkerProps>, { 'data-code-block': true })}</>;
       }
       // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
       return <pre>{children}</pre>;
