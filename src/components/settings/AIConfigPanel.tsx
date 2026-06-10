@@ -36,6 +36,7 @@ const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   deepseek: 'https://api.deepseek.com',
   mimo: MIMO_PLAN_ENDPOINTS.api,
+  atlascloud: 'https://api.atlascloud.ai/v1',
   'openai-compatible': '',
 };
 
@@ -50,6 +51,8 @@ function getEndpointPlaceholder(apiType: AIApiType, mimoPlan: MiMoPlan): string 
       return 'https://api.deepseek.com';
     case 'mimo':
       return MIMO_PLAN_ENDPOINTS[mimoPlan];
+    case 'atlascloud':
+      return 'https://api.atlascloud.ai/v1';
     case 'openai-compatible':
       return 'https://integrate.api.nvidia.com/v1/chat/completions';
     default:
@@ -67,6 +70,8 @@ function getEndpointHelpText(apiType: AIApiType, t: (zh: string, en: string) => 
       return t('填写到域名即可（如 https://api.deepseek.com），路径会自动生成', 'Only include the domain (e.g. https://api.deepseek.com), the path will be generated automatically');
     case 'mimo':
       return t('填写到 /v1 即可（如 https://api.xiaomimimo.com/v1），路径会自动生成', 'Only include up to /v1 (e.g. https://api.xiaomimimo.com/v1), the path will be generated automatically');
+    case 'atlascloud':
+      return t('填写到 /v1 即可（默认 https://api.atlascloud.ai/v1），路径会自动生成', 'Only include up to /v1 (default https://api.atlascloud.ai/v1), the path will be generated automatically');
     default:
       return t('只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages', 'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.');
   }
@@ -456,6 +461,7 @@ Repository information:
                 <option value="gemini">Gemini</option>
                 <option value="deepseek">DeepSeek</option>
                 <option value="mimo">Xiaomi MiMo</option>
+                <option value="atlascloud">Atlas Cloud</option>
                 <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
               </select>
             </div>

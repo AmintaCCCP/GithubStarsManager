@@ -179,7 +179,7 @@ export class AIService {
     const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo' || apiType === 'atlascloud') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]
