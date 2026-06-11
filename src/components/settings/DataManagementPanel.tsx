@@ -850,9 +850,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     }
 
     const releaseIds = new Set(releases.map(r => r.id));
-    const staleReadReleases = Array.from(readReleases).filter(
-      id => !releaseIds.has(id)
-    ).length;
+    let staleReadReleases = 0;
+    for (const id of readReleases) {
+      if (!releaseIds.has(id)) {
+        staleReadReleases++;
+      }
+    }
     if (staleReadReleases > 0) {
       suggestions.push({
         key: 'readReleases',
@@ -880,9 +883,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             new Date(r.published_at).getTime() >= ninetyDaysAgo
           );
           const remainingIds = new Set(filteredReleases.map(r => r.id));
-          const cleanedReadReleases = new Set(
-            Array.from(readReleases).filter(id => remainingIds.has(id))
-          );
+          const cleanedReadReleases = new Set<number>();
+          for (const id of readReleases) {
+            if (remainingIds.has(id)) {
+              cleanedReadReleases.add(id);
+            }
+          }
           useAppStore.setState({ releases: filteredReleases, readReleases: cleanedReadReleases });
           break;
         }
@@ -891,9 +897,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           return;
         case 'readReleases': {
           const validReleaseIds = new Set(releases.map(r => r.id));
-          const cleanedReadReleases = new Set(
-            Array.from(readReleases).filter(id => validReleaseIds.has(id))
-          );
+          const cleanedReadReleases = new Set<number>();
+          for (const id of readReleases) {
+            if (validReleaseIds.has(id)) {
+              cleanedReadReleases.add(id);
+            }
+          }
           useAppStore.setState({ readReleases: cleanedReadReleases });
           break;
         }
