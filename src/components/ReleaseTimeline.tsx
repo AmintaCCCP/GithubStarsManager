@@ -56,6 +56,8 @@ export const ReleaseTimeline: React.FC = () => {
     setIncludePreRelease,
     releaseShowMode,
     setReleaseShowMode,
+    releaseLatestMode,
+    setReleaseLatestMode,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -70,6 +72,7 @@ export const ReleaseTimeline: React.FC = () => {
   // 视图切换下拉菜单状态（本地UI状态）
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
+  const [isLatestModeDropdownOpen, setIsLatestModeDropdownOpen] = useState(false);
   const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
@@ -233,7 +236,7 @@ export const ReleaseTimeline: React.FC = () => {
     });
     unreadSnapshotRef.current = ids;
     setSnapshotVersion(v => v + 1);
-  }, [releases, resolvedReleaseSources, includePreRelease, releaseShowMode]);
+  }, [releases, resolvedReleaseSources, includePreRelease, releaseShowMode, releaseLatestMode]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
@@ -282,15 +285,30 @@ export const ReleaseTimeline: React.FC = () => {
       }));
   }, [releasesWithLinks, searchQuery, selectedFilters]);
 
+  // 仅最新模式过滤：每个仓库只保留最新的 release
+  const latestModeReleases = useMemo(() => {
+    if (releaseLatestMode !== 'latest') return preUnreadFilteredReleases;
+
+    const repoMap = new Map<number, typeof preUnreadFilteredReleases[0]>();
+    for (const item of preUnreadFilteredReleases) {
+      const repoId = item.release.repository.id;
+      const existing = repoMap.get(repoId);
+      if (!existing || new Date(item.release.published_at) > new Date(existing.release.published_at)) {
+        repoMap.set(repoId, item);
+      }
+    }
+    return Array.from(repoMap.values());
+  }, [preUnreadFilteredReleases, releaseLatestMode]);
+
   // 未读模式过滤（使用快照，标记已读后不会立即消失，刷新页面后才更新）
   const filteredReleases = useMemo(() => {
     if (releaseShowMode === 'unread') {
-      return preUnreadFilteredReleases.filter(({ release }) => unreadSnapshotRef.current.has(release.id));
+      return latestModeReleases.filter(({ release }) => unreadSnapshotRef.current.has(release.id));
     }
-    return preUnreadFilteredReleases;
+    return latestModeReleases;
     // snapshotVersion 触发快照更新后重算；readReleases 不在此处以避免标记已读立即消失
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preUnreadFilteredReleases, releaseShowMode, snapshotVersion]);
+  }, [latestModeReleases, releaseShowMode, snapshotVersion]);
 
   const unreadCount = useMemo(() => {
     return subscribedReleases.filter(r => !readReleases.has(r.id)).length;
@@ -457,6 +475,12 @@ export const ReleaseTimeline: React.FC = () => {
     setReleaseShowMode(mode);
     setCurrentPage(1);
     setIsShowModeDropdownOpen(false);
+  };
+
+  const handleLatestModeChange = (mode: 'all' | 'latest') => {
+    setReleaseLatestMode(mode);
+    setCurrentPage(1);
+    setIsLatestModeDropdownOpen(false);
   };
 
   const handleMarkAllRead = async () => {
@@ -879,6 +903,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onClick={() => {
                   setIsViewDropdownOpen(!isViewDropdownOpen);
                   setIsShowModeDropdownOpen(false);
+                  setIsLatestModeDropdownOpen(false);
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
                 title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
@@ -976,6 +1001,11 @@ export const ReleaseTimeline: React.FC = () => {
                 ({t('已筛选', 'filtered')})
               </span>
             )}
+            {releaseLatestMode === 'latest' && (
+              <span className="text-sm text-brand-violet dark:text-brand-violet">
+                ({t('仅最新', 'latest only')})
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -985,6 +1015,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onClick={() => {
                   setIsShowModeDropdownOpen(!isShowModeDropdownOpen);
                   setIsViewDropdownOpen(false);
+                  setIsLatestModeDropdownOpen(false);
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
                 title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
@@ -1022,6 +1053,57 @@ export const ReleaseTimeline: React.FC = () => {
                       <div>
                         <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
                         <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('只显示未读的Release', 'Only show unread releases')}</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Latest Mode Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsLatestModeDropdownOpen(!isLatestModeDropdownOpen);
+                  setIsViewDropdownOpen(false);
+                  setIsShowModeDropdownOpen(false);
+                }}
+                className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
+              >
+                <Package className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
+                <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                  {releaseLatestMode === 'all' ? t('全部版本', 'All Versions') : t('仅最新', 'Latest')}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-text-tertiary transition-transform ${isLatestModeDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isLatestModeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsLatestModeDropdownOpen(false)} />
+                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-lg shadow-lg border border-black/[0.06] dark:border-white/[0.04] z-50 py-1">
+                    <button
+                      onClick={() => handleLatestModeChange('all')}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
+                        releaseLatestMode === 'all' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      }`}
+                    >
+                      <Package className={`w-4 h-4 ${releaseLatestMode === 'all' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('显示全部版本', 'Show All Versions')}</div>
+                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('显示所有Release记录', 'Show all release records')}</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleLatestModeChange('latest')}
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
+                        releaseLatestMode === 'latest' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      }`}
+                    >
+                      <Package className={`w-4 h-4 ${releaseLatestMode === 'latest' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <div>
+                        <div className="text-sm font-medium">{t('仅显示最新版本', 'Latest Version Only')}</div>
+                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
                       </div>
                     </button>
                   </div>

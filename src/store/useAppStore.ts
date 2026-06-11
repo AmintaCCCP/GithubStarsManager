@@ -346,6 +346,7 @@ interface AppActions {
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
   setReleaseShowMode: (mode: 'all' | 'unread') => void;
+  setReleaseLatestMode: (mode: 'all' | 'latest') => void;
   setReleaseSelectedFilters: (filters: string[]) => void;
   toggleReleaseSelectedFilter: (filterId: string) => void;
   clearReleaseSelectedFilters: () => void;
@@ -439,6 +440,7 @@ type PersistedAppState = Partial<
     | 'forkExpandedRepositories'
     | 'releaseViewMode'
     | 'releaseShowMode'
+    | 'releaseLatestMode'
     | 'releaseSelectedFilters'
     | 'releaseSearchQuery'
     | 'includePreRelease'
@@ -562,6 +564,7 @@ const normalizePersistedState = (
     isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseShowMode: safePersisted.releaseShowMode === 'unread' ? 'unread' : 'all',
+    releaseLatestMode: safePersisted.releaseLatestMode === 'latest' ? 'latest' : 'all',
     releaseSelectedFilters: Array.isArray(safePersisted.releaseSelectedFilters) ? safePersisted.releaseSelectedFilters : [],
     releaseSearchQuery: typeof safePersisted.releaseSearchQuery === 'string' ? safePersisted.releaseSearchQuery : '',
     discoveryChannels: (() => {
@@ -1270,6 +1273,22 @@ export const useAppStore = create<AppState & AppActions>()(
       markReleaseAsRead: (releaseId) => set((state) => {
         const newReadReleases = new Set(state.readReleases);
         newReadReleases.add(releaseId);
+
+        // In 'latest' mode, marking the latest release as read also marks all other releases of that repo
+        if (state.releaseLatestMode === 'latest') {
+          const markedRelease = state.releases.find(r => r.id === releaseId);
+          if (markedRelease) {
+            const repoId = markedRelease.repository.id;
+            const repoReleases = state.releases.filter(r => r.repository.id === repoId);
+            const latestRepoRelease = repoReleases.reduce((latest, r) =>
+              new Date(r.published_at) > new Date(latest.published_at) ? r : latest
+            , repoReleases[0]);
+            if (latestRepoRelease && latestRepoRelease.id === releaseId) {
+              repoReleases.forEach(r => newReadReleases.add(r.id));
+            }
+          }
+        }
+
         return { readReleases: newReadReleases };
       }),
       markAllReleasesAsRead: () => set((state) => {
@@ -1569,6 +1588,7 @@ export const useAppStore = create<AppState & AppActions>()(
       // Release Timeline View actions
       setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
       setReleaseShowMode: (releaseShowMode) => set({ releaseShowMode }),
+      setReleaseLatestMode: (releaseLatestMode) => set({ releaseLatestMode }),
       setReleaseSelectedFilters: (releaseSelectedFilters) => set({ releaseSelectedFilters }),
       toggleReleaseSelectedFilter: (filterId) => set((state) => ({
         releaseSelectedFilters: state.releaseSelectedFilters.includes(filterId)
