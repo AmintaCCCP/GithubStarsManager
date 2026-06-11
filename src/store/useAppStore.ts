@@ -938,6 +938,7 @@ export const useAppStore = create<AppState & AppActions>()(
       readmeModalOpen: false,
       releaseViewMode: 'timeline',
       releaseShowMode: 'all',
+      releaseLatestMode: 'all',
       releaseSelectedFilters: [],
       releaseSearchQuery: '',
       releaseExpandedRepositories: new Set<number>(),
@@ -1281,7 +1282,7 @@ export const useAppStore = create<AppState & AppActions>()(
             const repoId = markedRelease.repository.id;
             const repoReleases = state.releases.filter(r => r.repository.id === repoId);
             const latestRepoRelease = repoReleases.reduce((latest, r) =>
-              new Date(r.published_at) > new Date(latest.published_at) ? r : latest
+              r.published_at > latest.published_at ? r : latest
             , repoReleases[0]);
             if (latestRepoRelease && latestRepoRelease.id === releaseId) {
               repoReleases.forEach(r => newReadReleases.add(r.id));
@@ -1801,6 +1802,7 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化Release页面视图设置
         releaseViewMode: state.releaseViewMode,
         releaseShowMode: state.releaseShowMode,
+        releaseLatestMode: state.releaseLatestMode,
         releaseSelectedFilters: state.releaseSelectedFilters,
         releaseSearchQuery: state.releaseSearchQuery,
         releaseExpandedRepositories: Array.from(state.releaseExpandedRepositories),

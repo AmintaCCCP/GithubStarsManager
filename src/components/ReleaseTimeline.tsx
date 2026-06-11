@@ -293,7 +293,7 @@ export const ReleaseTimeline: React.FC = () => {
     for (const item of preUnreadFilteredReleases) {
       const repoId = item.release.repository.id;
       const existing = repoMap.get(repoId);
-      if (!existing || new Date(item.release.published_at) > new Date(existing.release.published_at)) {
+      if (!existing || item.release.published_at > existing.release.published_at) {
         repoMap.set(repoId, item);
       }
     }
