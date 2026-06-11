@@ -325,6 +325,7 @@ export interface AppState {
   // Release Timeline View
   releaseViewMode: 'timeline' | 'repository';
   releaseShowMode: 'all' | 'unread';
+  releaseLatestMode: 'all' | 'latest';
   releaseSelectedFilters: string[];
   releaseSearchQuery: string;
   releaseExpandedRepositories: Set<number>;
