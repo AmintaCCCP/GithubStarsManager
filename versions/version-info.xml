@@ -408,4 +408,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.3</downloadUrl>
   </version>
+  <version>
+    <number>0.6.4</number>
+    <releaseDate>2026-06-11</releaseDate>
+    <changelog>
+      <item>feat: Added configurable release sources with a Release Sources modal to toggle sources (starred, watched, custom repos), view per-source counts, manage custom/watch repos with add/remove and pagination, and sync watched GitHub repos. Source settings are included in export/import backups and backend auto-sync. (PR #215)</item>
+      <item>fix: Added direct GitHub API fallback for README content when the backend proxy fails but a frontend GitHub token is available, covering both single and multilingual README scenarios. (PR #214)</item>
+      <item>fix: Resolved React hook and Fast Refresh lint warnings; cleaned Vite build warning noise by aligning bundle warning thresholds and Rolldown options; fixed TypeScript errors across store types, backup/import panels, diagnostic log rendering, and markdown code block typing. (PR #217)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.4</downloadUrl>
+  </version>
 </versions>
