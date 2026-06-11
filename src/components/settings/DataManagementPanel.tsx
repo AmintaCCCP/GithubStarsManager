@@ -849,15 +849,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       });
     }
 
-    const oldReadReleases = readReleases.size;
-    if (oldReadReleases > 50) {
+    const releaseIds = new Set(releases.map(r => r.id));
+    const staleReadReleases = Array.from(readReleases).filter(
+      id => !releaseIds.has(id)
+    ).length;
+    if (staleReadReleases > 0) {
       suggestions.push({
         key: 'readReleases',
         label: '已读Release标记',
         labelEn: 'Read Release Marks',
-        description: '已读Release的标记记录',
-        descriptionEn: 'Records of read releases',
-        count: oldReadReleases,
+        description: '已不存在的Release的已读标记，可安全清理',
+        descriptionEn: 'Read markers for releases that no longer exist, safe to clean',
+        count: staleReadReleases,
         icon: <Eye className="w-4 h-4" />,
         color: 'text-gray-700 dark:text-text-secondary',
         bgColor: 'bg-light-surface dark:bg-white/[0.04]'
@@ -873,18 +876,27 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         case 'oldReleases': {
           const now = Date.now();
           const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
-          const filteredReleases = releases.filter(r => 
+          const filteredReleases = releases.filter(r =>
             new Date(r.published_at).getTime() >= ninetyDaysAgo
           );
-          setReleases(filteredReleases);
+          const remainingIds = new Set(filteredReleases.map(r => r.id));
+          const cleanedReadReleases = new Set(
+            Array.from(readReleases).filter(id => remainingIds.has(id))
+          );
+          useAppStore.setState({ releases: filteredReleases, readReleases: cleanedReadReleases });
           break;
         }
         case 'discoveryCache':
           await deleteDiscoveryData();
           return;
-        case 'readReleases':
-          useAppStore.setState({ readReleases: new Set<number>() });
+        case 'readReleases': {
+          const validReleaseIds = new Set(releases.map(r => r.id));
+          const cleanedReadReleases = new Set(
+            Array.from(readReleases).filter(id => validReleaseIds.has(id))
+          );
+          useAppStore.setState({ readReleases: cleanedReadReleases });
           break;
+        }
         case 'unanalyzedRepos':
           showSuccess(t('未分析仓库无法直接清理，请通过 AI 分析功能处理', 'Unanalyzed repos cannot be cleaned directly. Use AI analysis to process them.'));
           return;
@@ -895,7 +907,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       addLog(t('清理数据', 'Cleanup data'), false, String(error));
       showError(t('清理失败，请重试', 'Cleanup failed, please try again'));
     }
-  }, [releases, setReleases, deleteDiscoveryData, addLog, showSuccess, showError, t]);
+  }, [releases, readReleases, deleteDiscoveryData, addLog, showSuccess, showError, t]);
 
   const deleteAllData = async () => {
     try {
