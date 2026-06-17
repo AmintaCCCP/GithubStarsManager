@@ -55,6 +55,7 @@ export const GistView: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingGist, setEditingGist] = useState<Gist | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const detailRequestSeqRef = useRef(0);
 
   const categoryItems = useMemo(() => ({
     all: getGistCategoryItems('all', gists, starredGists, user?.login),
@@ -169,7 +170,9 @@ export const GistView: React.FC = () => {
     let success = 0;
     let failed = 0;
 
-    for (const gist of targets) {
+    const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
+
+    const analyzeOne = async (gist: Gist) => {
       setAnalyzingGist(gist.id, true);
       try {
         const detail = await api.getGist(gist.id, gist);
@@ -193,6 +196,12 @@ export const GistView: React.FC = () => {
       } finally {
         setAnalyzingGist(gist.id, false);
       }
+    };
+
+    // 按 concurrency 分批并发执行
+    for (let i = 0; i < targets.length; i += concurrency) {
+      const batch = targets.slice(i, i + concurrency);
+      await Promise.all(batch.map(gist => analyzeOne(gist)));
     }
 
     setIsAnalyzingAll(false);
@@ -200,12 +209,15 @@ export const GistView: React.FC = () => {
   };
 
   const openDetail = async (gist: Gist) => {
+    const requestSeq = ++detailRequestSeqRef.current;
     setDetailGist(gist);
     setIsDetailOpen(true);
     if (!githubToken) return;
 
     try {
       const detail = await new GitHubApiService(githubToken).getGist(gist.id, gist);
+      // 防止旧请求覆盖新打开的 gist 详情
+      if (requestSeq !== detailRequestSeqRef.current) return;
       updateGist(detail);
       setDetailGist(detail);
     } catch {
@@ -399,7 +411,8 @@ export const GistView: React.FC = () => {
                   deleteGist(gistId);
                 }}
                 onUnstarred={(gistId) => {
-                  setStarredGists(starredGists.filter(item => item.id !== gistId));
+                  const latestStarred = useAppStore.getState().starredGists;
+                  setStarredGists(latestStarred.filter(item => item.id !== gistId));
                 }}
               />
             ))}
