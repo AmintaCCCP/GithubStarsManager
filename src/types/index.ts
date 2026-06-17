@@ -164,6 +164,47 @@ export interface GitHubUser {
   email: string | null;
 }
 
+export interface GistFile {
+  filename: string;
+  type: string | null;
+  language: string | null;
+  raw_url?: string;
+  size: number;
+  truncated?: boolean;
+  content?: string;
+}
+
+export interface Gist {
+  id: string;
+  description: string | null;
+  public: boolean;
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+  comments: number;
+  owner: {
+    login: string;
+    avatar_url: string;
+    html_url?: string;
+  } | null;
+  files: Record<string, GistFile>;
+  starred?: boolean;
+  ai_summary?: string;
+  analyzed_at?: string;
+  analysis_failed?: boolean;
+  analysis_error?: string;
+  last_edited?: string;
+}
+
+export type GistCategoryId = 'all' | 'starred' | 'mine';
+
+export interface GistSearchFilters {
+  query: string;
+  sortBy: 'updated' | 'created' | 'name' | 'files';
+  sortOrder: 'desc' | 'asc';
+  isAnalyzed?: boolean;
+}
+
 export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'mimo' | 'openai-compatible';
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
@@ -260,6 +301,14 @@ export interface AppState {
   isLoading: boolean;
   lastSync: string | null;
   analyzingRepositoryIds: Set<number>;
+
+  // Gists
+  gists: Gist[];
+  starredGists: Gist[];
+  gistSearchFilters: GistSearchFilters;
+  gistSearchResults: Gist[];
+  selectedGistCategory: GistCategoryId;
+  analyzingGistIds: Set<string>;
   
   // AI
   aiConfigs: AIConfig[];
@@ -292,7 +341,7 @@ export interface AppState {
   
   // UI
   theme: 'light' | 'dark';
-  currentView: 'repositories' | 'releases' | 'forks' | 'settings' | 'subscription';
+  currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription';
   selectedCategory: string;
   language: 'zh' | 'en';
   isSidebarCollapsed: boolean;
