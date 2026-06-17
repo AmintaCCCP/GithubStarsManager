@@ -1,4 +1,4 @@
-import { Repository, AIConfig, AIApiType } from '../types';
+import { Repository, Gist, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 import { logger } from './logger';
@@ -555,6 +555,87 @@ ${options.user}` : options.user;
       logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
       // 抛出错误，让调用方处理失败状态
       throw error;
+    }
+  }
+
+  async analyzeGist(gist: Gist, contentPreview: string, signal?: AbortSignal): Promise<string> {
+    const fileList = Object.values(gist.files || {})
+      .map(file => `${file.filename}${file.language ? ` (${file.language})` : ''}, ${file.size} bytes`)
+      .join('\n');
+
+    const system = this.language === 'zh'
+      ? '你是一个专业的 GitHub Gist 分析助手。请用中文简洁总结 gist 的用途、关键内容和可能的使用场景。只输出摘要文本，不要 Markdown 标题。'
+      : 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely in English. Output summary text only, no Markdown heading.';
+
+    const user = this.language === 'zh'
+      ? `
+请分析以下 GitHub Gist，输出不超过 80 字的中文摘要。
+
+描述：${this.sanitizeForPrompt(gist.description || '无描述')}
+创建者：${gist.owner?.login || '未知'}
+文件：
+${this.sanitizeForPrompt(fileList || '无文件')}
+
+内容预览：
+${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
+      `.trim()
+      : `
+Analyze this GitHub Gist and output an English summary under 80 words.
+
+Description: ${this.sanitizeForPrompt(gist.description || 'No description')}
+Owner: ${gist.owner?.login || 'Unknown'}
+Files:
+${this.sanitizeForPrompt(fileList || 'No files')}
+
+Content preview:
+${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
+      `.trim();
+
+    return this.requestText({
+      system,
+      user,
+      temperature: 0.25,
+      maxTokens: 500,
+      signal,
+    });
+  }
+
+  async searchGistsWithReranking(gists: Gist[], query: string): Promise<Gist[]> {
+    if (gists.length === 0) return [];
+
+    const gistSummaries = gists.slice(0, 120).map((gist, index) => {
+      const files = Object.values(gist.files || {}).map(file => file.filename).join(', ');
+      return `${index + 1}. ID: ${gist.id}
+Description: ${gist.description || 'No description'}
+Owner: ${gist.owner?.login || 'Unknown'}
+Files: ${files || 'No files'}
+AI Summary: ${gist.ai_summary || 'None'}`;
+    }).join('\n\n');
+
+    const system = this.language === 'zh'
+      ? '你是 GitHub Gist 搜索排序助手。根据用户查询返回最相关 gist 的 id 数组 JSON，不要输出额外文字。'
+      : 'You are a GitHub Gist search reranking assistant. Return a JSON array of the most relevant gist ids for the user query. Do not output extra text.';
+
+    const content = await this.requestText({
+      system,
+      user: `Query: ${query}\n\nGists:\n${this.sanitizeForPrompt(gistSummaries)}`,
+      temperature: 0.1,
+      maxTokens: 1200,
+    });
+
+    try {
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const ids = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+      if (!Array.isArray(ids)) return gists;
+      const gistById = new Map(gists.map(gist => [gist.id, gist]));
+      const ranked = ids
+        .map(id => gistById.get(String(id)))
+        .filter((gist): gist is Gist => !!gist);
+      const rankedIds = new Set(ranked.map(gist => gist.id));
+      return [...ranked, ...gists.filter(gist => !rankedIds.has(gist.id))];
+    } catch (error) {
+      logger.warn('ai', 'Failed to parse gist reranking result', error);
+      return gists;
     }
   }
 
