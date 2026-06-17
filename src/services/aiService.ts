@@ -628,8 +628,15 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       const ids = JSON.parse(jsonMatch ? jsonMatch[0] : content);
       if (!Array.isArray(ids)) return gists;
       const gistById = new Map(gists.map(gist => [gist.id, gist]));
+      const seen = new Set<string>();
       const ranked = ids
-        .map(id => gistById.get(String(id)))
+        .map(id => String(id))
+        .filter(id => {
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+        .map(id => gistById.get(id))
         .filter((gist): gist is Gist => !!gist);
       const rankedIds = new Set(ranked.map(gist => gist.id));
       return [...ranked, ...gists.filter(gist => !rankedIds.has(gist.id))];

@@ -87,18 +87,22 @@ export const filterAndSortGists = (gists: Gist[], filters: GistSearchFilters): G
 
   if (queryWords.length > 0) {
     filtered = filtered.filter(gist => {
-      const searchable = [
+      // 逐字段匹配并提前中断，避免把所有文件内容拼接成超大字符串导致的性能问题。
+      const fields = [
         gist.description || '',
         gist.owner?.login || '',
         gist.ai_summary || '',
-        ...Object.values(gist.files || {}).flatMap(file => [
-          file.filename,
-          file.language || '',
-          file.type || '',
-          file.content || '',
-        ]),
-      ].join(' ').toLowerCase();
-      return queryWords.every(word => searchable.includes(word));
+      ];
+      const files = Object.values(gist.files || {});
+      return queryWords.every(word => {
+        if (fields.some(field => field.toLowerCase().includes(word))) return true;
+        return files.some(file =>
+          file.filename.toLowerCase().includes(word) ||
+          (file.language || '').toLowerCase().includes(word) ||
+          (file.type || '').toLowerCase().includes(word) ||
+          (file.content || '').toLowerCase().includes(word)
+        );
+      });
     });
   }
 

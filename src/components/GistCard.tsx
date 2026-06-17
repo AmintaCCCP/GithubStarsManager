@@ -36,12 +36,13 @@ export const GistCard: React.FC<GistCardProps> = ({
   } = useAppStore();
   const isStoreAnalyzing = useAppStore(state => state.analyzingGistIds.has(gist.id));
   const { toast, confirm } = useDialog();
-  const [isBusy, setIsBusy] = useState(false);
+  const [isAnalyzingLocal, setIsAnalyzingLocal] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const title = getGistTitle(gist);
   const primaryLanguage = getGistPrimaryLanguage(gist);
   const fileCount = getGistFileCount(gist);
-  const isAnalyzing = isStoreAnalyzing || isBusy;
+  const isAnalyzing = isStoreAnalyzing || isAnalyzingLocal;
 
   const fileNames = useMemo(() =>
     Object.values(gist.files || {}).slice(0, 3).map(file => file.filename).join(', '),
@@ -80,7 +81,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     }
 
     setAnalyzingGist(gist.id, true);
-    setIsBusy(true);
+    setIsAnalyzingLocal(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
       const detail = await githubApi.getGist(gist.id, gist);
@@ -103,7 +104,7 @@ export const GistCard: React.FC<GistCardProps> = ({
       });
       toast(t('Gist AI分析失败', 'Gist AI analysis failed'), 'error');
     } finally {
-      setIsBusy(false);
+      setIsAnalyzingLocal(false);
       setAnalyzingGist(gist.id, false);
     }
   };
@@ -118,7 +119,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     );
     if (!confirmed) return;
 
-    setIsBusy(true);
+    setIsMutating(true);
     try {
       await new GitHubApiService(githubToken).unstarGist(gist.id);
       onUnstarred(gist.id);
@@ -127,7 +128,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     } catch {
       toast(t('取消收藏失败', 'Failed to unstar'), 'error');
     } finally {
-      setIsBusy(false);
+      setIsMutating(false);
     }
   };
 
@@ -141,7 +142,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     );
     if (!confirmed) return;
 
-    setIsBusy(true);
+    setIsMutating(true);
     try {
       await new GitHubApiService(githubToken).deleteGist(gist.id);
       deleteGist(gist.id);
@@ -150,7 +151,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     } catch {
       toast(t('删除 Gist 失败', 'Failed to delete gist'), 'error');
     } finally {
-      setIsBusy(false);
+      setIsMutating(false);
     }
   };
 
@@ -212,7 +213,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             <button
               type="button"
               onClick={handleUnstar}
-              disabled={isBusy}
+              disabled={isMutating}
               className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
               title={t('取消收藏', 'Unstar')}
             >
@@ -235,7 +236,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={isBusy}
+                disabled={isMutating}
                 className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-red-500/10 dark:hover:text-red-300"
                 title={t('删除', 'Delete')}
               >

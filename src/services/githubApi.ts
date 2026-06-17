@@ -249,9 +249,22 @@ export class GitHubApiService {
   }
 
   private mergeGistMetadata(existing: Gist | undefined, incoming: Gist, starred?: boolean): Gist {
+    // 列表 API 不返回文件内容，深度合并文件以保留已加载过的 content；
+    // starred 仅信任显式传入或接口新值，不再回退到缓存，避免取消收藏后状态陈旧。
+    const mergedFiles: Record<string, GistFile> = { ...incoming.files };
+    if (existing?.files) {
+      for (const [filename, file] of Object.entries(mergedFiles)) {
+        const existingFile = existing.files[filename];
+        if (existingFile && file.content === undefined && existingFile.content !== undefined) {
+          mergedFiles[filename] = { ...file, content: existingFile.content };
+        }
+      }
+    }
+
     return {
       ...incoming,
-      starred: starred ?? incoming.starred ?? existing?.starred,
+      files: mergedFiles,
+      starred: starred ?? incoming.starred,
       ai_summary: existing?.ai_summary,
       analyzed_at: existing?.analyzed_at,
       analysis_failed: existing?.analysis_failed,

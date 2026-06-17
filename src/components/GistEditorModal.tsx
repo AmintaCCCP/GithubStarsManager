@@ -20,8 +20,16 @@ interface GistEditorModalProps {
   onSubmit: (input: GistCreateInput | GistUpdateInput) => Promise<void>;
 }
 
+const generateFileId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // 非安全上下文或旧浏览器降级
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const createEmptyFile = (): EditableFile => ({
-  id: crypto.randomUUID(),
+  id: generateFileId(),
   filename: 'snippet.txt',
   content: '',
 });
@@ -39,7 +47,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
     setDescription(gist?.description || '');
     setIsPublic(gist?.public ?? false);
     const nextFiles = Object.values(gist?.files || {}).map(file => ({
-      id: crypto.randomUUID(),
+      id: generateFileId(),
       originalFilename: file.filename,
       filename: file.filename,
       content: file.content || '',
@@ -48,9 +56,17 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
   }, [gist, isOpen]);
 
   const visibleFiles = files.filter(file => !file.deleted);
-  const canSubmit = useMemo(() => {
-    return visibleFiles.length > 0 && visibleFiles.every(file => file.filename.trim() && file.content.length > 0);
+  const hasDuplicateFilenames = useMemo(() => {
+    const names = visibleFiles.map(file => file.filename.trim()).filter(Boolean);
+    return new Set(names).size !== names.length;
   }, [visibleFiles]);
+  const canSubmit = useMemo(() => {
+    return (
+      visibleFiles.length > 0 &&
+      !hasDuplicateFilenames &&
+      visibleFiles.every(file => file.filename.trim() && file.content.length > 0)
+    );
+  }, [visibleFiles, hasDuplicateFilenames]);
 
   const updateFile = (id: string, updates: Partial<EditableFile>) => {
     setFiles(prev => prev.map(file => file.id === id ? { ...file, ...updates } : file));
@@ -131,6 +147,11 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-gray-900 dark:text-text-primary">{t('文件', 'Files')}</div>
+            {hasDuplicateFilenames && (
+              <div className="text-xs text-red-600 dark:text-red-300">
+                {t('文件名不能重复', 'Filenames must be unique')}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setFiles(prev => [...prev, createEmptyFile()])}

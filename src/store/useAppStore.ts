@@ -1188,13 +1188,14 @@ export const useAppStore = create<AppState & AppActions>()(
         const gistsResult = replaceGistInList(state.gists, gist);
         const starredResult = replaceGistInList(state.starredGists, gist);
         const searchResult = replaceGistInList(state.gistSearchResults, gist);
+        const isMine = !!state.user?.login && gist.owner?.login === state.user.login;
 
         return {
           gists: gistsResult.found
             ? gistsResult.gists
-            : state.gists.some(item => item.id === gist.id)
-              ? state.gists
-              : [gist, ...state.gists],
+            : isMine
+              ? [gist, ...state.gists]
+              : state.gists,
           starredGists: starredResult.found ? starredResult.gists : state.starredGists,
           gistSearchResults: searchResult.found ? searchResult.gists : state.gistSearchResults,
         };
