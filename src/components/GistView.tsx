@@ -240,10 +240,12 @@ export const GistView: React.FC = () => {
       updateGist({ ...created, last_edited: new Date().toISOString() });
       toast(t('Gist 已创建', 'Gist created'), 'success');
     } catch (error) {
+      const msg = error instanceof Error ? error.message : '';
+      const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
       toast(
         t(
-          `Gist ${editingGist ? '更新' : '创建'}失败：${error instanceof Error ? error.message : '未知错误'}`,
-          `Failed to ${editingGist ? 'update' : 'create'} gist: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Gist ${editingGist ? '更新' : '创建'}失败：${msg || '未知错误'}${isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : ''}`,
+          `Failed to ${editingGist ? 'update' : 'create'} gist: ${msg || 'Unknown error'}${isPermission ? ' (Make sure your token has the gist scope and re-login with the updated token)' : ''}`
         ),
         'error'
       );
@@ -267,8 +269,8 @@ export const GistView: React.FC = () => {
                   </p>
                   <p className="leading-relaxed">
                     {t(
-                      '若私有 gist 没有拉取到，或无法新建/编辑/删除 gist，请确保 GitHub token 包含 gist 权限范围（OAuth 登录会自动申请；使用 PAT 时需手动勾选 gist）。修改权限后需重新登录。',
-                      'If your private gists are missing, or you cannot create/edit/delete gists, make sure your GitHub token includes the gist scope (OAuth login requests it automatically; for PATs you must check gist manually). Re-login after changing scopes.'
+                      '若私有 gist 未拉取到，或无法新建/编辑/删除 gist，请到 GitHub → Settings → Developer settings → Personal access tokens 中确认当前 token 已勾选 gist 权限。修改权限后请重新输入 token 登录。',
+                      'If your private gists are missing, or you cannot create/edit/delete gists, go to GitHub → Settings → Developer settings → Personal access tokens and make sure the gist scope is checked for your current token. Re-login with the updated token after changing scopes.'
                     )}
                   </p>
                   <div className="absolute bottom-full left-3 -mb-px h-2 w-2 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"></div>

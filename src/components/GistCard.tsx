@@ -148,8 +148,16 @@ export const GistCard: React.FC<GistCardProps> = ({
       deleteGist(gist.id);
       onDeleted(gist.id);
       toast(t('Gist 已删除', 'Gist deleted'), 'success');
-    } catch {
-      toast(t('删除 Gist 失败', 'Failed to delete gist'), 'error');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '';
+      const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
+      toast(
+        t(
+          `删除 Gist 失败${msg ? `：${msg}` : ''}${isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : ''}`,
+          `Failed to delete gist${msg ? `: ${msg}` : ''}${isPermission ? ' (Make sure your token has the gist scope and re-login with the updated token)' : ''}`
+        ),
+        'error'
+      );
     } finally {
       setIsMutating(false);
     }
