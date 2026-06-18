@@ -418,4 +418,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.4</downloadUrl>
   </version>
+  <version>
+    <number>0.6.5</number>
+    <releaseDate>2026-06-18</releaseDate>
+    <changelog>
+      <item>feat: Added Gist management tab with full CRUD support, AI analysis, semantic search, and syntax-highlighted code viewer. Note: requires gist scope on your GitHub PAT. (PR #223)</item>
+      <item>feat: Added "Latest Version Only" filter on the Release Timeline page to show only the most recent release per repository. (PR #219)</item>
+      <item>fix: Data cleanup in Settings now correctly removes only orphaned read-release markers instead of clearing all read state. (PR #220)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.5</downloadUrl>
+  </version>
 </versions>
