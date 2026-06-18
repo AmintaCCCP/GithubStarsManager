@@ -593,7 +593,9 @@ const normalizePersistedState = (
     selectedGistCategory: safePersisted.selectedGistCategory === 'starred' || safePersisted.selectedGistCategory === 'mine'
       ? safePersisted.selectedGistCategory
       : 'all',
-    analyzingGistIds: normalizeStringSet(safePersisted.analyzingGistIds),
+    // 不恢复 analyzingGistIds：异步分析任务无法在页面重载后存活，
+    // 恢复会导致 Gist 卡片永久卡在“分析中”状态。
+    analyzingGistIds: new Set<string>(),
     releases,
     searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),

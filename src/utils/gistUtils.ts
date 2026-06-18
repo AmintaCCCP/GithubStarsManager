@@ -72,6 +72,11 @@ export const getGistCategoryItems = (
       ...(existing || gist),
       ...gist,
       starred: gist.starred || starredIds.has(gist.id) || existing?.starred,
+      // 显式保留可选元数据，避免展开时 undefined 覆盖已有值
+      ai_summary: gist.ai_summary ?? existing?.ai_summary,
+      analyzed_at: gist.analyzed_at ?? existing?.analyzed_at,
+      analysis_failed: gist.analysis_failed ?? existing?.analysis_failed,
+      analysis_error: gist.analysis_error ?? existing?.analysis_error,
     });
   });
 
