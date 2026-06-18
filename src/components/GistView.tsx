@@ -271,7 +271,7 @@ export const GistView: React.FC = () => {
                       'If your private gists are missing, or you cannot create/edit/delete gists, make sure your GitHub token includes the gist scope (OAuth login requests it automatically; for PATs you must check gist manually). Re-login after changing scopes.'
                     )}
                   </p>
-                  <div className="absolute bottom-full left-3 h-2 w-2 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"></div>
+                  <div className="absolute bottom-full left-3 -mb-px h-2 w-2 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"></div>
                 </div>
               </div>
             </div>
