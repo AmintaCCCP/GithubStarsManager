@@ -33,6 +33,7 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | **One‑click Downloads** | Expand release assets and download instantly |
 | **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
 | **Fork Management** | View, sync upstream, and trigger GitHub Actions workflows on forked repos |
+| **Gist Management** | Browse, create, edit, and delete Gists; AI-powered summaries and semantic search |
 | **Network Proxy** | HTTP / SOCKS5 proxy with protocol-level connection testing |
 | **Remote Download (aria2)** | Send release assets to aria2 for download via JSON-RPC |
 | **Diagnostic Logs** | Unified frontend/backend log viewer with debug capture mode |
@@ -121,7 +122,23 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 5. Search & Filters
+### 5. Gist Management (`Gist` View)
+
+**Features:**
+- **Gist Listing** — Automatically syncs all your Gists and starred Gists with category filtering (All / Mine / Starred)
+- **Create & Edit** — Multi-file Gist editor with syntax-highlighted code blocks; supports adding, renaming, and deleting files
+- **AI Analysis** — One-click AI summarization for Gist content; batch analysis with pause/resume
+- **Semantic Search** — AI-powered search reranking to find Gists by intent, not just filename
+- **Detail View** — Expandable Gist detail modal with file content, syntax highlighting, and copy-to-clipboard
+- **Star & Unstar** — Star/unstar Gists directly from the card
+- **Smart Filtering** — Filter by analysis status, language, and sort by name/date/file count
+
+**Screenshot:**
+![Gist Management Interface](upload/gist.png)
+
+---
+
+### 6. Search & Filters
 
 **Features:**
 - **Multi-dimensional Search** — Keyword search, repo status filter, tag filter, language filter, platform filter
@@ -137,7 +154,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 6. Settings Panel
+### 7. Settings Panel
 
 **Settings Groups:**
 
@@ -157,7 +174,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 7. Custom AI Models
+### 8. Custom AI Models
 
 **Features:**
 - **Multi AI Provider Support** — OpenAI (GPT-3.5/GPT-4), Anthropic (Claude), Ollama (local models), any OpenAI-compatible API
