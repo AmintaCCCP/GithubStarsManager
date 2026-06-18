@@ -1,5 +1,7 @@
 import {
   Repository,
+  Gist,
+  GistFile,
   Release,
   GitHubUser,
   DiscoveryPlatform,
@@ -50,6 +52,22 @@ const GITHUB_API_BASE = 'https://api.github.com';
 interface GitHubSearchRepoResponse {
   items: (Repository & { forks_count?: number })[];
   total_count: number;
+}
+
+export interface GistFileInput {
+  filename: string;
+  content: string;
+}
+
+export interface GistCreateInput {
+  description: string;
+  public: boolean;
+  files: GistFileInput[];
+}
+
+export interface GistUpdateInput {
+  description?: string;
+  files?: Array<GistFileInput & { previousFilename?: string; deleted?: boolean }>;
 }
 
 export interface ReleaseFetchOptions {
@@ -228,6 +246,165 @@ export class GitHubApiService {
     }
 
     return allRepos;
+  }
+
+  private mergeGistMetadata(existing: Gist | undefined, incoming: Gist, starred?: boolean): Gist {
+    // 列表 API 不返回文件内容，深度合并文件以保留已加载过的 content；
+    // starred 仅信任显式传入或接口新值，不再回退到缓存，避免取消收藏后状态陈旧。
+    const mergedFiles: Record<string, GistFile> = { ...incoming.files };
+    if (existing?.files) {
+      for (const [filename, file] of Object.entries(mergedFiles)) {
+        const existingFile = existing.files[filename];
+        if (existingFile && file.content === undefined && existingFile.content !== undefined) {
+          mergedFiles[filename] = { ...file, content: existingFile.content };
+        }
+      }
+    }
+
+    return {
+      ...incoming,
+      files: mergedFiles,
+      starred: starred ?? incoming.starred,
+      ai_summary: existing?.ai_summary,
+      analyzed_at: existing?.analyzed_at,
+      analysis_failed: existing?.analysis_failed,
+      analysis_error: existing?.analysis_error,
+      last_edited: existing?.last_edited,
+    };
+  }
+
+  async getGists(page = 1, perPage = 100): Promise<Gist[]> {
+    return this.makeRequest<Gist[]>(`/gists?page=${page}&per_page=${perPage}`);
+  }
+
+  async getAllGists(existingGists: Gist[] = []): Promise<Gist[]> {
+    let allGists: Gist[] = [];
+    let page = 1;
+    const perPage = 100;
+    const existingById = new Map(existingGists.map(gist => [gist.id, gist]));
+
+    while (true) {
+      const gists = await this.getGists(page, perPage);
+      if (gists.length === 0) break;
+
+      allGists = [
+        ...allGists,
+        ...gists.map(gist => this.mergeGistMetadata(existingById.get(gist.id), gist)),
+      ];
+
+      if (gists.length < perPage) break;
+      page++;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allGists;
+  }
+
+  async getStarredGists(page = 1, perPage = 100): Promise<Gist[]> {
+    return this.makeRequest<Gist[]>(`/gists/starred?page=${page}&per_page=${perPage}`);
+  }
+
+  async getAllStarredGists(existingGists: Gist[] = []): Promise<Gist[]> {
+    let allGists: Gist[] = [];
+    let page = 1;
+    const perPage = 100;
+    const existingById = new Map(existingGists.map(gist => [gist.id, gist]));
+
+    while (true) {
+      const gists = await this.getStarredGists(page, perPage);
+      if (gists.length === 0) break;
+
+      allGists = [
+        ...allGists,
+        ...gists.map(gist => this.mergeGistMetadata(existingById.get(gist.id), gist, true)),
+      ];
+
+      if (gists.length < perPage) break;
+      page++;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allGists;
+  }
+
+  async getGist(gistId: string, existing?: Gist): Promise<Gist> {
+    const gist = await this.makeRequest<Gist>(`/gists/${encodeURIComponent(gistId)}`);
+    return this.mergeGistMetadata(existing, gist, existing?.starred);
+  }
+
+  async createGist(input: GistCreateInput): Promise<Gist> {
+    const files = input.files.reduce<Record<string, { content: string }>>((acc, file) => {
+      acc[file.filename] = { content: file.content };
+      return acc;
+    }, {});
+
+    return this.makeRequest<Gist>('/gists', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        description: input.description,
+        public: input.public,
+        files,
+      }),
+    });
+  }
+
+  async updateGist(gistId: string, input: GistUpdateInput, existing?: Gist): Promise<Gist> {
+    const files = (input.files || []).reduce<Record<string, { content?: string; filename?: string } | null>>((acc, file) => {
+      if (file.deleted) {
+        acc[file.previousFilename || file.filename] = null;
+        return acc;
+      }
+
+      acc[file.previousFilename || file.filename] = {
+        content: file.content,
+        ...(file.previousFilename && file.previousFilename !== file.filename ? { filename: file.filename } : {}),
+      };
+      return acc;
+    }, {});
+
+    const payload: Record<string, unknown> = {};
+    if (input.description !== undefined) payload.description = input.description;
+    if (Object.keys(files).length > 0) payload.files = files;
+
+    const gist = await this.makeRequest<Gist>(`/gists/${encodeURIComponent(gistId)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return this.mergeGistMetadata(existing, gist, existing?.starred);
+  }
+
+  async deleteGist(gistId: string): Promise<void> {
+    await this.makeRequest<void>(`/gists/${encodeURIComponent(gistId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async unstarGist(gistId: string): Promise<void> {
+    await this.makeRequest<void>(`/gists/${encodeURIComponent(gistId)}/star`, {
+      method: 'DELETE',
+    });
+  }
+
+  async starGist(gistId: string): Promise<void> {
+    await this.makeRequest<void>(`/gists/${encodeURIComponent(gistId)}/star`, {
+      method: 'PUT',
+    });
+  }
+
+  getGistContentPreview(gist: Gist, maxChars = 6000): string {
+    return Object.values(gist.files || {})
+      .map((file: GistFile) => {
+        const content = file.content || '';
+        return `### ${file.filename}\n${content.slice(0, maxChars)}`;
+      })
+      .join('\n\n')
+      .slice(0, maxChars);
   }
 
   async getWatchedRepositories(page = 1, perPage = 100, username?: string): Promise<Repository[]> {
@@ -1301,7 +1478,9 @@ export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): str
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: 'read:user user:email repo',
+    // `gist` scope 是读写用户 gist（含 secret/私有 gist）所必需的，
+    // 否则只能列出公共 gist，且无法创建/编辑/删除 gist。
+    scope: 'read:user user:email repo gist',
     state: Math.random().toString(36).substring(7),
   });
 

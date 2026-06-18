@@ -9,6 +9,7 @@ import { ForkTimeline } from './components/ForkTimeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { DebugModeIndicator } from './components/DebugModeIndicator';
 import { DiscoveryView } from './components/DiscoveryView';
+import { GistView } from './components/GistView';
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAppStore } from './store/useAppStore';
@@ -81,6 +82,9 @@ RepositoriesView.displayName = 'RepositoriesView';
 
 const ReleasesView = React.memo(() => <ReleaseTimeline />);
 ReleasesView.displayName = 'ReleasesView';
+
+const GistsView = React.memo(() => <GistView />);
+GistsView.displayName = 'GistsView';
 
 const ForksView = React.memo(() => <ForkTimeline />);
 ForksView.displayName = 'ForksView';
@@ -163,6 +167,8 @@ function App() {
             onCategorySelect={handleCategorySelect}
           />
         );
+      case 'gists':
+        return <GistsView />;
       case 'releases':
         return <ReleasesView />;
       case 'forks':
@@ -199,7 +205,7 @@ function App() {
     <div className="min-h-screen bg-light-bg dark:bg-marketing-black text-gray-900 dark:text-text-primary transition-colors duration-200">
       <UpdateNotificationBanner />
       <Header />
-      <main className="max-w-[1200px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {currentViewContent}
       </main>
       <BackToTop />
