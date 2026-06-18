@@ -228,16 +228,26 @@ export const GistView: React.FC = () => {
   const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {
     if (!githubToken) return;
     const api = new GitHubApiService(githubToken);
-    if (editingGist) {
-      const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
-      updateGist({ ...updated, last_edited: new Date().toISOString() });
-      toast(t('Gist 已更新', 'Gist updated'), 'success');
-      return;
-    }
+    try {
+      if (editingGist) {
+        const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
+        updateGist({ ...updated, last_edited: new Date().toISOString() });
+        toast(t('Gist 已更新', 'Gist updated'), 'success');
+        return;
+      }
 
-    const created = await api.createGist(input as GistCreateInput);
-    updateGist({ ...created, last_edited: new Date().toISOString() });
-    toast(t('Gist 已创建', 'Gist created'), 'success');
+      const created = await api.createGist(input as GistCreateInput);
+      updateGist({ ...created, last_edited: new Date().toISOString() });
+      toast(t('Gist 已创建', 'Gist created'), 'success');
+    } catch (error) {
+      toast(
+        t(
+          `Gist ${editingGist ? '更新' : '创建'}失败：${error instanceof Error ? error.message : '未知错误'}`,
+          `Failed to ${editingGist ? 'update' : 'create'} gist: ${error instanceof Error ? error.message : 'Unknown error'}`
+        ),
+        'error'
+      );
+    }
   };
 
   const selectedSort = sortOptions.find(option => option.value === gistSearchFilters.sortBy) || sortOptions[0];
