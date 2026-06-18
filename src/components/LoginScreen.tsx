@@ -206,7 +206,7 @@ export const LoginScreen: React.FC = () => {
             <ol className="text-xs text-gray-700 dark:text-text-tertiary space-y-1">
               <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
               <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
-              <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong> {t('和', 'and')} <strong>user</strong></li>
+              <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong>、<strong>user</strong> {t('和', 'and')} <strong>gist</strong></li>
               <li>4. {t('复制生成的token并粘贴到上方', 'Copy the generated token and paste it above')}</li>
             </ol>
             <div className="mt-3">

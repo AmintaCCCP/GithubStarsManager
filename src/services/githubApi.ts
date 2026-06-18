@@ -1478,7 +1478,9 @@ export const createGitHubOAuthUrl = (clientId: string, redirectUri: string): str
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: 'read:user user:email repo',
+    // `gist` scope 是读写用户 gist（含 secret/私有 gist）所必需的，
+    // 否则只能列出公共 gist，且无法创建/编辑/删除 gist。
+    scope: 'read:user user:email repo gist',
     state: Math.random().toString(36).substring(7),
   });
 

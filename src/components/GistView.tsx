@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, ChevronDown, FileCode2, Loader2, Plus, RefreshCw, Search, Star, User, X } from 'lucide-react';
+import { Bot, ChevronDown, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Search, Star, User, X } from 'lucide-react';
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
@@ -247,7 +247,24 @@ export const GistView: React.FC = () => {
       <aside className="lg:w-64 lg:flex-shrink-0">
         <div className="sticky top-24 rounded-lg border border-black/[0.06] bg-white p-3 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
           <div className="mb-3 flex items-center justify-between px-2">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
+            <div className="flex items-center gap-1">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
+              <div className="group relative">
+                <HelpCircle className="h-3.5 w-3.5 cursor-help text-gray-400 dark:text-text-quaternary" />
+                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-600 shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                  <p className="mb-1 font-medium text-gray-900 dark:text-white">
+                    {t('访问 Gist 需要 gist 权限', 'Gist access requires the gist scope')}
+                  </p>
+                  <p className="leading-relaxed">
+                    {t(
+                      '若私有 gist 没有拉取到，或无法新建/编辑/删除 gist，请确保 GitHub token 包含 gist 权限范围（OAuth 登录会自动申请；使用 PAT 时需手动勾选 gist）。修改权限后需重新登录。',
+                      'If your private gists are missing, or you cannot create/edit/delete gists, make sure your GitHub token includes the gist scope (OAuth login requests it automatically; for PATs you must check gist manually). Re-login after changing scopes.'
+                    )}
+                  </p>
+                  <div className="absolute bottom-full left-3 h-2 w-2 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"></div>
+                </div>
+              </div>
+            </div>
             <span className="text-xs text-gray-500 dark:text-text-tertiary">{categoryItems.all.length}</span>
           </div>
           <div className="space-y-1">
