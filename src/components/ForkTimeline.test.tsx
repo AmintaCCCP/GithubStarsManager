@@ -174,7 +174,7 @@ describe('ForkTimeline owner filtering', () => {
     render(<ForkTimeline />);
 
     await waitFor(() => {
-      expect(toastMock).toHaveBeenCalledWith('组织列表加载失败，请检查 GitHub token 权限。', 'warning');
+      expect(toastMock).toHaveBeenCalledWith('组织列表加载失败，请检查 GitHub token 权限。', 'error');
     });
   });
 });

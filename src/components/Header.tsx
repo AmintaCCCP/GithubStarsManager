@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, GitFork } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, GitFork, FileCode2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { useDialog } from '../hooks/useDialog';
@@ -14,6 +14,8 @@ export const Header: React.FC = () => {
     lastSync,
     githubToken,
     repositories,
+    gists,
+    starredGists,
     setTheme,
     setCurrentView,
     setRepositories,
@@ -24,6 +26,7 @@ export const Header: React.FC = () => {
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
+  const gistCount = useMemo(() => new Set([...gists, ...starredGists].map(gist => gist.id)).size, [gists, starredGists]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isTextWrapped, setIsTextWrapped] = useState(false);
@@ -198,6 +201,28 @@ export const Header: React.FC = () => {
               )}
             </button>
             <button
+              onClick={() => setCurrentView('gists')}
+              aria-label={isTextWrapped ? 'Gist' : undefined}
+              title={isTextWrapped ? 'Gist' : undefined}
+              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
+                currentView === 'gists'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+              }`}
+            >
+              <FileCode2 className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
+              {!isTextWrapped && (
+                <>
+                  Gist
+                  {currentView === 'gists' && gistCount > 0 && (
+                    <span className="ml-1.5 text-sm text-brand-violet">
+                      {gistCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+            <button
               onClick={() => setCurrentView('releases')}
               aria-label={isTextWrapped ? t('发布', 'Releases') : undefined}
               title={isTextWrapped ? t('发布', 'Releases') : undefined}
@@ -261,6 +286,17 @@ export const Header: React.FC = () => {
               title={t('仓库', 'Repositories')}
             >
               <Search className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setCurrentView('gists')}
+              className={`p-2.5 rounded-lg transition-colors ${
+                currentView === 'gists'
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+              }`}
+              title="Gist"
+            >
+              <FileCode2 className="w-5 h-5" />
             </button>
             <button
               onClick={() => setCurrentView('releases')}
@@ -330,6 +366,27 @@ export const Header: React.FC = () => {
                   {currentView === 'repositories' && repositories.length > 0 && (
                     <span className="text-sm text-brand-violet">
                       {repositories.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('gists');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
+                    currentView === 'gists'
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <FileCode2 className="w-5 h-5 mr-3" />
+                    Gist
+                  </div>
+                  {currentView === 'gists' && gistCount > 0 && (
+                    <span className="text-sm text-brand-violet">
+                      {gistCount}
                     </span>
                   )}
                 </button>

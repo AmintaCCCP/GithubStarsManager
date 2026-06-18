@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
 import {
   AppState,
+  Gist,
+  GistCategoryId,
+  GistSearchFilters,
   Repository,
   Release,
   ForkRepo,
@@ -239,6 +242,29 @@ const replaceRepositoryInList = (
   return { repositories: nextRepositories, changed: true, found: true };
 };
 
+const areGistRecordsEqual = (a: Gist, b: Gist): boolean => {
+  if (a === b) return true;
+  return JSON.stringify(a) === JSON.stringify(b);
+};
+
+const replaceGistInList = (
+  gists: Gist[],
+  gist: Gist
+): { gists: Gist[]; changed: boolean; found: boolean } => {
+  const index = gists.findIndex((item) => item.id === gist.id);
+  if (index === -1) {
+    return { gists, changed: false, found: false };
+  }
+
+  if (areGistRecordsEqual(gists[index], gist)) {
+    return { gists, changed: false, found: true };
+  }
+
+  const nextGists = gists.slice();
+  nextGists[index] = gist;
+  return { gists: nextGists, changed: true, found: true };
+};
+
 interface AppActions {
   // Auth actions
   setUser: (user: GitHubUser | null) => void;
@@ -253,6 +279,16 @@ interface AppActions {
   setLastSync: (timestamp: string) => void;
   deleteRepository: (repoId: number) => void;
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
+
+  // Gist actions
+  setGists: (gists: Gist[]) => void;
+  setStarredGists: (gists: Gist[]) => void;
+  updateGist: (gist: Gist) => void;
+  deleteGist: (gistId: string) => void;
+  setGistSearchFilters: (filters: Partial<GistSearchFilters>) => void;
+  setGistSearchResults: (results: Gist[]) => void;
+  setSelectedGistCategory: (category: GistCategoryId) => void;
+  setAnalyzingGist: (gistId: string, isAnalyzing: boolean) => void;
   
   // AI actions
   addAIConfig: (config: AIConfig) => void;
@@ -318,7 +354,7 @@ interface AppActions {
   
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
-  setCurrentView: (view: 'repositories' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
+  setCurrentView: (view: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -406,6 +442,13 @@ const initialSearchFilters: SearchFilters = {
   analysisFailed: undefined,
 };
 
+const initialGistSearchFilters: GistSearchFilters = {
+  query: '',
+  sortBy: 'updated',
+  sortOrder: 'desc',
+  isAnalyzed: undefined,
+};
+
 type PersistedAppState = Partial<
   Pick<
     AppState,
@@ -413,6 +456,11 @@ type PersistedAppState = Partial<
     | 'githubToken'
     | 'isAuthenticated'
     | 'repositories'
+    | 'gists'
+    | 'starredGists'
+    | 'gistSearchFilters'
+    | 'gistSearchResults'
+    | 'selectedGistCategory'
     | 'lastSync'
     | 'aiConfigs'
     | 'activeAIConfig'
@@ -467,6 +515,7 @@ type PersistedAppState = Partial<
   releaseSubscriptions?: unknown;
   readReleases?: unknown;
   readForks?: unknown;
+  analyzingGistIds?: unknown;
   releaseExpandedRepositories?: unknown;
   forkExpandedRepositories?: unknown;
 };
@@ -483,6 +532,18 @@ const normalizeNumberSet = (value: unknown): Set<number> => {
   return new Set<number>();
 };
 
+const normalizeStringSet = (value: unknown): Set<string> => {
+  if (value instanceof Set) {
+    return new Set(Array.from(value).filter((item): item is string => typeof item === 'string'));
+  }
+
+  if (Array.isArray(value)) {
+    return new Set(value.filter((item): item is string => typeof item === 'string'));
+  }
+
+  return new Set<string>();
+};
+
 const normalizePersistedState = (
   persisted: PersistedAppState | undefined,
   currentState: AppState & AppActions
@@ -491,6 +552,8 @@ const normalizePersistedState = (
   const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
+  const gists = Array.isArray(safePersisted.gists) ? safePersisted.gists : [];
+  const starredGists = Array.isArray(safePersisted.starredGists) ? safePersisted.starredGists : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
   // Migration for old users: mark repos with existing releases as already synced
@@ -524,6 +587,15 @@ const normalizePersistedState = (
         ? safePersisted.theme
         : 'dark',
     repositories: migratedRepositories,
+    gists,
+    starredGists,
+    gistSearchResults: Array.isArray(safePersisted.gistSearchResults) ? safePersisted.gistSearchResults : gists,
+    selectedGistCategory: safePersisted.selectedGistCategory === 'starred' || safePersisted.selectedGistCategory === 'mine'
+      ? safePersisted.selectedGistCategory
+      : 'all',
+    // 不恢复 analyzingGistIds：异步分析任务无法在页面重载后存活，
+    // 恢复会导致 Gist 卡片永久卡在“分析中”状态。
+    analyzingGistIds: new Set<string>(),
     releases,
     searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
@@ -542,6 +614,12 @@ const normalizePersistedState = (
       ...safePersisted.searchFilters,
       sortBy: safePersisted.searchFilters?.sortBy || 'stars',
       sortOrder: safePersisted.searchFilters?.sortOrder || 'desc',
+    },
+    gistSearchFilters: {
+      ...initialGistSearchFilters,
+      ...safePersisted.gistSearchFilters,
+      sortBy: safePersisted.gistSearchFilters?.sortBy || 'updated',
+      sortOrder: safePersisted.gistSearchFilters?.sortOrder || 'desc',
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
@@ -904,6 +982,12 @@ export const useAppStore = create<AppState & AppActions>()(
       githubToken: null,
       isAuthenticated: false,
       repositories: [],
+      gists: [],
+      starredGists: [],
+      gistSearchFilters: initialGistSearchFilters,
+      gistSearchResults: [],
+      selectedGistCategory: 'all',
+      analyzingGistIds: new Set<string>(),
       isLoading: false,
       lastSync: null,
       analyzingRepositoryIds: new Set<number>(),
@@ -993,6 +1077,10 @@ export const useAppStore = create<AppState & AppActions>()(
         githubToken: null,
         isAuthenticated: false,
         repositories: [],
+        gists: [],
+        starredGists: [],
+        gistSearchResults: [],
+        analyzingGistIds: new Set(),
         releases: [],
         releaseSubscriptions: new Set(),
         releaseSourceSettings: defaultReleaseSourceSettings,
@@ -1090,6 +1178,58 @@ export const useAppStore = create<AppState & AppActions>()(
           nextAnalyzingIds.delete(repoId);
         }
         return { analyzingRepositoryIds: nextAnalyzingIds };
+      }),
+
+      // Gist actions
+      setGists: (gists) => set((state) => ({
+        gists,
+        gistSearchResults: state.gistSearchFilters.query ? state.gistSearchResults : gists,
+      })),
+      setStarredGists: (starredGists) => set({ starredGists }),
+      updateGist: (gist) => set((state) => {
+        const gistsResult = replaceGistInList(state.gists, gist);
+        const starredResult = replaceGistInList(state.starredGists, gist);
+        const searchResult = replaceGistInList(state.gistSearchResults, gist);
+        const isMine = !!state.user?.login && gist.owner?.login === state.user.login;
+
+        return {
+          gists: gistsResult.found
+            ? gistsResult.gists
+            : isMine
+              ? [gist, ...state.gists]
+              : state.gists,
+          starredGists: starredResult.found ? starredResult.gists : state.starredGists,
+          gistSearchResults: searchResult.found ? searchResult.gists : state.gistSearchResults,
+        };
+      }),
+      deleteGist: (gistId) => set((state) => {
+        const nextAnalyzingIds = new Set(state.analyzingGistIds);
+        nextAnalyzingIds.delete(gistId);
+        return {
+          gists: state.gists.filter(gist => gist.id !== gistId),
+          starredGists: state.starredGists.filter(gist => gist.id !== gistId),
+          gistSearchResults: state.gistSearchResults.filter(gist => gist.id !== gistId),
+          analyzingGistIds: nextAnalyzingIds,
+        };
+      }),
+      setGistSearchFilters: (filters) => set((state) => ({
+        gistSearchFilters: { ...state.gistSearchFilters, ...filters },
+      })),
+      setGistSearchResults: (gistSearchResults) => set({ gistSearchResults }),
+      setSelectedGistCategory: (selectedGistCategory) => set({ selectedGistCategory }),
+      setAnalyzingGist: (gistId, isAnalyzing) => set((state) => {
+        const alreadyAnalyzing = state.analyzingGistIds.has(gistId);
+        if (alreadyAnalyzing === isAnalyzing) {
+          return state;
+        }
+
+        const nextAnalyzingIds = new Set(state.analyzingGistIds);
+        if (isAnalyzing) {
+          nextAnalyzingIds.add(gistId);
+        } else {
+          nextAnalyzingIds.delete(gistId);
+        }
+        return { analyzingGistIds: nextAnalyzingIds };
       }),
 
       // AI actions
@@ -1755,6 +1895,16 @@ export const useAppStore = create<AppState & AppActions>()(
         repositories: state.repositories,
         lastSync: state.lastSync,
 
+        // 持久化 Gist 数据
+        gists: state.gists,
+        starredGists: state.starredGists,
+        gistSearchFilters: {
+          sortBy: state.gistSearchFilters.sortBy,
+          sortOrder: state.gistSearchFilters.sortOrder,
+        },
+        selectedGistCategory: state.selectedGistCategory,
+        analyzingGistIds: Array.from(state.analyzingGistIds),
+
         // 持久化AI配置
         aiConfigs: state.aiConfigs,
         activeAIConfig: state.activeAIConfig,
@@ -2002,6 +2152,7 @@ export const useAppStore = create<AppState & AppActions>()(
         logger.info('store.hydrate', 'Store rehydrated', {
           isAuthenticated: normalized.isAuthenticated,
           repositoriesCount: normalized.repositories?.length || 0,
+          gistsCount: normalized.gists?.length || 0,
           lastSync: normalized.lastSync,
           language: normalized.language,
           webdavConfigsCount: normalized.webdavConfigs?.length || 0,
