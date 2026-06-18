@@ -260,7 +260,7 @@ export const GistView: React.FC = () => {
         <div className="sticky top-24 z-10 rounded-lg border border-black/[0.06] bg-white p-3 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-1">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
               <div className="group relative">
                 <HelpCircle className="h-3.5 w-3.5 cursor-help text-gray-400 dark:text-text-quaternary" />
                 <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-600 shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
