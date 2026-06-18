@@ -255,7 +255,7 @@ export const GistView: React.FC = () => {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
       <aside className="lg:w-64 lg:flex-shrink-0">
-        <div className="sticky top-24 rounded-lg border border-black/[0.06] bg-white p-3 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
+        <div className="sticky top-24 z-10 rounded-lg border border-black/[0.06] bg-white p-3 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-1">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
