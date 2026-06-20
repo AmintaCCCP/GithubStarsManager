@@ -223,8 +223,17 @@ export const GistView: React.FC = () => {
       setDetailGist(detail);
     } catch (error) {
       if (requestSeq !== detailRequestSeqRef.current) return;
-      // 重试仍失败时透出真实错误（如 502 Bad Gateway），便于用户判断是 GitHub 侧故障还是权限问题。
       const msg = error instanceof Error ? error.message : '';
+      // 502/503/504 通常是 GitHub gist API 对该 gist 稳定返回的服务端错误（如 karpathy/8627fe...），
+      // 重试无意义。此时用已缓存的 gist 数据降级打开弹窗，文件内容由 HighlightedCode 按需从 raw_url 获取。
+      const isServerFailure = /50[234]/.test(msg);
+      if (isServerFailure && gist) {
+        toast(
+          t('GitHub Gist API 暂时不可用，已使用缓存数据打开。文件内容将按需加载。', 'GitHub Gist API is temporarily unavailable. Opening with cached data. File content will load on demand.'),
+          'warning'
+        );
+        return;
+      }
       toast(t(`获取 Gist 详情失败${msg ? `：${msg}` : ''}`, `Failed to load gist details${msg ? `: ${msg}` : ''}`), 'error');
     }
   };
