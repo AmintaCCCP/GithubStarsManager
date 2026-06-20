@@ -84,7 +84,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     setIsAnalyzingLocal(true);
     try {
       const githubApi = createGitHubApiService(githubToken);
-      const detail = await githubApi.getGist(gist.id, gist);
+      const detail = await githubApi.getGistForAnalysis(gist.id, gist);
       const aiService = new AIService(activeConfig, language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
       updateGist({
