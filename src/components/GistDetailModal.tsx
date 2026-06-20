@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js';
-import { Copy, ExternalLink } from 'lucide-react';
+import { AlertCircle, Copy, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { Modal } from './Modal';
 import type { Gist, GistFile } from '../types';
 import { getGistTitle, inferGistCodeLanguage } from '../utils/gistUtils';
 import { safeWriteText } from '../utils/clipboardUtils';
+import { createGitHubApiService } from '../services/githubApiFactory';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import 'highlight.js/styles/github.min.css';
@@ -17,12 +18,61 @@ interface GistDetailModalProps {
 
 interface HighlightedCodeProps {
   file: GistFile;
+  onContentLoaded?: (filename: string, content: string) => void;
 }
 
-const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file }) => {
+const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded }) => {
   const codeRef = useRef<HTMLElement>(null);
   const language = inferGistCodeLanguage(file.filename, file.language);
-  const content = file.content || '';
+  const githubToken = useAppStore(state => state.githubToken);
+  const language2 = useAppStore(state => state.language);
+  const t = (zh: string, en: string) => language2 === 'zh' ? zh : en;
+
+  // 截断文件（>1MB）的 content 会被 GitHub gist 详情 API 省略，需要按需拉取 raw_url。
+  const needsRawFetch = !!file.truncated && !file.content && !!file.raw_url;
+  const [rawContent, setRawContent] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
+  const [isLoadingRaw, setIsLoadingRaw] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const content = file.content ?? rawContent ?? '';
+
+  useEffect(() => {
+    if (!needsRawFetch || !file.raw_url) return;
+    // 切换文件或重试时，取消上一个未完成请求，避免旧响应覆盖新文件。
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsLoadingRaw(true);
+    setRawError(null);
+    const doFetch = async () => {
+      if (!githubToken) {
+        setRawError(t('未配置 GitHub token，无法加载截断文件', 'GitHub token not configured, cannot load truncated file'));
+        setIsLoadingRaw(false);
+        return;
+      }
+      try {
+        const api = createGitHubApiService(githubToken);
+        const text = await api.getGistFileRaw(file.raw_url!, controller.signal);
+        if (controller.signal.aborted) return;
+        setRawContent(text);
+        onContentLoaded?.(file.filename, text);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        setRawError(msg === 'Aborted' ? t('加载已取消', 'Loading cancelled') : msg);
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingRaw(false);
+      }
+    };
+    doFetch();
+
+    return () => controller.abort();
+    // retryTick 用于手动触发重试；file.raw_url/filename 变化时也会重新拉取。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsRawFetch, file.raw_url, file.filename, retryTick, githubToken]);
 
   useEffect(() => {
     if (!codeRef.current) return;
@@ -33,6 +83,35 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file }) => {
       // Highlight.js can fail for obscure aliases; plaintext keeps the modal usable.
     }
   }, [content, language]);
+
+  if (isLoadingRaw) {
+    return (
+      <div className="flex items-center justify-center rounded-lg bg-light-surface p-8 dark:bg-black/30">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin text-gray-500 dark:text-text-tertiary" />
+        <span className="text-sm text-gray-500 dark:text-text-tertiary">{t('正在加载文件内容...', 'Loading file content...')}</span>
+      </div>
+    );
+  }
+
+  if (needsRawFetch && rawError) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg bg-light-surface p-8 dark:bg-black/30">
+        <AlertCircle className="mb-3 h-8 w-8 text-gray-600 dark:text-text-secondary" />
+        <p className="mb-4 max-w-md text-center text-sm text-gray-700 dark:text-text-secondary">{rawError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setRawContent(null);
+            setRetryTick(tick => tick + 1);
+          }}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90"
+        >
+          <RefreshCw className="h-4 w-4" />
+          {t('重试', 'Retry')}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <pre className="max-h-[60vh] overflow-auto rounded-lg bg-light-surface p-4 text-sm leading-6 dark:bg-black/30">
@@ -45,12 +124,27 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file }) => {
 
 export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, onClose }) => {
   const language = useAppStore(state => state.language);
+  const updateGist = useAppStore(state => state.updateGist);
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
+
+  // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
+  const handleContentLoaded = (filename: string, content: string) => {
+    if (!gist) return;
+    const targetFile = gist.files?.[filename];
+    if (!targetFile || targetFile.content) return;
+    updateGist({
+      ...gist,
+      files: {
+        ...gist.files,
+        [filename]: { ...targetFile, content },
+      },
+    });
+  };
 
   useEffect(() => {
     setActiveFilename(files[0]?.filename || '');
@@ -137,7 +231,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
                 {t('复制文件', 'Copy file')}
               </button>
             </div>
-            <HighlightedCode file={activeFile} />
+            <HighlightedCode file={activeFile} onContentLoaded={handleContentLoaded} />
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-black/[0.08] p-8 text-center text-gray-500 dark:border-white/[0.08] dark:text-text-tertiary">

@@ -84,9 +84,32 @@ export class GitHubApiService {
   private token: string;
   private rateLimitRemaining: number | null = null;
   private rateLimitReset: number | null = null;
+  private backendUrl: string | null = null;
+  private backendAuthToken: string | null = null;
 
   constructor(token: string) {
     this.token = token;
+  }
+
+  /**
+   * 设置后端代理地址。设置后所有请求（makeRequest / getGistFileRaw）将
+   * 通过服务器的 /api/proxy/github/* 路由转发，从而走用户配置的代理。
+   * 传 null 恢复直连模式。
+   */
+  setBackendUrl(url: string | null): void {
+    this.backendUrl = url;
+  }
+
+  setBackendAuthToken(token: string | null): void {
+    this.backendAuthToken = token;
+  }
+
+  private getBackendHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.backendAuthToken) {
+      headers.Authorization = `Bearer ${this.backendAuthToken}`;
+    }
+    return headers;
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit & { operationTag?: string } = {}, signal?: AbortSignal): Promise<T> {
@@ -119,35 +142,63 @@ export class GitHubApiService {
       }
     }
 
-    let response: Response;
-    try {
-      response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
-        ...fetchOptions,
-        signal,
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          ...fetchOptions.headers,
-        },
-      });
-    } catch (fetchError) {
-      const durationMs = Date.now() - startTime;
-      logger.error('githubApi', 'API request network error', { method, endpoint, durationMs, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
-      throw fetchError;
-    }
+    // GitHub 的 gist 等端点偶发 502/503/504（网关瞬时故障），这里对 5xx 做指数退避重试，
+    // 退避策略与 backendAdapter.fetchWithRetry 保持一致（1s/2s/4s，最多重试 3 次）。
+    const maxRetries = 3;
+    let response: Response | undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (this.backendUrl) {
+          // 通过后端代理路由：POST {backendUrl}/proxy/github/{endpoint}?query
+          // 服务端负责加鉴权头 + 读取代理配置 + 转发，所以客户端不再传 Authorization。
+          const proxyUrl = `${this.backendUrl}/proxy/github${endpoint}`;
+          const proxyBody: Record<string, unknown> = { method };
+          const requestHeaders = fetchOptions.headers as Record<string, string> | undefined;
+          // 转发必要头（如 starred repos 需要 star+json，POST/PATCH 需要 JSON Content-Type）
+          const acceptHeader = requestHeaders?.Accept || requestHeaders?.accept;
+          const contentTypeHeader = requestHeaders?.['Content-Type'] || requestHeaders?.['content-type'];
+          const proxyHeaders: Record<string, string> = {};
+          if (acceptHeader) proxyHeaders.Accept = acceptHeader;
+          if (contentTypeHeader) proxyHeaders['Content-Type'] = contentTypeHeader;
+          if (Object.keys(proxyHeaders).length > 0) proxyBody.headers = proxyHeaders;
+          if (fetchOptions.body) proxyBody.body = fetchOptions.body;
 
-    // Parse rate limit headers
-    const remaining = response.headers.get('X-RateLimit-Remaining');
-    const reset = response.headers.get('X-RateLimit-Reset');
-    if (remaining !== null) {
-      this.rateLimitRemaining = parseInt(remaining, 10);
-    }
-    if (reset !== null) {
-      this.rateLimitReset = parseInt(reset, 10);
-    }
+          response = await fetch(proxyUrl, {
+            method: 'POST',
+            signal,
+            headers: this.getBackendHeaders(),
+            body: JSON.stringify(proxyBody),
+          });
+        } else {
+          response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
+            ...fetchOptions,
+            signal,
+            headers: {
+              'Authorization': `Bearer ${this.token}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              ...fetchOptions.headers,
+            },
+          });
+        }
+      } catch (fetchError) {
+        const durationMs = Date.now() - startTime;
+        logger.error('githubApi', 'API request network error', { method, endpoint, durationMs, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
+        throw fetchError;
+      }
 
-    if (!response.ok) {
+      // Parse rate limit headers
+      const remaining = response.headers.get('X-RateLimit-Remaining');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      if (remaining !== null) {
+        this.rateLimitRemaining = parseInt(remaining, 10);
+      }
+      if (reset !== null) {
+        this.rateLimitReset = parseInt(reset, 10);
+      }
+
+      if (response.ok) break;
+
       const durationMs = Date.now() - startTime;
       if (response.status === 401) {
         logger.warn('githubApi', 'API request failed: unauthorized', { method, endpoint, status: response.status, durationMs });
@@ -160,9 +211,26 @@ export class GitHubApiService {
         logger.warn('githubApi', 'API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
       }
-      logger.warn('githubApi', 'API request failed', { method, endpoint, status: response.status, durationMs });
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+
+      // 5xx 视为可重试的瞬时故障；其余 4xx 直接抛出（重试无意义）。
+      const isRetryable = response.status >= 500 && response.status <= 599;
+      if (!isRetryable || attempt === maxRetries) {
+        logger.warn('githubApi', 'API request failed', { method, endpoint, status: response.status, durationMs });
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      }
+
+      // 重试前若请求已被取消，则不再等待，直接以当前失败状态抛出。
+      if (signal?.aborted) {
+        logger.warn('githubApi', 'API request aborted before retry', { method, endpoint, status: response.status });
+        throw new Error('Aborted');
+      }
+      const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
+      logger.warn('githubApi', 'API request failed, retrying', { method, endpoint, status: response.status, attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs, durationMs });
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
+
+    // 循环正常退出时 response 一定已赋值（最后一次成功 break 或在循环内抛出）。
+    const finalResponse = response!;
 
     if (logger.isDebugMode()) {
       // Capture request headers (mask auth)
@@ -174,25 +242,25 @@ export class GitHubApiService {
       };
       // Capture response headers
       const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((v, k) => { responseHeaders[k] = v; });
+      finalResponse.headers.forEach((v, k) => { responseHeaders[k] = v; });
       // Capture response body preview (clone to avoid consuming)
       let responseBody: string | undefined;
       try {
-        const cloned = response.clone();
+        const cloned = finalResponse.clone();
         const text = await cloned.text();
         if (text.length > 0) {
           responseBody = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
         }
       } catch { /* body not readable */ }
       logger.debug('githubApi', 'API request', {
-        method, endpoint, status: response.status, durationMs: Date.now() - startTime,
-        rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
+        method, endpoint, status: finalResponse.status, durationMs: Date.now() - startTime,
+        rateLimitRemaining: finalResponse.headers.get('x-ratelimit-remaining'),
         requestHeaders, responseHeaders, responseBody,
         ...(operationTag ? { operationTag } : {}),
       });
     }
 
-    const data = response.status === 204 ? null : await response.json();
+    const data = finalResponse.status === 204 ? null : await finalResponse.json();
 
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
@@ -330,6 +398,44 @@ export class GitHubApiService {
   async getGist(gistId: string, existing?: Gist): Promise<Gist> {
     const gist = await this.makeRequest<Gist>(`/gists/${encodeURIComponent(gistId)}`);
     return this.mergeGistMetadata(existing, gist, existing?.starred);
+  }
+
+  /**
+   * 拉取 gist 单个文件的原始内容。
+   * 用于 GitHub gist 详情 API 返回 truncated:true（文件 >1MB，content 被省略）时的回退取数。
+   * raw_url 指向 gist.githubusercontent.com，不能复用 makeRequest（它会在前面拼 GITHUB_API_BASE）。
+   * 当 backendUrl 已设置时通过服务端代理路由（走用户配置的代理），否则直连。
+   */
+  async getGistFileRaw(rawUrl: string, signal?: AbortSignal): Promise<string> {
+    if (this.backendUrl) {
+      const proxyUrl = `${this.backendUrl}/proxy/github-raw`;
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        signal,
+        headers: this.getBackendHeaders(),
+        body: JSON.stringify({ url: rawUrl }),
+      });
+      if (!response.ok) {
+        // 尝试从 JSON 错误体提取消息
+        let detail = response.statusText;
+        try { const data = await response.json(); detail = (data as { error?: string }).error || detail; } catch { /* ignore */ }
+        throw new Error(`GitHub raw proxy error: ${response.status} ${detail}`);
+      }
+      return response.text();
+    }
+
+    const response = await fetch(rawUrl, {
+      signal,
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    }
+    return response.text();
   }
 
   async createGist(input: GistCreateInput): Promise<Gist> {
