@@ -355,8 +355,14 @@ export class GitHubApiService {
     if (existing?.files) {
       for (const [filename, file] of Object.entries(mergedFiles)) {
         const existingFile = existing.files[filename];
-        if (existingFile && file.content === undefined && existingFile.content !== undefined) {
-          mergedFiles[filename] = { ...file, content: existingFile.content };
+        if (existingFile) {
+          // 优先保留已加载过的完整内容：
+          // - incoming.content 不存在（列表 API 不返回 content）
+          // - incoming 标记为截断，而 existing 已有完整内容
+          const incomingIncomplete = file.content === undefined || (file.truncated && existingFile.content !== undefined && !existingFile.truncated);
+          if (incomingIncomplete && existingFile.content !== undefined) {
+            mergedFiles[filename] = { ...file, content: existingFile.content, truncated: false };
+          }
         }
       }
     }

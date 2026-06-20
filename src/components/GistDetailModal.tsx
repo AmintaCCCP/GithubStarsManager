@@ -28,17 +28,18 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
   const language2 = useAppStore(state => state.language);
   const t = (zh: string, en: string) => language2 === 'zh' ? zh : en;
 
-  // 当文件没有 content 但有 raw_url 时按需拉取。这覆盖了两种场景：
-  // 1. 详情 API 返回 truncated:true（文件 >1MB，content 被省略）
+  // 需要按需从 raw_url 拉取完整内容的场景：
+  // 1. file.truncated === true：详情 API 标记文件已截断（>1MB），content 仅是部分内容
   // 2. 详情 API 502 降级后用列表缓存数据打开（列表 API 不返回 content，但返回 raw_url）
-  const needsRawFetch = !file.content && !!file.raw_url;
+  const needsRawFetch = (!!file.truncated || !file.content) && !!file.raw_url;
   const [rawContent, setRawContent] = useState<string | null>(null);
   const [rawError, setRawError] = useState<string | null>(null);
   const [isLoadingRaw, setIsLoadingRaw] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const onContentLoadedRef = useRef(onContentLoaded);
 
-  const content = file.content ?? rawContent ?? '';
+  // rawContent 来自 raw_url，始终比 file.content（可能是 API 截断的部分内容）更完整。
+  const content = rawContent ?? file.content ?? '';
 
   useEffect(() => {
     onContentLoadedRef.current = onContentLoaded;
@@ -146,7 +147,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
       gist;
 
     const targetFile = latest.files?.[filename];
-    if (!targetFile || targetFile.content) return;
+    if (!targetFile || (targetFile.content && !targetFile.truncated)) return;
     updateGist({
       ...latest,
       files: {
