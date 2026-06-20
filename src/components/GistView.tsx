@@ -222,6 +222,7 @@ export const GistView: React.FC = () => {
       updateGist(detail);
       setDetailGist(detail);
     } catch (error) {
+      if (requestSeq !== detailRequestSeqRef.current) return;
       // 重试仍失败时透出真实错误（如 502 Bad Gateway），便于用户判断是 GitHub 侧故障还是权限问题。
       const msg = error instanceof Error ? error.message : '';
       toast(t(`获取 Gist 详情失败${msg ? `：${msg}` : ''}`, `Failed to load gist details${msg ? `: ${msg}` : ''}`), 'error');

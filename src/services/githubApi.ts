@@ -183,8 +183,28 @@ export class GitHubApiService {
         }
       } catch (fetchError) {
         const durationMs = Date.now() - startTime;
-        logger.error('githubApi', 'API request network error', { method, endpoint, durationMs, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
-        throw fetchError;
+        // 网络错误（连接断开、DNS 超时、socket hang-up 等）视为可重试的瞬时故障，
+        // 仅在最后一次尝试时抛出；之前的尝试会继续走指数退避重试。
+        if (attempt === maxRetries || signal?.aborted) {
+          logger.error('githubApi', 'API request network error', { method, endpoint, durationMs, attempt: attempt + 1, maxRetries: maxRetries + 1, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
+          throw fetchError;
+        }
+        logger.warn('githubApi', 'API request network error, retrying', { method, endpoint, attempt: attempt + 1, maxRetries: maxRetries + 1, durationMs, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
+        const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => {
+            clearTimeout(timeoutId);
+            signal?.removeEventListener('abort', onAbort);
+            reject(new Error('Aborted'));
+          };
+          const timeoutId = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+          }, delayMs);
+          signal?.addEventListener('abort', onAbort);
+          if (signal?.aborted) onAbort();
+        });
+        continue;
       }
 
       // Parse rate limit headers
@@ -226,7 +246,19 @@ export class GitHubApiService {
       }
       const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
       logger.warn('githubApi', 'API request failed, retrying', { method, endpoint, status: response.status, attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs, durationMs });
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          clearTimeout(timeoutId);
+          signal?.removeEventListener('abort', onAbort);
+          reject(new Error('Aborted'));
+        };
+        const timeoutId = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        }, delayMs);
+        signal?.addEventListener('abort', onAbort);
+        if (signal?.aborted) onAbort();
+      });
     }
 
     // 循环正常退出时 response 一定已赋值（最后一次成功 break 或在循环内抛出）。
