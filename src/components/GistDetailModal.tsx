@@ -28,8 +28,10 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
   const language2 = useAppStore(state => state.language);
   const t = (zh: string, en: string) => language2 === 'zh' ? zh : en;
 
-  // 截断文件（>1MB）的 content 会被 GitHub gist 详情 API 省略，需要按需拉取 raw_url。
-  const needsRawFetch = !!file.truncated && !file.content && !!file.raw_url;
+  // 当文件没有 content 但有 raw_url 时按需拉取。这覆盖了两种场景：
+  // 1. 详情 API 返回 truncated:true（文件 >1MB，content 被省略）
+  // 2. 详情 API 502 降级后用列表缓存数据打开（列表 API 不返回 content，但返回 raw_url）
+  const needsRawFetch = !file.content && !!file.raw_url;
   const [rawContent, setRawContent] = useState<string | null>(null);
   const [rawError, setRawError] = useState<string | null>(null);
   const [isLoadingRaw, setIsLoadingRaw] = useState(false);
@@ -50,7 +52,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
     setRawError(null);
     const doFetch = async () => {
       if (!githubToken) {
-        setRawError(t('未配置 GitHub token，无法加载截断文件', 'GitHub token not configured, cannot load truncated file'));
+        setRawError(t('未配置 GitHub token，无法加载文件内容', 'GitHub token not configured, cannot load file content'));
         setIsLoadingRaw(false);
         return;
       }
