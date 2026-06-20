@@ -3,7 +3,8 @@ import { Bot, ChevronDown, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Sear
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
-import { GitHubApiService, GistCreateInput, GistUpdateInput } from '../services/githubApi';
+import { GistCreateInput, GistUpdateInput } from '../services/githubApi';
+import { createGitHubApiService } from '../services/githubApiFactory';
 import { AIService } from '../services/aiService';
 import { useAppStore } from '../store/useAppStore';
 import type { Gist, GistCategoryId } from '../types';
@@ -90,7 +91,7 @@ export const GistView: React.FC = () => {
 
     setIsRefreshing(true);
     try {
-      const api = new GitHubApiService(githubToken);
+      const api = createGitHubApiService(githubToken);
       const [mine, starred] = await Promise.all([
         api.getAllGists(gists),
         api.getAllStarredGists([...gists, ...starredGists]),
@@ -165,7 +166,7 @@ export const GistView: React.FC = () => {
     if (!confirmed) return;
 
     setIsAnalyzingAll(true);
-    const api = new GitHubApiService(githubToken);
+    const api = createGitHubApiService(githubToken);
     const aiService = new AIService(activeConfig, language);
     let success = 0;
     let failed = 0;
@@ -175,7 +176,7 @@ export const GistView: React.FC = () => {
     const analyzeOne = async (gist: Gist) => {
       setAnalyzingGist(gist.id, true);
       try {
-        const detail = await api.getGist(gist.id, gist);
+        const detail = await api.getGistForAnalysis(gist.id, gist);
         const summary = await aiService.analyzeGist(detail, api.getGistContentPreview(detail));
         updateGist({
           ...detail,
@@ -215,19 +216,31 @@ export const GistView: React.FC = () => {
     if (!githubToken) return;
 
     try {
-      const detail = await new GitHubApiService(githubToken).getGist(gist.id, gist);
+      const detail = await createGitHubApiService(githubToken).getGist(gist.id, gist);
       // 防止旧请求覆盖新打开的 gist 详情
       if (requestSeq !== detailRequestSeqRef.current) return;
       updateGist(detail);
       setDetailGist(detail);
-    } catch {
-      toast(t('获取 Gist 详情失败', 'Failed to load gist details'), 'error');
+    } catch (error) {
+      if (requestSeq !== detailRequestSeqRef.current) return;
+      const msg = error instanceof Error ? error.message : '';
+      // 502/503/504 通常是 GitHub gist API 对该 gist 稳定返回的服务端错误（如 karpathy/8627fe...），
+      // 重试无意义。此时用已缓存的 gist 数据降级打开弹窗，文件内容由 HighlightedCode 按需从 raw_url 获取。
+      const isServerFailure = /5\d{2}/.test(msg);
+      if (isServerFailure && gist) {
+        toast(
+          t('GitHub Gist API 暂时不可用，已使用缓存数据打开。文件内容将按需加载。', 'GitHub Gist API is temporarily unavailable. Opening with cached data. File content will load on demand.'),
+          'warning'
+        );
+        return;
+      }
+      toast(t(`获取 Gist 详情失败${msg ? `：${msg}` : ''}`, `Failed to load gist details${msg ? `: ${msg}` : ''}`), 'error');
     }
   };
 
   const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {
     if (!githubToken) return;
-    const api = new GitHubApiService(githubToken);
+    const api = createGitHubApiService(githubToken);
     try {
       if (editingGist) {
         const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);

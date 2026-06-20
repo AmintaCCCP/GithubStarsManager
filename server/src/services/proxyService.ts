@@ -18,6 +18,7 @@ export interface ProxyRequestOptions {
   body?: string | object;
   timeout?: number;
   proxyConfig?: ProxyConfig | null;
+  preserveRawResponse?: boolean;
 }
 
 export interface ProxyResponse {
@@ -59,7 +60,7 @@ export function validateUrl(rawUrl: string): void {
 }
 
 export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyResponse> {
-  const { url, method, headers = {}, body, timeout = 30000, proxyConfig } = options;
+  const { url, method, headers = {}, body, timeout = 30000, proxyConfig, preserveRawResponse = false } = options;
 
   try {
     validateUrl(url);
@@ -72,6 +73,10 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
       timeout,
       validateStatus: () => true, // 不抛出 HTTP 错误状态码
     };
+    if (preserveRawResponse) {
+      axiosConfig.responseType = 'text';
+      axiosConfig.transformResponse = [(data) => data];
+    }
 
     if (body && method !== 'GET' && method !== 'HEAD') {
       axiosConfig.data = body;
@@ -124,17 +129,21 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
     }
 
     let data: unknown;
-    const contentType = String(response.headers['content-type'] || '');
-    if (contentType.includes('application/json') && typeof response.data === 'object') {
-      data = response.data;
-    } else if (typeof response.data === 'string') {
-      try {
-        data = JSON.parse(response.data);
-      } catch {
+    if (preserveRawResponse) {
+      data = typeof response.data === 'string' ? response.data : String(response.data ?? '');
+    } else {
+      const contentType = String(response.headers['content-type'] || '');
+      if (contentType.includes('application/json') && typeof response.data === 'object') {
+        data = response.data;
+      } else if (typeof response.data === 'string') {
+        try {
+          data = JSON.parse(response.data);
+        } catch {
+          data = response.data;
+        }
+      } else {
         data = response.data;
       }
-    } else {
-      data = response.data;
     }
 
     return { status: response.status, headers: responseHeaders, data };

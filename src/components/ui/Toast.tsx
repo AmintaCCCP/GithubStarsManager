@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastProps {
   message: string;
@@ -15,18 +15,21 @@ const iconMap = {
   success: CheckCircle,
   error: AlertCircle,
   info: Info,
+  warning: AlertTriangle,
 };
 
 const bgMap = {
   success: 'bg-gray-50 dark:bg-white/[0.04] border-status-green/30',
   error: 'bg-gray-50 dark:bg-white/[0.04] border-status-red/30',
   info: 'bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08]',
+  warning: 'bg-gray-50 dark:bg-white/[0.04] border-amber-400/40',
 };
 
 const iconColorMap = {
   success: 'text-status-green dark:text-status-green',
   error: 'text-status-red dark:text-status-red',
   info: 'text-gray-500 dark:text-text-secondary',
+  warning: 'text-amber-500 dark:text-amber-400',
 };
 
 export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000 }) => {
