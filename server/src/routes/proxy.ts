@@ -138,7 +138,14 @@ router.post('/api/proxy/github-raw', async (req, res) => {
     }
 
     // Whitelist: only allow known GitHub raw-content hosts
-    const parsed = new URL(body.url);
+    let parsed: URL;
+    try {
+      parsed = new URL(body.url);
+    } catch {
+      res.status(400).json({ error: 'Invalid URL format', code: 'INVALID_URL' });
+      return;
+    }
+
     const allowedHosts = new Set(['gist.githubusercontent.com', 'raw.githubusercontent.com']);
     if (!allowedHosts.has(parsed.hostname.toLowerCase())) {
       res.status(400).json({ error: `Host ${parsed.hostname} not allowed`, code: 'HOST_NOT_ALLOWED' });
@@ -147,11 +154,20 @@ router.post('/api/proxy/github-raw', async (req, res) => {
     validateUrl(body.url);
 
     const method = body.method || 'GET';
+    const safeForwardHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(body.headers || {})) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'authorization' || lowerKey === 'proxy-authorization' || lowerKey === 'host' || lowerKey === 'content-length') {
+        continue;
+      }
+      safeForwardHeaders[key] = value;
+    }
+
     const headers: Record<string, string> = {
+      ...safeForwardHeaders,
       'Authorization': `Bearer ${token}`,
       'User-Agent': 'GithubStarsManager-Backend',
       'Accept': 'application/vnd.github.v3+json',
-      ...body.headers,
     };
 
     const proxyConfig = getProxyConfig();

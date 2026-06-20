@@ -89,4 +89,54 @@ describe('GitHub proxy routes', () => {
     expect(options.preserveRawResponse).toBe(true);
     expect(options.proxyConfig).toMatchObject({ enabled: true, type: 'http', host: '127.0.0.1', port: 7890 });
   });
+
+  it('rejects malformed raw gist URLs as client errors', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/github-raw')
+      .send({ url: 'not a url' })
+      .expect(400, { error: 'Invalid URL format', code: 'INVALID_URL' });
+
+    expect(validateUrlMock).not.toHaveBeenCalled();
+    expect(proxyRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects raw URLs from non-GitHub content hosts', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/github-raw')
+      .send({ url: 'https://example.com/file.txt' })
+      .expect(400, { error: 'Host example.com not allowed', code: 'HOST_NOT_ALLOWED' });
+
+    expect(validateUrlMock).not.toHaveBeenCalled();
+    expect(proxyRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('does not let client raw headers override server GitHub credentials', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/github-raw')
+      .send({
+        url: 'https://gist.githubusercontent.com/karpathy/8627fe009c40f57531cb18360106ce95/raw/file',
+        headers: {
+          Authorization: 'Bearer client-token',
+          'Proxy-Authorization': 'Basic client-proxy',
+          Host: 'evil.example.com',
+          'Content-Length': '999',
+          'X-Custom': 'kept',
+        },
+      })
+      .expect(200, { ok: true });
+
+    expect(proxyRequestMock).toHaveBeenCalledOnce();
+    const options = proxyRequestMock.mock.calls[0][0];
+    expect(options.headers.Authorization).toBe('Bearer github-token');
+    expect(options.headers['Proxy-Authorization']).toBeUndefined();
+    expect(options.headers.Host).toBeUndefined();
+    expect(options.headers['Content-Length']).toBeUndefined();
+    expect(options.headers['X-Custom']).toBe('kept');
+  });
 });

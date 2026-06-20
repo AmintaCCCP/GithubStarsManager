@@ -34,16 +34,17 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
   const [rawError, setRawError] = useState<string | null>(null);
   const [isLoadingRaw, setIsLoadingRaw] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
+  const onContentLoadedRef = useRef(onContentLoaded);
 
   const content = file.content ?? rawContent ?? '';
 
   useEffect(() => {
+    onContentLoadedRef.current = onContentLoaded;
+  }, [onContentLoaded]);
+
+  useEffect(() => {
     if (!needsRawFetch || !file.raw_url) return;
-    // 切换文件或重试时，取消上一个未完成请求，避免旧响应覆盖新文件。
-    abortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
 
     setIsLoadingRaw(true);
     setRawError(null);
@@ -58,7 +59,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
         const text = await api.getGistFileRaw(file.raw_url!, controller.signal);
         if (controller.signal.aborted) return;
         setRawContent(text);
-        onContentLoaded?.(file.filename, text);
+        onContentLoadedRef.current?.(file.filename, text);
       } catch (err) {
         if (controller.signal.aborted) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -135,12 +136,19 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
   const handleContentLoaded = (filename: string, content: string) => {
     if (!gist) return;
-    const targetFile = gist.files?.[filename];
+    const state = useAppStore.getState();
+    const latest =
+      state.gists.find(item => item.id === gist.id) ||
+      state.starredGists.find(item => item.id === gist.id) ||
+      state.gistSearchResults.find(item => item.id === gist.id) ||
+      gist;
+
+    const targetFile = latest.files?.[filename];
     if (!targetFile || targetFile.content) return;
     updateGist({
-      ...gist,
+      ...latest,
       files: {
-        ...gist.files,
+        ...latest.files,
         [filename]: { ...targetFile, content },
       },
     });
