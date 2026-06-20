@@ -532,18 +532,6 @@ const normalizeNumberSet = (value: unknown): Set<number> => {
   return new Set<number>();
 };
 
-const normalizeStringSet = (value: unknown): Set<string> => {
-  if (value instanceof Set) {
-    return new Set(Array.from(value).filter((item): item is string => typeof item === 'string'));
-  }
-
-  if (Array.isArray(value)) {
-    return new Set(value.filter((item): item is string => typeof item === 'string'));
-  }
-
-  return new Set<string>();
-};
-
 const normalizePersistedState = (
   persisted: PersistedAppState | undefined,
   currentState: AppState & AppActions

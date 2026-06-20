@@ -50,10 +50,14 @@ export const getGistPrimaryLanguage = (gist: Gist): string | null => {
 };
 
 export const inferGistCodeLanguage = (filename: string, apiLanguage?: string | null): string => {
-  if (apiLanguage) return apiLanguage.toLowerCase().replace(/\s+/g, '-');
+  if (apiLanguage) {
+    const normalized = apiLanguage.toLowerCase().replace(/\s+/g, '-');
+    return normalized === 'text' ? 'plaintext' : normalized;
+  }
   const lower = filename.toLowerCase();
   if (lower === 'dockerfile') return 'dockerfile';
-  const extension = lower.includes('.') ? lower.split('.').pop() || '' : lower;
+  if (!lower.includes('.')) return extensionLanguageMap[lower] || 'plaintext';
+  const extension = lower.split('.').pop() || '';
   return extensionLanguageMap[extension] || extension || 'plaintext';
 };
 

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Bot, Clock, Copy, Edit3, ExternalLink, FileCode2, Loader2, StarOff, Trash2, User } from 'lucide-react';
 import type { Gist } from '../types';
-import { GitHubApiService } from '../services/githubApi';
+import { createGitHubApiService } from '../services/githubApiFactory';
 import { AIService } from '../services/aiService';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
@@ -83,7 +83,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     setAnalyzingGist(gist.id, true);
     setIsAnalyzingLocal(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const detail = await githubApi.getGist(gist.id, gist);
       const aiService = new AIService(activeConfig, language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
@@ -121,7 +121,7 @@ export const GistCard: React.FC<GistCardProps> = ({
 
     setIsMutating(true);
     try {
-      await new GitHubApiService(githubToken).unstarGist(gist.id);
+      await createGitHubApiService(githubToken).unstarGist(gist.id);
       onUnstarred(gist.id);
       updateGist({ ...gist, starred: false });
       toast(t('已取消收藏', 'Unstarred'), 'success');
@@ -144,7 +144,7 @@ export const GistCard: React.FC<GistCardProps> = ({
 
     setIsMutating(true);
     try {
-      await new GitHubApiService(githubToken).deleteGist(gist.id);
+      await createGitHubApiService(githubToken).deleteGist(gist.id);
       deleteGist(gist.id);
       onDeleted(gist.id);
       toast(t('Gist 已删除', 'Gist deleted'), 'success');
