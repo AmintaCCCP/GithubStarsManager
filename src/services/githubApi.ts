@@ -447,7 +447,7 @@ export class GitHubApiService {
       return await this.getGist(gistId, existing);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const isServerFailure = /50[0-9]/.test(msg);
+      const isServerFailure = /5\d{2}/.test(msg);
       if (!isServerFailure || !existing) throw err;
 
       // 降级：用 existing 的元数据，从 raw_url 逐个拉取文件内容

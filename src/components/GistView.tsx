@@ -226,7 +226,7 @@ export const GistView: React.FC = () => {
       const msg = error instanceof Error ? error.message : '';
       // 502/503/504 通常是 GitHub gist API 对该 gist 稳定返回的服务端错误（如 karpathy/8627fe...），
       // 重试无意义。此时用已缓存的 gist 数据降级打开弹窗，文件内容由 HighlightedCode 按需从 raw_url 获取。
-      const isServerFailure = /50[234]/.test(msg);
+      const isServerFailure = /5\d{2}/.test(msg);
       if (isServerFailure && gist) {
         toast(
           t('GitHub Gist API 暂时不可用，已使用缓存数据打开。文件内容将按需加载。', 'GitHub Gist API is temporarily unavailable. Opening with cached data. File content will load on demand.'),
