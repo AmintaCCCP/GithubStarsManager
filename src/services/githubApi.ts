@@ -439,6 +439,32 @@ export class GitHubApiService {
   }
 
   /**
+   * 获取 gist 用于 AI 分析。正常走详情 API；若详情 API 返回 5xx（如某些 gist 稳定 502），
+   * 则降级用缓存元数据 + raw_url 拉取文件内容，确保分析不中断。
+   */
+  async getGistForAnalysis(gistId: string, existing?: Gist, signal?: AbortSignal): Promise<Gist> {
+    try {
+      return await this.getGist(gistId, existing);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isServerFailure = /50[0-9]/.test(msg);
+      if (!isServerFailure || !existing) throw err;
+
+      // 降级：用 existing 的元数据，从 raw_url 逐个拉取文件内容
+      const files = { ...existing.files };
+      const entries = Object.entries(files);
+      await Promise.all(entries.map(async ([filename, file]) => {
+        if (file.content || !file.raw_url) return;
+        try {
+          const content = await this.getGistFileRaw(file.raw_url, signal);
+          files[filename] = { ...file, content, truncated: false };
+        } catch { /* 单文件失败不影响其他文件 */ }
+      }));
+      return { ...existing, files };
+    }
+  }
+
+  /**
    * 拉取 gist 单个文件的原始内容。
    * 用于 GitHub gist 详情 API 返回 truncated:true（文件 >1MB，content 被省略）时的回退取数。
    * raw_url 指向 gist.githubusercontent.com，不能复用 makeRequest（它会在前面拼 GITHUB_API_BASE）。

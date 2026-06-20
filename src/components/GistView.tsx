@@ -176,7 +176,7 @@ export const GistView: React.FC = () => {
     const analyzeOne = async (gist: Gist) => {
       setAnalyzingGist(gist.id, true);
       try {
-        const detail = await api.getGist(gist.id, gist);
+        const detail = await api.getGistForAnalysis(gist.id, gist);
         const summary = await aiService.analyzeGist(detail, api.getGistContentPreview(detail));
         updateGist({
           ...detail,
