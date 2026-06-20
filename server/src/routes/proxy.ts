@@ -88,7 +88,7 @@ router.post('/api/proxy/github/*', async (req, res) => {
     const queryString = new URL(req.url, 'http://localhost').search;
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
 
-    const body = req.body as { method?: string; headers?: Record<string, string> };
+    const body = req.body as { method?: string; headers?: Record<string, string>; body?: string | object };
     const method = body.method || 'GET';
     
     const headers: Record<string, string> = {
@@ -97,13 +97,88 @@ router.post('/api/proxy/github/*', async (req, res) => {
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'GithubStarsManager-Backend',
     };
+    const contentType = body.headers?.['Content-Type'] || body.headers?.['content-type'];
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
 
     const proxyConfig = getProxyConfig();
-    const result = await proxyRequest({ url: targetUrl, method, headers, proxyConfig });
+    const result = await proxyRequest({ url: targetUrl, method, headers, body: body.body, proxyConfig });
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.github', 'GitHub proxy error', err);
     res.status(500).json({ error: 'GitHub proxy failed', code: 'GITHUB_PROXY_FAILED' });
+  }
+});
+
+// POST /api/proxy/github-raw
+// Proxies requests to gist.githubusercontent.com (or other allowed GitHub raw-content hosts).
+// Used for fetching individual gist file content (raw_url) when the gist API marks files as truncated.
+router.post('/api/proxy/github-raw', async (req, res) => {
+  try {
+    const db = getDb();
+    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    if (!tokenRow?.value) {
+      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      return;
+    }
+
+    let token: string;
+    try {
+      token = decrypt(tokenRow.value, config.encryptionKey);
+    } catch {
+      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      return;
+    }
+
+    const body = req.body as { url?: string; method?: string; headers?: Record<string, string> };
+    if (!body.url || typeof body.url !== 'string') {
+      res.status(400).json({ error: 'Missing url', code: 'MISSING_URL' });
+      return;
+    }
+
+    // Whitelist: only allow known GitHub raw-content hosts
+    let parsed: URL;
+    try {
+      parsed = new URL(body.url);
+    } catch {
+      res.status(400).json({ error: 'Invalid URL format', code: 'INVALID_URL' });
+      return;
+    }
+
+    const allowedHosts = new Set(['gist.githubusercontent.com', 'raw.githubusercontent.com']);
+    if (!allowedHosts.has(parsed.hostname.toLowerCase())) {
+      res.status(400).json({ error: `Host ${parsed.hostname} not allowed`, code: 'HOST_NOT_ALLOWED' });
+      return;
+    }
+    validateUrl(body.url);
+
+    const method = body.method || 'GET';
+    const safeForwardHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(body.headers || {})) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'authorization' || lowerKey === 'proxy-authorization' || lowerKey === 'host' || lowerKey === 'content-length') {
+        continue;
+      }
+      safeForwardHeaders[key] = value;
+    }
+
+    const headers: Record<string, string> = {
+      ...safeForwardHeaders,
+      'Authorization': `Bearer ${token}`,
+      'User-Agent': 'GithubStarsManager-Backend',
+      'Accept': 'application/vnd.github.v3+json',
+    };
+
+    const proxyConfig = getProxyConfig();
+    const result = await proxyRequest({ url: body.url, method, headers, proxyConfig, preserveRawResponse: true });
+
+    // Raw content is text/plain, forward as-is (not JSON-wrapped)
+    const contentType = String(result.headers['content-type'] || 'text/plain');
+    res.status(result.status).type(contentType).send(typeof result.data === 'string' ? result.data : JSON.stringify(result.data));
+  } catch (err) {
+    logger.errorFromError('proxy.github-raw', 'GitHub raw proxy error', err);
+    res.status(500).json({ error: 'GitHub raw proxy failed', code: 'GITHUB_RAW_PROXY_FAILED' });
   }
 });
 
