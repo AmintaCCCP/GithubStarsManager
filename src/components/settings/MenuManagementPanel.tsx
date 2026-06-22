@@ -13,7 +13,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { HeaderMenuId, HeaderMenuItem } from '../../types';
+import { HeaderMenuId } from '../../types';
 
 interface MenuManagementPanelProps {
   t: (zh: string, en: string) => string;
@@ -34,7 +34,7 @@ const MENU_META: Record<HeaderMenuId, {
 };
 
 export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) => {
-  const { headerMenuConfig, setHeaderMenuConfig, language } = useAppStore();
+  const { headerMenuConfig, setHeaderMenuConfig } = useAppStore();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
@@ -44,14 +44,14 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
     [headerMenuConfig]
   );
 
-  const handleToggle = (id: HeaderMenuId) => {
+  const handleToggle = useCallback((id: HeaderMenuId) => {
     const meta = MENU_META[id];
     if (!meta.canHide) return;
     const newConfig = headerMenuConfig.map(item =>
       item.id === id ? { ...item, visible: !item.visible } : item
     );
     setHeaderMenuConfig(newConfig);
-  };
+  }, [headerMenuConfig, setHeaderMenuConfig]);
 
   const reorder = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;

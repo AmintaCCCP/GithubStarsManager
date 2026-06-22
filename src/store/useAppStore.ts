@@ -33,6 +33,7 @@ import {
   ReleaseSourceSettings,
   defaultSubscriptionChannels,
   defaultReleaseSourceSettings,
+  HeaderMenuId,
   HeaderMenuItem,
   defaultHeaderMenuConfig,
 } from '../types';
@@ -46,6 +47,9 @@ import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
+
+/** Menu IDs that must always remain visible — enforced at store level */
+const REQUIRED_HEADER_MENU_IDS: ReadonlySet<HeaderMenuId> = new Set(['repositories', 'settings']);
 
 const scheduleIdleTask = (callback: () => void): number => {
   if (typeof window === 'undefined') {
@@ -818,13 +822,19 @@ const normalizePersistedState = (
       const persisted = (safePersisted as Record<string, unknown>).headerMenuConfig;
       if (!Array.isArray(persisted)) return defaultHeaderMenuConfig;
       // 合并：确保所有默认菜单都存在，保留用户自定义的 visible/order
-      const persistedMap = new Map(persisted.map((item: unknown) => [(item as Record<string, unknown>).id, item as Record<string, unknown>]));
+      // 防御性过滤：跳过非对象或 null 的损坏数据
+      const persistedMap = new Map(
+        persisted
+          .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+          .map((item) => [item.id, item])
+      );
       return defaultHeaderMenuConfig.map((defaultItem) => {
         const persistedItem = persistedMap.get(defaultItem.id);
         if (!persistedItem) return defaultItem;
+        const isRequired = REQUIRED_HEADER_MENU_IDS.has(defaultItem.id);
         return {
           ...defaultItem,
-          visible: typeof persistedItem.visible === 'boolean' ? persistedItem.visible : defaultItem.visible,
+          visible: isRequired ? true : (typeof persistedItem.visible === 'boolean' ? persistedItem.visible : defaultItem.visible),
           order: typeof persistedItem.order === 'number' ? persistedItem.order : defaultItem.order,
         };
       });
@@ -1715,7 +1725,11 @@ export const useAppStore = create<AppState & AppActions>()(
       setLanguage: (language) => set({ language }),
       setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       setReadmeModalOpen: (readmeModalOpen) => set({ readmeModalOpen }),
-      setHeaderMenuConfig: (config) => set({ headerMenuConfig: config }),
+      setHeaderMenuConfig: (config) => set({
+        headerMenuConfig: config.map(item =>
+          REQUIRED_HEADER_MENU_IDS.has(item.id) ? { ...item, visible: true } : item
+        ),
+      }),
 
       // Hydration state
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
