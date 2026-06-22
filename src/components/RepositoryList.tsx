@@ -1219,10 +1219,26 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </div>
             </div>
           )}
+
+          {/* Sync Button - highlighted, right of display toggle */}
+          <div className="flex flex-col items-end flex-shrink-0">
+            <button
+              onClick={handleStarSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-2 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-indigo text-white hover:bg-brand-hover"
+              title={t('同步星标仓库列表', 'Sync starred repositories')}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+            </button>
+            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap mt-1">
+              {formatLastSync(lastSync)}
+            </span>
+          </div>
         </div>
 
-        {/* Statistics + Sync */}
-        <div className={`flex items-start sm:items-center gap-3 sm:gap-4 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
+        {/* Statistics */}
+        <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
           <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
             <div className="flex items-center justify-between">
               <div>
@@ -1254,22 +1270,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Sync Button - highlighted, right side */}
-          <div className="flex flex-col items-end flex-shrink-0">
-            <button
-              onClick={handleStarSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-violet text-white hover:bg-brand-violet/90 dark:bg-brand-violet dark:text-white dark:hover:bg-brand-violet/90"
-              title={t('同步星标仓库列表', 'Sync starred repositories')}
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
-            </button>
-            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap mt-1">
-              {formatLastSync(lastSync)}
-            </span>
           </div>
         </div>
       </div>
