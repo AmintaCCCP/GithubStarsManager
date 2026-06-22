@@ -168,6 +168,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     disabled={index === 0}
                     className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                     title={t('上移', 'Move up')}
+                    aria-label={t(`${meta.labelZh}上移`, `Move ${meta.labelEn} up`)}
                   >
                     <ChevronUp className="w-3.5 h-3.5 text-gray-500 dark:text-text-tertiary" />
                   </button>
@@ -176,6 +177,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     disabled={index === sortedConfig.length - 1}
                     className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                     title={t('下移', 'Move down')}
+                    aria-label={t(`${meta.labelZh}下移`, `Move ${meta.labelEn} down`)}
                   >
                     <ChevronDown className="w-3.5 h-3.5 text-gray-500 dark:text-text-tertiary" />
                   </button>
@@ -195,6 +197,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                   title={!meta.canHide ? t('此菜单不可关闭', 'This menu cannot be hidden') : undefined}
                   role="switch"
                   aria-checked={item.visible}
+                  aria-label={t(`切换${meta.labelZh}显示`, `Toggle ${meta.labelEn} visibility`)}
                 >
                   <span
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${

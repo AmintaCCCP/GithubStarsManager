@@ -81,6 +81,7 @@ export const Header: React.FC = () => {
                   key={menuItem.id}
                   onClick={() => setCurrentView(menuItem.id as AppState['currentView'])}
                   title={t(meta.labelZh, meta.labelEn)}
+                  aria-label={t(meta.labelZh, meta.labelEn)}
                   className={`flex items-center whitespace-nowrap rounded-lg font-medium transition-colors ${
                     isActive
                       ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
