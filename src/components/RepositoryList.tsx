@@ -243,6 +243,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     };
   }, []);
 
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
       toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
@@ -998,15 +1000,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const { unanalyzedCount, analyzedCount, failedCount } = repositoryStats;
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-
   return (
     <div className="space-y-6">
 
 
-      {/* AI Analysis Controls - 移动端优化布局 */}
+      {/* Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
             <button

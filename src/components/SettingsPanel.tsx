@@ -11,6 +11,7 @@ import {
   Trash2,
   Wifi,
   ScrollText,
+  Layout,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { isElectron } from '../services/electronProxy';
@@ -25,9 +26,10 @@ import {
   DataManagementPanel,
   NetworkPanel,
   DiagnosticLogsPanel,
+  MenuManagementPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'data' | 'logs' | 'network';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -254,7 +256,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'data', 'logs', 'network']),
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network']),
     []
   );
 
@@ -333,6 +335,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       icon: <Package className="w-5 h-5" />,
     },
     {
+      id: 'menu',
+      label: t('菜单管理', 'Menu'),
+      icon: <Layout className="w-5 h-5" />,
+    },
+    {
       id: 'data',
       label: t('数据管理', 'Data Management'),
       icon: <Trash2 className="w-5 h-5" />,
@@ -364,6 +371,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <BackendPanel t={t} />;
         case 'category':
           return <CategoryPanel t={t} />;
+        case 'menu':
+          return <MenuManagementPanel t={t} />;
         case 'data':
           return <DataManagementPanel t={t} />;
         case 'logs':

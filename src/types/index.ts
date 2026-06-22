@@ -289,6 +289,23 @@ export interface AssetFilter {
   icon?: string;
 }
 
+export type HeaderMenuId = 'repositories' | 'gists' | 'releases' | 'forks' | 'subscription' | 'settings';
+
+export interface HeaderMenuItem {
+  id: HeaderMenuId;
+  visible: boolean;
+  order: number;
+}
+
+export const defaultHeaderMenuConfig: HeaderMenuItem[] = [
+  { id: 'repositories', visible: true, order: 0 },
+  { id: 'gists', visible: true, order: 1 },
+  { id: 'releases', visible: true, order: 2 },
+  { id: 'forks', visible: true, order: 3 },
+  { id: 'subscription', visible: true, order: 4 },
+  { id: 'settings', visible: true, order: 5 },
+];
+
 export interface AppState {
   // Auth
   user: GitHubUser | null;
@@ -299,6 +316,7 @@ export interface AppState {
   // Repositories
   repositories: Repository[];
   isLoading: boolean;
+  isSyncingStars: boolean;
   lastSync: string | null;
   analyzingRepositoryIds: Set<number>;
 
@@ -346,6 +364,7 @@ export interface AppState {
   language: 'zh' | 'en';
   isSidebarCollapsed: boolean;
   readmeModalOpen: boolean;
+  headerMenuConfig: HeaderMenuItem[];
   
   // Update
   updateNotification: UpdateNotification | null;
