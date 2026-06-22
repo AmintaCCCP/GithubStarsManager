@@ -1,153 +1,47 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, RefreshCw, TrendingUp, GitFork, FileCode2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, TrendingUp, GitFork, FileCode2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
 import { useDialog } from '../hooks/useDialog';
-import { forceSyncToBackend } from '../services/autoSync';
+import { HeaderMenuId, AppState } from '../types';
+
+const MENU_META: Record<HeaderMenuId, {
+  icon: React.ComponentType<{ className?: string }>;
+  labelZh: string;
+  labelEn: string;
+}> = {
+  repositories: { icon: Search, labelZh: '仓库', labelEn: 'Repositories' },
+  gists: { icon: FileCode2, labelZh: 'Gist', labelEn: 'Gist' },
+  releases: { icon: Calendar, labelZh: '发布', labelEn: 'Releases' },
+  forks: { icon: GitFork, labelZh: '复刻', labelEn: 'Forks' },
+  subscription: { icon: TrendingUp, labelZh: '趋势', labelEn: 'Trending' },
+  settings: { icon: Settings, labelZh: '设置', labelEn: 'Settings' },
+};
 
 export const Header: React.FC = () => {
   const {
     user,
     theme,
     currentView,
-    isLoading,
-    lastSync,
-    githubToken,
-    repositories,
-    gists,
-    starredGists,
+    headerMenuConfig,
     setTheme,
     setCurrentView,
-    setRepositories,
-    setLoading,
-    setLastSync,
     logout,
     language,
   } = useAppStore();
 
-  const { toast, confirm } = useDialog();
-  const gistCount = useMemo(() => new Set([...gists, ...starredGists].map(gist => gist.id)).size, [gists, starredGists]);
+  const { confirm } = useDialog();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isTextWrapped, setIsTextWrapped] = useState(false);
-  const navRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const checkIfTextWrapped = () => {
-      const windowWidth = window.innerWidth;
-      if (windowWidth < 1100) {
-        setIsTextWrapped(true);
-        return;
-      }
-
-      if (navRef.current) {
-        const buttons = navRef.current.querySelectorAll('button');
-        let wrapped = false;
-        buttons.forEach(button => {
-          if (button.scrollHeight > button.clientHeight + 5) {
-            wrapped = true;
-          }
-        });
-        setIsTextWrapped(wrapped);
-      }
-    };
-
-    checkIfTextWrapped();
-    
-    const resizeObserver = new ResizeObserver(checkIfTextWrapped);
-    if (navRef.current) {
-      resizeObserver.observe(navRef.current);
-    }
-    
-    window.addEventListener('resize', checkIfTextWrapped);
-    
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', checkIfTextWrapped);
-    };
-  }, []);
-
-  const handleSync = async () => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-
-      const newRepositories = await githubApi.getAllStarredRepositories();
-
-      const existingRepoMap = new Map(repositories.map(repo => [repo.id, repo]));
-      const mergedRepositories = newRepositories.map(newRepo => {
-        const existing = existingRepoMap.get(newRepo.id);
-        if (existing) {
-          return {
-            ...newRepo,
-            has_fetched_releases: existing.has_fetched_releases,
-            last_release_fetch_time: existing.last_release_fetch_time,
-            ai_summary: existing.ai_summary,
-            ai_tags: existing.ai_tags,
-            ai_platforms: existing.ai_platforms,
-            analyzed_at: existing.analyzed_at,
-            analysis_failed: existing.analysis_failed,
-            custom_description: existing.custom_description,
-            custom_tags: existing.custom_tags,
-            custom_category: existing.custom_category,
-            category_locked: existing.category_locked,
-            last_edited: existing.last_edited,
-          };
-        }
-        return newRepo;
-      });
-
-      setRepositories(mergedRepositories);
-
-      // Force-push to backend immediately (bypass 2s debounce) so data survives a page refresh
-      forceSyncToBackend().catch(console.error);
-
-      // Note: Release fetching is now handled by the Refresh button in Release Timeline
-      // Header sync only syncs the starred repos list
-
-      setLastSync(new Date().toISOString());
-      console.log('Sync completed successfully');
-
-      // 显示同步结果
-      const newRepoCount = newRepositories.length - repositories.length;
-      if (newRepoCount > 0) {
-        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
-      } else {
-        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-      if (error instanceof Error && error.message.includes('token')) {
-        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
-        logout();
-      } else {
-        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatLastSync = (timestamp: string | null) => {
-    if (!timestamp) return 'Never';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-     
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return date.toLocaleDateString();
-  };
+  const visibleMenus = useMemo(() =>
+    [...headerMenuConfig]
+      .filter(item => item.visible)
+      .sort((a, b) => a.order - b.order),
+    [headerMenuConfig]
+  );
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-   
   return (
     <header className="bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -176,302 +70,76 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation - Desktop (≥1300px): Icon + Text + Badge */}
-          <nav ref={navRef} className={`hidden xl:flex items-center space-x-1 hd-btns xl:hd-btns ${isTextWrapped ? 'flex-wrap' : ''}`}>
-            <button
-              onClick={() => setCurrentView('repositories')}
-              aria-label={isTextWrapped ? t('仓库', 'Repositories') : undefined}
-              title={isTextWrapped ? t('仓库', 'Repositories') : undefined}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'repositories'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <Search className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && (
-                <>
-                  {t('仓库', 'Repositories')}
-                  {currentView === 'repositories' && repositories.length > 0 && (
-                    <span className="ml-1.5 text-sm text-brand-violet">
-                      {repositories.length}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setCurrentView('gists')}
-              aria-label={isTextWrapped ? 'Gist' : undefined}
-              title={isTextWrapped ? 'Gist' : undefined}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'gists'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <FileCode2 className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && (
-                <>
-                  Gist
-                  {currentView === 'gists' && gistCount > 0 && (
-                    <span className="ml-1.5 text-sm text-brand-violet">
-                      {gistCount}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setCurrentView('releases')}
-              aria-label={isTextWrapped ? t('发布', 'Releases') : undefined}
-              title={isTextWrapped ? t('发布', 'Releases') : undefined}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'releases'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <Calendar className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && t('发布', 'Releases')}
-            </button>
-            <button
-              onClick={() => setCurrentView('forks')}
-              aria-label={isTextWrapped ? t('复刻', 'Forks') : undefined}
-              title={isTextWrapped ? t('复刻', 'Forks') : undefined}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'forks'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <GitFork className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && t('复刻', 'Forks')}
-            </button>
-            <button
-              onClick={() => setCurrentView('subscription')}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'subscription'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <TrendingUp className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && t('趋势', 'Trending')}
-            </button>
-            <button
-              onClick={() => setCurrentView('settings')}
-              aria-label={isTextWrapped ? t('设置', 'Settings') : undefined}
-              title={isTextWrapped ? t('设置', 'Settings') : undefined}
-              className={`${isTextWrapped ? 'p-2.5' : 'px-4 py-2'} rounded-lg font-medium transition-colors ${
-                currentView === 'settings'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-            >
-              <Settings className={`${isTextWrapped ? 'w-5 h-5' : 'w-4 h-4'} ${isTextWrapped ? '' : 'inline mr-2'}`} />
-              {!isTextWrapped && t('设置', 'Settings')}
-            </button>
-          </nav>
-
-          {/* Navigation - Tablet (768px-1299px): Icon only */}
-          <nav className="hidden md:flex xl:hidden items-center space-x-1 hd-btns md:hd-btns">
-            <button
-              onClick={() => setCurrentView('repositories')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'repositories'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title={t('仓库', 'Repositories')}
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentView('gists')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'gists'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title="Gist"
-            >
-              <FileCode2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentView('releases')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'releases'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title={t('发布', 'Releases')}
-            >
-              <Calendar className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentView('forks')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'forks'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title={t('复刻', 'Forks')}
-            >
-              <GitFork className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentView('subscription')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'subscription'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title={t('趋势', 'Trending')}
-            >
-              <TrendingUp className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentView('settings')}
-              className={`p-2.5 rounded-lg transition-colors ${
-                currentView === 'settings'
-                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                  : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-              }`}
-              title={t('设置', 'Settings')}
-            >
-              <Settings className="w-5 h-5" />
-            </button>
+          {/* Navigation - Desktop & Tablet (≥768px) */}
+          <nav className="hidden md:flex flex-nowrap items-center space-x-1 hd-btns lg:hd-btns">
+            {visibleMenus.map(menuItem => {
+              const meta = MENU_META[menuItem.id];
+              const Icon = meta.icon;
+              const isActive = currentView === menuItem.id;
+              return (
+                <button
+                  key={menuItem.id}
+                  onClick={() => setCurrentView(menuItem.id as AppState['currentView'])}
+                  title={t(meta.labelZh, meta.labelEn)}
+                  className={`flex items-center whitespace-nowrap rounded-lg font-medium transition-colors ${
+                    isActive
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                  } xl:px-4 xl:py-2 p-2.5`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="hidden xl:inline ml-2">{t(meta.labelZh, meta.labelEn)}</span>
+                </button>
+              );
+            })}
           </nav>
 
           {/* Mobile Dropdown Menu (<768px) */}
           {mobileMenuOpen && (
             <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-black/[0.06] dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
               <nav className="flex flex-col p-2 space-y-1">
-                <button
-                  onClick={() => {
-                    setCurrentView('repositories');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'repositories'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <Search className="w-5 h-5 mr-3" />
-                    {t('仓库', 'Repositories')}
-                  </div>
-                  {currentView === 'repositories' && repositories.length > 0 && (
-                    <span className="text-sm text-brand-violet">
-                      {repositories.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentView('gists');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'gists'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <FileCode2 className="w-5 h-5 mr-3" />
-                    Gist
-                  </div>
-                  {currentView === 'gists' && gistCount > 0 && (
-                    <span className="text-sm text-brand-violet">
-                      {gistCount}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentView('releases');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'releases'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <Calendar className="w-5 h-5 mr-3" />
-                    {t('发布', 'Releases')}
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentView('forks');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'forks'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <GitFork className="w-5 h-5 mr-3" />
-                    {t('复刻', 'Forks')}
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentView('subscription');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'subscription'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-3" />
-                    {t('趋势', 'Trending')}
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentView('settings');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
-                    currentView === 'settings'
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <Settings className="w-5 h-5 mr-3" />
-                    {t('设置', 'Settings')}
-                  </div>
-                </button>
+                {visibleMenus.map(menuItem => {
+                  const meta = MENU_META[menuItem.id];
+                  const Icon = meta.icon;
+                  const isActive = currentView === menuItem.id;
+                  return (
+                    <button
+                      key={menuItem.id}
+                      onClick={() => {
+                        setCurrentView(menuItem.id as AppState['currentView']);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
+                        isActive
+                          ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
+                          : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 mr-3" />
+                      {t(meta.labelZh, meta.labelEn)}
+                    </button>
+                  );
+                })}
               </nav>
             </div>
           )}
 
           {/* User Actions */}
           <div className="flex items-center gap-2 sm:gap-3 hd-btns lg:hd-btns">
-            {/* Sync Status */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary">
-              <span>{t('上次同步:', 'Last sync:')} {formatLastSync(lastSync)}</span>
-              <button
-                onClick={handleSync}
-                disabled={isLoading}
-                className="p-1 rounded hover:bg-light-surface dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                title={t('同步星标仓库列表（不包含Release）', 'Sync starred repos list (excludes Release)')}
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
+              aria-label={t('菜单', 'Menu')}
+            >
+              <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {mobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
 
             {/* Theme Toggle */}
             <button
