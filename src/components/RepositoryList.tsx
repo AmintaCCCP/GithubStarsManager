@@ -265,30 +265,40 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const mergedRepositories = newRepositories.map(newRepo => {
         const existing = existingRepoMap.get(newRepo.id);
         if (existing) {
+          // Spread existing first to preserve all local state (AI analysis, custom fields,
+          // subscribed_to_releases, analysis_error, etc.), then override only fresh API metadata
           return {
-            ...newRepo,
-            has_fetched_releases: existing.has_fetched_releases,
-            last_release_fetch_time: existing.last_release_fetch_time,
-            ai_summary: existing.ai_summary,
-            ai_tags: existing.ai_tags,
-            ai_platforms: existing.ai_platforms,
-            analyzed_at: existing.analyzed_at,
-            analysis_failed: existing.analysis_failed,
-            custom_description: existing.custom_description,
-            custom_tags: existing.custom_tags,
-            custom_category: existing.custom_category,
-            category_locked: existing.category_locked,
-            last_edited: existing.last_edited,
+            ...existing,
+            name: newRepo.name,
+            full_name: newRepo.full_name,
+            description: newRepo.description,
+            html_url: newRepo.html_url,
+            stargazers_count: newRepo.stargazers_count,
+            forks_count: newRepo.forks_count,
+            forks: newRepo.forks,
+            language: newRepo.language,
+            updated_at: newRepo.updated_at,
+            pushed_at: newRepo.pushed_at,
+            starred_at: newRepo.starred_at,
+            owner: newRepo.owner,
+            topics: newRepo.topics,
           };
         }
         return newRepo;
       });
 
+      // Calculate exact new repos using Set (handles simultaneous star/unstar correctly)
+      const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
+      const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
+
       setRepositories(mergedRepositories);
-      forceSyncToBackend().catch(console.error);
+      try {
+        await forceSyncToBackend();
+      } catch (syncErr) {
+        console.error('Backend sync failed:', syncErr);
+      }
       setLastSync(new Date().toISOString());
 
-      const newRepoCount = Math.max(0, newRepositories.length - storeRepos.length);
       if (newRepoCount > 0) {
         toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
       } else {
@@ -309,12 +319,13 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const formatLastSync = (timestamp: string | null) => {
     if (!timestamp) return t('从未同步', 'Never');
     const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     if (diffHours < 1) return t('刚刚', 'Just now');
     if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
   };
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
