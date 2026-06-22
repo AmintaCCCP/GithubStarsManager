@@ -282,6 +282,7 @@ interface AppActions {
   updateRepository: (repo: Repository) => void;
   addRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
+  setSyncingStars: (syncing: boolean) => void;
   setLastSync: (timestamp: string) => void;
   deleteRepository: (repoId: number) => void;
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
@@ -1006,6 +1007,7 @@ export const useAppStore = create<AppState & AppActions>()(
       selectedGistCategory: 'all',
       analyzingGistIds: new Set<string>(),
       isLoading: false,
+      isSyncingStars: false,
       lastSync: null,
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
@@ -1164,6 +1166,7 @@ export const useAppStore = create<AppState & AppActions>()(
         };
       }),
       setLoading: (isLoading) => set({ isLoading }),
+      setSyncingStars: (isSyncingStars) => set({ isSyncingStars }),
       setLastSync: (lastSync) => set({ lastSync }),
       deleteRepository: (repoId) => set((state) => {
         const nextReleaseSubscriptions = new Set(state.releaseSubscriptions);
