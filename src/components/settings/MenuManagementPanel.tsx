@@ -148,14 +148,21 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 {/* Drag handle */}
                 <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary flex-shrink-0" />
 
-                {/* Menu icon + label */}
+                {/* Menu icon + label + lock */}
                 <Icon className="w-5 h-5 text-gray-600 dark:text-text-secondary flex-shrink-0" />
-                <span className="flex-1 text-sm font-medium text-gray-900 dark:text-text-primary">
-                  {t(meta.labelZh, meta.labelEn)}
+                <span className="flex-1 flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <span>{t(meta.labelZh, meta.labelEn)}</span>
+                  {!meta.canHide && (
+                    <span className="text-gray-400 dark:text-text-tertiary flex-shrink-0" title={t('必显', 'Always visible')}>
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                  )}
                 </span>
 
                 {/* Order arrows */}
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-shrink-0">
                   <button
                     onClick={() => handleMoveUp(index)}
                     disabled={index === 0}
@@ -195,15 +202,6 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     }`}
                   />
                 </button>
-
-                {/* Lock hint for non-hideable */}
-                {!meta.canHide && (
-                  <span className="text-xs text-gray-400 dark:text-text-tertiary whitespace-nowrap" title={t('必显', 'Always visible')}>
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                )}
               </div>
             );
           })}

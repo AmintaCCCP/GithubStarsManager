@@ -1090,21 +1090,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       {/* Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          {/* Sync Button */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleStarSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface disabled:opacity-50 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
-              title={t('同步星标仓库列表', 'Sync starred repositories')}
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
-            </button>
-            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap">
-              {formatLastSync(lastSync)}
-            </span>
-          </div>
 
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
@@ -1236,8 +1221,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           )}
         </div>
 
-        {/* Statistics */}
-        <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
+        {/* Statistics + Sync */}
+        <div className={`flex items-start sm:items-center gap-3 sm:gap-4 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
           <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
             <div className="flex items-center justify-between">
               <div>
@@ -1269,6 +1254,22 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Sync Button - highlighted, right side */}
+          <div className="flex flex-col items-end flex-shrink-0">
+            <button
+              onClick={handleStarSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-violet text-white hover:bg-brand-violet/90 dark:bg-brand-violet dark:text-white dark:hover:bg-brand-violet/90"
+              title={t('同步星标仓库列表', 'Sync starred repositories')}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+            </button>
+            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap mt-1">
+              {formatLastSync(lastSync)}
+            </span>
           </div>
         </div>
       </div>
