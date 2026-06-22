@@ -428,4 +428,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.5</downloadUrl>
   </version>
+  <version>
+    <number>0.6.6</number>
+    <releaseDate>2026-06-23</releaseDate>
+    <changelog>
+      <item>fix: Gist proxy support — route Gist API requests through backend proxy, add raw content proxy for truncated files, render extensionless files as plaintext. (PR #224)</item>
+      <item>feat: Header menu customization — show/hide and reorder navigation items via drag-and-drop in Settings > Menu Management. (PR #226)</item>
+      <item>feat: Sync button relocated to Repositories page control bar with localized last-synced timestamp. (PR #226)</item>
+      <item>feat: Responsive navigation using pure CSS breakpoints, eliminating text wrapping on narrow viewports. (PR #226)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.6</downloadUrl>
+  </version>
 </versions>
