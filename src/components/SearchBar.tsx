@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw } from 'lucide-react';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
+import { GitHubApiService } from '../services/githubApi';
+import { forceSyncToBackend } from '../services/autoSync';
 import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
+import { useDialog } from '../hooks/useDialog';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { NumberInput } from './ui/NumberInput';
 
@@ -87,7 +90,14 @@ export const SearchBar: React.FC = () => {
     customCategories,
     hiddenDefaultCategoryIds,
     defaultCategoryOverrides,
+    githubToken,
+    lastSync,
+    setRepositories,
+    setLastSync,
   } = useAppStore();
+
+  const { toast } = useDialog();
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchFilters.query);
@@ -792,6 +802,82 @@ export const SearchBar: React.FC = () => {
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
+  const handleStarSync = async () => {
+    if (!githubToken) {
+      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const newRepositories = await githubApi.getAllStarredRepositories();
+
+      const storeRepos = useAppStore.getState().repositories;
+      const existingRepoMap = new Map(storeRepos.map(repo => [repo.id, repo]));
+      const mergedRepositories = newRepositories.map(newRepo => {
+        const existing = existingRepoMap.get(newRepo.id);
+        if (existing) {
+          return {
+            ...existing,
+            name: newRepo.name,
+            full_name: newRepo.full_name,
+            description: newRepo.description,
+            html_url: newRepo.html_url,
+            stargazers_count: newRepo.stargazers_count,
+            forks_count: newRepo.forks_count,
+            forks: newRepo.forks,
+            language: newRepo.language,
+            updated_at: newRepo.updated_at,
+            pushed_at: newRepo.pushed_at,
+            starred_at: newRepo.starred_at,
+            owner: newRepo.owner,
+            topics: newRepo.topics,
+          };
+        }
+        return newRepo;
+      });
+
+      const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
+      const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
+
+      setRepositories(mergedRepositories);
+      try {
+        await forceSyncToBackend();
+      } catch (syncErr) {
+        console.error('Backend sync failed:', syncErr);
+      }
+      setLastSync(new Date().toISOString());
+
+      if (newRepoCount > 0) {
+        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
+      } else {
+        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      if (error instanceof Error && error.message.includes('token')) {
+        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
+      } else {
+        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const formatLastSync = (timestamp: string | null) => {
+    if (!timestamp) return t('从未同步', 'Never');
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return t('刚刚', 'Just now');
+    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
+    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
+  };
+
   // 全局快捷键支持（Ctrl/Cmd+K、Ctrl/Cmd+Shift+F、/、Escape）
   useSearchShortcuts({
     onFocusSearch: () => {
@@ -984,7 +1070,7 @@ export const SearchBar: React.FC = () => {
 
         </div>
 
-        {/* Sort Controls */}
+        {/* Sort Controls + Sync Button */}
         <div className="flex items-center gap-2 relative z-30">
           <SortByDropdown
             value={searchFilters.sortBy}
@@ -999,6 +1085,22 @@ export const SearchBar: React.FC = () => {
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
           </button>
+
+          {/* Sync Button */}
+          <div className="flex items-center gap-2 ml-1">
+            <button
+              onClick={handleStarSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-indigo text-white hover:bg-brand-hover"
+              title={t('同步星标仓库列表', 'Sync starred repositories')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+            </button>
+            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap">
+              {formatLastSync(lastSync)}
+            </span>
+          </div>
         </div>
       </div>
 

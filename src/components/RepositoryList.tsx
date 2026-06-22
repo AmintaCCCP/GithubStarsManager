@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Bot, ChevronDown, Pause, Play, RefreshCw } from 'lucide-react';
+import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
@@ -29,11 +29,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     activeAIConfig,
     isLoading,
     setLoading,
-    lastSync,
     updateRepository,
     deleteRepository,
-    setRepositories,
-    setLastSync,
     language,
     customCategories,
     hiddenDefaultCategoryIds,
@@ -51,7 +48,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   const previousCategoryRef = useRef(selectedCategory);
   const savedScrollYRef = useRef<number | null>(null);
@@ -248,85 +244,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   }, []);
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-
-  const handleStarSync = async () => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const newRepositories = await githubApi.getAllStarredRepositories();
-
-      const storeRepos = useAppStore.getState().repositories;
-      const existingRepoMap = new Map(storeRepos.map(repo => [repo.id, repo]));
-      const mergedRepositories = newRepositories.map(newRepo => {
-        const existing = existingRepoMap.get(newRepo.id);
-        if (existing) {
-          // Spread existing first to preserve all local state (AI analysis, custom fields,
-          // subscribed_to_releases, analysis_error, etc.), then override only fresh API metadata
-          return {
-            ...existing,
-            name: newRepo.name,
-            full_name: newRepo.full_name,
-            description: newRepo.description,
-            html_url: newRepo.html_url,
-            stargazers_count: newRepo.stargazers_count,
-            forks_count: newRepo.forks_count,
-            forks: newRepo.forks,
-            language: newRepo.language,
-            updated_at: newRepo.updated_at,
-            pushed_at: newRepo.pushed_at,
-            starred_at: newRepo.starred_at,
-            owner: newRepo.owner,
-            topics: newRepo.topics,
-          };
-        }
-        return newRepo;
-      });
-
-      // Calculate exact new repos using Set (handles simultaneous star/unstar correctly)
-      const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
-      const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
-
-      setRepositories(mergedRepositories);
-      try {
-        await forceSyncToBackend();
-      } catch (syncErr) {
-        console.error('Backend sync failed:', syncErr);
-      }
-      setLastSync(new Date().toISOString());
-
-      if (newRepoCount > 0) {
-        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
-      } else {
-        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-      if (error instanceof Error && error.message.includes('token')) {
-        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
-      } else {
-        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
-      }
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const formatLastSync = (timestamp: string | null) => {
-    if (!timestamp) return t('从未同步', 'Never');
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours < 1) return t('刚刚', 'Just now');
-    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
-    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
-  };
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
@@ -1219,22 +1136,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </div>
             </div>
           )}
-
-          {/* Sync Button - highlighted, right of display toggle */}
-          <div className="flex flex-col items-end flex-shrink-0">
-            <button
-              onClick={handleStarSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-2 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-indigo text-white hover:bg-brand-hover"
-              title={t('同步星标仓库列表', 'Sync starred repositories')}
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
-            </button>
-            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap mt-1">
-              {formatLastSync(lastSync)}
-            </span>
-          </div>
         </div>
 
         {/* Statistics */}
