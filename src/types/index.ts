@@ -316,6 +316,7 @@ export interface AppState {
   // Repositories
   repositories: Repository[];
   isLoading: boolean;
+  isSyncingStars: boolean;
   lastSync: string | null;
   analyzingRepositoryIds: Set<number>;
 

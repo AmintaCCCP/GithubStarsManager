@@ -94,10 +94,11 @@ export const SearchBar: React.FC = () => {
     lastSync,
     setRepositories,
     setLastSync,
+    isSyncingStars,
+    setSyncingStars,
   } = useAppStore();
 
   const { toast } = useDialog();
-  const [isSyncing, setIsSyncing] = useState(false);
   
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchFilters.query);
@@ -808,7 +809,7 @@ export const SearchBar: React.FC = () => {
       return;
     }
 
-    setIsSyncing(true);
+    setSyncingStars(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
@@ -842,11 +843,8 @@ export const SearchBar: React.FC = () => {
       const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
 
       setRepositories(mergedRepositories);
-      try {
-        await forceSyncToBackend();
-      } catch (syncErr) {
-        console.error('Backend sync failed:', syncErr);
-      }
+      await forceSyncToBackend();
+      
       setLastSync(new Date().toISOString());
 
       if (newRepoCount > 0) {
@@ -859,10 +857,10 @@ export const SearchBar: React.FC = () => {
       if (error instanceof Error && error.message.includes('token')) {
         toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
       } else {
-        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
+        toast(t('同步失败，请检查网络连接或稍后重试。', 'Sync failed. Please check your network connection or try again later.'), 'error');
       }
     } finally {
-      setIsSyncing(false);
+      setSyncingStars(false);
     }
   };
 
@@ -1087,17 +1085,17 @@ export const SearchBar: React.FC = () => {
           </button>
 
           {/* Sync Button */}
-          <div className="flex items-center gap-2 ml-1">
+          <div className="flex flex-col items-end gap-1 ml-1">
             <button
               onClick={handleStarSync}
-              disabled={isSyncing}
+              disabled={isSyncingStars}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-indigo text-white hover:bg-brand-hover"
               title={t('同步星标仓库列表', 'Sync starred repositories')}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
               <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
             </button>
-            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap">
+            <span className="text-[10px] text-gray-500 dark:text-text-tertiary whitespace-nowrap leading-none">
               {formatLastSync(lastSync)}
             </span>
           </div>
