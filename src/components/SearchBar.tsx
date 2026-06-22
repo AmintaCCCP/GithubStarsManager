@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { GitHubApiService } from '../services/githubApi';
@@ -1085,7 +1085,7 @@ export const SearchBar: React.FC = () => {
           </button>
 
           {/* Sync Button */}
-          <div className="flex flex-col items-end gap-1 ml-1">
+          <div className="flex items-center gap-2 ml-1">
             <button
               onClick={handleStarSync}
               disabled={isSyncingStars}
@@ -1095,9 +1095,18 @@ export const SearchBar: React.FC = () => {
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
               <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
             </button>
-            <span className="text-[10px] text-gray-500 dark:text-text-tertiary whitespace-nowrap leading-none">
-              {formatLastSync(lastSync)}
-            </span>
+            <div className="group relative">
+              <Clock className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
+              <div className="absolute right-0 top-full mt-2 w-max p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
+                <p className="font-medium">
+                  {t('最近更新时间', 'Last synced')}
+                </p>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  {formatLastSync(lastSync)}
+                </p>
+                <div className="absolute bottom-full right-1 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
