@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
+import { Bot, ChevronDown, Pause, Play, RefreshCw } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
@@ -29,8 +29,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     activeAIConfig,
     isLoading,
     setLoading,
+    lastSync,
     updateRepository,
     deleteRepository,
+    setRepositories,
+    setLastSync,
     language,
     customCategories,
     hiddenDefaultCategoryIds,
@@ -48,6 +51,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   const previousCategoryRef = useRef(selectedCategory);
   const savedScrollYRef = useRef<number | null>(null);
@@ -242,6 +246,76 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       window.removeEventListener('gsm:repository-sync-visual-state', handleSyncVisualState as EventListener);
     };
   }, []);
+
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+
+  const handleStarSync = async () => {
+    if (!githubToken) {
+      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const githubApi = new GitHubApiService(githubToken);
+      const newRepositories = await githubApi.getAllStarredRepositories();
+
+      const storeRepos = useAppStore.getState().repositories;
+      const existingRepoMap = new Map(storeRepos.map(repo => [repo.id, repo]));
+      const mergedRepositories = newRepositories.map(newRepo => {
+        const existing = existingRepoMap.get(newRepo.id);
+        if (existing) {
+          return {
+            ...newRepo,
+            has_fetched_releases: existing.has_fetched_releases,
+            last_release_fetch_time: existing.last_release_fetch_time,
+            ai_summary: existing.ai_summary,
+            ai_tags: existing.ai_tags,
+            ai_platforms: existing.ai_platforms,
+            analyzed_at: existing.analyzed_at,
+            analysis_failed: existing.analysis_failed,
+            custom_description: existing.custom_description,
+            custom_tags: existing.custom_tags,
+            custom_category: existing.custom_category,
+            category_locked: existing.category_locked,
+            last_edited: existing.last_edited,
+          };
+        }
+        return newRepo;
+      });
+
+      setRepositories(mergedRepositories);
+      forceSyncToBackend().catch(console.error);
+      setLastSync(new Date().toISOString());
+
+      const newRepoCount = Math.max(0, newRepositories.length - storeRepos.length);
+      if (newRepoCount > 0) {
+        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
+      } else {
+        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      if (error instanceof Error && error.message.includes('token')) {
+        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
+      } else {
+        toast(t('同步失败，请检查网络连接。', 'Sync failed. Please check your network connection.'), 'error');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const formatLastSync = (timestamp: string | null) => {
+    if (!timestamp) return t('从未同步', 'Never');
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return t('刚刚', 'Just now');
+    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
+    return date.toLocaleDateString();
+  };
 
   const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     if (!githubToken) {
@@ -998,15 +1072,29 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const { unanalyzedCount, analyzedCount, failedCount } = repositoryStats;
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-
   return (
     <div className="space-y-6">
 
 
-      {/* AI Analysis Controls - 移动端优化布局 */}
+      {/* Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          {/* Sync Button */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleStarSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface disabled:opacity-50 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+              title={t('同步星标仓库列表', 'Sync starred repositories')}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+            </button>
+            <span className="text-xs text-gray-500 dark:text-text-tertiary whitespace-nowrap">
+              {formatLastSync(lastSync)}
+            </span>
+          </div>
+
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
             <button

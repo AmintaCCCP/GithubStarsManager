@@ -32,7 +32,9 @@ import {
   ReleaseSourceId,
   ReleaseSourceSettings,
   defaultSubscriptionChannels,
-  defaultReleaseSourceSettings
+  defaultReleaseSourceSettings,
+  HeaderMenuItem,
+  defaultHeaderMenuConfig,
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import {
@@ -359,6 +361,7 @@ interface AppActions {
   setLanguage: (language: 'zh' | 'en') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setReadmeModalOpen: (open: boolean) => void;
+  setHeaderMenuConfig: (config: HeaderMenuItem[]) => void;
 
   // Hydration state
   setHasHydrated: (hydrated: boolean) => void;
@@ -510,6 +513,7 @@ type PersistedAppState = Partial<
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
     | 'subscriptionChannels'
+    | 'headerMenuConfig'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -810,6 +814,21 @@ const normalizePersistedState = (
       }
       return { enabled: false, host: '', port: 6800 };
     })(),
+    headerMenuConfig: (() => {
+      const persisted = (safePersisted as Record<string, unknown>).headerMenuConfig;
+      if (!Array.isArray(persisted)) return defaultHeaderMenuConfig;
+      // 合并：确保所有默认菜单都存在，保留用户自定义的 visible/order
+      const persistedMap = new Map(persisted.map((item: unknown) => [(item as Record<string, unknown>).id, item as Record<string, unknown>]));
+      return defaultHeaderMenuConfig.map((defaultItem) => {
+        const persistedItem = persistedMap.get(defaultItem.id);
+        if (!persistedItem) return defaultItem;
+        return {
+          ...defaultItem,
+          visible: typeof persistedItem.visible === 'boolean' ? persistedItem.visible : defaultItem.visible,
+          order: typeof persistedItem.order === 'number' ? persistedItem.order : defaultItem.order,
+        };
+      });
+    })(),
   };
 };
 
@@ -1050,6 +1069,7 @@ export const useAppStore = create<AppState & AppActions>()(
       subscriptionLastRefresh: { 'most-stars': null, 'most-forks': null, 'most-dev': null, 'trending': null },
       subscriptionIsLoading: { 'most-stars': false, 'most-forks': false, 'most-dev': false, 'trending': false },
       subscriptionChannels: defaultSubscriptionChannels,
+      headerMenuConfig: defaultHeaderMenuConfig,
 
       // Auth actions
       setUser: (user) => {
@@ -1695,6 +1715,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setLanguage: (language) => set({ language }),
       setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       setReadmeModalOpen: (readmeModalOpen) => set({ readmeModalOpen }),
+      setHeaderMenuConfig: (config) => set({ headerMenuConfig: config }),
 
       // Hydration state
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -1871,7 +1892,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 8,
+      version: 9,
       storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -1928,6 +1949,7 @@ export const useAppStore = create<AppState & AppActions>()(
         selectedCategory: state.selectedCategory,
         language: state.language,
         isSidebarCollapsed: state.isSidebarCollapsed,
+        headerMenuConfig: state.headerMenuConfig,
 
         // backendApiSecret: 保留在内存中，不持久化（安全考虑）
 
@@ -2127,6 +2149,11 @@ export const useAppStore = create<AppState & AppActions>()(
   // 初始化 rpcDownloadConfig
   if (state && !(state as Record<string, unknown>).rpcDownloadConfig) {
     (state as Record<string, unknown>).rpcDownloadConfig = { enabled: false, host: '', port: 6800 };
+  }
+
+  // v8→v9: 初始化 headerMenuConfig
+  if (state && !Array.isArray((state as Record<string, unknown>).headerMenuConfig)) {
+    (state as Record<string, unknown>).headerMenuConfig = defaultHeaderMenuConfig;
   }
 
         return state as PersistedAppState;
