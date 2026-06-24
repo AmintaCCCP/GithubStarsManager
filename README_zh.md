@@ -25,6 +25,7 @@
 | **自动同步星标** | 连接 GitHub Token 自动拉取所有星标仓库 |
 | **AI 摘要与分类** | 使用 AI 生成标签、主题和简短 README 概览 |
 | **语义搜索** | 按意图而非精确名称查找仓库 |
+| **向量语义搜索** | 将仓库描述/README 嵌入 Cloudflare Vectorize 向量库，自然语言查询实现高精度语义匹配 |
 | **Release 追踪** | 订阅仓库并在统一时间线查看新版本 |
 | **一键下载** | 展开 Release 资产并即时下载 |
 | **智能资产过滤** | 按关键词匹配资产 (dmg / mac / arm64 / aarch64) |
@@ -163,6 +164,7 @@
 | **Network** | HTTP/SOCKS5 代理配置及协议级测试；aria2 RPC 远程下载设置 |
 | **Category** | 分类管理、分类排序、默认分类覆盖规则 |
 | **Data Management** | 数据导入/导出、清除本地数据、重置所有数据 |
+| **向量搜索** | 配置 Cloudflare Vectorize Worker、Embedding 模型、索引模式（描述/README）、索引重建管理 |
 
 **截图：**
 ![Settings Panel Interface](upload/settings.png)
@@ -256,6 +258,36 @@ npm run build
 5. Release 资产按钮将自动把下载任务推送到 aria2
 
 支持有后端和纯前端两种模式（浏览器直连 aria2）。
+
+## 🧠 向量语义搜索（可选）
+
+向量语义搜索基于 [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) 提供高精度的自然语言搜索。将仓库描述（或完整 README 内容）嵌入为向量，通过语义相似度匹配，而非关键词匹配。
+
+**工作原理：**
+1. 前端通过用户配置的 Embedding 服务商（OpenAI、Gemini、Cohere、Ollama、硅基流动或任何兼容 OpenAI 的 API）生成向量
+2. 轻量级 Cloudflare Worker 作为纯 Vectorize 代理（存/查/删）
+3. 搜索时，将查询文本嵌入为向量并与索引匹配；可选由 AI 服务进行二次排序
+4. 关闭向量搜索或搜索失败时，自动回退到基于关键词的 AI 搜索
+
+**支持的 Embedding 服务商：**
+
+| 服务商 | 模型 | 维度 |
+|--------|------|------|
+| OpenAI | text-embedding-3-small / large | 1536 / 3072 |
+| Gemini | text-embedding-004 | 768 |
+| Cohere | embed-multilingual-v3.0 | 1024 |
+| Ollama | nomic-embed-text / bge-m3 | 768 / 1024 |
+| 硅基流动 | BAAI/bge-large-zh-v1.5 | 1024 |
+| OpenAI 兼容 | （自定义） | （自定义） |
+
+**快速配置：**
+1. 部署 Cloudflare Worker — 详见 [cloudflare-worker/README.md](cloudflare-worker/README.md)
+2. 在应用中：**设置 → 向量搜索** — 填入 Worker 地址和认证 Token
+3. 配置 Embedding 服务商（API Key + 模型）
+4. 点击 **重建索引** 将所有仓库嵌入并上传
+5. 使用 **AI 搜索** 按钮 — 启用后自动走向量搜索
+
+> ⚠️ 更换 Embedding 模型后必须重建索引 — 不同模型生成的向量维度不兼容。
 
 ## 💾 WebDAV备份配置
 

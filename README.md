@@ -29,6 +29,7 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | **Auto-sync Stars** | Connect your GitHub token to automatically pull all starred repositories |
 | **AI Summaries & Categories** | Generate tags, topics, and short README overviews using AI |
 | **Semantic Search** | Find repos by intent, not exact names |
+| **Vector Semantic Search** | Embed repo descriptions/READMEs into a Cloudflare Vectorize index; query with natural language for high-precision semantic matching |
 | **Release Tracking** | Subscribe to repos and see new versions in one unified timeline |
 | **One‑click Downloads** | Expand release assets and download instantly |
 | **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
@@ -168,6 +169,7 @@ Deploy an Express + SQLite backend for:
 | **Network** | HTTP/SOCKS5 proxy config with protocol-level testing; aria2 RPC remote download setup |
 | **Category** | Category management, category sorting, default category override rules |
 | **Data Management** | Data import/export, clear local data, reset all data |
+| **Vector Search** | Configure Cloudflare Vectorize worker, embedding model, index mode (description / README), and manage index rebuild |
 
 **Screenshot:**
 ![Settings Panel Interface](upload/settings.png)
@@ -311,6 +313,36 @@ Send release download links directly to an aria2 daemon:
 5. Release asset buttons will now queue downloads to aria2
 
 Works in both backend-proxied mode and client-only mode (direct browser→aria2 connection).
+
+## 🧠 Vector Semantic Search (Optional)
+
+Vector Semantic Search uses [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) to provide high-precision, natural-language search over your starred repositories. Instead of keyword matching, it embeds repo descriptions (or full README content) into vectors and searches by semantic similarity.
+
+**How it works:**
+1. Frontend generates embeddings via your configured provider (OpenAI, Gemini, Cohere, Ollama, SiliconFlow, or any OpenAI-compatible API)
+2. A lightweight Cloudflare Worker acts as a pure Vectorize proxy (store / query / delete)
+3. On search, the query is embedded and matched against the vector index; results are optionally reranked by your AI service
+4. When disabled or on failure, the app automatically falls back to keyword-based AI search
+
+**Supported Embedding Providers:**
+
+| Provider | Models | Dimensions |
+|----------|--------|------------|
+| OpenAI | text-embedding-3-small / large | 1536 / 3072 |
+| Gemini | text-embedding-004 | 768 |
+| Cohere | embed-multilingual-v3.0 | 1024 |
+| Ollama | nomic-embed-text / bge-m3 | 768 / 1024 |
+| SiliconFlow | BAAI/bge-large-zh-v1.5 | 1024 |
+| OpenAI-compatible | (custom) | (custom) |
+
+**Quick setup:**
+1. Deploy the Cloudflare Worker — see [cloudflare-worker/README.md](cloudflare-worker/README.md) for step-by-step deployment instructions
+2. In the app: **Settings → Vector Search** — enter the Worker URL and auth token
+3. Configure an embedding provider (API key + model)
+4. Click **Rebuild Index** to embed and upload all repos
+5. Use the **AI Search** button — it will automatically use vector search when enabled
+
+> ⚠️ After changing the embedding model, you must rebuild the index — different models produce incompatible vector dimensions.
 
 ## 💾 WebDAV Backup Configuration
 
