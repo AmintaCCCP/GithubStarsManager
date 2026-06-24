@@ -87,15 +87,16 @@ export default {
         if ((info.vectorCount ?? 0) === 0) {
           return jsonResponse({ success: true, deleted: 0 });
         }
-        // Vectorize topK 上限为 100，零向量维度必须与索引维度一致
-        const zeroVector = new Array(info.dimensions ?? 1536).fill(0);
-        const existing = await env.VECTORIZE.query(zeroVector, {
-          topK: 100,
-          returnMetadata: false,
-        });
-        const staleIds = existing.matches
-          .filter((m) => !keepSet.has(m.id))
-          .map((m) => m.id);
+        // 使用 listVectors 分页枚举所有向量 ID，找出不在 keepSet 中的
+        let staleIds = [];
+        let cursor;
+        do {
+          const page = await env.VECTORIZE.listVectors({ limit: 1000, cursor });
+          for (const v of page.vectors) {
+            if (!keepSet.has(v.id)) staleIds.push(v.id);
+          }
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor);
         if (staleIds.length > 0) {
           await env.VECTORIZE.deleteByIds(staleIds);
         }
