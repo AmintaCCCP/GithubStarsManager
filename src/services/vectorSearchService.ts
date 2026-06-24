@@ -321,7 +321,7 @@ export class VectorSearchService {
 /**
  * 拼接仓库文本用于 embedding
  * @param repo 仓库数据
- * @param readmeContent README 内容（可选，截取前 2000 字符）
+ * @param readmeContent README 内容（可选，截取前 6000 字符，跳过装饰性头部）
  */
 export function buildEmbeddingText(repo: Repository, readmeContent?: string): string {
   const parts = [
@@ -334,9 +334,16 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string): st
     (repo.custom_tags || []).join(', '),
     repo.language || '',
   ];
-  // README 内容提供最丰富的语义信息，截取前 2000 字符避免超出 embedding 模型上下文
+  // README 内容提供最丰富的语义信息
+  // 截取前 6000 字符，跳过常见的装饰性徽章/图片头部
   if (readmeContent) {
-    const truncated = readmeContent.slice(0, 2000).trim();
+    const cleaned = readmeContent
+      .replace(/!\[.*?\]\(.*?\)/g, '') // 移除图片/徽章 ![...](...)
+      .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // 移除链接徽章 [![...](...)](...)
+      .replace(/<[^>]+>/g, ' ') // 移除 HTML 标签
+      .replace(/\n{3,}/g, '\n\n') // 压缩多余空行
+      .trim();
+    const truncated = cleaned.slice(0, 6000);
     if (truncated) parts.push(truncated);
   }
   return parts.filter(Boolean).join('\n');
@@ -359,6 +366,10 @@ export async function indexAllRepos(
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number }> {
   const { batchSize = 100, onProgress, signal, readmeFetcher } = options;
+
+  if (!Number.isInteger(batchSize) || batchSize <= 0) {
+    throw new Error('batchSize must be a positive integer');
+  }
 
   // 只索引已分析且未失败的仓库
   const indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
