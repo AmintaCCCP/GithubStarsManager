@@ -439,4 +439,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.6</downloadUrl>
   </version>
+  <version>
+    <number>0.6.7</number>
+    <releaseDate>2026-06-24</releaseDate>
+    <changelog>
+      <item>feat: Added Vector Semantic Search with Cloudflare Vectorize integration — search starred repositories using natural language with semantic understanding. This is an experimental feature; please evaluate carefully before upgrading.</item>
+      <item>feat: Added embedding support for 6 providers (OpenAI, OpenAI-compatible, SiliconFlow, Gemini, Cohere, Ollama) with configurable index modes (Description/README).</item>
+      <item>feat: Added auto-indexing for new repos after sync and incremental indexing support.</item>
+      <item>fix: Fixed vector search results being overwritten by filters and sort operations.</item>
+      <item>fix: Worker authentication security improvements and various audit fixes.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.7</downloadUrl>
+  </version>
 </versions>
