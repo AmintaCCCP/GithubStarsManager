@@ -223,13 +223,12 @@ export interface EmbeddingConfig {
   apiKeyStatus?: SecretStatus;
 }
 
-// 向量搜索整体配置
+// 向量搜索整体配置（持久化 + 同步，不含运行时状态）
 export interface VectorSearchConfig {
   enabled: boolean;
   workerUrl: string;
   authToken: string;
   embeddingConfigId: string;
-  status?: VectorSearchStatus;
 }
 
 export interface VectorSearchStatus {
@@ -371,6 +370,7 @@ export interface AppState {
 
   // Vector Search
   vectorSearchConfig: VectorSearchConfig;
+  vectorSearchStatus?: VectorSearchStatus;
 
   // WebDAV
   webdavConfigs: WebDAVConfig[];

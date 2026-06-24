@@ -76,6 +76,32 @@ export default {
         return jsonResponse({ success: true, deleted: ids.length });
       }
 
+      // POST /cleanup — 删除不在 keepIds 列表中的向量（清理已 unstar 的仓库）
+      if (request.method === 'POST' && url.pathname === '/cleanup') {
+        const { keepIds } = await request.json();
+        if (!Array.isArray(keepIds)) {
+          return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
+        }
+        const keepSet = new Set(keepIds);
+        const zeroVector = new Array(1536).fill(0);
+        const info = await env.VECTORIZE.describe();
+        const sampleSize = Math.min(info.vectorCount ?? 0, 10000);
+        if (sampleSize === 0) {
+          return jsonResponse({ success: true, deleted: 0 });
+        }
+        const existing = await env.VECTORIZE.query(zeroVector, {
+          topK: sampleSize,
+          returnMetadata: false,
+        });
+        const staleIds = existing.matches
+          .filter((m) => !keepSet.has(m.id))
+          .map((m) => m.id);
+        if (staleIds.length > 0) {
+          await env.VECTORIZE.deleteByIds(staleIds);
+        }
+        return jsonResponse({ success: true, deleted: staleIds.length });
+      }
+
       // GET /status — 返回索引信息
       if (request.method === 'GET' && url.pathname === '/status') {
         const info = await env.VECTORIZE.describe();
