@@ -202,10 +202,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     }
   }, [formWorkerUrl, formAuthToken, setVectorSearchStatus]);
 
-  const handleRebuildIndex = useCallback(async () => {
+  const runIndexAll = useCallback(async (withCleanup: boolean) => {
     if (!activeConfig) return;
 
-    // Use form state (not store) so unsaved URL/token/model changes are respected
     const embeddingClient = new EmbeddingClient({
       ...activeConfig,
       apiType: formApiType,
@@ -225,13 +224,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
-      // 清理已 unstar 的仓库向量
-      const keepIds = repositories.map(r => String(r.id));
-      try {
-        await vectorService.cleanup(keepIds);
-      } catch {
-        // cleanup 失败不阻塞重建
-        console.warn('Vector cleanup failed, continuing with rebuild');
+      if (withCleanup) {
+        const keepIds = repositories.map(r => String(r.id));
+        try {
+          await vectorService.cleanup(keepIds);
+        } catch {
+          console.warn('Vector cleanup failed, continuing with rebuild');
+        }
       }
 
       const readmeFetcher = githubToken
@@ -266,7 +265,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [activeConfig, formWorkerUrl, formAuthToken, activeEmbeddingConfig, repositories, setVectorSearchConfig]);
+  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, activeEmbeddingConfig, repositories, githubToken, setVectorSearchStatus, setVectorIndexingState]);
+
+  const handleRebuildIndex = useCallback(() => runIndexAll(true), [runIndexAll]);
+  const handleIncrementalIndex = useCallback(() => runIndexAll(false), [runIndexAll]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
@@ -658,6 +660,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('重建向量索引', 'Rebuild Vector Index')}
+          </button>
+          <button
+            onClick={handleIncrementalIndex}
+            disabled={isIndexing || !isConfigComplete}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {t('增量索引', 'Incremental Index')}
           </button>
           {isIndexing && (
             <button
