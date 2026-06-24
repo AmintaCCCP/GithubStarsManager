@@ -74,7 +74,7 @@ export default {
         }
         const matches = await env.VECTORIZE.query(vector, {
           topK,
-          returnMetadata: true,
+          returnMetadata: 'all' as const,
         });
         // 过滤低分结果
         const filtered = matches.matches.filter((m) => m.score >= threshold);
@@ -102,20 +102,25 @@ export default {
         if ((info.vectorCount ?? 0) === 0) {
           return jsonResponse({ success: true, deleted: 0 });
         }
-        // 使用 listVectors 分页枚举所有向量 ID，找出不在 keepSet 中的
-        let staleIds: string[] = [];
-        let cursor: string | undefined;
-        do {
-          const page = await env.VECTORIZE.listVectors({ limit: 1000, cursor });
-          for (const v of page.vectors) {
-            if (!keepSet.has(v.id)) staleIds.push(v.id);
-          }
-          cursor = page.nextCursor ?? undefined;
-        } while (cursor);
-        if (staleIds.length > 0) {
+        // 使用 query + 零向量采样，循环删除不在 keepSet 中的向量
+        // Vectorize binding 不支持 listVectors，topK 上限 100
+        const dimensions = info.dimensions ?? 1536;
+        let totalDeleted = 0;
+        const zeroVector = new Array(dimensions).fill(0);
+        // 最多迭代 10 轮（覆盖最多 1000 个向量）
+        for (let round = 0; round < 10; round++) {
+          const result = await env.VECTORIZE.query(zeroVector, {
+            topK: 100,
+            returnMetadata: false,
+          });
+          const staleIds = result.matches
+            .filter((m) => !keepSet.has(m.id))
+            .map((m) => m.id);
+          if (staleIds.length === 0) break;
           await env.VECTORIZE.deleteByIds(staleIds);
+          totalDeleted += staleIds.length;
         }
-        return jsonResponse({ success: true, deleted: staleIds.length });
+        return jsonResponse({ success: true, deleted: totalDeleted });
       }
 
       // GET /status — 返回索引信息

@@ -676,7 +676,7 @@ router.get('/api/configs/vector-search', (req, res) => {
     const row = db.prepare('SELECT * FROM vector_search_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
 
     if (!row) {
-      res.json({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' });
+      res.json({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 });
       return;
     }
 
@@ -703,6 +703,8 @@ router.get('/api/configs/vector-search', (req, res) => {
       authToken,
       authTokenStatus,
       embeddingConfigId: row.embedding_config_id ?? '',
+      indexMode: row.index_mode ?? 'readme',
+      readmeMaxChars: row.readme_max_chars ?? 6000,
       status,
       lastSyncAt: row.last_sync_at ?? null,
     });
@@ -716,7 +718,7 @@ router.get('/api/configs/vector-search', (req, res) => {
 router.put('/api/configs/vector-search', (req, res) => {
   try {
     const db = getDb();
-    const { enabled, workerUrl, authToken, embeddingConfigId, status, lastSyncAt } = req.body as Record<string, unknown>;
+    const { enabled, workerUrl, authToken, embeddingConfigId, indexMode, readmeMaxChars, status, lastSyncAt } = req.body as Record<string, unknown>;
 
     let encryptedToken = '';
     if (authToken && typeof authToken === 'string' && !authToken.startsWith('***')) {
@@ -727,11 +729,13 @@ router.put('/api/configs/vector-search', (req, res) => {
     }
 
     const statusJson = status ? JSON.stringify(status) : null;
+    const mode = indexMode === 'description' ? 'description' : 'readme';
+    const maxChars = typeof readmeMaxChars === 'number' && readmeMaxChars > 0 ? readmeMaxChars : 6000;
 
     db.prepare(`
-      INSERT OR REPLACE INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id, status_json, last_sync_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run('default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', statusJson, lastSyncAt ?? null);
+      INSERT OR REPLACE INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id, index_mode, readme_max_chars, status_json, last_sync_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run('default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', mode, maxChars, statusJson, lastSyncAt ?? null);
 
     res.json({ updated: true });
   } catch (err) {
