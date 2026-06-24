@@ -47,10 +47,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     embeddingConfigs,
     activeEmbeddingConfig,
     vectorSearchConfig,
+    vectorSearchStatus,
     addEmbeddingConfig,
     updateEmbeddingConfig,
     setActiveEmbeddingConfig,
     setVectorSearchConfig,
+    setVectorSearchStatus,
     repositories,
   } = useAppStore();
 
@@ -207,18 +209,25 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setIndexResult(null);
 
     try {
+      // 清理已 unstar 的仓库向量
+      const keepIds = repositories.map(r => String(r.id));
+      try {
+        await vectorService.cleanup(keepIds);
+      } catch {
+        // cleanup 失败不阻塞重建
+        console.warn('Vector cleanup failed, continuing with rebuild');
+      }
+
       const result = await indexAllRepos(repositories, embeddingClient, vectorService, {
         onProgress: (done, total) => setIndexProgress({ done, total }),
         signal: controller.signal,
       });
       setIndexResult(result);
-      setVectorSearchConfig({
-        status: {
-          connected: true,
-          vectorCount: result.indexed,
-          dimensions: activeConfig.dimensions,
-          lastSyncAt: new Date().toISOString(),
-        },
+      setVectorSearchStatus({
+        connected: true,
+        vectorCount: result.indexed,
+        dimensions: activeConfig.dimensions,
+        lastSyncAt: new Date().toISOString(),
       });
     } catch (err) {
       if (err instanceof Error && err.message === 'Aborted') {
@@ -543,13 +552,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            {vectorSearchConfig.status?.connected ? (
+            {vectorSearchStatus?.connected ? (
               <CheckCircle className="w-4 h-4 text-green-500" />
             ) : (
               <XCircle className="w-4 h-4 text-gray-400" />
             )}
             <span className="text-gray-700 dark:text-gray-300">
-              {vectorSearchConfig.status?.connected
+              {vectorSearchStatus?.connected
                 ? t('Worker 已连接', 'Worker connected')
                 : t('Worker 未连接', 'Worker not connected')}
             </span>
@@ -564,29 +573,29 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
           )}
 
-          {vectorSearchConfig.status?.vectorCount !== undefined && (
+          {vectorSearchStatus?.vectorCount !== undefined && (
             <div className="flex items-center gap-2">
               <span className="text-gray-500">📊</span>
               <span className="text-gray-700 dark:text-gray-300">
-                {t('索引向量数', 'Indexed vectors')}: {vectorSearchConfig.status.vectorCount.toLocaleString()}
+                {t('索引向量数', 'Indexed vectors')}: {vectorSearchStatus.vectorCount.toLocaleString()}
               </span>
             </div>
           )}
 
-          {vectorSearchConfig.status?.dimensions !== undefined && (
+          {vectorSearchStatus?.dimensions !== undefined && (
             <div className="flex items-center gap-2">
               <span className="text-gray-500">📐</span>
               <span className="text-gray-700 dark:text-gray-300">
-                {t('向量维度', 'Vector dimensions')}: {vectorSearchConfig.status.dimensions.toLocaleString()}
+                {t('向量维度', 'Vector dimensions')}: {vectorSearchStatus.dimensions.toLocaleString()}
               </span>
             </div>
           )}
 
-          {vectorSearchConfig.status?.lastSyncAt && (
+          {vectorSearchStatus?.lastSyncAt && (
             <div className="flex items-center gap-2">
               <span className="text-gray-500">🕐</span>
               <span className="text-gray-700 dark:text-gray-300">
-                {t('最后同步', 'Last sync')}: {new Date(vectorSearchConfig.status.lastSyncAt).toLocaleString()}
+                {t('最后同步', 'Last sync')}: {new Date(vectorSearchStatus.lastSyncAt).toLocaleString()}
               </span>
             </div>
           )}

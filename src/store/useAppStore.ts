@@ -12,6 +12,7 @@ import {
   WebDAVConfig,
   EmbeddingConfig,
   VectorSearchConfig,
+  VectorSearchStatus,
   ProxyConfig,
   RpcDownloadConfig,
   SearchFilters,
@@ -323,6 +324,7 @@ interface AppActions {
 
   // Vector Search actions
   setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
+  setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -1343,6 +1345,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setVectorSearchConfig: (config) => set((state) => ({
         vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
       })),
+      setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
 
       // Search actions
       setSearchFilters: (filters) => set((state) => {

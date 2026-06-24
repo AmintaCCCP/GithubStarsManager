@@ -18,18 +18,18 @@ export class EmbeddingClient {
    * 批量生成 embedding 向量
    * @param purpose 'document' 用于索引, 'query' 用于搜索查询
    */
-  async embed(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
+  async embed(texts: string[], purpose: 'document' | 'query' = 'document', signal?: AbortSignal): Promise<number[][]> {
     switch (this.config.apiType) {
       case 'openai':
       case 'openai-compatible':
       case 'siliconflow':
-        return this.embedOpenAICompatible(texts);
+        return this.embedOpenAICompatible(texts, signal);
       case 'ollama':
-        return this.embedOllama(texts);
+        return this.embedOllama(texts, signal);
       case 'gemini':
-        return this.embedGemini(texts, purpose);
+        return this.embedGemini(texts, purpose, signal);
       case 'cohere':
-        return this.embedCohere(texts, purpose);
+        return this.embedCohere(texts, purpose, signal);
       default:
         throw new Error(`Unsupported embedding API type: ${this.config.apiType}`);
     }
@@ -58,7 +58,7 @@ export class EmbeddingClient {
   // OpenAI / OpenAI-compatible
   // POST /v1/embeddings  or  custom URL
   // ----------------------------------------------------------
-  private async embedOpenAICompatible(texts: string[]): Promise<number[][]> {
+  private async embedOpenAICompatible(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     const url =
       this.config.apiType === 'openai' || this.config.apiType === 'siliconflow'
         ? `${this.config.baseUrl.replace(/\/+$/, '')}/v1/embeddings`
@@ -73,6 +73,7 @@ export class EmbeddingClient {
       method: 'POST',
       headers,
       body: JSON.stringify({ model: this.config.model, input: texts }),
+      signal,
     });
 
     if (!response.ok) {
@@ -91,13 +92,14 @@ export class EmbeddingClient {
   // Ollama 本地模型
   // POST /api/embed
   // ----------------------------------------------------------
-  private async embedOllama(texts: string[]): Promise<number[][]> {
+  private async embedOllama(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     const url = `${this.config.baseUrl.replace(/\/+$/, '')}/api/embed`;
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: this.config.model, input: texts }),
+      signal,
     });
 
     if (!response.ok) {
@@ -114,7 +116,7 @@ export class EmbeddingClient {
   // Google Gemini
   // POST /v1beta/models/{model}:batchEmbedContents
   // ----------------------------------------------------------
-  private async embedGemini(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
+  private async embedGemini(texts: string[], purpose: 'document' | 'query' = 'document', signal?: AbortSignal): Promise<number[][]> {
     const baseUrl = this.config.baseUrl.replace(/\/+$/, '');
     const url = `${baseUrl}/v1beta/models/${this.config.model}:batchEmbedContents?key=${this.config.apiKey}`;
     const taskType = purpose === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT';
@@ -129,6 +131,7 @@ export class EmbeddingClient {
           taskType,
         })),
       }),
+      signal,
     });
 
     if (!response.ok) {
@@ -144,7 +147,7 @@ export class EmbeddingClient {
   // Cohere
   // POST /v1/embed
   // ----------------------------------------------------------
-  private async embedCohere(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
+  private async embedCohere(texts: string[], purpose: 'document' | 'query' = 'document', signal?: AbortSignal): Promise<number[][]> {
     const url = `${this.config.baseUrl.replace(/\/+$/, '')}/v1/embed`;
 
     const response = await fetch(url, {
@@ -158,6 +161,7 @@ export class EmbeddingClient {
         texts,
         input_type: purpose === 'query' ? 'search_query' : 'search_document',
       }),
+      signal,
     });
 
     if (!response.ok) {
@@ -213,7 +217,7 @@ export class VectorSearchService {
     this.authToken = config.authToken;
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(path: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
     const url = `${this.workerUrl}${path}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -221,7 +225,7 @@ export class VectorSearchService {
       ...(options.headers as Record<string, string>),
     };
 
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, headers, signal });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
@@ -238,11 +242,11 @@ export class VectorSearchService {
   /**
    * 批量 upsert 向量到 Vectorize
    */
-  async upsert(vectors: VectorizeVector[]): Promise<{ upserted: number }> {
+  async upsert(vectors: VectorizeVector[], signal?: AbortSignal): Promise<{ upserted: number }> {
     return this.request<{ upserted: number }>('/upsert', {
       method: 'POST',
       body: JSON.stringify({ vectors }),
-    });
+    }, signal);
   }
 
   /**
@@ -250,24 +254,35 @@ export class VectorSearchService {
    */
   async query(
     vector: number[],
-    options: { topK?: number; threshold?: number } = {}
+    options: { topK?: number; threshold?: number } = {},
+    signal?: AbortSignal,
   ): Promise<VectorQueryResult[]> {
     const { topK = 20, threshold = 0.3 } = options;
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
       body: JSON.stringify({ vector, topK, threshold }),
-    });
+    }, signal);
     return result.matches;
   }
 
   /**
    * 删除指定 ID 的向量
    */
-  async delete(ids: string[]): Promise<{ deleted: number }> {
+  async delete(ids: string[], signal?: AbortSignal): Promise<{ deleted: number }> {
     return this.request<{ deleted: number }>('/delete', {
       method: 'POST',
       body: JSON.stringify({ ids }),
-    });
+    }, signal);
+  }
+
+  /**
+   * 清理不在 keepIds 列表中的向量（删除已 unstar 的仓库）
+   */
+  async cleanup(keepIds: string[], signal?: AbortSignal): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>('/cleanup', {
+      method: 'POST',
+      body: JSON.stringify({ keepIds }),
+    }, signal);
   }
 
   /**
@@ -351,7 +366,7 @@ export async function indexAllRepos(
 
     try {
       // 1. 调用 Embedding API 生成向量
-      const vectors = await embeddingClient.embed(texts);
+      const vectors = await embeddingClient.embed(texts, 'document', signal);
 
       // Validate that the embedding API returned the expected number of vectors
       if (!Array.isArray(vectors) || vectors.length < batch.length) {
@@ -374,7 +389,7 @@ export async function indexAllRepos(
       }));
 
       // 3. upsert 到 Worker
-      await vectorService.upsert(vectorizeVectors);
+      await vectorService.upsert(vectorizeVectors, signal);
       indexed += batch.length;
     } catch (err) {
       if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {

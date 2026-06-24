@@ -166,6 +166,7 @@ export const SearchBar: React.FC = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const skipNextTextSearchRef = useRef(false);
   const filterChipBaseClass = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm border transition-colors';
   const filterChipActiveClass = 'bg-brand-indigo text-white border-brand-indigo shadow-sm dark:bg-brand-indigo/80 dark:text-white dark:border-brand-indigo/70 font-medium';
   const filterChipInactiveClass = 'bg-white border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary';
@@ -208,6 +209,11 @@ export const SearchBar: React.FC = () => {
 
   useEffect(() => {
     const performSearch = async () => {
+      // Skip if vector search just set results
+      if (skipNextTextSearchRef.current) {
+        skipNextTextSearchRef.current = false;
+        return;
+      }
       if (!searchFilters.query) {
         performBasicFilter();
       } else {
@@ -535,6 +541,7 @@ export const SearchBar: React.FC = () => {
                   (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
                 );
                 console.log('🎯 Vector search results:', finalFiltered.length);
+                skipNextTextSearchRef.current = true;
                 setSearchResults(finalFiltered);
                 setSearchFilters({ query: searchQuery });
                 return;
