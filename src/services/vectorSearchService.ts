@@ -373,7 +373,7 @@ export async function indexAllRepos(
     indexMode?: 'description' | 'readme';
     readmeMaxChars?: number;
   } = {}
-): Promise<{ indexed: number; skipped: number; errors: number }> {
+): Promise<{ indexed: number; skipped: number; errors: number; error?: string }> {
   const { batchSize = 100, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000 } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
@@ -384,6 +384,7 @@ export async function indexAllRepos(
   const indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
   let indexed = 0;
   let errors = 0;
+  let lastError = '';
 
   // 仅在 readme 模式下获取 README 内容
   const shouldFetchReadme = indexMode === 'readme' && readmeFetcher;
@@ -446,6 +447,7 @@ export async function indexAllRepos(
       if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
         throw new Error('Aborted');
       }
+      lastError = err instanceof Error ? err.message : String(err);
       console.error(`Batch ${i}-${i + batch.length} failed:`, err);
       errors += batch.length;
     }
@@ -454,5 +456,5 @@ export async function indexAllRepos(
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
   }
 
-  return { indexed, skipped: repos.length - indexable.length, errors };
+  return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined };
 }

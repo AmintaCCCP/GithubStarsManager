@@ -161,7 +161,11 @@ function registerEncryptedConfigRoutes(opts: {
       let encryptedKey: string | null = null;
       if (rawKey && typeof rawKey === 'string' && !rawKey.startsWith('***')) {
         encryptedKey = encrypt(rawKey, config.encryptionKey);
+      } else if (rawKey === '') {
+        // Explicit empty string = user wants to clear the secret
+        encryptedKey = '';
       } else {
+        // Omitted or masked = reuse existing
         const existing = db.prepare(`SELECT ${secretColumn} FROM ${table} WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
         encryptedKey = (existing?.[secretColumn] as string) ?? null;
       }

@@ -216,11 +216,16 @@ export const SearchBar: React.FC = () => {
         skipNextTextSearchRef.current = false;
         return;
       }
+      // Check if vector search is still enabled
+      const vsEnabled = useAppStore.getState().vectorSearchConfig.enabled;
+      if (!vsEnabled) {
+        vectorScoreMapRef.current = null;
+      }
       if (!searchFilters.query) {
         vectorScoreMapRef.current = null;
         performBasicFilter();
-      } else if (vectorScoreMapRef.current && vectorScoreMapRef.current.query === searchFilters.query) {
-        // Vector results exist for this exact query — re-apply filters and re-sort by score
+      } else if (vectorScoreMapRef.current && vectorScoreMapRef.current.query === searchFilters.query && vsEnabled) {
+        // Vector results exist for this exact query and vector search is enabled — re-apply filters and re-sort by score
         const { scores } = vectorScoreMapRef.current;
         const reFiltered = applyFilters(repositories.filter(r => scores.has(String(r.id))));
         const reSorted = reFiltered.sort(
@@ -228,7 +233,7 @@ export const SearchBar: React.FC = () => {
         );
         setSearchResults(reSorted);
       } else {
-        // Query changed or no vector results — clear stale ref and do text search
+        // Query changed or vector search disabled — clear stale ref and do text search
         vectorScoreMapRef.current = null;
       }
       if (!vectorScoreMapRef.current) {
@@ -886,12 +891,15 @@ export const SearchBar: React.FC = () => {
         const readmeFetcher = githubToken
           ? (owner: string, repo: string, signal?: AbortSignal) => new GitHubApiService(githubToken).getRepositoryReadme(owner, repo, signal)
           : undefined;
-        // 后台执行，不阻塞 UI
-        indexAllRepos(mergedRepositories, embClient, vecService, {
-          readmeFetcher,
-          indexMode: vsCfg.indexMode,
-          readmeMaxChars: vsCfg.readmeMaxChars,
-        }).catch(() => {});
+        // 只索引新增仓库，不重复索引已有仓库
+        const newRepos = mergedRepositories.filter(repo => !existingRepoIds.has(repo.id));
+        if (newRepos.length > 0) {
+          indexAllRepos(newRepos, embClient, vecService, {
+            readmeFetcher,
+            indexMode: vsCfg.indexMode,
+            readmeMaxChars: vsCfg.readmeMaxChars,
+          }).catch(() => {});
+        }
       }
     } catch (error) {
       console.error('Sync failed:', error);

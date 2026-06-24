@@ -232,7 +232,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     try {
       if (withCleanup) {
         const keepIds = repositories.map(r => String(r.id));
-        await vectorService.cleanup(keepIds, controller.signal);
+        try {
+          await vectorService.cleanup(keepIds, controller.signal);
+        } catch (cleanupErr) {
+          // Cleanup 失败不阻塞重建，记录警告继续
+          console.warn('Vector cleanup failed, continuing with rebuild:', cleanupErr);
+        }
       }
 
       const readmeFetcher = githubToken
@@ -772,8 +777,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Result */}
         {indexResult && (
-          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md text-sm text-green-700 dark:text-green-300">
+          <div className={`p-3 rounded-md text-sm ${
+            indexResult.errors > 0 && indexResult.indexed === 0
+              ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+              : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+          }`}>
             {t('索引完成', 'Indexing complete')}: {indexResult.indexed} {t('已索引', 'indexed')}, {indexResult.skipped} {t('跳过', 'skipped')}, {indexResult.errors} {t('失败', 'errors')}
+            {indexResult.error && (
+              <div className="mt-1 text-xs opacity-80">{indexResult.error}</div>
+            )}
           </div>
         )}
       </div>
