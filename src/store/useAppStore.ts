@@ -13,6 +13,7 @@ import {
   EmbeddingConfig,
   VectorSearchConfig,
   VectorSearchStatus,
+  VectorIndexingState,
   ProxyConfig,
   RpcDownloadConfig,
   SearchFilters,
@@ -325,6 +326,7 @@ interface AppActions {
   // Vector Search actions
   setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
   setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
+  setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -1039,6 +1041,7 @@ export const useAppStore = create<AppState & AppActions>()(
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
       vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' },
+      vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       webdavConfigs: [],
       activeWebDAVConfig: null,
       lastBackup: null,
@@ -1346,6 +1349,9 @@ export const useAppStore = create<AppState & AppActions>()(
         vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
       })),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
+      setVectorIndexingState: (indexingState) => set((state) => ({
+        vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
+      })),
 
       // Search actions
       setSearchFilters: (filters) => set((state) => {

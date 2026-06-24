@@ -354,13 +354,19 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string): st
  * 遍历所有已分析仓库，分批生成 embedding 并 upsert 到 Worker
  * @param readmeFetcher 可选：获取仓库 README 内容的函数 (owner, repo) => content
  */
+export interface IndexProgress {
+  phase: 'readme' | 'embedding' | 'uploading';
+  done: number;
+  total: number;
+}
+
 export async function indexAllRepos(
   repos: Repository[],
   embeddingClient: EmbeddingClient,
   vectorService: VectorSearchService,
   options: {
     batchSize?: number;
-    onProgress?: (done: number, total: number) => void;
+    onProgress?: (progress: IndexProgress) => void;
     signal?: AbortSignal;
     readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
   } = {}
@@ -379,8 +385,10 @@ export async function indexAllRepos(
   // 预先批量获取 README 内容（如果提供了 fetcher）
   const readmeCache = new Map<string, string>();
   if (readmeFetcher) {
-    for (const repo of indexable) {
+    for (let i = 0; i < indexable.length; i++) {
+      const repo = indexable[i];
       if (signal?.aborted) throw new Error('Aborted');
+      onProgress?.({ phase: 'readme', done: i, total: indexable.length });
       try {
         const [owner, name] = repo.full_name.split('/');
         const readme = await readmeFetcher(owner, name, signal);
@@ -389,8 +397,10 @@ export async function indexAllRepos(
         // README 获取失败不影响索引
       }
     }
+    onProgress?.({ phase: 'readme', done: indexable.length, total: indexable.length });
   }
 
+  const totalBatches = Math.ceil(indexable.length / batchSize);
   for (let i = 0; i < indexable.length; i += batchSize) {
     if (signal?.aborted) {
       throw new Error('Aborted');
@@ -424,6 +434,8 @@ export async function indexAllRepos(
       }));
 
       // 3. upsert 到 Worker
+      const currentBatch = Math.floor(i / batchSize) + 1;
+      onProgress?.({ phase: 'uploading', done: currentBatch, total: totalBatches });
       await vectorService.upsert(vectorizeVectors, signal);
       indexed += batch.length;
     } catch (err) {
@@ -434,7 +446,8 @@ export async function indexAllRepos(
       errors += batch.length;
     }
 
-    onProgress?.(Math.min(i + batchSize, indexable.length), indexable.length);
+    const currentBatch = Math.floor(i / batchSize) + 1;
+    onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
   }
 
   return { indexed, skipped: repos.length - indexable.length, errors };
