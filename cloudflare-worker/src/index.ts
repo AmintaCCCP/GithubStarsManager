@@ -98,15 +98,14 @@ export default {
           return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
         }
         const keepSet = new Set(keepIds);
-        // Query with a zero vector to get a broad sample of existing vectors
-        const zeroVector = new Array(1536).fill(0);
         const info = await env.VECTORIZE.describe();
-        const sampleSize = Math.min(info.vectorCount ?? 0, 10000);
-        if (sampleSize === 0) {
+        if ((info.vectorCount ?? 0) === 0) {
           return jsonResponse({ success: true, deleted: 0 });
         }
+        // Vectorize topK 上限为 100，零向量维度必须与索引维度一致
+        const zeroVector = new Array(info.dimensions ?? 1536).fill(0);
         const existing = await env.VECTORIZE.query(zeroVector, {
-          topK: sampleSize,
+          topK: 100,
           returnMetadata: false,
         });
         const staleIds = existing.matches
