@@ -206,6 +206,39 @@ export interface GistSearchFilters {
 }
 
 export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'mimo' | 'openai-compatible';
+
+// Embedding 提供商类型
+export type EmbeddingApiType = 'openai' | 'openai-compatible' | 'gemini' | 'cohere' | 'ollama' | 'siliconflow';
+
+// Embedding 配置（结构与 AIConfig/WebDAVConfig 平行）
+export interface EmbeddingConfig {
+  id: string;
+  name: string;
+  apiType: EmbeddingApiType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  dimensions: number;
+  isActive: boolean;
+  apiKeyStatus?: SecretStatus;
+}
+
+// 向量搜索整体配置
+export interface VectorSearchConfig {
+  enabled: boolean;
+  workerUrl: string;
+  authToken: string;
+  embeddingConfigId: string;
+  status?: VectorSearchStatus;
+}
+
+export interface VectorSearchStatus {
+  connected: boolean;
+  vectorCount: number;
+  dimensions: number;
+  lastSyncAt?: string;
+  error?: string;
+}
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
 
@@ -331,7 +364,14 @@ export interface AppState {
   // AI
   aiConfigs: AIConfig[];
   activeAIConfig: string | null;
-  
+
+  // Embedding
+  embeddingConfigs: EmbeddingConfig[];
+  activeEmbeddingConfig: string | null;
+
+  // Vector Search
+  vectorSearchConfig: VectorSearchConfig;
+
   // WebDAV
   webdavConfigs: WebDAVConfig[];
   activeWebDAVConfig: string | null;

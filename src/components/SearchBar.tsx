@@ -7,7 +7,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useDialog } from '../hooks/useDialog';
-import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
+import { isRepoCustomized } from '../utils/repoUtils';
 import { NumberInput } from './ui/NumberInput';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
@@ -143,36 +143,8 @@ export const SearchBar: React.FC = () => {
         stats.notSubscribed++;
       }
       
-      // 自定义状态统计 - 与编辑页面逻辑一致
-      // 描述：有自定义描述标记（包括明确清空），且内容与AI/原始不同
-      const hasCustomDesc = repo.custom_description !== undefined;
-      const repoDesc = (repo.description || '').trim();
-      const aiDesc = (repo.ai_summary || '').trim();
-      const customDesc = (repo.custom_description || '').trim();
-      const isDescEdited = hasCustomDesc &&
-        (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
-
-      // 标签：有自定义标签标记（包括明确清空），且内容与AI/Topics不同
-      const hasCustomTags = repo.custom_tags !== undefined;
-      const aiTags = repo.ai_tags || [];
-      const topics = repo.topics || [];
-      const customTags = repo.custom_tags || [];
-      const isTagsEdited = hasCustomTags &&
-        (customTags.length === 0 || (
-          JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
-          JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
-        ));
-
-      // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
-      const aiCat = getAICategory(repo, allCategories);
-      const defaultCat = getDefaultCategory(repo, allCategories);
-      const customCat = repo.custom_category;
-      const isCategoryEdited = customCat !== undefined &&
-        (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
-
-      // 任意一个为true则视为已编辑（注意：分类锁定不算编辑）
-      const isCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
-      if (isCustomized) {
+      // 自定义状态统计
+      if (isRepoCustomized(repo, allCategories)) {
         stats.edited++;
       } else {
         stats.notEdited++;
@@ -376,36 +348,11 @@ export const SearchBar: React.FC = () => {
       );
     }
 
-    // 自定义筛选 - 与编辑页面逻辑一致
+    // 自定义筛选
     if (searchFilters.isEdited !== undefined) {
-      filtered = filtered.filter(repo => {
-        const hasCustomDesc = repo.custom_description !== undefined;
-        const repoDesc = (repo.description || '').trim();
-        const aiDesc = (repo.ai_summary || '').trim();
-        const customDesc = (repo.custom_description || '').trim();
-        const isDescEdited = hasCustomDesc &&
-          (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
-
-        const hasCustomTags = repo.custom_tags !== undefined;
-        const aiTags = repo.ai_tags || [];
-        const topics = repo.topics || [];
-        const customTags = repo.custom_tags || [];
-        const isTagsEdited = hasCustomTags &&
-          (customTags.length === 0 || (
-            JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
-            JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
-          ));
-
-        // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
-        const aiCat = getAICategory(repo, allCategories);
-        const defaultCat = getDefaultCategory(repo, allCategories);
-        const customCat = repo.custom_category;
-        const isCategoryEdited = customCat !== undefined &&
-          (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
-
-        const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
-        return searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized;
-      });
+      filtered = filtered.filter(repo =>
+        searchFilters.isEdited ? isRepoCustomized(repo, allCategories) : !isRepoCustomized(repo, allCategories)
+      );
     }
 
     // Category locked filter - 检查分类是否被锁定
@@ -492,29 +439,8 @@ export const SearchBar: React.FC = () => {
 
         // Edited filter
         if (searchFilters.isEdited !== undefined) {
-          const hasCustomDesc = repo.custom_description !== undefined;
-          const repoDesc = (repo.description || '').trim();
-          const aiDesc = (repo.ai_summary || '').trim();
-          const customDesc = (repo.custom_description || '').trim();
-          const isDescEdited = hasCustomDesc &&
-            (customDesc === '' || (customDesc !== repoDesc && customDesc !== aiDesc));
-          const hasCustomTags = repo.custom_tags !== undefined;
-          const aiTags = repo.ai_tags || [];
-          const topics = repo.topics || [];
-          const customTags = repo.custom_tags || [];
-          const isTagsEdited = hasCustomTags &&
-            (customTags.length === 0 || (
-              JSON.stringify([...customTags].sort()) !== JSON.stringify([...aiTags].sort()) &&
-              JSON.stringify([...customTags].sort()) !== JSON.stringify([...topics].sort())
-            ));
-          // 分类：有自定义分类标记（包括明确清空），且与AI/默认不一致
-          const aiCat = getAICategory(repo, allCategories);
-          const defaultCat = getDefaultCategory(repo, allCategories);
-          const customCat = repo.custom_category;
-          const isCategoryEdited = customCat !== undefined &&
-            (customCat === '' || (customCat !== aiCat && customCat !== defaultCat));
-          const isRepoCustomized = isDescEdited || isTagsEdited || isCategoryEdited;
-          tempFiltered = tempFiltered && (searchFilters.isEdited ? isRepoCustomized : !isRepoCustomized);
+          const customized = isRepoCustomized(repo, allCategories);
+          tempFiltered = tempFiltered && (searchFilters.isEdited ? customized : !customized);
         }
 
         // Analysis failed filter
@@ -570,15 +496,61 @@ export const SearchBar: React.FC = () => {
     // Trigger AI search immediately
     setIsSearching(true);
     console.log('🔍 Starting AI search for query:', searchQuery);
-    
+
     try {
       let filtered = repositories;
-      
+
+      // ====== 向量搜索分支 ======
+      const vsConfig = useAppStore.getState().vectorSearchConfig;
+      const embConfigs = useAppStore.getState().embeddingConfigs;
+      const activeEmbConfig = embConfigs.find(c => c.id === vsConfig?.embeddingConfigId);
+
+      if (vsConfig?.enabled && vsConfig?.workerUrl && activeEmbConfig) {
+        try {
+          const { VectorSearchService, EmbeddingClient } = await import('../services/vectorSearchService');
+          const embeddingClient = new EmbeddingClient(activeEmbConfig);
+          const vectorService = new VectorSearchService(vsConfig);
+
+          // 1. 前端调用 Embedding API 生成查询向量
+          const queryVectors = await embeddingClient.embed([searchQuery]);
+          if (queryVectors && queryVectors.length > 0) {
+            // 2. 前端将查询向量发送到 Worker
+            const vectorResults = await vectorService.query(queryVectors[0], { topK: 30, threshold: 0.3 });
+
+            if (vectorResults.length > 0) {
+              // 3. 从本地仓库数据中取出匹配结果，按相似度排序
+              const scoreMap = new Map(vectorResults.map(r => [r.id, r.score]));
+              const scoredRepos = filtered
+                .filter(repo => scoreMap.has(String(repo.id)))
+                .map(repo => ({
+                  repo,
+                  score: scoreMap.get(String(repo.id)) || 0,
+                }))
+                .sort((a, b) => b.score - a.score)
+                .map(item => item.repo);
+
+              if (scoredRepos.length > 0) {
+                const finalFiltered = applyFilters(scoredRepos);
+                console.log('🎯 Vector search results:', finalFiltered.length);
+                setSearchResults(finalFiltered);
+                setSearchFilters({ query: searchQuery });
+                return;
+              }
+            }
+          }
+          // 向量搜索无结果 → 继续走关键词搜索
+          console.log('⚠️ Vector search returned no results, falling back to keyword search');
+        } catch (vectorError) {
+          console.warn('❌ Vector search failed, falling back to keyword search:', vectorError);
+        }
+      }
+      // ====== 向量搜索分支结束 ======
+
       const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
       console.log('🤖 AI Config found:', !!activeConfig, 'Active AI Config ID:', activeAIConfig);
       console.log('📋 Available AI Configs:', aiConfigs.length);
       console.log('🔧 AI Configs:', aiConfigs.map(c => ({ id: c.id, name: c.name, hasApiKey: !!c.apiKey })));
-      
+
       if (activeConfig) {
         try {
           console.log('🚀 Calling AI service...');
