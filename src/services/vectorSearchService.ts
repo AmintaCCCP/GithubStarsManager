@@ -321,9 +321,10 @@ export class VectorSearchService {
 /**
  * 拼接仓库文本用于 embedding
  * @param repo 仓库数据
- * @param readmeContent README 内容（可选，截取前 6000 字符，跳过装饰性头部）
+ * @param readmeContent README 内容（可选）
+ * @param maxChars README 最大字符数，默认 6000
  */
-export function buildEmbeddingText(repo: Repository, readmeContent?: string): string {
+export function buildEmbeddingText(repo: Repository, readmeContent?: string, maxChars = 6000): string {
   const parts = [
     repo.full_name,
     repo.description || '',
@@ -335,7 +336,7 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string): st
     repo.language || '',
   ];
   // README 内容提供最丰富的语义信息
-  // 截取前 6000 字符，跳过常见的装饰性徽章/图片头部
+  // 跳过常见的装饰性徽章/图片头部
   if (readmeContent) {
     const cleaned = readmeContent
       .replace(/!\[.*?\]\(.*?\)/g, '') // 移除图片/徽章 ![...](...)
@@ -343,7 +344,7 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string): st
       .replace(/<[^>]+>/g, ' ') // 移除 HTML 标签
       .replace(/\n{3,}/g, '\n\n') // 压缩多余空行
       .trim();
-    const truncated = cleaned.slice(0, 6000);
+    const truncated = cleaned.slice(0, maxChars);
     if (truncated) parts.push(truncated);
   }
   return parts.filter(Boolean).join('\n');
@@ -369,9 +370,11 @@ export async function indexAllRepos(
     onProgress?: (progress: IndexProgress) => void;
     signal?: AbortSignal;
     readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
+    indexMode?: 'description' | 'readme';
+    readmeMaxChars?: number;
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number }> {
-  const { batchSize = 100, onProgress, signal, readmeFetcher } = options;
+  const { batchSize = 100, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000 } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
     throw new Error('batchSize must be a positive integer');
@@ -382,9 +385,10 @@ export async function indexAllRepos(
   let indexed = 0;
   let errors = 0;
 
-  // 预先批量获取 README 内容（如果提供了 fetcher）
+  // 仅在 readme 模式下获取 README 内容
+  const shouldFetchReadme = indexMode === 'readme' && readmeFetcher;
   const readmeCache = new Map<string, string>();
-  if (readmeFetcher) {
+  if (shouldFetchReadme) {
     for (let i = 0; i < indexable.length; i++) {
       const repo = indexable[i];
       if (signal?.aborted) throw new Error('Aborted');
@@ -407,7 +411,7 @@ export async function indexAllRepos(
     }
 
     const batch = indexable.slice(i, i + batchSize);
-    const texts = batch.map(repo => buildEmbeddingText(repo, readmeCache.get(repo.full_name)));
+    const texts = batch.map(repo => buildEmbeddingText(repo, readmeCache.get(repo.full_name), readmeMaxChars));
 
     try {
       // 1. 调用 Embedding API 生成向量

@@ -880,7 +880,11 @@ export const SearchBar: React.FC = () => {
           ? (owner: string, repo: string, signal?: AbortSignal) => new GitHubApiService(githubToken).getRepositoryReadme(owner, repo, signal)
           : undefined;
         // 后台执行，不阻塞 UI
-        indexAllRepos(mergedRepositories, embClient, vecService, { readmeFetcher }).catch(() => {});
+        indexAllRepos(mergedRepositories, embClient, vecService, {
+          readmeFetcher,
+          indexMode: vsCfg.indexMode,
+          readmeMaxChars: vsCfg.readmeMaxChars,
+        }).catch(() => {});
       }
     } catch (error) {
       console.error('Sync failed:', error);

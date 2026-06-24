@@ -643,8 +643,12 @@ const normalizePersistedState = (
           workerUrl: typeof safePersisted.vectorSearchConfig.workerUrl === 'string' ? safePersisted.vectorSearchConfig.workerUrl : '',
           authToken: typeof safePersisted.vectorSearchConfig.authToken === 'string' ? safePersisted.vectorSearchConfig.authToken : '',
           embeddingConfigId: typeof safePersisted.vectorSearchConfig.embeddingConfigId === 'string' ? safePersisted.vectorSearchConfig.embeddingConfigId : '',
+          indexMode: safePersisted.vectorSearchConfig.indexMode === 'description' ? 'description' : 'readme',
+          readmeMaxChars: typeof safePersisted.vectorSearchConfig.readmeMaxChars === 'number' && safePersisted.vectorSearchConfig.readmeMaxChars > 0
+            ? safePersisted.vectorSearchConfig.readmeMaxChars
+            : 6000,
         }
-      : { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' },
+      : { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 },
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1040,7 +1044,7 @@ export const useAppStore = create<AppState & AppActions>()(
       activeAIConfig: null,
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
-      vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' },
+      vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       webdavConfigs: [],
       activeWebDAVConfig: null,
@@ -2257,7 +2261,15 @@ export const useAppStore = create<AppState & AppActions>()(
 
   // 初始化 vectorSearchConfig
   if (state && !(state as Record<string, unknown>).vectorSearchConfig) {
-    (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' };
+    (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 };
+  }
+  // 迁移：为旧配置添加 indexMode 和 readmeMaxChars
+  if (state) {
+    const vsc = (state as Record<string, unknown>).vectorSearchConfig as Record<string, unknown> | undefined;
+    if (vsc && typeof vsc === 'object') {
+      if (vsc.indexMode !== 'description' && vsc.indexMode !== 'readme') vsc.indexMode = 'readme';
+      if (typeof vsc.readmeMaxChars !== 'number' || vsc.readmeMaxChars <= 0) vsc.readmeMaxChars = 6000;
+    }
   }
 
         return state as PersistedAppState;

@@ -223,12 +223,17 @@ export interface EmbeddingConfig {
   apiKeyStatus?: SecretStatus;
 }
 
+// 索引内容模式
+export type VectorIndexMode = 'description' | 'readme';
+
 // 向量搜索整体配置（持久化 + 同步，不含运行时状态）
 export interface VectorSearchConfig {
   enabled: boolean;
   workerUrl: string;
   authToken: string;
   embeddingConfigId: string;
+  indexMode: VectorIndexMode;
+  readmeMaxChars: number;  // README 截取字符数，默认 6000
 }
 
 export interface VectorSearchStatus {
