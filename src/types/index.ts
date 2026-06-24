@@ -238,6 +238,14 @@ export interface VectorSearchStatus {
   lastSyncAt?: string;
   error?: string;
 }
+
+export interface VectorIndexingState {
+  isIndexing: boolean;
+  phase: 'readme' | 'embedding' | 'uploading' | null;
+  phaseDone: number;
+  phaseTotal: number;
+  result: { indexed: number; skipped: number; errors: number } | null;
+}
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
 
@@ -371,6 +379,7 @@ export interface AppState {
   // Vector Search
   vectorSearchConfig: VectorSearchConfig;
   vectorSearchStatus?: VectorSearchStatus;
+  vectorIndexingState: VectorIndexingState;
 
   // WebDAV
   webdavConfigs: WebDAVConfig[];

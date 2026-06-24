@@ -49,11 +49,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     activeEmbeddingConfig,
     vectorSearchConfig,
     vectorSearchStatus,
+    vectorIndexingState,
     addEmbeddingConfig,
     updateEmbeddingConfig,
     setActiveEmbeddingConfig,
     setVectorSearchConfig,
     setVectorSearchStatus,
+    setVectorIndexingState,
     repositories,
     githubToken,
   } = useAppStore();
@@ -82,10 +84,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [embeddingSaved, setEmbeddingSaved] = useState(false);
   const [workerSaved, setWorkerSaved] = useState(false);
 
-  // Indexing state
-  const [isIndexing, setIsIndexing] = useState(false);
-  const [indexProgress, setIndexProgress] = useState({ done: 0, total: 0 });
-  const [indexResult, setIndexResult] = useState<{ indexed: number; skipped: number; errors: number } | null>(null);
+  // Indexing state (from store, persists across navigation)
+  const { isIndexing, phase, phaseDone, phaseTotal, result: indexResult } = vectorIndexingState;
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // Deploy guide
@@ -222,9 +222,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     });
     const controller = new AbortController();
     setAbortController(controller);
-    setIsIndexing(true);
-    setIndexProgress({ done: 0, total: 0 });
-    setIndexResult(null);
+    setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
       // 清理已 unstar 的仓库向量
@@ -244,11 +242,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         : undefined;
 
       const result = await indexAllRepos(repositories, embeddingClient, vectorService, {
-        onProgress: (done, total) => setIndexProgress({ done, total }),
+        onProgress: (progress) => setVectorIndexingState({
+          phase: progress.phase,
+          phaseDone: progress.done,
+          phaseTotal: progress.total,
+        }),
         signal: controller.signal,
         readmeFetcher,
       });
-      setIndexResult(result);
+      setVectorIndexingState({ result, isIndexing: false, phase: null });
       setVectorSearchStatus({
         connected: true,
         vectorCount: result.indexed,
@@ -257,12 +259,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       });
     } catch (err) {
       if (err instanceof Error && err.message === 'Aborted') {
-        setIndexResult(null);
+        setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
-        setIndexResult({ indexed: 0, skipped: 0, errors: repositories.length });
+        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length } });
       }
     } finally {
-      setIsIndexing(false);
       setAbortController(null);
     }
   }, [activeConfig, formWorkerUrl, formAuthToken, activeEmbeddingConfig, repositories, setVectorSearchConfig]);
@@ -670,17 +671,23 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
 
         {/* Progress */}
-        {isIndexing && indexProgress.total > 0 && (
+        {isIndexing && phaseTotal > 0 && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
               <span>
-                {indexProgress.done}/{indexProgress.total} ({Math.round((indexProgress.done / indexProgress.total) * 100)}%)
+                {phase === 'readme' && `📖 ${t('获取 README', 'Fetching README')}`}
+                {phase === 'embedding' && `🧠 ${t('生成向量', 'Generating embeddings')}`}
+                {phase === 'uploading' && `☁️ ${t('上传向量', 'Uploading vectors')}`}
+                {!phase && `⏳ ${t('准备中', 'Preparing')}`}
+              </span>
+              <span>
+                {phaseDone}/{phaseTotal} ({Math.round((phaseDone / phaseTotal) * 100)}%)
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-purple-500 h-2 rounded-full transition-all"
-                style={{ width: `${(indexProgress.done / indexProgress.total) * 100}%` }}
+                style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
               />
             </div>
           </div>
