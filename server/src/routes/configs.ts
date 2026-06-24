@@ -102,7 +102,11 @@ function registerEncryptedConfigRoutes(opts: {
                 continue;
               }
             }
+          } else if (rawKey === '') {
+            // Explicit empty string = user wants to clear the secret
+            encryptedKey = '';
           } else {
+            // Omitted or masked = reuse existing
             encryptedKey = existingKeys.get(String(c.id)) ?? '';
           }
 
@@ -121,24 +125,21 @@ function registerEncryptedConfigRoutes(opts: {
           syncResult.inserted++;
         }
 
+        // Rollback if any config was skipped (prevents partial replacement)
         if (syncResult.skipped.length > 0) {
-          logger.warn(`${logPrefix}.bulk`, `Skipped ${label} configs with missing keys`, { skippedCount: syncResult.skipped.length, skipped: syncResult.skipped });
-        }
-
-        if (syncResult.inserted === 0 && configs.length > 0) {
-          throw new Error('ALL_CONFIGS_SKIPPED');
+          throw new Error('SOME_CONFIGS_SKIPPED');
         }
       });
 
       bulkSync();
-      res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
+      res.json({ synced: syncResult.inserted, skipped: 0, errors: [] });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       logger.errorFromError(`${logPrefix}.bulk`, `PUT ${basePath}/bulk error`, err);
-      if (errMsg === 'ALL_CONFIGS_SKIPPED') {
+      if (errMsg === 'SOME_CONFIGS_SKIPPED') {
         res.status(422).json({
-          error: `All ${label} configs were skipped — check the errors field for per-config reasons`,
-          code: `SYNC_${logPrefix.toUpperCase().replace(/\./g, '_')}_ALL_SKIPPED`,
+          error: `Some ${label} configs were skipped — check the errors field for per-config reasons`,
+          code: `SYNC_${logPrefix.toUpperCase().replace(/\./g, '_')}_PARTIAL_SKIP`,
           synced: 0,
           skipped: syncResult.skipped.length,
           errors: syncResult.skipped,

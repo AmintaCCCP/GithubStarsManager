@@ -147,7 +147,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     });
     setWorkerSaved(true);
     setTimeout(() => setWorkerSaved(false), 2000);
-  }, [formWorkerUrl, formAuthToken, activeEmbeddingConfig, setVectorSearchConfig]);
+  }, [formWorkerUrl, formAuthToken, formIndexMode, formReadmeMaxChars, activeEmbeddingConfig, setVectorSearchConfig]);
 
   const handleTestEmbedding = useCallback(async () => {
     setTestingEmbedding(true);
@@ -232,11 +232,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     try {
       if (withCleanup) {
         const keepIds = repositories.map(r => String(r.id));
-        try {
-          await vectorService.cleanup(keepIds);
-        } catch {
-          console.warn('Vector cleanup failed, continuing with rebuild');
-        }
+        await vectorService.cleanup(keepIds, controller.signal);
       }
 
       const readmeFetcher = githubToken
@@ -261,7 +257,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       setVectorSearchStatus({
         connected: true,
         vectorCount: result.indexed,
-        dimensions: activeConfig.dimensions,
+        dimensions: formDimensions,
         lastSyncAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -283,6 +279,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   }, [abortController]);
 
   const isConfigComplete = !!(
+    activeConfig &&
     formBaseUrl &&
     formModel &&
     (formApiType === 'ollama' || formApiKey) &&

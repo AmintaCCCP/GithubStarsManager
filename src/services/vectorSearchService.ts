@@ -339,8 +339,8 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
   // 跳过常见的装饰性徽章/图片头部
   if (readmeContent) {
     const cleaned = readmeContent
+      .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // 移除链接徽章 [![...](...)](...) — 必须在图片之前
       .replace(/!\[.*?\]\(.*?\)/g, '') // 移除图片/徽章 ![...](...)
-      .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // 移除链接徽章 [![...](...)](...)
       .replace(/<[^>]+>/g, ' ') // 移除 HTML 标签
       .replace(/\n{3,}/g, '\n\n') // 压缩多余空行
       .trim();
