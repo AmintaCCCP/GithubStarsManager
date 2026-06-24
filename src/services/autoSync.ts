@@ -227,7 +227,16 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.embedding = hashes.embedding;
     }
     if (changed.vectorSearch && vectorSearchResult.status === 'fulfilled') {
-      state.setVectorSearchConfig(vectorSearchResult.value);
+      const backendConfig = vectorSearchResult.value;
+      // Preserve local authToken if backend returned empty or decrypt_failed
+      const localConfig = state.vectorSearchConfig;
+      if ((backendConfig as Record<string, unknown>).authTokenStatus === 'decrypt_failed' || !backendConfig.authToken) {
+        if (localConfig.authToken) {
+          logger.warn('sync.decryptFailed', 'Backend decrypt_failed for vector search authToken, preserving local value');
+          backendConfig.authToken = localConfig.authToken;
+        }
+      }
+      state.setVectorSearchConfig(backendConfig);
       _lastHash.vectorSearch = hashes.vectorSearch;
     }
     // Sync active selections from settings

@@ -258,7 +258,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network']),
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch']),
     []
   );
 

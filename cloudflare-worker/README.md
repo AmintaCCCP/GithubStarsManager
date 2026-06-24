@@ -51,7 +51,7 @@
 ### 第 5 步：获取 Worker URL
 
 部署成功后，页面顶部会显示 Worker 的 URL，格式类似：
-```
+```text
 https://github-stars-vectorize.<your-subdomain>.workers.dev
 ```
 

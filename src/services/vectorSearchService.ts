@@ -16,8 +16,9 @@ export class EmbeddingClient {
 
   /**
    * 批量生成 embedding 向量
+   * @param purpose 'document' 用于索引, 'query' 用于搜索查询
    */
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
     switch (this.config.apiType) {
       case 'openai':
       case 'openai-compatible':
@@ -26,9 +27,9 @@ export class EmbeddingClient {
       case 'ollama':
         return this.embedOllama(texts);
       case 'gemini':
-        return this.embedGemini(texts);
+        return this.embedGemini(texts, purpose);
       case 'cohere':
-        return this.embedCohere(texts);
+        return this.embedCohere(texts, purpose);
       default:
         throw new Error(`Unsupported embedding API type: ${this.config.apiType}`);
     }
@@ -113,9 +114,10 @@ export class EmbeddingClient {
   // Google Gemini
   // POST /v1beta/models/{model}:batchEmbedContents
   // ----------------------------------------------------------
-  private async embedGemini(texts: string[]): Promise<number[][]> {
+  private async embedGemini(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
     const baseUrl = this.config.baseUrl.replace(/\/+$/, '');
     const url = `${baseUrl}/v1beta/models/${this.config.model}:batchEmbedContents?key=${this.config.apiKey}`;
+    const taskType = purpose === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT';
 
     const response = await fetch(url, {
       method: 'POST',
@@ -124,6 +126,7 @@ export class EmbeddingClient {
         requests: texts.map((text) => ({
           model: `models/${this.config.model}`,
           content: { parts: [{ text }] },
+          taskType,
         })),
       }),
     });
@@ -141,7 +144,7 @@ export class EmbeddingClient {
   // Cohere
   // POST /v1/embed
   // ----------------------------------------------------------
-  private async embedCohere(texts: string[]): Promise<number[][]> {
+  private async embedCohere(texts: string[], purpose: 'document' | 'query' = 'document'): Promise<number[][]> {
     const url = `${this.config.baseUrl.replace(/\/+$/, '')}/v1/embed`;
 
     const response = await fetch(url, {
@@ -153,7 +156,7 @@ export class EmbeddingClient {
       body: JSON.stringify({
         model: this.config.model,
         texts,
-        input_type: 'search_document',
+        input_type: purpose === 'query' ? 'search_query' : 'search_document',
       }),
     });
 

@@ -512,7 +512,7 @@ export const SearchBar: React.FC = () => {
           const vectorService = new VectorSearchService(vsConfig);
 
           // 1. 前端调用 Embedding API 生成查询向量
-          const queryVectors = await embeddingClient.embed([searchQuery]);
+          const queryVectors = await embeddingClient.embed([searchQuery], 'query');
           if (queryVectors && queryVectors.length > 0) {
             // 2. 前端将查询向量发送到 Worker
             const vectorResults = await vectorService.query(queryVectors[0], { topK: 30, threshold: 0.3 });
@@ -530,7 +530,10 @@ export const SearchBar: React.FC = () => {
                 .map(item => item.repo);
 
               if (scoredRepos.length > 0) {
-                const finalFiltered = applyFilters(scoredRepos);
+                // Re-sort by similarity score after filtering, since applyFilters may reorder
+                const finalFiltered = applyFilters([...scoredRepos]).sort(
+                  (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
+                );
                 console.log('🎯 Vector search results:', finalFiltered.length);
                 setSearchResults(finalFiltered);
                 setSearchFilters({ query: searchQuery });

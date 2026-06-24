@@ -185,8 +185,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const handleRebuildIndex = useCallback(async () => {
     if (!activeConfig) return;
 
-    const embeddingClient = new EmbeddingClient(activeConfig);
-    // Use form state (not store) so unsaved URL/token changes are respected
+    // Use form state (not store) so unsaved URL/token/model changes are respected
+    const embeddingClient = new EmbeddingClient({
+      ...activeConfig,
+      apiType: formApiType,
+      baseUrl: formBaseUrl,
+      apiKey: formApiKey,
+      model: formModel,
+      dimensions: formDimensions,
+    });
     const vectorService = new VectorSearchService({
       enabled: true,
       workerUrl: formWorkerUrl,
@@ -327,6 +334,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'https://api.openai.com'
                 : formApiType === 'siliconflow'
                 ? 'https://api.siliconflow.cn'
+                : formApiType === 'gemini'
+                ? 'https://generativelanguage.googleapis.com'
+                : formApiType === 'cohere'
+                ? 'https://api.cohere.com'
                 : formApiType === 'ollama'
                 ? 'http://localhost:11434'
                 : 'https://api.example.com/v1/embeddings'

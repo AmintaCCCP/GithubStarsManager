@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
@@ -59,8 +60,10 @@ function registerEncryptedConfigRoutes(opts: {
   updateParams: (body: Record<string, unknown>, id: string, encryptedKey: string) => unknown[];
   /** Shape the response object for a single config */
   shapeResponse: (c: Record<string, unknown>, id: string | number, maskedKey: string) => Record<string, unknown>;
+  /** If false, configs without a secret are allowed (e.g. Ollama). Default true. */
+  requiresSecret?: boolean;
 }): void {
-  const { router, basePath, table, secretColumn, label, logPrefix, insertSql, updateSql, insertParams, updateParams, shapeResponse } = opts;
+  const { router, basePath, table, secretColumn, label, logPrefix, insertSql, updateSql, insertParams, updateParams, shapeResponse, requiresSecret = true } = opts;
 
   // PUT /bulk — replace all configs (for sync)
   router.put(`${basePath}/bulk`, (req, res) => {
@@ -103,7 +106,7 @@ function registerEncryptedConfigRoutes(opts: {
             encryptedKey = existingKeys.get(String(c.id)) ?? '';
           }
 
-          if (!encryptedKey) {
+          if (!encryptedKey && requiresSecret) {
             syncResult.skipped.push({
               id: String(c.id),
               name: String(c.name ?? ''),
@@ -615,14 +618,15 @@ router.post('/api/configs/embedding', (req, res) => {
     const db = getDb();
     const { name, apiType, baseUrl, apiKey, model, dimensions, isActive } = req.body as Record<string, unknown>;
 
+    const id = typeof req.body.id === 'string' && req.body.id ? req.body.id : randomUUID();
     const encryptedKey = apiKey && typeof apiKey === 'string' ? encrypt(apiKey, config.encryptionKey) : '';
 
-    const result = db.prepare(
-      'INSERT INTO embedding_configs (name, api_type, base_url, api_key_encrypted, model, dimensions, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(name ?? '', apiType ?? 'openai', baseUrl ?? '', encryptedKey, model ?? '', dimensions ?? 1536, isActive ? 1 : 0);
+    db.prepare(
+      'INSERT INTO embedding_configs (id, name, api_type, base_url, api_key_encrypted, model, dimensions, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, name ?? '', apiType ?? 'openai', baseUrl ?? '', encryptedKey, model ?? '', dimensions ?? 1536, isActive ? 1 : 0);
 
     res.status(201).json({
-      id: result.lastInsertRowid,
+      id,
       name,
       apiType,
       baseUrl,
@@ -659,6 +663,7 @@ registerEncryptedConfigRoutes({
     id, name: c.name, apiType: c.apiType, baseUrl: c.baseUrl,
     apiKey: maskedKey, model: c.model, dimensions: c.dimensions ?? 1536, isActive: !!c.isActive,
   }),
+  requiresSecret: false, // Ollama 等本地模型不需要 API Key
 });
 
 // ── Vector Search Config ──
