@@ -182,6 +182,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       });
       const result = await service.testConnection();
       setWorkerTestResult(result);
+      // 同步更新 store 中的状态，让状态区域实时反映
+      if (result.success) {
+        setVectorSearchStatus({
+          connected: true,
+          vectorCount: result.vectorCount,
+          dimensions: result.dimensions,
+        });
+      }
     } catch (err) {
       setWorkerTestResult({
         success: false,
@@ -192,7 +200,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setTestingWorker(false);
     }
-  }, [formWorkerUrl, formAuthToken]);
+  }, [formWorkerUrl, formAuthToken, setVectorSearchStatus]);
 
   const handleRebuildIndex = useCallback(async () => {
     if (!activeConfig) return;
@@ -641,7 +649,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {t('索引管理', 'Index Management')}
         </h3>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleRebuildIndex}
             disabled={isIndexing || !isConfigComplete}
@@ -686,14 +694,51 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         )}
       </div>
 
-      {/* Section 5: Deploy Guide */}
+      {/* Section 5: Delete Index */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑤</span>
+          {t('删除索引', 'Delete Index')}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {t(
+            '如果更换了 Embedding 模型（维度不同），需要删除旧索引后重新创建。',
+            'If you changed the Embedding model (different dimensions), you need to delete the old index and recreate it.'
+          )}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const cmd = 'npx wrangler vectorize delete github-stars';
+              navigator.clipboard.writeText(cmd);
+            }}
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+          >
+            {t('复制删除命令', 'Copy Delete Command')}
+          </button>
+          <button
+            onClick={() => {
+              const cmd = `npx wrangler vectorize create github-stars --dimensions=${formDimensions} --metric=cosine`;
+              navigator.clipboard.writeText(cmd);
+            }}
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+          >
+            {t('复制创建命令', 'Copy Create Command')}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-500">
+          {t('在 cloudflare-worker 目录下执行以上命令，然后点击上方「重建向量索引」', 'Run these commands in the cloudflare-worker directory, then click "Rebuild Vector Index" above')}
+        </p>
+      </div>
+
+      {/* Section 6: Deploy Guide */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <button
           onClick={() => setShowDeployGuide(!showDeployGuide)}
           className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
         >
           <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑤</span>
+            <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑥</span>
             {t('部署指南', 'Deploy Guide')}
           </h3>
           {showDeployGuide ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
@@ -764,10 +809,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-500">
-              {t(
-                '详细部署指南请参考 cloudflare-worker/README.md',
-                'For detailed instructions, see cloudflare-worker/README.md'
-              )}
+              {t('详细部署指南请参考', 'For detailed instructions, see')}{' '}
+              <a
+                href="https://github.com/AmintaCCCP/GithubStarsManager/blob/main/cloudflare-worker/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-500 hover:underline"
+              >
+                cloudflare-worker/README.md
+              </a>
             </p>
           </div>
         )}
