@@ -18,6 +18,7 @@ import {
   VectorSearchService,
   indexAllRepos,
 } from '../../services/vectorSearchService';
+import { GitHubApiService } from '../../services/githubApi';
 import type { EmbeddingApiType, EmbeddingConfig } from '../../types';
 
 interface VectorSearchSettingsProps {
@@ -54,6 +55,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorSearchConfig,
     setVectorSearchStatus,
     repositories,
+    githubToken,
   } = useAppStore();
 
   // Local form state for embedding config
@@ -75,6 +77,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ success: boolean; dimensions: number; error?: string } | null>(null);
   const [testingWorker, setTestingWorker] = useState(false);
   const [workerTestResult, setWorkerTestResult] = useState<{ success: boolean; vectorCount: number; dimensions: number; error?: string } | null>(null);
+
+  // Save feedback
+  const [embeddingSaved, setEmbeddingSaved] = useState(false);
+  const [workerSaved, setWorkerSaved] = useState(false);
 
   // Indexing state
   const [isIndexing, setIsIndexing] = useState(false);
@@ -123,6 +129,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       });
       setActiveEmbeddingConfig(id);
     }
+    setEmbeddingSaved(true);
+    setTimeout(() => setEmbeddingSaved(false), 2000);
   }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, addEmbeddingConfig, updateEmbeddingConfig, setActiveEmbeddingConfig]);
 
   const handleSaveWorkerConfig = useCallback(() => {
@@ -131,6 +139,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       authToken: formAuthToken,
       embeddingConfigId: activeEmbeddingConfig || '',
     });
+    setWorkerSaved(true);
+    setTimeout(() => setWorkerSaved(false), 2000);
   }, [formWorkerUrl, formAuthToken, activeEmbeddingConfig, setVectorSearchConfig]);
 
   const handleTestEmbedding = useCallback(async () => {
@@ -218,9 +228,17 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         console.warn('Vector cleanup failed, continuing with rebuild');
       }
 
+      const readmeFetcher = githubToken
+        ? (owner: string, repo: string, signal?: AbortSignal) => {
+            const api = new GitHubApiService(githubToken);
+            return api.getRepositoryReadme(owner, repo, signal);
+          }
+        : undefined;
+
       const result = await indexAllRepos(repositories, embeddingClient, vectorService, {
         onProgress: (done, total) => setIndexProgress({ done, total }),
         signal: controller.signal,
+        readmeFetcher,
       });
       setIndexResult(result);
       setVectorSearchStatus({
@@ -418,7 +436,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
             <button
-              onClick={() => setFormDimensions(DEFAULT_DIMENSIONS[formApiType])}
+              onClick={() => {
+                const dim = DEFAULT_DIMENSIONS[formApiType];
+                setFormDimensions(dim);
+                // 临时高亮显示已设置的维度
+                const input = document.querySelector(`input[type="number"]`) as HTMLInputElement;
+                if (input) { input.focus(); input.select(); }
+              }}
               className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               {t('自动检测', 'Auto Detect')}
@@ -441,9 +465,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </button>
           <button
             onClick={handleSaveEmbeddingConfig}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            className={`px-4 py-2 text-sm rounded-md transition-colors ${
+              embeddingSaved
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
-            {t('保存配置', 'Save Config')}
+            {embeddingSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
           </button>
         </div>
 
@@ -520,9 +548,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </button>
           <button
             onClick={handleSaveWorkerConfig}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            className={`px-4 py-2 text-sm rounded-md transition-colors ${
+              workerSaved
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
-            {t('保存配置', 'Save Config')}
+            {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
           </button>
         </div>
 
@@ -669,47 +701,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {showDeployGuide && (
           <div className="px-4 pb-4 text-sm text-gray-600 dark:text-gray-400 space-y-4">
-            {/* 方式一：Web UI */}
+            {/* 首次部署 */}
             <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
               <p className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-                {t('方式一：网页控制台部署（推荐）', 'Method 1: Cloudflare Dashboard (Recommended)')}
-              </p>
-              <ol className="list-decimal list-inside space-y-1.5">
-                <li>
-                  {t('登录', 'Login to')}{' '}
-                  <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">
-                    Cloudflare Dashboard
-                  </a>
-                  {t('，进入 Storage & Databases → Vectorize → Create index', ', go to Storage & Databases → Vectorize → Create index')}
-                </li>
-                <li>
-                  {t('索引名填', 'Index name:')} <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">github-stars</code>
-                  {t('，维度填', ', Dimensions:')} <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">{formDimensions}</code>
-                  {t('，距离度量选 Cosine', ', Distance metric: Cosine')}
-                </li>
-                <li>
-                  {t('进入 Workers & Pages → Create → Create Worker，删除默认代码，粘贴', 'Go to Workers & Pages → Create → Create Worker, delete default code, paste')}{' '}
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">worker.js</code>
-                  {t('内容，Save and deploy', ' content, Save and deploy')}
-                </li>
-                <li>
-                  {t('进入 Worker → Settings → Bindings → Add → Vectorize，变量名填', 'Go to Worker → Settings → Bindings → Add → Vectorize, Variable name:')}{' '}
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">VECTORIZE</code>
-                  {t('，选择刚创建的索引', ', select the index you just created')}
-                </li>
-                <li>
-                  {t('Settings → Variables and Secrets → Add → Secret，变量名填', 'Settings → Variables and Secrets → Add → Secret, Variable name:')}{' '}
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">AUTH_TOKEN</code>
-                  {t('，值填一个随机字符串', ', value: a random string')}
-                </li>
-                <li>{t('复制页面顶部的 Worker URL，填入上方 Worker 地址', 'Copy the Worker URL from the top of the page and paste it above')}</li>
-              </ol>
-            </div>
-
-            {/* 方式二：CLI */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-              <p className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-                {t('方式二：Wrangler CLI 部署', 'Method 2: Wrangler CLI')}
+                {t('首次部署', 'Initial Deployment')}
               </p>
               <ol className="list-decimal list-inside space-y-1.5">
                 <li>
@@ -732,6 +727,40 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
                 </li>
               </ol>
+            </div>
+
+            {/* 更新部署 */}
+            <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+              <p className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                {t('更新部署（代码变更后）', 'Redeploy (after code changes)')}
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5">
+                <li>
+                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
+                </li>
+                <li>
+                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
+                  {t('（如果依赖有变更，先执行 ', ' (if dependencies changed, run ')}
+                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm install</code>
+                  {t('）', ')')}
+                </li>
+              </ol>
+              <p className="mt-2 text-xs text-gray-500">
+                {t('注意：更新部署不需要重新创建 Vectorize 索引，已有向量数据不受影响。', 'Note: Redeployment does not require recreating the Vectorize index. Existing vector data is preserved.')}
+              </p>
+            </div>
+
+            {/* 模型变更警告 */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                ⚠️ {t('更换 Embedding 模型后必须重建索引', 'Must rebuild index after changing Embedding model')}
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                {t(
+                  '不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」',
+                  'Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click "Rebuild Vector Index" below'
+                )}
+              </p>
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-500">
