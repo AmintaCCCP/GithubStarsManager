@@ -249,7 +249,7 @@ export interface VectorIndexingState {
   phase: 'readme' | 'embedding' | 'uploading' | null;
   phaseDone: number;
   phaseTotal: number;
-  result: { indexed: number; skipped: number; errors: number } | null;
+  result: { indexed: number; skipped: number; errors: number; error?: string } | null;
 }
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';

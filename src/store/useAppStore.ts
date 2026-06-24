@@ -637,18 +637,23 @@ const normalizePersistedState = (
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     embeddingConfigs: Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [],
     activeEmbeddingConfig: typeof safePersisted.activeEmbeddingConfig === 'string' ? safePersisted.activeEmbeddingConfig : null,
-    vectorSearchConfig: safePersisted.vectorSearchConfig && typeof safePersisted.vectorSearchConfig === 'object'
-      ? {
-          enabled: !!safePersisted.vectorSearchConfig.enabled,
-          workerUrl: typeof safePersisted.vectorSearchConfig.workerUrl === 'string' ? safePersisted.vectorSearchConfig.workerUrl : '',
-          authToken: typeof safePersisted.vectorSearchConfig.authToken === 'string' ? safePersisted.vectorSearchConfig.authToken : '',
-          embeddingConfigId: typeof safePersisted.vectorSearchConfig.embeddingConfigId === 'string' ? safePersisted.vectorSearchConfig.embeddingConfigId : '',
-          indexMode: safePersisted.vectorSearchConfig.indexMode === 'description' ? 'description' : 'readme',
-          readmeMaxChars: typeof safePersisted.vectorSearchConfig.readmeMaxChars === 'number' && safePersisted.vectorSearchConfig.readmeMaxChars > 0
-            ? safePersisted.vectorSearchConfig.readmeMaxChars
-            : 6000,
-        }
-      : { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 },
+    vectorSearchConfig: (() => {
+      const raw = safePersisted.vectorSearchConfig;
+      const embCfgs = Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [];
+      const embIds = new Set(embCfgs.map((c: { id: string }) => c.id));
+      if (raw && typeof raw === 'object') {
+        const configId = typeof raw.embeddingConfigId === 'string' ? raw.embeddingConfigId : '';
+        return {
+          enabled: !!raw.enabled && embIds.has(configId),
+          workerUrl: typeof raw.workerUrl === 'string' ? raw.workerUrl : '',
+          authToken: typeof raw.authToken === 'string' ? raw.authToken : '',
+          embeddingConfigId: embIds.has(configId) ? configId : '',
+          indexMode: raw.indexMode === 'description' ? 'description' as const : 'readme' as const,
+          readmeMaxChars: typeof raw.readmeMaxChars === 'number' && raw.readmeMaxChars > 0 ? raw.readmeMaxChars : 6000,
+        };
+      }
+      return { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 };
+    })(),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
