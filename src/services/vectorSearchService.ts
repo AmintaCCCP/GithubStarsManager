@@ -320,8 +320,10 @@ export class VectorSearchService {
 
 /**
  * 拼接仓库文本用于 embedding
+ * @param repo 仓库数据
+ * @param readmeContent README 内容（可选，截取前 2000 字符）
  */
-export function buildEmbeddingText(repo: Repository): string {
+export function buildEmbeddingText(repo: Repository, readmeContent?: string): string {
   const parts = [
     repo.full_name,
     repo.description || '',
@@ -332,12 +334,18 @@ export function buildEmbeddingText(repo: Repository): string {
     (repo.custom_tags || []).join(', '),
     repo.language || '',
   ];
+  // README 内容提供最丰富的语义信息，截取前 2000 字符避免超出 embedding 模型上下文
+  if (readmeContent) {
+    const truncated = readmeContent.slice(0, 2000).trim();
+    if (truncated) parts.push(truncated);
+  }
   return parts.filter(Boolean).join('\n');
 }
 
 /**
  * 全量重建向量索引
  * 遍历所有已分析仓库，分批生成 embedding 并 upsert 到 Worker
+ * @param readmeFetcher 可选：获取仓库 README 内容的函数 (owner, repo) => content
  */
 export async function indexAllRepos(
   repos: Repository[],
@@ -347,14 +355,30 @@ export async function indexAllRepos(
     batchSize?: number;
     onProgress?: (done: number, total: number) => void;
     signal?: AbortSignal;
+    readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number }> {
-  const { batchSize = 100, onProgress, signal } = options;
+  const { batchSize = 100, onProgress, signal, readmeFetcher } = options;
 
   // 只索引已分析且未失败的仓库
   const indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
   let indexed = 0;
   let errors = 0;
+
+  // 预先批量获取 README 内容（如果提供了 fetcher）
+  const readmeCache = new Map<string, string>();
+  if (readmeFetcher) {
+    for (const repo of indexable) {
+      if (signal?.aborted) throw new Error('Aborted');
+      try {
+        const [owner, name] = repo.full_name.split('/');
+        const readme = await readmeFetcher(owner, name, signal);
+        if (readme) readmeCache.set(repo.full_name, readme);
+      } catch {
+        // README 获取失败不影响索引
+      }
+    }
+  }
 
   for (let i = 0; i < indexable.length; i += batchSize) {
     if (signal?.aborted) {
@@ -362,7 +386,7 @@ export async function indexAllRepos(
     }
 
     const batch = indexable.slice(i, i + batchSize);
-    const texts = batch.map(buildEmbeddingText);
+    const texts = batch.map(repo => buildEmbeddingText(repo, readmeCache.get(repo.full_name)));
 
     try {
       // 1. 调用 Embedding API 生成向量
