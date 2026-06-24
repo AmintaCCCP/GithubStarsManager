@@ -1,7 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 import { logger } from './logger';
 
-import { Repository, Release, AIConfig, WebDAVConfig } from '../types';
+import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 
@@ -591,6 +591,62 @@ class BackendAdapter {
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch WebDAV configs error');
     return res.json() as Promise<WebDAVConfig[]>;
+  }
+
+  // === Embedding Configs ===
+
+  async syncEmbeddingConfigs(configs: EmbeddingConfig[]): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/configs/embedding/bulk`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ configs })
+    }, 30000, 3);
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync embedding configs error');
+
+    try {
+      const data = await res.json() as { synced?: number; skipped?: number; errors?: Array<{ id: string; name: string; reason: string }> };
+      if (data.skipped && data.skipped > 0) {
+        const reasons = data.errors?.map(e => `${e.name}: ${e.reason}`).join('; ') ?? '';
+        throw new Error(`Sync embedding configs partial failure: ${data.skipped} skipped${reasons ? ` (${reasons})` : ''}`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Sync embedding configs partial failure')) throw err;
+    }
+  }
+
+  async fetchEmbeddingConfigs(): Promise<EmbeddingConfig[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/embedding?decrypt=true`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch embedding configs error');
+    return res.json() as Promise<EmbeddingConfig[]>;
+  }
+
+  // === Vector Search Config ===
+
+  async syncVectorSearchConfig(config: VectorSearchConfig): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/configs/vector-search`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(config)
+    }, 30000, 3);
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync vector search config error');
+  }
+
+  async fetchVectorSearchConfig(): Promise<VectorSearchConfig> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/vector-search?decrypt=true`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch vector search config error');
+    return res.json() as Promise<VectorSearchConfig>;
   }
 
 

@@ -10,6 +10,10 @@ import {
   ForkRepo,
   AIConfig,
   WebDAVConfig,
+  EmbeddingConfig,
+  VectorSearchConfig,
+  VectorSearchStatus,
+  VectorIndexingState,
   ProxyConfig,
   RpcDownloadConfig,
   SearchFilters,
@@ -311,6 +315,18 @@ interface AppActions {
   setActiveWebDAVConfig: (id: string | null) => void;
   setWebDAVConfigs: (configs: WebDAVConfig[]) => void;
   setLastBackup: (timestamp: string) => void;
+
+  // Embedding actions
+  addEmbeddingConfig: (config: EmbeddingConfig) => void;
+  updateEmbeddingConfig: (id: string, updates: Partial<EmbeddingConfig>) => void;
+  deleteEmbeddingConfig: (id: string) => void;
+  setActiveEmbeddingConfig: (id: string | null) => void;
+  setEmbeddingConfigs: (configs: EmbeddingConfig[]) => void;
+
+  // Vector Search actions
+  setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
+  setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
+  setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -619,6 +635,25 @@ const normalizePersistedState = (
       sortOrder: safePersisted.gistSearchFilters?.sortOrder || 'desc',
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
+    embeddingConfigs: Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [],
+    activeEmbeddingConfig: typeof safePersisted.activeEmbeddingConfig === 'string' ? safePersisted.activeEmbeddingConfig : null,
+    vectorSearchConfig: (() => {
+      const raw = safePersisted.vectorSearchConfig;
+      const embCfgs = Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [];
+      const embIds = new Set(embCfgs.map((c: { id: string }) => c.id));
+      if (raw && typeof raw === 'object') {
+        const configId = typeof raw.embeddingConfigId === 'string' ? raw.embeddingConfigId : '';
+        return {
+          enabled: !!raw.enabled && embIds.has(configId),
+          workerUrl: typeof raw.workerUrl === 'string' ? raw.workerUrl : '',
+          authToken: typeof raw.authToken === 'string' ? raw.authToken : '',
+          embeddingConfigId: embIds.has(configId) ? configId : '',
+          indexMode: raw.indexMode === 'description' ? 'description' as const : 'readme' as const,
+          readmeMaxChars: typeof raw.readmeMaxChars === 'number' && raw.readmeMaxChars > 0 ? raw.readmeMaxChars : 6000,
+        };
+      }
+      return { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 };
+    })(),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1012,6 +1047,10 @@ export const useAppStore = create<AppState & AppActions>()(
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
+      embeddingConfigs: [],
+      activeEmbeddingConfig: null,
+      vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 },
+      vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       webdavConfigs: [],
       activeWebDAVConfig: null,
       lastBackup: null,
@@ -1285,6 +1324,43 @@ export const useAppStore = create<AppState & AppActions>()(
       setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
       setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
+
+      // Embedding actions
+      addEmbeddingConfig: (config) => set((state) => ({
+        embeddingConfigs: [...state.embeddingConfigs, config]
+      })),
+      updateEmbeddingConfig: (id, updates) => set((state) => ({
+        embeddingConfigs: state.embeddingConfigs.map(config =>
+          config.id === id ? { ...config, ...updates } : config
+        )
+      })),
+      deleteEmbeddingConfig: (id) => set((state) => ({
+        embeddingConfigs: state.embeddingConfigs.filter(config => config.id !== id),
+        activeEmbeddingConfig: state.activeEmbeddingConfig === id ? null : state.activeEmbeddingConfig,
+        vectorSearchConfig: state.vectorSearchConfig.embeddingConfigId === id
+          ? { ...state.vectorSearchConfig, embeddingConfigId: '', enabled: false }
+          : state.vectorSearchConfig,
+      })),
+      setActiveEmbeddingConfig: (activeEmbeddingConfig) => set({ activeEmbeddingConfig }),
+      setEmbeddingConfigs: (embeddingConfigs) => set((state) => {
+        const ids = new Set(embeddingConfigs.map(config => config.id));
+        const activeEmbeddingConfig = state.activeEmbeddingConfig && ids.has(state.activeEmbeddingConfig)
+          ? state.activeEmbeddingConfig
+          : null;
+        const vectorSearchConfig = ids.has(state.vectorSearchConfig.embeddingConfigId)
+          ? state.vectorSearchConfig
+          : { ...state.vectorSearchConfig, embeddingConfigId: '', enabled: false };
+        return { embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig };
+      }),
+
+      // Vector Search actions
+      setVectorSearchConfig: (config) => set((state) => ({
+        vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
+      })),
+      setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
+      setVectorIndexingState: (indexingState) => set((state) => ({
+        vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
+      })),
 
       // Search actions
       setSearchFilters: (filters) => set((state) => {
@@ -1935,6 +2011,13 @@ export const useAppStore = create<AppState & AppActions>()(
         aiConfigs: state.aiConfigs,
         activeAIConfig: state.activeAIConfig,
 
+        // 持久化Embedding配置
+        embeddingConfigs: state.embeddingConfigs,
+        activeEmbeddingConfig: state.activeEmbeddingConfig,
+
+        // 持久化向量搜索配置
+        vectorSearchConfig: state.vectorSearchConfig,
+
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -2171,6 +2254,27 @@ export const useAppStore = create<AppState & AppActions>()(
   // v8→v9: 初始化 headerMenuConfig
   if (state && !Array.isArray((state as Record<string, unknown>).headerMenuConfig)) {
     (state as Record<string, unknown>).headerMenuConfig = defaultHeaderMenuConfig;
+  }
+
+  // 初始化 embeddingConfigs
+  if (state && !Array.isArray((state as Record<string, unknown>).embeddingConfigs)) {
+    (state as Record<string, unknown>).embeddingConfigs = [];
+  }
+  if (state && typeof (state as Record<string, unknown>).activeEmbeddingConfig !== 'string') {
+    (state as Record<string, unknown>).activeEmbeddingConfig = null;
+  }
+
+  // 初始化 vectorSearchConfig
+  if (state && !(state as Record<string, unknown>).vectorSearchConfig) {
+    (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 };
+  }
+  // 迁移：为旧配置添加 indexMode 和 readmeMaxChars
+  if (state) {
+    const vsc = (state as Record<string, unknown>).vectorSearchConfig as Record<string, unknown> | undefined;
+    if (vsc && typeof vsc === 'object') {
+      if (vsc.indexMode !== 'description' && vsc.indexMode !== 'readme') vsc.indexMode = 'readme';
+      if (typeof vsc.readmeMaxChars !== 'number' || vsc.readmeMaxChars <= 0) vsc.readmeMaxChars = 6000;
+    }
   }
 
         return state as PersistedAppState;

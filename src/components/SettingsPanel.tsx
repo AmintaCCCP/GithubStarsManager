@@ -12,6 +12,7 @@ import {
   Wifi,
   ScrollText,
   Layout,
+  Search,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { isElectron } from '../services/electronProxy';
@@ -27,9 +28,10 @@ import {
   NetworkPanel,
   DiagnosticLogsPanel,
   MenuManagementPanel,
+  VectorSearchSettings,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -256,7 +258,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network']),
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch']),
     []
   );
 
@@ -354,6 +356,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('网络设置', 'Network'),
       icon: <Wifi className="w-5 h-5" />,
     }] : []),
+    {
+      id: 'vectorSearch' as SettingsTab,
+      label: t('向量搜索', 'Vector Search'),
+      icon: <Search className="w-5 h-5" />,
+    },
   ];
 
   const renderTabContent = () => {
@@ -379,6 +386,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <DiagnosticLogsPanel t={t} />;
         case 'network':
           return <NetworkPanel t={t} />;
+        case 'vectorSearch':
+          return <VectorSearchSettings t={t} />;
         default:
           return null;
       }

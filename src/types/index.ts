@@ -206,6 +206,51 @@ export interface GistSearchFilters {
 }
 
 export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'mimo' | 'openai-compatible';
+
+// Embedding 提供商类型
+export type EmbeddingApiType = 'openai' | 'openai-compatible' | 'gemini' | 'cohere' | 'ollama' | 'siliconflow';
+
+// Embedding 配置（结构与 AIConfig/WebDAVConfig 平行）
+export interface EmbeddingConfig {
+  id: string;
+  name: string;
+  apiType: EmbeddingApiType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  dimensions: number;
+  isActive: boolean;
+  apiKeyStatus?: SecretStatus;
+}
+
+// 索引内容模式
+export type VectorIndexMode = 'description' | 'readme';
+
+// 向量搜索整体配置（持久化 + 同步，不含运行时状态）
+export interface VectorSearchConfig {
+  enabled: boolean;
+  workerUrl: string;
+  authToken: string;
+  embeddingConfigId: string;
+  indexMode: VectorIndexMode;
+  readmeMaxChars: number;  // README 截取字符数，默认 6000
+}
+
+export interface VectorSearchStatus {
+  connected: boolean;
+  vectorCount: number;
+  dimensions: number;
+  lastSyncAt?: string;
+  error?: string;
+}
+
+export interface VectorIndexingState {
+  isIndexing: boolean;
+  phase: 'readme' | 'embedding' | 'uploading' | null;
+  phaseDone: number;
+  phaseTotal: number;
+  result: { indexed: number; skipped: number; errors: number; error?: string } | null;
+}
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
 
@@ -331,7 +376,16 @@ export interface AppState {
   // AI
   aiConfigs: AIConfig[];
   activeAIConfig: string | null;
-  
+
+  // Embedding
+  embeddingConfigs: EmbeddingConfig[];
+  activeEmbeddingConfig: string | null;
+
+  // Vector Search
+  vectorSearchConfig: VectorSearchConfig;
+  vectorSearchStatus?: VectorSearchStatus;
+  vectorIndexingState: VectorIndexingState;
+
   // WebDAV
   webdavConfigs: WebDAVConfig[];
   activeWebDAVConfig: string | null;
