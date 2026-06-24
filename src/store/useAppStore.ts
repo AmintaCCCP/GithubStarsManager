@@ -1322,10 +1322,22 @@ export const useAppStore = create<AppState & AppActions>()(
       })),
       deleteEmbeddingConfig: (id) => set((state) => ({
         embeddingConfigs: state.embeddingConfigs.filter(config => config.id !== id),
-        activeEmbeddingConfig: state.activeEmbeddingConfig === id ? null : state.activeEmbeddingConfig
+        activeEmbeddingConfig: state.activeEmbeddingConfig === id ? null : state.activeEmbeddingConfig,
+        vectorSearchConfig: state.vectorSearchConfig.embeddingConfigId === id
+          ? { ...state.vectorSearchConfig, embeddingConfigId: '', enabled: false }
+          : state.vectorSearchConfig,
       })),
       setActiveEmbeddingConfig: (activeEmbeddingConfig) => set({ activeEmbeddingConfig }),
-      setEmbeddingConfigs: (embeddingConfigs) => set({ embeddingConfigs }),
+      setEmbeddingConfigs: (embeddingConfigs) => set((state) => {
+        const ids = new Set(embeddingConfigs.map(config => config.id));
+        const activeEmbeddingConfig = state.activeEmbeddingConfig && ids.has(state.activeEmbeddingConfig)
+          ? state.activeEmbeddingConfig
+          : null;
+        const vectorSearchConfig = ids.has(state.vectorSearchConfig.embeddingConfigId)
+          ? state.vectorSearchConfig
+          : { ...state.vectorSearchConfig, embeddingConfigId: '', enabled: false };
+        return { embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig };
+      }),
 
       // Vector Search actions
       setVectorSearchConfig: (config) => set((state) => ({

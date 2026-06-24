@@ -30,7 +30,10 @@ export default {
     }
 
     // 认证
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+    if (!env.AUTH_TOKEN) {
+      return jsonResponse({ success: false, error: 'Server auth not configured' }, 500);
+    }
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '') ?? '';
     if (token !== env.AUTH_TOKEN) {
       return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
     }
