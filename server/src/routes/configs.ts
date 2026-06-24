@@ -726,9 +726,14 @@ router.put('/api/configs/vector-search', (req, res) => {
     const { enabled, workerUrl, authToken, embeddingConfigId, indexMode, readmeMaxChars, status, lastSyncAt } = req.body as Record<string, unknown>;
 
     let encryptedToken = '';
-    if (authToken && typeof authToken === 'string' && !authToken.startsWith('***')) {
+    const hasAuthToken = Object.prototype.hasOwnProperty.call(req.body, 'authToken');
+    if (hasAuthToken && authToken === '') {
+      // Explicit empty string = user wants to clear the token
+      encryptedToken = '';
+    } else if (authToken && typeof authToken === 'string' && !authToken.startsWith('***')) {
       encryptedToken = encrypt(authToken, config.encryptionKey);
     } else {
+      // Omitted or masked = reuse existing
       const existing = db.prepare('SELECT auth_token_encrypted FROM vector_search_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
       encryptedToken = (existing?.auth_token_encrypted as string) ?? '';
     }

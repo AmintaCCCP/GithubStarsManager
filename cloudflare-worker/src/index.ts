@@ -72,8 +72,10 @@ export default {
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }
+        // returnMetadata:'all' caps topK at 50; clamp to avoid silent truncation
+        const clampedTopK = Math.min(topK, 50);
         const matches = await env.VECTORIZE.query(vector, {
-          topK,
+          topK: clampedTopK,
           returnMetadata: 'all' as const,
         });
         // 过滤低分结果
