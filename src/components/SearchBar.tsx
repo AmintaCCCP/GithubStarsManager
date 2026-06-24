@@ -167,7 +167,7 @@ export const SearchBar: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const skipNextTextSearchRef = useRef(false);
-  const vectorScoreMapRef = useRef<Map<string, number> | null>(null);
+  const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
   const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const filterChipBaseClass = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm border transition-colors';
   const filterChipActiveClass = 'bg-brand-indigo text-white border-brand-indigo shadow-sm dark:bg-brand-indigo/80 dark:text-white dark:border-brand-indigo/70 font-medium';
@@ -219,15 +219,19 @@ export const SearchBar: React.FC = () => {
       if (!searchFilters.query) {
         vectorScoreMapRef.current = null;
         performBasicFilter();
-      } else if (vectorScoreMapRef.current) {
-        // Vector results exist — just re-apply filters and re-sort by score
-        const scoreMap = vectorScoreMapRef.current;
-        const reFiltered = applyFilters(repositories.filter(r => scoreMap.has(String(r.id))));
+      } else if (vectorScoreMapRef.current && vectorScoreMapRef.current.query === searchFilters.query) {
+        // Vector results exist for this exact query — re-apply filters and re-sort by score
+        const { scores } = vectorScoreMapRef.current;
+        const reFiltered = applyFilters(repositories.filter(r => scores.has(String(r.id))));
         const reSorted = reFiltered.sort(
-          (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
+          (a, b) => (scores.get(String(b.id)) ?? 0) - (scores.get(String(a.id)) ?? 0)
         );
         setSearchResults(reSorted);
       } else {
+        // Query changed or no vector results — clear stale ref and do text search
+        vectorScoreMapRef.current = null;
+      }
+      if (!vectorScoreMapRef.current) {
         const textResults = performBasicTextSearch(repositories, searchFilters.query);
         const finalFiltered = applyFilters(textResults);
         setSearchResults(finalFiltered);
@@ -553,6 +557,7 @@ export const SearchBar: React.FC = () => {
               if (scoredRepos.length > 0) {
                 // 4. AI 校验：用 LLM 对向量搜索结果进行二次排序
                 let reranked = scoredRepos;
+                let rerankSucceeded = false;
                 const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
                 if (rerankConfig) {
                   try {
@@ -560,18 +565,20 @@ export const SearchBar: React.FC = () => {
                     const { AIService } = await import('../services/aiService');
                     const rerankService = new AIService(rerankConfig, language);
                     reranked = await rerankService.searchRepositoriesWithReranking(scoredRepos, searchQuery);
+                    rerankSucceeded = true;
                     console.log('🤖 AI reranked results:', reranked.length);
                   } catch (rerankError) {
                     console.warn('AI reranking failed, using vector order:', rerankError);
                   }
                 }
 
-                // Re-sort by similarity score after filtering, since applyFilters may reorder
-                const finalFiltered = applyFilters([...reranked]).sort(
-                  (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
-                );
+                // If AI reranking succeeded, preserve its order; otherwise sort by vector score
+                const finalFiltered = applyFilters([...reranked]);
+                if (!rerankSucceeded) {
+                  finalFiltered.sort((a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0));
+                }
                 console.log('🎯 Vector search results:', finalFiltered.length);
-                vectorScoreMapRef.current = scoreMap;
+                vectorScoreMapRef.current = { query: searchQuery, scores: scoreMap };
                 skipNextTextSearchRef.current = true;
                 setSearchResults(finalFiltered);
                 setSearchFilters({ query: searchQuery });
