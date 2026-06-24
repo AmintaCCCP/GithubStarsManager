@@ -107,6 +107,31 @@ export function initializeSchema(db: Database.Database): void {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS embedding_configs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      api_type TEXT NOT NULL DEFAULT 'openai',
+      base_url TEXT NOT NULL DEFAULT '',
+      api_key_encrypted TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT '',
+      dimensions INTEGER NOT NULL DEFAULT 1536,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS vector_search_configs (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      enabled INTEGER NOT NULL DEFAULT 0,
+      worker_url TEXT NOT NULL DEFAULT '',
+      auth_token_encrypted TEXT NOT NULL DEFAULT '',
+      embedding_config_id TEXT,
+      status_json TEXT,
+      last_sync_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');

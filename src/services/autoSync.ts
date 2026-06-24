@@ -33,6 +33,8 @@ const _lastHash = {
   releases: '',
   ai: '',
   webdav: '',
+  embedding: '',
+  vectorSearch: '',
   settings: '',
 };
 
@@ -65,15 +67,17 @@ export async function syncFromBackend(): Promise<void> {
 
   const startTime = Date.now();
   try {
-    const [reposResult, releasesResult, aiResult, webdavResult, settingsResult] = await Promise.allSettled([
+    const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
       backend.fetchAIConfigs(),
       backend.fetchWebDAVConfigs(),
+      backend.fetchEmbeddingConfigs(),
+      backend.fetchVectorSearchConfig(),
       backend.fetchSettings(),
     ]);
 
-    const changed = { repos: false, releases: false, ai: false, webdav: false, settings: false };
+    const changed = { repos: false, releases: false, ai: false, webdav: false, embedding: false, vectorSearch: false, settings: false };
 
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
@@ -106,6 +110,22 @@ export async function syncFromBackend(): Promise<void> {
       if (hash !== _lastHash.webdav) {
         hashes.webdav = hash;
         changed.webdav = true;
+      }
+    }
+
+    if (embeddingResult.status === 'fulfilled') {
+      const hash = quickHash(embeddingResult.value);
+      if (hash !== _lastHash.embedding) {
+        hashes.embedding = hash;
+        changed.embedding = true;
+      }
+    }
+
+    if (vectorSearchResult.status === 'fulfilled') {
+      const hash = quickHash(vectorSearchResult.value);
+      if (hash !== _lastHash.vectorSearch) {
+        hashes.vectorSearch = hash;
+        changed.vectorSearch = true;
       }
     }
 
@@ -190,6 +210,26 @@ export async function syncFromBackend(): Promise<void> {
       // Store raw backend hash for consistent change detection
       _lastHash.webdav = hashes.webdav;
     }
+    if (changed.embedding && embeddingResult.status === 'fulfilled') {
+      const backendConfigs = embeddingResult.value;
+      const localConfigs = state.embeddingConfigs;
+      const mergedConfigs = backendConfigs.map(bc => {
+        if (bc.apiKeyStatus === 'decrypt_failed' || !bc.apiKey) {
+          const local = localConfigs.find(lc => lc.id === bc.id);
+          if (local && local.apiKey) {
+            logger.warn('sync.decryptFailed', `Backend decrypt_failed for embedding config "${bc.name}", preserving local apiKey`);
+            return { ...bc, apiKey: local.apiKey, apiKeyStatus: 'ok' as const };
+          }
+        }
+        return bc;
+      });
+      state.setEmbeddingConfigs(mergedConfigs);
+      _lastHash.embedding = hashes.embedding;
+    }
+    if (changed.vectorSearch && vectorSearchResult.status === 'fulfilled') {
+      state.setVectorSearchConfig(vectorSearchResult.value);
+      _lastHash.vectorSearch = hashes.vectorSearch;
+    }
     // Sync active selections from settings
     if (changed.settings && settingsResult.status === 'fulfilled') {
       const settings = settingsResult.value;
@@ -198,6 +238,9 @@ export async function syncFromBackend(): Promise<void> {
       }
       if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
         state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
+      }
+      if (typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null) {
+        state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);
       }
       if (Array.isArray(settings.hiddenDefaultCategoryIds)) {
         const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
@@ -272,9 +315,12 @@ export async function syncToBackend(): Promise<void> {
       backend.syncReleases(state.releases),
       backend.syncAIConfigs(state.aiConfigs),
       backend.syncWebDAVConfigs(state.webdavConfigs),
+      backend.syncEmbeddingConfigs(state.embeddingConfigs),
+      backend.syncVectorSearchConfig(state.vectorSearchConfig),
       backend.syncSettings({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        activeEmbeddingConfig: state.activeEmbeddingConfig,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
@@ -283,7 +329,7 @@ export async function syncToBackend(): Promise<void> {
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       }),
     ]);
-    const [reposSync, releasesSync, aiSync, webdavSync, settingsSync] = results;
+    const [reposSync, releasesSync, aiSync, webdavSync, embeddingSync, vectorSearchSync, settingsSync] = results;
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
@@ -299,10 +345,13 @@ export async function syncToBackend(): Promise<void> {
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
+    if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
+    if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = quickHash(state.vectorSearchConfig);
     if (settingsSync.status === 'fulfilled') {
       _lastHash.settings = quickHash({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
+        activeEmbeddingConfig: state.activeEmbeddingConfig,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
@@ -365,8 +414,11 @@ export function startAutoSync(): () => void {
       state.releases !== prevState.releases ||
       state.aiConfigs !== prevState.aiConfigs ||
       state.webdavConfigs !== prevState.webdavConfigs ||
+      state.embeddingConfigs !== prevState.embeddingConfigs ||
+      state.vectorSearchConfig !== prevState.vectorSearchConfig ||
       state.activeAIConfig !== prevState.activeAIConfig ||
       state.activeWebDAVConfig !== prevState.activeWebDAVConfig ||
+      state.activeEmbeddingConfig !== prevState.activeEmbeddingConfig ||
       state.hiddenDefaultCategoryIds !== prevState.hiddenDefaultCategoryIds ||
       state.categoryOrder !== prevState.categoryOrder ||
       state.customCategories !== prevState.customCategories ||

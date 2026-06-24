@@ -8,3 +8,4 @@ export { DataManagementPanel } from './DataManagementPanel';
 export { NetworkPanel } from './NetworkPanel';
 export { DiagnosticLogsPanel } from './DiagnosticLogsPanel';
 export { MenuManagementPanel } from './MenuManagementPanel';
+export { VectorSearchSettings } from './VectorSearchSettings';

@@ -10,6 +10,8 @@ import {
   ForkRepo,
   AIConfig,
   WebDAVConfig,
+  EmbeddingConfig,
+  VectorSearchConfig,
   ProxyConfig,
   RpcDownloadConfig,
   SearchFilters,
@@ -311,6 +313,16 @@ interface AppActions {
   setActiveWebDAVConfig: (id: string | null) => void;
   setWebDAVConfigs: (configs: WebDAVConfig[]) => void;
   setLastBackup: (timestamp: string) => void;
+
+  // Embedding actions
+  addEmbeddingConfig: (config: EmbeddingConfig) => void;
+  updateEmbeddingConfig: (id: string, updates: Partial<EmbeddingConfig>) => void;
+  deleteEmbeddingConfig: (id: string) => void;
+  setActiveEmbeddingConfig: (id: string | null) => void;
+  setEmbeddingConfigs: (configs: EmbeddingConfig[]) => void;
+
+  // Vector Search actions
+  setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -619,6 +631,16 @@ const normalizePersistedState = (
       sortOrder: safePersisted.gistSearchFilters?.sortOrder || 'desc',
     },
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
+    embeddingConfigs: Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [],
+    activeEmbeddingConfig: typeof safePersisted.activeEmbeddingConfig === 'string' ? safePersisted.activeEmbeddingConfig : null,
+    vectorSearchConfig: safePersisted.vectorSearchConfig && typeof safePersisted.vectorSearchConfig === 'object'
+      ? {
+          enabled: !!safePersisted.vectorSearchConfig.enabled,
+          workerUrl: typeof safePersisted.vectorSearchConfig.workerUrl === 'string' ? safePersisted.vectorSearchConfig.workerUrl : '',
+          authToken: typeof safePersisted.vectorSearchConfig.authToken === 'string' ? safePersisted.vectorSearchConfig.authToken : '',
+          embeddingConfigId: typeof safePersisted.vectorSearchConfig.embeddingConfigId === 'string' ? safePersisted.vectorSearchConfig.embeddingConfigId : '',
+        }
+      : { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' },
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1012,6 +1034,9 @@ export const useAppStore = create<AppState & AppActions>()(
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
+      embeddingConfigs: [],
+      activeEmbeddingConfig: null,
+      vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' },
       webdavConfigs: [],
       activeWebDAVConfig: null,
       lastBackup: null,
@@ -1285,6 +1310,27 @@ export const useAppStore = create<AppState & AppActions>()(
       setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
       setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
       setLastBackup: (lastBackup) => set({ lastBackup }),
+
+      // Embedding actions
+      addEmbeddingConfig: (config) => set((state) => ({
+        embeddingConfigs: [...state.embeddingConfigs, config]
+      })),
+      updateEmbeddingConfig: (id, updates) => set((state) => ({
+        embeddingConfigs: state.embeddingConfigs.map(config =>
+          config.id === id ? { ...config, ...updates } : config
+        )
+      })),
+      deleteEmbeddingConfig: (id) => set((state) => ({
+        embeddingConfigs: state.embeddingConfigs.filter(config => config.id !== id),
+        activeEmbeddingConfig: state.activeEmbeddingConfig === id ? null : state.activeEmbeddingConfig
+      })),
+      setActiveEmbeddingConfig: (activeEmbeddingConfig) => set({ activeEmbeddingConfig }),
+      setEmbeddingConfigs: (embeddingConfigs) => set({ embeddingConfigs }),
+
+      // Vector Search actions
+      setVectorSearchConfig: (config) => set((state) => ({
+        vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
+      })),
 
       // Search actions
       setSearchFilters: (filters) => set((state) => {
@@ -1935,6 +1981,13 @@ export const useAppStore = create<AppState & AppActions>()(
         aiConfigs: state.aiConfigs,
         activeAIConfig: state.activeAIConfig,
 
+        // 持久化Embedding配置
+        embeddingConfigs: state.embeddingConfigs,
+        activeEmbeddingConfig: state.activeEmbeddingConfig,
+
+        // 持久化向量搜索配置
+        vectorSearchConfig: state.vectorSearchConfig,
+
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -2171,6 +2224,19 @@ export const useAppStore = create<AppState & AppActions>()(
   // v8→v9: 初始化 headerMenuConfig
   if (state && !Array.isArray((state as Record<string, unknown>).headerMenuConfig)) {
     (state as Record<string, unknown>).headerMenuConfig = defaultHeaderMenuConfig;
+  }
+
+  // 初始化 embeddingConfigs
+  if (state && !Array.isArray((state as Record<string, unknown>).embeddingConfigs)) {
+    (state as Record<string, unknown>).embeddingConfigs = [];
+  }
+  if (state && typeof (state as Record<string, unknown>).activeEmbeddingConfig !== 'string') {
+    (state as Record<string, unknown>).activeEmbeddingConfig = null;
+  }
+
+  // 初始化 vectorSearchConfig
+  if (state && !(state as Record<string, unknown>).vectorSearchConfig) {
+    (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '' };
   }
 
         return state as PersistedAppState;
