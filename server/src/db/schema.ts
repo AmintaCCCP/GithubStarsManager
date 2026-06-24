@@ -107,6 +107,33 @@ export function initializeSchema(db: Database.Database): void {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS embedding_configs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      api_type TEXT NOT NULL DEFAULT 'openai',
+      base_url TEXT NOT NULL DEFAULT '',
+      api_key_encrypted TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT '',
+      dimensions INTEGER NOT NULL DEFAULT 1536,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS vector_search_configs (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      enabled INTEGER NOT NULL DEFAULT 0,
+      worker_url TEXT NOT NULL DEFAULT '',
+      auth_token_encrypted TEXT NOT NULL DEFAULT '',
+      embedding_config_id TEXT,
+      index_mode TEXT NOT NULL DEFAULT 'readme',
+      readme_max_chars INTEGER NOT NULL DEFAULT 6000,
+      status_json TEXT,
+      last_sync_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
@@ -120,4 +147,6 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'asset_filters', 'description', 'TEXT');
   addColumnIfMissing(db, 'asset_filters', 'platform', 'TEXT');
   addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
+  addColumnIfMissing(db, 'vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
 }
