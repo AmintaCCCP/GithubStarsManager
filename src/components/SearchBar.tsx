@@ -167,6 +167,8 @@ export const SearchBar: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const skipNextTextSearchRef = useRef(false);
+  const vectorScoreMapRef = useRef<Map<string, number> | null>(null);
+  const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const filterChipBaseClass = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm border transition-colors';
   const filterChipActiveClass = 'bg-brand-indigo text-white border-brand-indigo shadow-sm dark:bg-brand-indigo/80 dark:text-white dark:border-brand-indigo/70 font-medium';
   const filterChipInactiveClass = 'bg-white border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary';
@@ -215,7 +217,16 @@ export const SearchBar: React.FC = () => {
         return;
       }
       if (!searchFilters.query) {
+        vectorScoreMapRef.current = null;
         performBasicFilter();
+      } else if (vectorScoreMapRef.current) {
+        // Vector results exist — just re-apply filters and re-sort by score
+        const scoreMap = vectorScoreMapRef.current;
+        const reFiltered = applyFilters(repositories.filter(r => scoreMap.has(String(r.id))));
+        const reSorted = reFiltered.sort(
+          (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
+        );
+        setSearchResults(reSorted);
       } else {
         const textResults = performBasicTextSearch(repositories, searchFilters.query);
         const finalFiltered = applyFilters(textResults);
@@ -501,6 +512,8 @@ export const SearchBar: React.FC = () => {
     
     // Trigger AI search immediately
     setIsSearching(true);
+    setSearchPhase(null);
+    vectorScoreMapRef.current = null;
     console.log('🔍 Starting AI search for query:', searchQuery);
 
     try {
@@ -518,9 +531,11 @@ export const SearchBar: React.FC = () => {
           const vectorService = new VectorSearchService(vsConfig);
 
           // 1. 前端调用 Embedding API 生成查询向量
+          setSearchPhase(t('生成查询向量...', 'Generating query vector...'));
           const queryVectors = await embeddingClient.embed([searchQuery], 'query');
           if (queryVectors && queryVectors.length > 0) {
             // 2. 前端将查询向量发送到 Worker
+            setSearchPhase(t('检索向量库...', 'Searching vector index...'));
             const vectorResults = await vectorService.query(queryVectors[0], { topK: 30, threshold: 0.3 });
 
             if (vectorResults.length > 0) {
@@ -536,25 +551,12 @@ export const SearchBar: React.FC = () => {
                 .map(item => item.repo);
 
               if (scoredRepos.length > 0) {
-                // 4. AI 校验：用 LLM 对向量搜索结果进行二次排序
-                let reranked = scoredRepos;
-                const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
-                if (rerankConfig) {
-                  try {
-                    const { AIService } = await import('../services/aiService');
-                    const rerankService = new AIService(rerankConfig, language);
-                    reranked = await rerankService.searchRepositoriesWithReranking(scoredRepos, searchQuery);
-                    console.log('🤖 AI reranked results:', reranked.length);
-                  } catch (rerankError) {
-                    console.warn('AI reranking failed, using vector order:', rerankError);
-                  }
-                }
-
                 // Re-sort by similarity score after filtering, since applyFilters may reorder
-                const finalFiltered = applyFilters([...reranked]).sort(
+                const finalFiltered = applyFilters([...scoredRepos]).sort(
                   (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
                 );
                 console.log('🎯 Vector search results:', finalFiltered.length);
+                vectorScoreMapRef.current = scoreMap;
                 skipNextTextSearchRef.current = true;
                 setSearchResults(finalFiltered);
                 setSearchFilters({ query: searchQuery });
@@ -578,8 +580,9 @@ export const SearchBar: React.FC = () => {
       if (activeConfig) {
         try {
           console.log('🚀 Calling AI service...');
+          setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
           const aiService = new AIService(activeConfig, language);
-          
+
           // 先尝试AI搜索
           const aiResults = await aiService.searchRepositoriesWithReranking(filtered, searchQuery);
           console.log('✅ AI search completed, results:', aiResults.length);
@@ -609,6 +612,7 @@ export const SearchBar: React.FC = () => {
       console.error('💥 Search failed:', error);
     } finally {
       setIsSearching(false);
+      setSearchPhase(null);
     }
   };
 
@@ -848,6 +852,21 @@ export const SearchBar: React.FC = () => {
       } else {
         toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
       }
+
+      // 向量搜索开启时，后台自动索引新仓库
+      const vsCfg = useAppStore.getState().vectorSearchConfig;
+      const embCfgs = useAppStore.getState().embeddingConfigs;
+      const activeEmb = embCfgs.find(c => c.id === vsCfg?.embeddingConfigId);
+      if (vsCfg?.enabled && vsCfg?.workerUrl && activeEmb && newRepoCount > 0) {
+        const { VectorSearchService, EmbeddingClient, indexAllRepos } = await import('../services/vectorSearchService');
+        const embClient = new EmbeddingClient(activeEmb);
+        const vecService = new VectorSearchService(vsCfg);
+        const readmeFetcher = githubToken
+          ? (owner: string, repo: string, signal?: AbortSignal) => new GitHubApiService(githubToken).getRepositoryReadme(owner, repo, signal)
+          : undefined;
+        // 后台执行，不阻塞 UI
+        indexAllRepos(mergedRepositories, embClient, vecService, { readmeFetcher }).catch(() => {});
+      }
     } catch (error) {
       console.error('Sync failed:', error);
       if (error instanceof Error && error.message.includes('token')) {
@@ -980,13 +999,18 @@ export const SearchBar: React.FC = () => {
             onClick={handleAISearch}
             disabled={isSearching}
             className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm font-medium disabled:opacity-50"
-            title={activeAIConfig 
+            title={activeAIConfig
               ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
           >
             <Bot className="w-4 h-4" />
             <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
           </button>
+          {isSearching && searchPhase && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 animate-pulse whitespace-nowrap">
+              {searchPhase}
+            </span>
+          )}
           <div className="group relative">
             <AlertCircle className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
             <div className="absolute right-0 top-full mt-2 w-80 max-w-xs p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
