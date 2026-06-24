@@ -551,8 +551,23 @@ export const SearchBar: React.FC = () => {
                 .map(item => item.repo);
 
               if (scoredRepos.length > 0) {
+                // 4. AI 校验：用 LLM 对向量搜索结果进行二次排序
+                let reranked = scoredRepos;
+                const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
+                if (rerankConfig) {
+                  try {
+                    setSearchPhase(t('AI 校验排序...', 'AI reranking...'));
+                    const { AIService } = await import('../services/aiService');
+                    const rerankService = new AIService(rerankConfig, language);
+                    reranked = await rerankService.searchRepositoriesWithReranking(scoredRepos, searchQuery);
+                    console.log('🤖 AI reranked results:', reranked.length);
+                  } catch (rerankError) {
+                    console.warn('AI reranking failed, using vector order:', rerankError);
+                  }
+                }
+
                 // Re-sort by similarity score after filtering, since applyFilters may reorder
-                const finalFiltered = applyFilters([...scoredRepos]).sort(
+                const finalFiltered = applyFilters([...reranked]).sort(
                   (a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0)
                 );
                 console.log('🎯 Vector search results:', finalFiltered.length);
