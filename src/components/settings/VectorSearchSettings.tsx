@@ -74,6 +74,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [formAuthToken, setFormAuthToken] = useState(vectorSearchConfig.authToken || '');
   const [showAuthToken, setShowAuthToken] = useState(false);
 
+  // Index mode state
+  const [formIndexMode, setFormIndexMode] = useState<'description' | 'readme'>(vectorSearchConfig.indexMode || 'readme');
+  const [formReadmeMaxChars, setFormReadmeMaxChars] = useState(vectorSearchConfig.readmeMaxChars || 6000);
+
   // Test state
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ success: boolean; dimensions: number; error?: string } | null>(null);
@@ -138,6 +142,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       workerUrl: formWorkerUrl,
       authToken: formAuthToken,
       embeddingConfigId: activeEmbeddingConfig || '',
+      indexMode: formIndexMode,
+      readmeMaxChars: formReadmeMaxChars,
     });
     setWorkerSaved(true);
     setTimeout(() => setWorkerSaved(false), 2000);
@@ -248,6 +254,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         }),
         signal: controller.signal,
         readmeFetcher,
+        indexMode: formIndexMode,
+        readmeMaxChars: formReadmeMaxChars,
       });
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       setVectorSearchStatus({
@@ -265,7 +273,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, activeEmbeddingConfig, repositories, githubToken, setVectorSearchStatus, setVectorIndexingState]);
+  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, formIndexMode, formReadmeMaxChars, activeEmbeddingConfig, repositories, githubToken, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleRebuildIndex = useCallback(() => runIndexAll(true), [runIndexAll]);
   const handleIncrementalIndex = useCallback(() => runIndexAll(false), [runIndexAll]);
@@ -547,7 +555,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </div>
         </div>
 
-        {/* Test & Save */}
+        {/* Test */}
         <div className="flex gap-2">
           <button
             onClick={handleTestWorker}
@@ -556,16 +564,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           >
             {testingWorker ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {t('测试 Worker 连接', 'Test Worker Connection')}
-          </button>
-          <button
-            onClick={handleSaveWorkerConfig}
-            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-              workerSaved
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
-          >
-            {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
           </button>
         </div>
 
@@ -651,6 +649,78 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">④</span>
           {t('索引管理', 'Index Management')}
         </h3>
+
+        {/* 索引内容选择 */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('索引内容', 'Index Content')}
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setFormIndexMode('description')}
+              className={`p-3 text-left text-sm rounded-lg border transition-colors ${
+                formIndexMode === 'description'
+                  ? 'border-brand-indigo bg-brand-indigo/5 dark:bg-brand-indigo/10'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {t('仓库描述', 'Description')}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('⚡ 速度快，精度较低', '⚡ Fast, lower precision')}
+              </div>
+            </button>
+            <button
+              onClick={() => setFormIndexMode('readme')}
+              className={`p-3 text-left text-sm rounded-lg border transition-colors ${
+                formIndexMode === 'readme'
+                  ? 'border-brand-indigo bg-brand-indigo/5 dark:bg-brand-indigo/10'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {t('README 内容', 'README Content')}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('🎯 精度高，速度较慢', '🎯 High precision, slower')}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* README 字符数设置 */}
+        {formIndexMode === 'readme' && (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {t('README 截取字符数', 'README Max Characters')}
+            </label>
+            <input
+              type="number"
+              value={formReadmeMaxChars}
+              onChange={(e) => setFormReadmeMaxChars(Math.max(500, parseInt(e.target.value) || 6000))}
+              min={500}
+              max={20000}
+              step={1000}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-indigo focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('建议 4000-8000，越长精度越高但索引越慢', 'Recommended 4000-8000. Longer = higher precision but slower indexing')}
+            </p>
+          </div>
+        )}
+
+        {/* 保存索引配置 */}
+        <button
+          onClick={handleSaveWorkerConfig}
+          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+            workerSaved
+              ? 'bg-green-500 text-white'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+          }`}
+        >
+          {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存索引配置', 'Save Index Config')}
+        </button>
 
         <div className="flex flex-wrap gap-2">
           <button
