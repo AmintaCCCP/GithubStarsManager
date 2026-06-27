@@ -247,6 +247,8 @@ npm run build
 
 在设置 → 网络标签页中配置（Electron 客户端或后端服务器可用时显示）。
 
+![network](upload/network.png)
+
 ## ⬇️ 远程下载 (aria2 RPC)
 
 将 Release 下载链接直接发送到 aria2 守护进程：
@@ -262,6 +264,8 @@ npm run build
 ## 🧠 向量语义搜索（可选）
 
 向量语义搜索基于 [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) 提供高精度的自然语言搜索。将仓库描述（或完整 README 内容）嵌入为向量，通过语义相似度匹配，而非关键词匹配。
+
+![vectorize](upload/vectorize.png)
 
 **工作原理：**
 1. 前端通过用户配置的 Embedding 服务商（OpenAI、Gemini、Cohere、Ollama、硅基流动或任何兼容 OpenAI 的 API）生成向量

@@ -302,6 +302,8 @@ The app supports routing all outbound requests through a proxy:
 
 Configure in Settings → Network tab (available in Electron client or with backend server).
 
+![network](upload/network.png)
+
 ## ⬇️ Remote Download (aria2 RPC)
 
 Send release download links directly to an aria2 daemon:
@@ -317,6 +319,8 @@ Works in both backend-proxied mode and client-only mode (direct browser→aria2 
 ## 🧠 Vector Semantic Search (Optional)
 
 Vector Semantic Search uses [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) to provide high-precision, natural-language search over your starred repositories. Instead of keyword matching, it embeds repo descriptions (or full README content) into vectors and searches by semantic similarity.
+
+![vectorize](upload/vectorize.png)
 
 **How it works:**
 1. Frontend generates embeddings via your configured provider (OpenAI, Gemini, Cohere, Ollama, SiliconFlow, or any OpenAI-compatible API)
