@@ -154,7 +154,7 @@ router.put('/api/repositories', (req, res) => {
         category_locked = excluded.category_locked,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases,
-        vector_indexed_at = CASE WHEN excluded.vector_indexed_at IS NOT NULL AND excluded.vector_indexed_at != '' THEN excluded.vector_indexed_at ELSE repositories.vector_indexed_at END
+        vector_indexed_at = excluded.vector_indexed_at
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
