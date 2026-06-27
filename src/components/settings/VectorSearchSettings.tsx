@@ -58,7 +58,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState,
     repositories,
     githubToken,
-    updateRepository,
     setRepositories,
   } = useAppStore();
 
