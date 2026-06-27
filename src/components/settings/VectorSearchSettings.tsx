@@ -278,11 +278,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         incremental: false,
       });
 
-      // 3. cleanup：全量重建后只保留本次成功重建的向量（失败不中断索引结果）
+      // 3. cleanup：全量重建后只保留本次成功重建的向量
       try {
         await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
       } catch (cleanupErr) {
-        console.warn('Vector cleanup failed after rebuild (non-fatal):', cleanupErr);
+        console.warn('Vector cleanup failed after rebuild:', cleanupErr);
+        throw cleanupErr;
       }
 
       // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新，保留 searchResults）
@@ -302,8 +303,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const msg = err instanceof Error ? err.message : String(err);
-        const repoCount = useAppStore.getState().repositories.length;
-        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repoCount, error: msg } });
+        const currentRepos = useAppStore.getState().repositories;
+        const indexableCount = currentRepos.filter((r) => r.analyzed_at && !r.analysis_failed).length;
+        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: currentRepos.length - indexableCount, errors: indexableCount, error: msg } });
       }
     } finally {
       setAbortController(null);
@@ -367,11 +369,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const msg = err instanceof Error ? err.message : String(err);
-        const repoCount = useAppStore.getState().repositories.length;
+        const currentRepos = useAppStore.getState().repositories;
+        const indexableCount = currentRepos.filter((r) => r.analyzed_at && !r.analysis_failed).length;
+        const skippedCount = currentRepos.length - indexableCount;
         setVectorIndexingState({
           isIndexing: false,
           phase: null,
-          result: { indexed: 0, skipped: 0, errors: repoCount, error: msg },
+          result: { indexed: 0, skipped: skippedCount, errors: indexableCount, error: msg },
         });
       }
     } finally {

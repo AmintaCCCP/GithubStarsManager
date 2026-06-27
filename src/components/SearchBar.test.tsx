@@ -75,25 +75,28 @@ const baseStoreState = () => ({
 });
 
 const mockUseAppStore = vi.mocked(useAppStore);
-// SearchBar also calls useAppStore.getState() directly in effects/handlers.
+// Track the current mock state so getState() returns the same overrides as the hook.
+let currentState = baseStoreState();
 (mockUseAppStore as unknown as { getState: () => ReturnType<typeof baseStoreState> }).getState =
-  () => baseStoreState();
+  () => currentState;
 
 describe('SearchBar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    currentState = baseStoreState();
   });
 
   it('clears the committed query when the search input is manually emptied', () => {
     const setSearchFilters = vi.fn();
-    mockUseAppStore.mockReturnValue(createStoreState({
+    currentState = createStoreState({
       searchFilters: {
         ...defaultSearchFilters,
         query: 'react',
       },
       setSearchFilters,
-    }) as ReturnType<typeof useAppStore>);
+    });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
 
     render(<SearchBar />);
 
@@ -119,6 +122,7 @@ describe('SearchBar', () => {
     });
     storeState.setSearchFilters = setSearchFilters;
 
+    currentState = storeState;
     mockUseAppStore.mockReturnValue(storeState as ReturnType<typeof useAppStore>);
 
     const { rerender } = render(<SearchBar />);
