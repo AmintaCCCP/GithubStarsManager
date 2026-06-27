@@ -378,7 +378,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]); = useCallback(() => {
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
+
+  const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
   }, [abortController]);
 
