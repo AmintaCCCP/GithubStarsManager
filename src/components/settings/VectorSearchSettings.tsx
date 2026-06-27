@@ -278,12 +278,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         incremental: false,
       });
 
-      // 3. cleanup：全量重建后只保留本次成功重建的向量
+      // 3. cleanup：全量重建后只保留本次成功重建的向量（失败不中断索引结果）
       try {
         await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
       } catch (cleanupErr) {
-        console.warn('Vector cleanup failed after rebuild:', cleanupErr);
-        throw cleanupErr;
+        console.warn('Vector cleanup failed after rebuild (non-fatal):', cleanupErr);
       }
 
       // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新，保留 searchResults）
@@ -842,7 +841,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
             {unindexedCount > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">
+              <span className="ml-1 px-2 py-0.5 text-xs bg-brand-indigo text-white rounded-full">
                 {unindexedCount}
               </span>
             )}
@@ -874,7 +873,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
-                className="bg-purple-500 h-2 rounded-full transition-all"
+                className="bg-brand-indigo h-2 rounded-full transition-all"
                 style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
               />
             </div>
