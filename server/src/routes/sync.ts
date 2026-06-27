@@ -108,8 +108,8 @@ router.post('/api/sync/import', (req, res) => {
             owner_login, owner_avatar_url, topics,
             ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
             custom_description, custom_tags, custom_category, category_locked, last_edited,
-            subscribed_to_releases
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subscribed_to_releases, vector_indexed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
           // 验证必需的字段
@@ -130,7 +130,8 @@ router.post('/api/sync/import', (req, res) => {
             r.custom_description ?? null,
             typeof r.custom_tags === 'string' ? r.custom_tags : JSON.stringify(r.custom_tags ?? []),
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
-            r.subscribed_to_releases ? 1 : 0
+            r.subscribed_to_releases ? 1 : 0,
+            r.vector_indexed_at ?? null
           );
         }
         counts.repositories = repos.length;

@@ -39,6 +39,7 @@ function transformRepo(row: Record<string, unknown>) {
     category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
+    vector_indexed_at: row.vector_indexed_at ?? undefined,
   };
 }
 
@@ -126,8 +127,8 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases, vector_indexed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -152,7 +153,8 @@ router.put('/api/repositories', (req, res) => {
         custom_category = excluded.custom_category,
         category_locked = excluded.category_locked,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
-        subscribed_to_releases = excluded.subscribed_to_releases
+        subscribed_to_releases = excluded.subscribed_to_releases,
+        vector_indexed_at = CASE WHEN excluded.vector_indexed_at IS NOT NULL AND excluded.vector_indexed_at != '' THEN excluded.vector_indexed_at ELSE repositories.vector_indexed_at END
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -198,7 +200,8 @@ router.put('/api/repositories', (req, res) => {
           repo.custom_description ?? null,
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
-          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0
+          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
+          repo.vector_indexed_at ?? null
         );
         count++;
       }
@@ -232,6 +235,7 @@ router.patch('/api/repositories/:id', (req, res) => {
       category_locked: (v) => (v === true || v === 1) ? 1 : 0,
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
+      vector_indexed_at: (v) => v,
       description: (v) => v,
       name: (v) => v,
     };

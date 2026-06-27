@@ -58,6 +58,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState,
     repositories,
     githubToken,
+    updateRepository,
   } = useAppStore();
 
   // Local form state for embedding config
@@ -208,9 +209,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     }
   }, [formWorkerUrl, formAuthToken, setVectorSearchStatus]);
 
-  const runIndexAll = useCallback(async (withCleanup: boolean) => {
-    if (!activeConfig) return;
+  // 未索引数量（已分析、未失败、未向量索引或内容已更新）
+  const unindexedCount = repositories.filter((r) => {
+    if (!r.analyzed_at || r.analysis_failed) return false;
+    if (!r.vector_indexed_at) return true;
+    const contentTime = r.last_edited || r.analyzed_at || '';
+    return contentTime > r.vector_indexed_at;
+  }).length;
 
+  const createClients = useCallback(() => {
+    if (!activeConfig) return null;
     const embeddingClient = new EmbeddingClient({
       ...activeConfig,
       apiType: formApiType,
@@ -225,40 +233,64 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       authToken: formAuthToken,
       embeddingConfigId: activeEmbeddingConfig || '',
     });
+    const readmeFetcher = githubToken
+      ? (owner: string, repo: string, signal?: AbortSignal) => {
+          const api = new GitHubApiService(githubToken);
+          return api.getRepositoryReadme(owner, repo, signal);
+        }
+      : undefined;
+    return { embeddingClient, vectorService, readmeFetcher };
+  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, activeEmbeddingConfig, githubToken]);
+
+  const handleRebuildIndex = useCallback(async () => {
+    const clients = createClients();
+    if (!clients) return;
+
     const controller = new AbortController();
     setAbortController(controller);
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
-      if (withCleanup) {
-        const keepIds = repositories.map(r => String(r.id));
-        try {
-          await vectorService.cleanup(keepIds, controller.signal);
-        } catch (cleanupErr) {
-          // Cleanup 失败不阻塞重建，记录警告继续
-          console.warn('Vector cleanup failed, continuing with rebuild:', cleanupErr);
+      // 1. cleanup：删除不在当前仓库列表中的向量
+      const keepIds = repositories.map(r => String(r.id));
+      try {
+        await clients.vectorService.cleanup(keepIds, controller.signal);
+      } catch (cleanupErr) {
+        console.warn('Vector cleanup failed, continuing with rebuild:', cleanupErr);
+      }
+
+      // 2. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
+      for (const repo of repositories) {
+        if (repo.vector_indexed_at) {
+          updateRepository({ ...repo, vector_indexed_at: undefined });
         }
       }
 
-      const readmeFetcher = githubToken
-        ? (owner: string, repo: string, signal?: AbortSignal) => {
-            const api = new GitHubApiService(githubToken);
-            return api.getRepositoryReadme(owner, repo, signal);
-          }
-        : undefined;
-
-      const result = await indexAllRepos(repositories, embeddingClient, vectorService, {
+      // 3. 全量索引
+      const now = new Date().toISOString();
+      const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
           phase: progress.phase,
           phaseDone: progress.done,
           phaseTotal: progress.total,
         }),
         signal: controller.signal,
-        readmeFetcher,
+        readmeFetcher: clients.readmeFetcher,
         indexMode: formIndexMode,
         readmeMaxChars: formReadmeMaxChars,
+        incremental: false,
       });
+
+      // 4. 为成功索引的 repo 设置 vector_indexed_at
+      const indexedSet = new Set(result.indexedRepoIds);
+      for (const repo of useAppStore.getState().repositories) {
+        if (indexedSet.has(repo.id)) {
+          updateRepository({ ...repo, vector_indexed_at: now });
+        }
+      }
+
       setVectorIndexingState({ result, isIndexing: false, phase: null });
+      // Rebuild 替换全部索引，vectorCount = 本次成功数量
       setVectorSearchStatus({
         connected: true,
         vectorCount: result.indexed,
@@ -274,10 +306,56 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, formIndexMode, formReadmeMaxChars, activeEmbeddingConfig, repositories, githubToken, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepository, setVectorSearchStatus, setVectorIndexingState]);
 
-  const handleRebuildIndex = useCallback(() => runIndexAll(true), [runIndexAll]);
-  const handleIncrementalIndex = useCallback(() => runIndexAll(false), [runIndexAll]);
+  const handleIncrementalIndex = useCallback(async () => {
+    const clients = createClients();
+    if (!clients) return;
+
+    const controller = new AbortController();
+    setAbortController(controller);
+    setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
+
+    try {
+      const now = new Date().toISOString();
+      const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
+        onProgress: (progress) => setVectorIndexingState({
+          phase: progress.phase,
+          phaseDone: progress.done,
+          phaseTotal: progress.total,
+        }),
+        signal: controller.signal,
+        readmeFetcher: clients.readmeFetcher,
+        indexMode: formIndexMode,
+        readmeMaxChars: formReadmeMaxChars,
+        incremental: true,
+        onRepoIndexed: (repoId) => {
+          // 用 getState() 获取最新 repo 数据，避免 stale closure 覆盖并发编辑
+          const repo = useAppStore.getState().repositories.find(r => r.id === repoId);
+          if (repo) {
+            updateRepository({ ...repo, vector_indexed_at: now });
+          }
+        },
+      });
+
+      setVectorIndexingState({ result, isIndexing: false, phase: null });
+      const prevCount = useAppStore.getState().vectorSearchStatus.vectorCount || 0;
+      setVectorSearchStatus({
+        connected: true,
+        vectorCount: prevCount + result.indexed,
+        dimensions: formDimensions,
+        lastSyncAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        setVectorIndexingState({ isIndexing: false, phase: null, result: null });
+      } else {
+        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length } });
+      }
+    } finally {
+      setAbortController(null);
+    }
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepository, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
@@ -735,11 +813,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </button>
           <button
             onClick={handleIncrementalIndex}
-            disabled={isIndexing || !isConfigComplete}
+            disabled={isIndexing || !isConfigComplete || unindexedCount === 0}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
+            {unindexedCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-500 text-white rounded-full">
+                {unindexedCount}
+              </span>
+            )}
           </button>
           {isIndexing && (
             <button

@@ -14,6 +14,7 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'custom_category',
   'category_locked',
   'last_edited',
+  'vector_indexed_at',
 ];
 
 export function mergeRepositoriesPreservingLocalMetadata(

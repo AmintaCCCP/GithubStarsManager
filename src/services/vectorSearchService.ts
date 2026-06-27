@@ -351,8 +351,8 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
 }
 
 /**
- * 全量重建向量索引
- * 遍历所有已分析仓库，分批生成 embedding 并 upsert 到 Worker
+ * 全量/增量重建向量索引
+ * 遍历已分析仓库，分批生成 embedding 并 upsert 到 Worker
  * @param readmeFetcher 可选：获取仓库 README 内容的函数 (owner, repo) => content
  */
 export interface IndexProgress {
@@ -372,37 +372,60 @@ export async function indexAllRepos(
     readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
     indexMode?: 'description' | 'readme';
     readmeMaxChars?: number;
+    incremental?: boolean;
+    onRepoIndexed?: (repoId: number) => void;
   } = {}
-): Promise<{ indexed: number; skipped: number; errors: number; error?: string }> {
-  const { batchSize = 100, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000 } = options;
+): Promise<{ indexed: number; skipped: number; errors: number; error?: string; indexedRepoIds: number[] }> {
+  const { batchSize = 100, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
     throw new Error('batchSize must be a positive integer');
   }
 
   // 只索引已分析且未失败的仓库
-  const indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
+  let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
+  // 增量模式下跳过已索引且内容未更新的仓库
+  if (incremental) {
+    indexable = indexable.filter((r) => {
+      if (!r.vector_indexed_at) return true; // 从未索引
+      // 内容更新后需要重新索引
+      const contentTime = r.last_edited || r.analyzed_at || '';
+      return contentTime > r.vector_indexed_at;
+    });
+  }
   let indexed = 0;
   let errors = 0;
   let lastError = '';
+  const indexedRepoIds: number[] = [];
 
   // 仅在 readme 模式下获取 README 内容
   const shouldFetchReadme = indexMode === 'readme' && readmeFetcher;
   const readmeCache = new Map<string, string>();
   if (shouldFetchReadme) {
-    for (let i = 0; i < indexable.length; i++) {
-      const repo = indexable[i];
+    const CONCURRENCY = 5;
+    let completed = 0;
+
+    for (let i = 0; i < indexable.length; i += CONCURRENCY) {
       if (signal?.aborted) throw new Error('Aborted');
-      onProgress?.({ phase: 'readme', done: i, total: indexable.length });
-      try {
-        const [owner, name] = repo.full_name.split('/');
-        const readme = await readmeFetcher(owner, name, signal);
-        if (readme) readmeCache.set(repo.full_name, readme);
-      } catch {
-        // README 获取失败不影响索引
+
+      const batch = indexable.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async (repo) => {
+          const [owner, name] = repo.full_name.split('/');
+          const readme = await readmeFetcher(owner, name, signal);
+          return { fullName: repo.full_name, readme };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.readme) {
+          readmeCache.set(result.value.fullName, result.value.readme);
+        }
       }
+
+      completed = Math.min(completed + batch.length, indexable.length);
+      onProgress?.({ phase: 'readme', done: completed, total: indexable.length });
     }
-    onProgress?.({ phase: 'readme', done: indexable.length, total: indexable.length });
   }
 
   const totalBatches = Math.ceil(indexable.length / batchSize);
@@ -443,6 +466,10 @@ export async function indexAllRepos(
       onProgress?.({ phase: 'uploading', done: currentBatch, total: totalBatches });
       await vectorService.upsert(vectorizeVectors, signal);
       indexed += batch.length;
+      for (const repo of batch) {
+        indexedRepoIds.push(repo.id);
+        onRepoIndexed?.(repo.id);
+      }
     } catch (err) {
       if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
         throw new Error('Aborted');
@@ -456,5 +483,5 @@ export async function indexAllRepos(
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
   }
 
-  return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined };
+  return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined, indexedRepoIds };
 }
