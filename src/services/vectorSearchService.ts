@@ -379,18 +379,10 @@ export function looksLikeLengthError(err: unknown): boolean {
 }
 
 /**
- * 对最终拼接好的文本做二次截断用于重试。
- * 逐级折半直到不超过 maxChars。
+ * 对文本做截断，保留下限 256 字符。
  */
 export function truncateForRetry(text: string, maxChars: number): string {
-  // 已经够短，无需截断
-  if (text.length <= maxChars) return text;
-  // 逐级折半 maxChars 直到：要么 text 能放下，要么触达 256 下限
-  let limit = maxChars;
-  while (limit > 256 && text.length > limit) {
-    limit = Math.floor(limit / 2);
-  }
-  return text.slice(0, Math.max(256, limit));
+  return text.slice(0, Math.max(256, Math.min(text.length, maxChars)));
 }
 
 /**
@@ -429,13 +421,13 @@ export async function embedWithFallback(
   for (let i = 0; i < texts.length; i++) {
     if (signal?.aborted) throw new Error('Aborted');
     const original = texts[i];
-    // 截断重试阶梯：每步严格递减，确保不会重复尝试同一长度
-    // step1 = 原文；step2 = min(原文, retryMaxChars)；step3 = 再折半；下限 256
-    const half = Math.floor(retryMaxChars / 2);
+    // 截断重试阶梯：每步严格递减，保留下限 256
+    const firstLimit = Math.max(256, Math.min(retryMaxChars, Math.floor(original.length / 2)));
+    const secondLimit = Math.max(256, Math.floor(firstLimit / 2));
     const candidates = [
       original,
-      truncateForRetry(original, retryMaxChars),
-      truncateForRetry(original, half),
+      truncateForRetry(original, firstLimit),
+      truncateForRetry(original, secondLimit),
     ].filter((c, idx, arr) => idx === 0 || c.length < (arr[idx - 1]?.length ?? Infinity));
     let succeeded = false;
     for (const candidate of candidates) {

@@ -54,11 +54,10 @@ describe('truncateForRetry', () => {
     expect(result.length).toBe(1000);
   });
 
-  it('truncates oversized text', () => {
+  it('truncates oversized text to maxChars', () => {
     const long = 'x'.repeat(10000);
     const result = truncateForRetry(long, 6000);
-    expect(result.length).toBeLessThanOrEqual(6000);
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.length).toBe(6000);
   });
 
   it('stops halving at 256 floor', () => {
@@ -107,29 +106,29 @@ describe('embedWithFallback', () => {
 
   it('rescues oversized item via truncation retry', async () => {
     // Per-item: full text fails but truncated version succeeds.
-    // Models like bge have ~512 token (~2000 char) limits; truncation ladder
-    // goes 6000 → 3000 → 1500, so a text that fails at full length but succeeds
-    // when under ~2000 chars is rescuable.
+    // With retryMaxChars=6000 and 10000-char text:
+    //   candidate lengths: [10000, 5000, 2500]
+    // Model accepts < 2000 chars → only the 3rd candidate (2500) fails too → null.
+    // But with retryMaxChars=6000 and 8000-char text:
+    //   candidate lengths: [8000, 4000, 2000] → 3rd succeeds.
     const client = makeClient(async (texts) => {
-      if (texts.length > 1) {
-        throw LENGTH_ERROR();
-      }
+      if (texts.length > 1) throw LENGTH_ERROR();
       const t = texts[0];
-      // Accept only texts under 2000 chars (simulating a 512-token bge limit)
-      if (t.length > 2000) {
-        throw new Error('too long: input length exceeds maximum token limit');
-      }
+      if (t.length > 2000) throw new Error('too long: input length exceeds maximum token limit');
       return [vec(t.length)];
     });
-    // Text longer than retryMaxChars(6000) so truncation actually kicks in
-    const longText = 'y'.repeat(10000);
+    const longText = 'y'.repeat(8000);
     const result = await embedWithFallback([longText], client, undefined, 6000);
     expect(result[0]).not.toBeNull();
-    // Should have retried with a truncated candidate (<=2000 chars)
-    expect(client.embed.mock.calls.length).toBeGreaterThan(1);
-    // The successful call used a truncated text under 2000 chars
-    const lastCallText = client.embed.mock.calls[client.embed.mock.calls.length - 1][0] as string[];
-    expect(lastCallText[0].length).toBeLessThanOrEqual(2000);
+    // 4 calls: 1 batch attempt + 3 per-item candidates [8000, 4000, 2000]
+    expect(client.embed.mock.calls.length).toBe(4);
+    // Verify per-item candidate lengths (calls 1-3, call 0 is the batch)
+    const call1 = client.embed.mock.calls[1][0] as string[];
+    const call2 = client.embed.mock.calls[2][0] as string[];
+    const call3 = client.embed.mock.calls[3][0] as string[];
+    expect(call1[0].length).toBe(8000);  // original
+    expect(call2[0].length).toBe(4000);  // firstLimit = min(6000, 8000/2) = 4000
+    expect(call3[0].length).toBe(2000);  // secondLimit = max(256, 4000/2) = 2000
   });
 
   it('rethrows non-length errors', async () => {

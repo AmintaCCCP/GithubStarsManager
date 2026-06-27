@@ -263,8 +263,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         currentRepos.filter(r => r.vector_indexed_at).map(r => ({ id: r.id, patch: { vector_indexed_at: undefined } }))
       );
 
-      // 2. 全量索引
+      // 2. 全量索引，逐批确认后立即 stamp（中断不丢失已确认进度）
       const now = new Date().toISOString();
+      const stampedRepoIds: number[] = [];
       const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
           phase: progress.phase,
@@ -276,7 +277,20 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         indexMode: formIndexMode,
         readmeMaxChars: formReadmeMaxChars,
         incremental: false,
+        onRepoIndexed: (repoId) => {
+          stampedRepoIds.push(repoId);
+          // 批量 stamp：每 32 个（一个 batch）刷新一次，减少 UI 刷新频率
+          if (stampedRepoIds.length % 32 === 0) {
+            const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
+            updateRepositoriesMetadata(batch.map(id => ({ id, patch: { vector_indexed_at: now } })));
+          }
+        },
       });
+
+      // stamp 剩余未刷新的
+      if (stampedRepoIds.length > 0) {
+        updateRepositoriesMetadata(stampedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } })));
+      }
 
       // 3. cleanup：全量重建后只保留本次成功重建的向量
       try {
@@ -285,11 +299,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         console.warn('Vector cleanup failed after rebuild:', cleanupErr);
         throw cleanupErr;
       }
-
-      // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新，保留 searchResults）
-      updateRepositoriesMetadata(
-        result.indexedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } }))
-      );
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       setVectorSearchStatus({
@@ -330,6 +339,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       );
 
       const now = new Date().toISOString();
+      const stampedRepoIds: number[] = [];
       const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
           phase: progress.phase,
@@ -341,12 +351,19 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         indexMode: formIndexMode,
         readmeMaxChars: formReadmeMaxChars,
         incremental: true,
+        onRepoIndexed: (repoId) => {
+          stampedRepoIds.push(repoId);
+          if (stampedRepoIds.length % 32 === 0) {
+            const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
+            updateRepositoriesMetadata(batch.map(id => ({ id, patch: { vector_indexed_at: now } })));
+          }
+        },
       });
 
-      // 批量设置 vector_indexed_at（保留 searchResults 不被重置）
-      updateRepositoriesMetadata(
-        result.indexedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } }))
-      );
+      // stamp 剩余未刷新的
+      if (stampedRepoIds.length > 0) {
+        updateRepositoriesMetadata(stampedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } })));
+      }
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       // 只计算本次新增索引的 repo（之前无 vector_indexed_at），不包含重新索引的
