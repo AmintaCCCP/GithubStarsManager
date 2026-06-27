@@ -59,6 +59,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     repositories,
     githubToken,
     updateRepository,
+    setRepositories,
   } = useAppStore();
 
   // Local form state for embedding config
@@ -251,22 +252,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
-      // 1. cleanup：删除不在当前仓库列表中的向量
-      const keepIds = repositories.map(r => String(r.id));
-      try {
-        await clients.vectorService.cleanup(keepIds, controller.signal);
-      } catch (cleanupErr) {
-        console.warn('Vector cleanup failed, continuing with rebuild:', cleanupErr);
-      }
+      // 1. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
+      setRepositories(repositories.map(repo =>
+        repo.vector_indexed_at ? { ...repo, vector_indexed_at: undefined } : repo
+      ));
 
-      // 2. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
-      for (const repo of repositories) {
-        if (repo.vector_indexed_at) {
-          updateRepository({ ...repo, vector_indexed_at: undefined });
-        }
-      }
-
-      // 3. 全量索引
+      // 2. 全量索引
       const now = new Date().toISOString();
       const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
@@ -281,16 +272,20 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         incremental: false,
       });
 
-      // 4. 为成功索引的 repo 设置 vector_indexed_at
-      const indexedSet = new Set(result.indexedRepoIds);
-      for (const repo of useAppStore.getState().repositories) {
-        if (indexedSet.has(repo.id)) {
-          updateRepository({ ...repo, vector_indexed_at: now });
-        }
+      // 3. cleanup：全量重建后只保留本次成功重建的向量
+      try {
+        await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
+      } catch (cleanupErr) {
+        console.warn('Vector cleanup failed after rebuild:', cleanupErr);
       }
 
+      // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新）
+      const indexedSet = new Set(result.indexedRepoIds);
+      setRepositories(useAppStore.getState().repositories.map(repo =>
+        indexedSet.has(repo.id) ? { ...repo, vector_indexed_at: now } : repo
+      ));
+
       setVectorIndexingState({ result, isIndexing: false, phase: null });
-      // Rebuild 替换全部索引，vectorCount = 本次成功数量
       setVectorSearchStatus({
         connected: true,
         vectorCount: result.indexed,
@@ -306,7 +301,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepository, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, setRepositories, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleIncrementalIndex = useCallback(async () => {
     const clients = createClients();
@@ -317,6 +312,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
+      // 记录索引前无 vector_indexed_at 的 repo，用于精确计算新增数量
+      const newlyIndexedRepoIds = new Set(
+        repositories.filter(r => !r.vector_indexed_at).map(r => r.id)
+      );
+
       const now = new Date().toISOString();
       const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
@@ -329,20 +329,21 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         indexMode: formIndexMode,
         readmeMaxChars: formReadmeMaxChars,
         incremental: true,
-        onRepoIndexed: (repoId) => {
-          // 用 getState() 获取最新 repo 数据，避免 stale closure 覆盖并发编辑
-          const repo = useAppStore.getState().repositories.find(r => r.id === repoId);
-          if (repo) {
-            updateRepository({ ...repo, vector_indexed_at: now });
-          }
-        },
       });
 
+      // 批量设置 vector_indexed_at（一次性更新，避免逐个 updateRepository）
+      const indexedSet = new Set(result.indexedRepoIds);
+      setRepositories(useAppStore.getState().repositories.map(repo =>
+        indexedSet.has(repo.id) ? { ...repo, vector_indexed_at: now } : repo
+      ));
+
       setVectorIndexingState({ result, isIndexing: false, phase: null });
+      // 只计算本次新增索引的 repo（之前无 vector_indexed_at），不包含重新索引的
+      const newlyIndexedCount = result.indexedRepoIds.filter(id => newlyIndexedRepoIds.has(id)).length;
       const prevCount = useAppStore.getState().vectorSearchStatus.vectorCount || 0;
       setVectorSearchStatus({
         connected: true,
-        vectorCount: prevCount + result.indexed,
+        vectorCount: prevCount + newlyIndexedCount,
         dimensions: formDimensions,
         lastSyncAt: new Date().toISOString(),
       });
@@ -355,7 +356,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepository, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, setRepositories, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
