@@ -370,12 +370,20 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         const currentRepos = useAppStore.getState().repositories;
-        const indexableCount = currentRepos.filter((r) => r.analyzed_at && !r.analysis_failed).length;
-        const skippedCount = currentRepos.length - indexableCount;
+        const attemptedCount = currentRepos.filter((r) => {
+          if (!r.analyzed_at || r.analysis_failed) return false;
+          if (!r.vector_indexed_at) return true;
+          const contentTime = [r.last_edited, r.analyzed_at]
+            .filter((t): t is string => !!t)
+            .sort()
+            .pop() || '';
+          return contentTime > r.vector_indexed_at;
+        }).length;
+        const skippedCount = currentRepos.length - attemptedCount;
         setVectorIndexingState({
           isIndexing: false,
           phase: null,
-          result: { indexed: 0, skipped: skippedCount, errors: indexableCount, error: msg },
+          result: { indexed: 0, skipped: skippedCount, errors: attemptedCount, error: msg },
         });
       }
     } finally {
