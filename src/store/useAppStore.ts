@@ -284,6 +284,8 @@ interface AppActions {
   // Repository actions
   setRepositories: (repos: Repository[]) => void;
   updateRepository: (repo: Repository) => void;
+  /** 批量更新多个仓库的指定字段，保留当前过滤的 searchResults 不被重置 */
+  updateRepositoriesMetadata: (updates: { id: number; patch: Partial<Repository> }[]) => void;
   addRepository: (repo: Repository) => void;
   setLoading: (loading: boolean) => void;
   setSyncingStars: (syncing: boolean) => void;
@@ -1169,6 +1171,41 @@ export const useAppStore = create<AppState & AppActions>()(
           searchResults: searchResultsResult.repositories
         };
       }),
+      updateRepositoriesMetadata: (updates) => set((state) => {
+        if (!updates.length) return state;
+        const patchMap = new Map(updates.map((u) => [u.id, u.patch]));
+
+        const applyPatches = (list: Repository[]): { repositories: Repository[]; changed: boolean } => {
+          let changed = false;
+          // 用 Map 索引避免多次 findIndex
+          const indexById = new Map(list.map((r, i) => [r.id, i]));
+          const next = list.slice();
+          for (const [id, patch] of patchMap) {
+            const idx = indexById.get(id);
+            if (idx === undefined) continue;
+            const merged = { ...next[idx], ...patch };
+            if (!areRepositoryRecordsEqual(next[idx], merged)) {
+              next[idx] = merged;
+              changed = true;
+            }
+          }
+          return { repositories: next, changed };
+        };
+
+        const repositoriesResult = applyPatches(state.repositories);
+        const searchResultsResult = state.searchResults === state.repositories
+          ? repositoriesResult
+          : applyPatches(state.searchResults);
+
+        if (!repositoriesResult.changed && !searchResultsResult.changed) {
+          return state;
+        }
+
+        return {
+          repositories: repositoriesResult.repositories,
+          searchResults: searchResultsResult.repositories,
+        };
+      }),
       addRepository: (repo) => set((state) => {
         // 检查是否已存在相同 full_name 的仓库
         const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
@@ -2018,6 +2055,8 @@ export const useAppStore = create<AppState & AppActions>()(
 
         // 持久化向量搜索配置
         vectorSearchConfig: state.vectorSearchConfig,
+        // 持久化向量搜索状态（vectorCount 等，跨重启保留）
+        vectorSearchStatus: state.vectorSearchStatus,
 
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
@@ -2137,6 +2176,12 @@ export const useAppStore = create<AppState & AppActions>()(
         if (state && typeof state.defaultCategoryOverrides !== 'object') {
           console.log('Migrating from old version: initializing defaultCategoryOverrides');
           state.defaultCategoryOverrides = {};
+        }
+
+        // 从旧版本升级时，确保 vectorSearchStatus 字段存在（vectorCount 等）
+        if (state && !state.vectorSearchStatus) {
+          console.log('Migrating from old version: initializing vectorSearchStatus');
+          state.vectorSearchStatus = { connected: false, vectorCount: 0, dimensions: 0 };
         }
 
         // 迁移仓库数据中的旧标记

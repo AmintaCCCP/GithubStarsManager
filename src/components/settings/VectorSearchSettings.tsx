@@ -58,7 +58,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState,
     repositories,
     githubToken,
-    setRepositories,
+    updateRepositoriesMetadata,
   } = useAppStore();
 
   // Local form state for embedding config
@@ -236,11 +236,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       authToken: formAuthToken,
       embeddingConfigId: activeEmbeddingConfig || '',
     });
-    const readmeFetcher = githubToken
-      ? (owner: string, repo: string, signal?: AbortSignal) => {
-          const api = new GitHubApiService(githubToken);
-          return api.getRepositoryReadme(owner, repo, signal);
-        }
+    // 复用单个 GitHubApiService 实例，保留 rate-limit state
+    const githubApi = githubToken ? new GitHubApiService(githubToken) : null;
+    const readmeFetcher = githubApi
+      ? (owner: string, repo: string, signal?: AbortSignal) =>
+          githubApi.getRepositoryReadme(owner, repo, signal)
       : undefined;
     return { embeddingClient, vectorService, readmeFetcher };
   }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, activeEmbeddingConfig, githubToken]);
@@ -255,9 +255,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
     try {
       // 1. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
-      setRepositories(repositories.map(repo =>
-        repo.vector_indexed_at ? { ...repo, vector_indexed_at: undefined } : repo
-      ));
+      //    用 updateRepositoriesMetadata 避免重置当前过滤的 searchResults
+      updateRepositoriesMetadata(
+        repositories.filter(r => r.vector_indexed_at).map(r => ({ id: r.id, patch: { vector_indexed_at: undefined } }))
+      );
 
       // 2. 全量索引
       const now = new Date().toISOString();
@@ -282,11 +283,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         throw cleanupErr;
       }
 
-      // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新）
-      const indexedSet = new Set(result.indexedRepoIds);
-      setRepositories(useAppStore.getState().repositories.map(repo =>
-        indexedSet.has(repo.id) ? { ...repo, vector_indexed_at: now } : repo
-      ));
+      // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新，保留 searchResults）
+      updateRepositoriesMetadata(
+        result.indexedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } }))
+      );
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       setVectorSearchStatus({
@@ -305,7 +305,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, setRepositories, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleIncrementalIndex = useCallback(async () => {
     const clients = createClients();
@@ -335,11 +335,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         incremental: true,
       });
 
-      // 批量设置 vector_indexed_at（一次性更新，避免逐个 updateRepository）
-      const indexedSet = new Set(result.indexedRepoIds);
-      setRepositories(useAppStore.getState().repositories.map(repo =>
-        indexedSet.has(repo.id) ? { ...repo, vector_indexed_at: now } : repo
-      ));
+      // 批量设置 vector_indexed_at（保留 searchResults 不被重置）
+      updateRepositoriesMetadata(
+        result.indexedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } }))
+      );
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       // 只计算本次新增索引的 repo（之前无 vector_indexed_at），不包含重新索引的
@@ -371,7 +370,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, setRepositories, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
