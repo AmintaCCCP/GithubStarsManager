@@ -235,6 +235,13 @@ export interface VectorSearchConfig {
   embeddingConfigId: string;
   indexMode: VectorIndexMode;
   readmeMaxChars: number;  // README 截取字符数，默认 6000
+  // 搜索参数（可选，有默认值）
+  searchThreshold?: number;   // 相似度阈值，默认 0.35
+  searchTopK?: number;        // 返回结果数，默认 30
+  enableHyDE?: boolean;       // 是否启用 HyDE 查询预处理，默认 true
+  enableReranking?: boolean;  // 是否启用 LLM 语义重排序，默认 true
+  // 嵌入文本格式版本，buildEmbeddingText 格式变化时递增
+  embeddingFormatVersion?: number;
 }
 
 export interface VectorSearchStatus {
