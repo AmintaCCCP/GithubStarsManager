@@ -213,7 +213,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const unindexedCount = repositories.filter((r) => {
     if (!r.analyzed_at || r.analysis_failed) return false;
     if (!r.vector_indexed_at) return true;
-    const contentTime = r.last_edited || r.analyzed_at || '';
+    const contentTime = [r.last_edited, r.analyzed_at]
+      .filter((t): t is string => !!t)
+      .sort()
+      .pop() || '';
     return contentTime > r.vector_indexed_at;
   }).length;
 

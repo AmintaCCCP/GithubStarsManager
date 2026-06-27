@@ -6,20 +6,33 @@ import {
 } from './vectorSearchService';
 
 // Minimal mock: only the `.embed` method is used by embedWithFallback.
+// Signature mirrors EmbeddingClient.embed; helpers only pass the args they use.
 const makeClient = (
-  embedImpl: (texts: string[], purpose: 'document' | 'query', signal?: AbortSignal) => Promise<number[][]>,
+  embedImpl: (texts: string[]) => Promise<number[][]>,
 ) => ({ embed: vi.fn(embedImpl) }) as unknown as Parameters<typeof embedWithFallback>[1];
 
 const vec = (n: number) => [n, n + 1, n + 2];
 
+// 硅基流动真实的长度超限 payload（code 20015）
+const LENGTH_ERROR = () =>
+  new Error('Embedding API error 400: {"code":20015,"message":"The parameter is invalid.","data":null}');
+
 describe('looksLikeLengthError', () => {
   it('detects SiliconFlow 20015 length errors', () => {
-    expect(looksLikeLengthError(new Error('Embedding API error 400: {"code":20015,"message":"The parameter is invalid."}'))).toBe(true);
+    expect(looksLikeLengthError(LENGTH_ERROR())).toBe(true);
   });
 
-  it('detects generic length phrases', () => {
-    expect(looksLikeLengthError(new Error('input length exceeds maximum token limit'))).toBe(true);
-    expect(looksLikeLengthError(new Error('text too long'))).toBe(true);
+  it('detects explicit length/token phrases', () => {
+    expect(looksLikeLengthError(new Error('input length exceeds the model maximum'))).toBe(true);
+    expect(looksLikeLengthError(new Error('maximum token limit reached'))).toBe(true);
+    expect(looksLikeLengthError(new Error('text too long for model'))).toBe(true);
+  });
+
+  it('does NOT treat generic 400 / "parameter is invalid" as length errors', () => {
+    // 纯 400 状态码不一定是长度问题（可能是配置/参数缺失）
+    expect(looksLikeLengthError(new Error('400 Bad Request'))).toBe(false);
+    // 只有 "parameter is invalid" 而无 20015 也可能是配置错误
+    expect(looksLikeLengthError(new Error('parameter is invalid'))).toBe(false);
   });
 
   it('rejects non-length errors', () => {
@@ -34,7 +47,7 @@ describe('truncateForRetry', () => {
     expect(truncateForRetry('short', 6000)).toBe('short');
   });
 
-  it('halves until under limit', () => {
+  it('leaves text unchanged when shorter than maxChars', () => {
     const long = 'x'.repeat(1000);
     const result = truncateForRetry(long, 6000);
     // 6000 > 1000, so no truncation needed actually
@@ -64,16 +77,16 @@ describe('embedWithFallback', () => {
     expect(result.every((v) => Array.isArray(v))).toBe(true);
   });
 
-  it('isolates single oversized item on length error', async () => {
+  it('isolates single oversized item on 20015 length error', async () => {
     // Batch call throws 20015; per-item: only the long one fails, short ones succeed.
-    const client = makeClient(async (texts, _purpose, _signal) => {
+    const client = makeClient(async (texts) => {
       if (texts.length > 1) {
         // batch path
-        throw new Error('Embedding API error 400: {"code":20015,"message":"The parameter is invalid."}');
+        throw LENGTH_ERROR();
       }
       const t = texts[0];
       if (t.length > 100) {
-        throw new Error('Embedding API error 400: {"code":20015,"message":"The parameter is invalid."}');
+        throw LENGTH_ERROR();
       }
       return [vec(t.length)];
     });
@@ -84,19 +97,27 @@ describe('embedWithFallback', () => {
     expect(result[2]).not.toBeNull();
   });
 
+  it('does NOT fall back to per-item on generic 400 errors', async () => {
+    // 通用 400（非长度类）应整批失败，不降级为逐条
+    const client = makeClient(async () => {
+      throw new Error('400 Bad Request: model not found');
+    });
+    await expect(embedWithFallback(['a', 'b'], client, undefined, 6000)).rejects.toThrow('400');
+  });
+
   it('rescues oversized item via truncation retry', async () => {
     // Per-item: full text fails but truncated version succeeds.
     // Models like bge have ~512 token (~2000 char) limits; truncation ladder
     // goes 6000 → 3000 → 1500, so a text that fails at full length but succeeds
     // when under ~2000 chars is rescuable.
-    const client = makeClient(async (texts, _purpose, _signal) => {
+    const client = makeClient(async (texts) => {
       if (texts.length > 1) {
-        throw new Error('400 parameter is invalid');
+        throw LENGTH_ERROR();
       }
       const t = texts[0];
       // Accept only texts under 2000 chars (simulating a 512-token bge limit)
       if (t.length > 2000) {
-        throw new Error('400 too long');
+        throw new Error('too long: input length exceeds maximum token limit');
       }
       return [vec(t.length)];
     });
@@ -104,7 +125,7 @@ describe('embedWithFallback', () => {
     const longText = 'y'.repeat(10000);
     const result = await embedWithFallback([longText], client, undefined, 6000);
     expect(result[0]).not.toBeNull();
-    // Should have retried with a truncated candidate (<=3000 chars)
+    // Should have retried with a truncated candidate (<=2000 chars)
     expect(client.embed.mock.calls.length).toBeGreaterThan(1);
     // The successful call used a truncated text under 2000 chars
     const lastCallText = client.embed.mock.calls[client.embed.mock.calls.length - 1][0] as string[];
