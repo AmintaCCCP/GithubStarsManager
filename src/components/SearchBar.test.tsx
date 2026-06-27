@@ -9,6 +9,13 @@ vi.mock('../store/useAppStore', () => ({
   getAllCategories: vi.fn(() => []),
 }));
 
+vi.mock('../hooks/useDialog', () => ({
+  useDialog: () => ({
+    toast: vi.fn(),
+    confirm: vi.fn(),
+  }),
+}));
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
 
@@ -62,9 +69,15 @@ const baseStoreState = () => ({
   customCategories: [],
   hiddenDefaultCategoryIds: [],
   defaultCategoryOverrides: {},
+  vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 },
+  vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
+  embeddingConfigs: [],
 });
 
 const mockUseAppStore = vi.mocked(useAppStore);
+// SearchBar also calls useAppStore.getState() directly in effects/handlers.
+(mockUseAppStore as unknown as { getState: () => ReturnType<typeof baseStoreState> }).getState =
+  () => baseStoreState();
 
 describe('SearchBar', () => {
   beforeEach(() => {
