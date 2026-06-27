@@ -451,4 +451,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.7</downloadUrl>
   </version>
+  <version>
+    <number>0.6.8</number>
+    <releaseDate>2026-06-27</releaseDate>
+    <changelog>
+      <item>feat: Added true incremental vector indexing with `vector_indexed_at` tracking across the full data pipeline, unindexed repo count badge, and concurrent README fetching. (PR #230)</item>
+      <item>feat: Optimized vector search with true semantic reranking, HyDE query preprocessing, structured embedding text, keyword boosting, and configurable search parameters in Settings UI. (PR #231)</item>
+      <item>fix: Fixed JSON parsing greedy regex, variable shadowing in keyword boosting, HyDE timeout cleanup, stale closure issues, and ISO 8601 validation for `vector_indexed_at`. (PR #230, #231)</item>
+      <item>fix: Added `EMBEDDING_FORMAT_VERSION` tracking to auto-trigger full reindex when embedding text format changes. (PR #231)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.8</downloadUrl>
+  </version>
 </versions>
