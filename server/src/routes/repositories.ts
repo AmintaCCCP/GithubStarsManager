@@ -118,6 +118,13 @@ router.put('/api/repositories', (req, res) => {
         res.status(400).json({ error: 'Each repository must have a valid non-negative stargazers_count', code: 'INVALID_STARGAZERS_COUNT' });
         return;
       }
+      // 校验 vector_indexed_at：允许 null/undefined 或合法 ISO 8601 字符串
+      if (repo.vector_indexed_at !== null && repo.vector_indexed_at !== undefined && repo.vector_indexed_at !== '') {
+        if (typeof repo.vector_indexed_at !== 'string' || isNaN(Date.parse(repo.vector_indexed_at))) {
+          res.status(400).json({ error: 'vector_indexed_at must be an ISO 8601 string or null', code: 'INVALID_VECTOR_INDEXED_AT' });
+          return;
+        }
+      }
     }
 
     const stmt = db.prepare(`
