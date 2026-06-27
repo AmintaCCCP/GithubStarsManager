@@ -68,7 +68,7 @@ export default {
 
       // POST /query — 向量相似度查询
       if (request.method === 'POST' && url.pathname === '/query') {
-        const { vector, topK = 20, threshold = 0.3 } = (await request.json()) as QueryRequest;
+        const { vector, topK = 20, threshold = 0.35 } = (await request.json()) as QueryRequest;
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }

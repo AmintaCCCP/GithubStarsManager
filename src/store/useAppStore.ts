@@ -2314,12 +2314,17 @@ export const useAppStore = create<AppState & AppActions>()(
   if (state && !(state as Record<string, unknown>).vectorSearchConfig) {
     (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 };
   }
-  // 迁移：为旧配置添加 indexMode 和 readmeMaxChars
+  // 迁移：为旧配置添加缺失字段
   if (state) {
     const vsc = (state as Record<string, unknown>).vectorSearchConfig as Record<string, unknown> | undefined;
     if (vsc && typeof vsc === 'object') {
       if (vsc.indexMode !== 'description' && vsc.indexMode !== 'readme') vsc.indexMode = 'readme';
       if (typeof vsc.readmeMaxChars !== 'number' || vsc.readmeMaxChars <= 0) vsc.readmeMaxChars = 6000;
+      if (typeof vsc.searchThreshold !== 'number') vsc.searchThreshold = 0.35;
+      if (typeof vsc.searchTopK !== 'number') vsc.searchTopK = 30;
+      if (typeof vsc.enableHyDE !== 'boolean') vsc.enableHyDE = true;
+      if (typeof vsc.enableReranking !== 'boolean') vsc.enableReranking = true;
+      if (typeof vsc.embeddingFormatVersion !== 'number') vsc.embeddingFormatVersion = 1;
     }
   }
 
