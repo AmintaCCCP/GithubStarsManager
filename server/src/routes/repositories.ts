@@ -242,10 +242,10 @@ router.patch('/api/repositories/:id', (req, res) => {
       name: (v) => v,
     };
 
-    // 校验 vector_indexed_at 类型：只允许 null 或 ISO 字符串，拒绝数字/布尔/对象
+    // 校验 vector_indexed_at 类型：只允许 null 或 ISO 8601 字符串，拒绝数字/布尔/对象/非日期字符串
     if ('vector_indexed_at' in updates) {
       const v = updates.vector_indexed_at;
-      if (v !== null && v !== undefined && v !== '' && typeof v !== 'string') {
+      if (v !== null && v !== undefined && v !== '' && (typeof v !== 'string' || isNaN(Date.parse(v)))) {
         res.status(400).json({
           error: 'vector_indexed_at must be an ISO string or null',
           code: 'INVALID_VECTOR_INDEXED_AT',
