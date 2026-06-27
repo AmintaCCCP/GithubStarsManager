@@ -365,15 +365,15 @@ export interface IndexProgress {
  * 判断 embedding 错误是否属于"输入过长"类（如硅基流动 20015）。
  * 这类错误的特点是：batch 中某一条超 token 限制导致整批失败，
  * 可以通过降级为逐条 embed 来隔离出真正超限的那条。
+ * 只匹配明确的长度/token 关键词，避免把通用 400/配置错误误判为可重试。
  */
 export function looksLikeLengthError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return (
-    /\b400\b/.test(msg) ||
     /\b20015\b/.test(msg) ||
-    /parameter is invalid/i.test(msg) ||
     /input length/i.test(msg) ||
     /maximum token/i.test(msg) ||
+    /token limit/i.test(msg) ||
     /too long/i.test(msg)
   );
 }
@@ -449,9 +449,9 @@ export async function embedWithFallback(
         if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
           throw new Error('Aborted');
         }
-        // 仍是 length 错误 → 尝试更短的候选；其他错误记录后跳过
+        // 仍是 length 错误 → 尝试更短的候选；非长度错误（5xx/network/auth）立即抛出
         if (!looksLikeLengthError(err)) {
-          break;
+          throw err;
         }
       }
     }
@@ -489,8 +489,11 @@ export async function indexAllRepos(
   if (incremental) {
     indexable = indexable.filter((r) => {
       if (!r.vector_indexed_at) return true; // 从未索引
-      // 内容更新后需要重新索引
-      const contentTime = r.last_edited || r.analyzed_at || '';
+      // 取 last_edited 与 analyzed_at 中较新者作为内容时间，更新后需要重新索引
+      const contentTime = [r.last_edited, r.analyzed_at]
+        .filter((t): t is string => !!t)
+        .sort()
+        .pop() || '';
       return contentTime > r.vector_indexed_at;
     });
   }
