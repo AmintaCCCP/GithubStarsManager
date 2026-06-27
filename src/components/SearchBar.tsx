@@ -880,27 +880,6 @@ export const SearchBar: React.FC = () => {
         toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
       }
 
-      // 向量搜索开启时，后台自动索引新仓库
-      const vsCfg = useAppStore.getState().vectorSearchConfig;
-      const embCfgs = useAppStore.getState().embeddingConfigs;
-      const activeEmb = embCfgs.find(c => c.id === vsCfg?.embeddingConfigId);
-      if (vsCfg?.enabled && vsCfg?.workerUrl && activeEmb && newRepoCount > 0) {
-        const { VectorSearchService, EmbeddingClient, indexAllRepos } = await import('../services/vectorSearchService');
-        const embClient = new EmbeddingClient(activeEmb);
-        const vecService = new VectorSearchService(vsCfg);
-        const readmeFetcher = githubToken
-          ? (owner: string, repo: string, signal?: AbortSignal) => new GitHubApiService(githubToken).getRepositoryReadme(owner, repo, signal)
-          : undefined;
-        // 只索引新增仓库，不重复索引已有仓库
-        const newRepos = mergedRepositories.filter(repo => !existingRepoIds.has(repo.id));
-        if (newRepos.length > 0) {
-          indexAllRepos(newRepos, embClient, vecService, {
-            readmeFetcher,
-            indexMode: vsCfg.indexMode,
-            readmeMaxChars: vsCfg.readmeMaxChars,
-          }).catch(() => {});
-        }
-      }
     } catch (error) {
       console.error('Sync failed:', error);
       if (error instanceof Error && error.message.includes('token')) {
