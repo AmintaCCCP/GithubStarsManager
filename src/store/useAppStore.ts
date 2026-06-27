@@ -1050,6 +1050,7 @@ export const useAppStore = create<AppState & AppActions>()(
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
       vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 },
+      vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       webdavConfigs: [],
       activeWebDAVConfig: null,

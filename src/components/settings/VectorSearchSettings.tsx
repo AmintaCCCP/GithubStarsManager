@@ -299,7 +299,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       if (err instanceof Error && err.message === 'Aborted') {
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
-        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length } });
+        const msg = err instanceof Error ? err.message : String(err);
+        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length, error: msg } });
       }
     } finally {
       setAbortController(null);
@@ -342,14 +343,20 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
       // 只计算本次新增索引的 repo（之前无 vector_indexed_at），不包含重新索引的
+      // 用可选链避免 vectorSearchStatus 为 undefined 时抛错（旧版本持久化状态或未测试连接）
       const newlyIndexedCount = result.indexedRepoIds.filter(id => newlyIndexedRepoIds.has(id)).length;
-      const prevCount = useAppStore.getState().vectorSearchStatus.vectorCount || 0;
-      setVectorSearchStatus({
-        connected: true,
-        vectorCount: prevCount + newlyIndexedCount,
-        dimensions: formDimensions,
-        lastSyncAt: new Date().toISOString(),
-      });
+      const prevCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
+      try {
+        setVectorSearchStatus({
+          connected: true,
+          vectorCount: prevCount + newlyIndexedCount,
+          dimensions: formDimensions,
+          lastSyncAt: new Date().toISOString(),
+        });
+      } catch (statusErr) {
+        // 状态更新失败不应回滚已成功的索引结果
+        console.warn('Failed to update vector search status:', statusErr);
+      }
     } catch (err) {
       if (err instanceof Error && err.message === 'Aborted') {
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
@@ -823,12 +830,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <button
             onClick={handleIncrementalIndex}
             disabled={isIndexing || !isConfigComplete || unindexedCount === 0}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
             {unindexedCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-500 text-white rounded-full">
+              <span className="ml-1 px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">
                 {unindexedCount}
               </span>
             )}
@@ -836,7 +843,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {isIndexing && (
             <button
               onClick={handleAbortIndexing}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
             >
               <Square className="w-4 h-4" />
               {t('中止', 'Abort')}
