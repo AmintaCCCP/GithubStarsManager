@@ -508,8 +508,8 @@ export async function indexAllRepos(
   // 增量模式下跳过已索引且内容未更新的仓库
   if (incremental) {
     // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
-    const formatVersionChanged = options.formatVersion !== undefined && options.currentFormatVersion !== undefined
-      && options.formatVersion < options.currentFormatVersion;
+    // 缺失版本号视为 v1（旧格式），仍需触发升级
+    const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
     indexable = indexable.filter((r) => {
       if (!r.vector_indexed_at) return true; // 从未索引
       if (formatVersionChanged) return true; // 格式版本升级，需要重新索引

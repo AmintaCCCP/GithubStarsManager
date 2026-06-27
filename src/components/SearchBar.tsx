@@ -550,7 +550,7 @@ export const SearchBar: React.FC = () => {
               const { AIService } = await import('../services/aiService');
               const hydeService = new AIService(hydeConfig, language);
               embeddingQuery = await Promise.race([
-                hydeService.generateHyDEQuery(searchQuery, hydeAbort.signal),
+                hydeService.generateHyDEQuery(searchQuery, hydeAbort.signal).catch(() => searchQuery),
                 new Promise<string>((resolve) => {
                   hydeTimer = setTimeout(() => {
                     hydeAbort.abort();
@@ -585,9 +585,9 @@ export const SearchBar: React.FC = () => {
               const queryLower = searchQuery.toLowerCase();
               const boostedResults = vectorResults.map(r => {
                 let bonus = 0;
-                const name = (r.metadata.full_name || '').toLowerCase();
-                const desc = (r.metadata.description || '').toLowerCase();
-                const tags = (r.metadata.tags || []).map(tag => tag.toLowerCase());
+                const name = (r.metadata?.full_name || '').toLowerCase();
+                const desc = (r.metadata?.description || '').toLowerCase();
+                const tags = (r.metadata?.tags || []).map(tag => tag.toLowerCase());
                 if (name.includes(queryLower)) bonus += 0.05;
                 if (desc.includes(queryLower)) bonus += 0.03;
                 if (tags.some(tag => tag.includes(queryLower))) bonus += 0.02;
@@ -623,9 +623,18 @@ export const SearchBar: React.FC = () => {
                   }
                 }
 
-                // If AI reranking succeeded, preserve its order; otherwise sort by vector score
+                // 保存 LLM 重排序顺序，applyFilters 可能按 UI 排序覆盖它
+                const rerankOrder = rerankSucceeded
+                  ? new Map(reranked.map((repo, index) => [String(repo.id), index]))
+                  : null;
                 const finalFiltered = applyFilters([...reranked]);
-                if (!rerankSucceeded) {
+                if (rerankOrder) {
+                  // 恢复 LLM 语义排序顺序
+                  finalFiltered.sort((a, b) =>
+                    (rerankOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+                    - (rerankOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER)
+                  );
+                } else {
                   finalFiltered.sort((a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0));
                 }
                 console.log('🎯 Vector search results:', finalFiltered.length);

@@ -653,7 +653,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
    * @param query 用户搜索查询
    * @returns 按语义相关性排序的仓库列表
    */
-  async searchRepositoriesWithSemanticReranking(repositories: Repository[], query: string): Promise<Repository[]> {
+  async searchRepositoriesWithSemanticReranking(repositories: Repository[], query: string, signal?: AbortSignal): Promise<Repository[]> {
     if (repositories.length === 0) return [];
 
     // 限制候选数量，控制 token 消耗
@@ -683,6 +683,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       user: `Query: ${query}\n\nRepositories:\n${this.sanitizeForPrompt(repoSummaries)}`,
       temperature: 0.1,
       maxTokens: 800,
+      signal,
     });
 
     try {
