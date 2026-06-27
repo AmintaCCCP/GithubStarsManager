@@ -276,6 +276,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
       } catch (cleanupErr) {
         console.warn('Vector cleanup failed after rebuild:', cleanupErr);
+        throw cleanupErr;
       }
 
       // 4. 为成功索引的 repo 设置 vector_indexed_at（批量更新）
@@ -350,7 +351,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       if (err instanceof Error && err.message === 'Aborted') {
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
-        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length } });
+        const msg = err instanceof Error ? err.message : String(err);
+        setVectorIndexingState({
+          isIndexing: false,
+          phase: null,
+          result: { indexed: 0, skipped: 0, errors: repositories.length, error: msg },
+        });
       }
     } finally {
       setAbortController(null);
