@@ -232,6 +232,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     return contentTime > r.vector_indexed_at;
   }).length;
 
+  // 嵌入文本格式版本升级时，即使无内容更新也需要触发增量索引来重建所有向量
+  const formatVersionNeedsReindex = (vectorSearchConfig.embeddingFormatVersion ?? 1) < EMBEDDING_FORMAT_VERSION;
+
   const createClients = useCallback(() => {
     if (!activeConfig) return null;
     const embeddingClient = new EmbeddingClient({
@@ -319,6 +322,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         dimensions: formDimensions,
         lastSyncAt: new Date().toISOString(),
       });
+      // 索引成功后更新格式版本号，避免下次增量索引重复触发全量重建
+      setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
     } catch (err) {
       if (err instanceof Error && err.message === 'Aborted') {
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
@@ -331,7 +336,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion]);
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion, setVectorSearchConfig]);
 
   const handleIncrementalIndex = useCallback(async () => {
     const clients = createClients();
@@ -395,6 +400,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         // 状态更新失败不应回滚已成功的索引结果
         console.warn('Failed to update vector search status:', statusErr);
       }
+      // 索引成功后更新格式版本号，避免下次增量索引重复触发全量重建
+      setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
     } catch (err) {
       if (err instanceof Error && err.message === 'Aborted') {
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
@@ -420,7 +427,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion]);
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion, setVectorSearchConfig]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
@@ -878,7 +885,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </button>
           <button
             onClick={handleIncrementalIndex}
-            disabled={isIndexing || !isConfigComplete || unindexedCount === 0}
+            disabled={isIndexing || !isConfigComplete || (unindexedCount === 0 && !formatVersionNeedsReindex)}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -947,11 +954,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Similarity Threshold */}
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label htmlFor="search-threshold" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {t('相似度阈值', 'Similarity Threshold')}
           </label>
           <div className="flex items-center gap-3">
             <input
+              id="search-threshold"
               type="range"
               min={0.1}
               max={0.8}
@@ -971,10 +979,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Top K */}
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label htmlFor="search-topk" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {t('返回结果数 (Top K)', 'Results Count (Top K)')}
           </label>
           <input
+            id="search-topk"
             type="number"
             value={formSearchTopK}
             onChange={(e) => setFormSearchTopK(Math.max(5, Math.min(50, parseInt(e.target.value) || 30)))}
@@ -998,6 +1007,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </p>
           </div>
           <button
+            role="switch"
+            aria-checked={formEnableHyDE}
+            aria-label={t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
             onClick={() => setFormEnableHyDE(!formEnableHyDE)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               formEnableHyDE ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'
@@ -1022,6 +1034,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </p>
           </div>
           <button
+            role="switch"
+            aria-checked={formEnableReranking}
+            aria-label={t('LLM 语义重排序', 'LLM Semantic Reranking')}
             onClick={() => setFormEnableReranking(!formEnableReranking)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               formEnableReranking ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'
