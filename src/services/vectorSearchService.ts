@@ -429,12 +429,14 @@ export async function embedWithFallback(
   for (let i = 0; i < texts.length; i++) {
     if (signal?.aborted) throw new Error('Aborted');
     const original = texts[i];
-    // 截断重试阶梯：原始 → 折半 → 再折半
+    // 截断重试阶梯：每步严格递减，确保不会重复尝试同一长度
+    // step1 = 原文；step2 = min(原文, retryMaxChars)；step3 = 再折半；下限 256
+    const half = Math.floor(retryMaxChars / 2);
     const candidates = [
       original,
       truncateForRetry(original, retryMaxChars),
-      truncateForRetry(original, Math.floor(retryMaxChars / 2)),
-    ];
+      truncateForRetry(original, half),
+    ].filter((c, idx, arr) => idx === 0 || c.length < (arr[idx - 1]?.length ?? Infinity));
     let succeeded = false;
     for (const candidate of candidates) {
       if (!candidate) { succeeded = true; break; } // 空文本直接跳过
@@ -569,15 +571,25 @@ export async function indexAllRepos(
       }
 
       // 3. upsert 到 Worker（仅当有成功向量时）
+      //    Vectorize upsert 是原子的，但用返回的 upserted 数量计数更严谨
       const currentBatch = Math.floor(i / batchSize) + 1;
       if (vectorizeVectors.length > 0) {
         onProgress?.({ phase: 'uploading', done: currentBatch, total: totalBatches });
-        await vectorService.upsert(vectorizeVectors, signal);
-        indexed += vectorizeVectors.length;
-        for (const vec of vectorizeVectors) {
-          const repoId = parseInt(vec.id, 10);
+        const upsertResult = await vectorService.upsert(vectorizeVectors, signal);
+        const upsertedCount = typeof upsertResult?.upserted === 'number'
+          ? Math.min(upsertResult.upserted, vectorizeVectors.length)
+          : vectorizeVectors.length;
+        indexed += upsertedCount;
+        // 仅标记确认 upserted 的 repo（按顺序）
+        for (let j = 0; j < upsertedCount; j++) {
+          const repoId = parseInt(vectorizeVectors[j].id, 10);
           indexedRepoIds.push(repoId);
           onRepoIndexed?.(repoId);
+        }
+        // 若 worker 返回的 upserted 少于发送数，差额计入 errors
+        const notUpserted = vectorizeVectors.length - upsertedCount;
+        if (notUpserted > 0) {
+          batchErrors += notUpserted;
         }
       }
       if (batchErrors > 0) {

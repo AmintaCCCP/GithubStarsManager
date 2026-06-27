@@ -235,10 +235,24 @@ router.patch('/api/repositories/:id', (req, res) => {
       category_locked: (v) => (v === true || v === 1) ? 1 : 0,
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
-      vector_indexed_at: (v) => v,
+      // 规范化：null/undefined/空字符串 → null；仅接受字符串（ISO 时间戳）
+      vector_indexed_at: (v) =>
+        (v === null || v === undefined || v === '') ? null : v,
       description: (v) => v,
       name: (v) => v,
     };
+
+    // 校验 vector_indexed_at 类型：只允许 null 或 ISO 字符串，拒绝数字/布尔/对象
+    if ('vector_indexed_at' in updates) {
+      const v = updates.vector_indexed_at;
+      if (v !== null && v !== undefined && v !== '' && typeof v !== 'string') {
+        res.status(400).json({
+          error: 'vector_indexed_at must be an ISO string or null',
+          code: 'INVALID_VECTOR_INDEXED_AT',
+        });
+        return;
+      }
+    }
 
     const setClauses: string[] = [];
     const values: unknown[] = [];
