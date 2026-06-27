@@ -149,4 +149,5 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
   addColumnIfMissing(db, 'vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
   addColumnIfMissing(db, 'vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
+  addColumnIfMissing(db, 'repositories', 'vector_indexed_at', 'TEXT');
 }

@@ -96,7 +96,7 @@ export default {
         for (let round = 0; round < 10; round++) {
           const result = await env.VECTORIZE.query(zeroVector, {
             topK: 100,
-            returnMetadata: false,
+            returnMetadata: 'none',
           });
           const staleIds = result.matches
             .filter((m) => !keepSet.has(m.id))

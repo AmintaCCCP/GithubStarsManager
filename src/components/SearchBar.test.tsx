@@ -9,6 +9,13 @@ vi.mock('../store/useAppStore', () => ({
   getAllCategories: vi.fn(() => []),
 }));
 
+vi.mock('../hooks/useDialog', () => ({
+  useDialog: () => ({
+    toast: vi.fn(),
+    confirm: vi.fn(),
+  }),
+}));
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
 
@@ -62,25 +69,34 @@ const baseStoreState = () => ({
   customCategories: [],
   hiddenDefaultCategoryIds: [],
   defaultCategoryOverrides: {},
+  vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 },
+  vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
+  embeddingConfigs: [],
 });
 
 const mockUseAppStore = vi.mocked(useAppStore);
+// Track the current mock state so getState() returns the same overrides as the hook.
+let currentState = baseStoreState();
+(mockUseAppStore as unknown as { getState: () => ReturnType<typeof baseStoreState> }).getState =
+  () => currentState;
 
 describe('SearchBar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    currentState = baseStoreState();
   });
 
   it('clears the committed query when the search input is manually emptied', () => {
     const setSearchFilters = vi.fn();
-    mockUseAppStore.mockReturnValue(createStoreState({
+    currentState = createStoreState({
       searchFilters: {
         ...defaultSearchFilters,
         query: 'react',
       },
       setSearchFilters,
-    }) as ReturnType<typeof useAppStore>);
+    });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
 
     render(<SearchBar />);
 
@@ -106,6 +122,7 @@ describe('SearchBar', () => {
     });
     storeState.setSearchFilters = setSearchFilters;
 
+    currentState = storeState;
     mockUseAppStore.mockReturnValue(storeState as ReturnType<typeof useAppStore>);
 
     const { rerender } = render(<SearchBar />);
