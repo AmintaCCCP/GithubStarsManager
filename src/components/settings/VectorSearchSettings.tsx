@@ -254,15 +254,18 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
+      // 每次点击时读取最新的 repositories，避免闭包捕获过期数据
+      const currentRepos = useAppStore.getState().repositories;
+
       // 1. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
       //    用 updateRepositoriesMetadata 避免重置当前过滤的 searchResults
       updateRepositoriesMetadata(
-        repositories.filter(r => r.vector_indexed_at).map(r => ({ id: r.id, patch: { vector_indexed_at: undefined } }))
+        currentRepos.filter(r => r.vector_indexed_at).map(r => ({ id: r.id, patch: { vector_indexed_at: undefined } }))
       );
 
       // 2. 全量索引
       const now = new Date().toISOString();
-      const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
+      const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
           phase: progress.phase,
           phaseDone: progress.done,
@@ -300,12 +303,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const msg = err instanceof Error ? err.message : String(err);
-        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repositories.length, error: msg } });
+        const repoCount = useAppStore.getState().repositories.length;
+        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: 0, errors: repoCount, error: msg } });
       }
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
 
   const handleIncrementalIndex = useCallback(async () => {
     const clients = createClients();
@@ -316,13 +320,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
+      // 每次点击时读取最新的 repositories，避免闭包捕获过期数据
+      const currentRepos = useAppStore.getState().repositories;
+
       // 记录索引前无 vector_indexed_at 的 repo，用于精确计算新增数量
       const newlyIndexedRepoIds = new Set(
-        repositories.filter(r => !r.vector_indexed_at).map(r => r.id)
+        currentRepos.filter(r => !r.vector_indexed_at).map(r => r.id)
       );
 
       const now = new Date().toISOString();
-      const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
+      const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
           phase: progress.phase,
           phaseDone: progress.done,
@@ -361,18 +368,17 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const msg = err instanceof Error ? err.message : String(err);
+        const repoCount = useAppStore.getState().repositories.length;
         setVectorIndexingState({
           isIndexing: false,
           phase: null,
-          result: { indexed: 0, skipped: 0, errors: repositories.length, error: msg },
+          result: { indexed: 0, skipped: 0, errors: repoCount, error: msg },
         });
       }
     } finally {
       setAbortController(null);
     }
-  }, [createClients, repositories, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]);
-
-  const handleAbortIndexing = useCallback(() => {
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState]); = useCallback(() => {
     abortController?.abort();
   }, [abortController]);
 
