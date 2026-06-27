@@ -39,6 +39,7 @@ function transformRepo(row: Record<string, unknown>) {
     category_locked: !!row.category_locked,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
+    vector_indexed_at: row.vector_indexed_at ?? undefined,
   };
 }
 
@@ -117,6 +118,13 @@ router.put('/api/repositories', (req, res) => {
         res.status(400).json({ error: 'Each repository must have a valid non-negative stargazers_count', code: 'INVALID_STARGAZERS_COUNT' });
         return;
       }
+      // 校验 vector_indexed_at：允许 null/undefined 或合法 ISO 8601 字符串
+      if (repo.vector_indexed_at !== null && repo.vector_indexed_at !== undefined && repo.vector_indexed_at !== '') {
+        if (typeof repo.vector_indexed_at !== 'string' || isNaN(Date.parse(repo.vector_indexed_at))) {
+          res.status(400).json({ error: 'vector_indexed_at must be an ISO 8601 string or null', code: 'INVALID_VECTOR_INDEXED_AT' });
+          return;
+        }
+      }
     }
 
     const stmt = db.prepare(`
@@ -126,8 +134,8 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases, vector_indexed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -152,7 +160,8 @@ router.put('/api/repositories', (req, res) => {
         custom_category = excluded.custom_category,
         category_locked = excluded.category_locked,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
-        subscribed_to_releases = excluded.subscribed_to_releases
+        subscribed_to_releases = excluded.subscribed_to_releases,
+        vector_indexed_at = excluded.vector_indexed_at
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -198,7 +207,8 @@ router.put('/api/repositories', (req, res) => {
           repo.custom_description ?? null,
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
-          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0
+          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
+          repo.vector_indexed_at ?? null
         );
         count++;
       }
@@ -232,9 +242,24 @@ router.patch('/api/repositories/:id', (req, res) => {
       category_locked: (v) => (v === true || v === 1) ? 1 : 0,
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
+      // 规范化：null/undefined/空字符串 → null；仅接受字符串（ISO 时间戳）
+      vector_indexed_at: (v) =>
+        (v === null || v === undefined || v === '') ? null : v,
       description: (v) => v,
       name: (v) => v,
     };
+
+    // 校验 vector_indexed_at 类型：只允许 null 或 ISO 8601 字符串，拒绝数字/布尔/对象/非日期字符串
+    if ('vector_indexed_at' in updates) {
+      const v = updates.vector_indexed_at;
+      if (v !== null && v !== undefined && v !== '' && (typeof v !== 'string' || isNaN(Date.parse(v)))) {
+        res.status(400).json({
+          error: 'vector_indexed_at must be an ISO string or null',
+          code: 'INVALID_VECTOR_INDEXED_AT',
+        });
+        return;
+      }
+    }
 
     const setClauses: string[] = [];
     const values: unknown[] = [];

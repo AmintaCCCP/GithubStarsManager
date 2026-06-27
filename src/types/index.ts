@@ -29,6 +29,7 @@ export interface Repository {
   custom_category?: string;
   category_locked?: boolean;
   last_edited?: string;
+  vector_indexed_at?: string;  // ISO timestamp of last successful vector indexing
   last_release_fetch_time?: string;  // ISO timestamp, for incremental sync
   has_fetched_releases?: boolean;   // whether this repo has been synced for releases
 }

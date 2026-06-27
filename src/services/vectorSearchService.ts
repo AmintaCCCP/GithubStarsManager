@@ -351,14 +351,109 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
 }
 
 /**
- * 全量重建向量索引
- * 遍历所有已分析仓库，分批生成 embedding 并 upsert 到 Worker
+ * 全量/增量重建向量索引
+ * 遍历已分析仓库，分批生成 embedding 并 upsert 到 Worker
  * @param readmeFetcher 可选：获取仓库 README 内容的函数 (owner, repo) => content
  */
 export interface IndexProgress {
   phase: 'readme' | 'embedding' | 'uploading';
   done: number;
   total: number;
+}
+
+/**
+ * 判断 embedding 错误是否属于"输入过长"类（如硅基流动 20015）。
+ * 这类错误的特点是：batch 中某一条超 token 限制导致整批失败，
+ * 可以通过降级为逐条 embed 来隔离出真正超限的那条。
+ * 只匹配明确的长度/token 关键词，避免把通用 400/配置错误误判为可重试。
+ */
+export function looksLikeLengthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /\b20015\b/.test(msg) ||
+    /input length/i.test(msg) ||
+    /maximum token/i.test(msg) ||
+    /token limit/i.test(msg) ||
+    /too long/i.test(msg)
+  );
+}
+
+/**
+ * 对文本做截断，保留下限 256 字符。
+ */
+export function truncateForRetry(text: string, maxChars: number): string {
+  return text.slice(0, Math.max(256, Math.min(text.length, maxChars)));
+}
+
+/**
+ * 批量 embed，带单条失败隔离 + 截断重试。
+ * - 正常路径：一次 batch 调用，快。
+ * - 若 batch 抛出"长度类"错误：降级为逐条 embed，只让真正超限的那条失败。
+ * - 非 length 错误（auth/5xx/网络）：直接 rethrow，交由上层整批失败处理。
+ * 返回稀疏数组：成功位置为向量，彻底失败的位置为 null。
+ */
+export async function embedWithFallback(
+  texts: string[],
+  embeddingClient: EmbeddingClient,
+  signal: AbortSignal | undefined,
+  retryMaxChars: number
+): Promise<(number[] | null)[]> {
+  // 快路径：尝试整批
+  try {
+    if (signal?.aborted) throw new Error('Aborted');
+    const vectors = await embeddingClient.embed(texts, 'document', signal);
+    if (Array.isArray(vectors) && vectors.length >= texts.length) {
+      return vectors.slice(0, texts.length);
+    }
+    throw new Error(`Embedding API returned ${vectors?.length ?? 0} vectors for ${texts.length} texts`);
+  } catch (err) {
+    if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
+      throw new Error('Aborted');
+    }
+    // 仅对"长度类"错误降级为逐条；其他错误整批失败
+    if (!looksLikeLengthError(err)) {
+      throw err;
+    }
+  }
+
+  // 慢路径：逐条 embed，单条超限则截断重试
+  const results: (number[] | null)[] = new Array(texts.length).fill(null);
+  for (let i = 0; i < texts.length; i++) {
+    if (signal?.aborted) throw new Error('Aborted');
+    const original = texts[i];
+    // 截断重试阶梯：每步严格递减，保留下限 256
+    const firstLimit = Math.max(256, Math.min(retryMaxChars, Math.floor(original.length / 2)));
+    const secondLimit = Math.max(256, Math.floor(firstLimit / 2));
+    const candidates = [
+      original,
+      truncateForRetry(original, firstLimit),
+      truncateForRetry(original, secondLimit),
+    ].filter((c, idx, arr) => idx === 0 || c.length < (arr[idx - 1]?.length ?? Infinity));
+    let succeeded = false;
+    for (const candidate of candidates) {
+      if (!candidate) { succeeded = true; break; } // 空文本直接跳过
+      try {
+        const v = await embeddingClient.embed([candidate], 'document', signal);
+        if (Array.isArray(v) && v.length === 1 && Array.isArray(v[0])) {
+          results[i] = v[0];
+          succeeded = true;
+          break;
+        }
+      } catch (err) {
+        if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
+          throw new Error('Aborted');
+        }
+        // 仍是 length 错误 → 尝试更短的候选；非长度错误（5xx/network/auth）立即抛出
+        if (!looksLikeLengthError(err)) {
+          throw err;
+        }
+      }
+    }
+    if (!succeeded) {
+      results[i] = null;
+    }
+  }
+  return results;
 }
 
 export async function indexAllRepos(
@@ -372,37 +467,63 @@ export async function indexAllRepos(
     readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
     indexMode?: 'description' | 'readme';
     readmeMaxChars?: number;
+    incremental?: boolean;
+    onRepoIndexed?: (repoId: number) => void;
   } = {}
-): Promise<{ indexed: number; skipped: number; errors: number; error?: string }> {
-  const { batchSize = 100, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000 } = options;
+): Promise<{ indexed: number; skipped: number; errors: number; error?: string; indexedRepoIds: number[] }> {
+  const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
     throw new Error('batchSize must be a positive integer');
   }
 
   // 只索引已分析且未失败的仓库
-  const indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
+  let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
+  // 增量模式下跳过已索引且内容未更新的仓库
+  if (incremental) {
+    indexable = indexable.filter((r) => {
+      if (!r.vector_indexed_at) return true; // 从未索引
+      // 取 last_edited 与 analyzed_at 中较新者作为内容时间，更新后需要重新索引
+      const contentTime = [r.last_edited, r.analyzed_at]
+        .filter((t): t is string => !!t)
+        .sort()
+        .pop() || '';
+      return contentTime > r.vector_indexed_at;
+    });
+  }
   let indexed = 0;
   let errors = 0;
   let lastError = '';
+  const indexedRepoIds: number[] = [];
 
   // 仅在 readme 模式下获取 README 内容
   const shouldFetchReadme = indexMode === 'readme' && readmeFetcher;
   const readmeCache = new Map<string, string>();
   if (shouldFetchReadme) {
-    for (let i = 0; i < indexable.length; i++) {
-      const repo = indexable[i];
+    const CONCURRENCY = 5;
+    let completed = 0;
+
+    for (let i = 0; i < indexable.length; i += CONCURRENCY) {
       if (signal?.aborted) throw new Error('Aborted');
-      onProgress?.({ phase: 'readme', done: i, total: indexable.length });
-      try {
-        const [owner, name] = repo.full_name.split('/');
-        const readme = await readmeFetcher(owner, name, signal);
-        if (readme) readmeCache.set(repo.full_name, readme);
-      } catch {
-        // README 获取失败不影响索引
+
+      const batch = indexable.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async (repo) => {
+          const [owner, name] = repo.full_name.split('/');
+          const readme = await readmeFetcher(owner, name, signal);
+          return { fullName: repo.full_name, readme };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.readme) {
+          readmeCache.set(result.value.fullName, result.value.readme);
+        }
       }
+
+      completed = Math.min(completed + batch.length, indexable.length);
+      onProgress?.({ phase: 'readme', done: completed, total: indexable.length });
     }
-    onProgress?.({ phase: 'readme', done: indexable.length, total: indexable.length });
   }
 
   const totalBatches = Math.ceil(indexable.length / batchSize);
@@ -415,34 +536,58 @@ export async function indexAllRepos(
     const texts = batch.map(repo => buildEmbeddingText(repo, readmeCache.get(repo.full_name), readmeMaxChars));
 
     try {
-      // 1. 调用 Embedding API 生成向量
-      const vectors = await embeddingClient.embed(texts, 'document', signal);
+      // 1. 调用 Embedding API 生成向量（带单条失败隔离 + 截断重试）
+      //    长度类错误（如硅基流动 20015）会降级为逐条 embed，避免整批失败
+      const vectors = await embedWithFallback(texts, embeddingClient, signal, readmeMaxChars);
 
-      // Validate that the embedding API returned the expected number of vectors
-      if (!Array.isArray(vectors) || vectors.length < batch.length) {
-        throw new Error(
-          `Embedding API returned ${vectors?.length ?? 0} vectors for ${batch.length} texts`
-        );
+      // 2. 组装成功项的 Vectorize 格式（跳过 null 的失败项）
+      const vectorizeVectors: VectorizeVector[] = [];
+      let batchErrors = 0;
+      for (let j = 0; j < batch.length; j++) {
+        const vec = vectors[j];
+        if (vec && Array.isArray(vec)) {
+          vectorizeVectors.push({
+            id: String(batch[j].id),
+            values: vec,
+            metadata: {
+              full_name: batch[j].full_name,
+              description: batch[j].description || '',
+              language: batch[j].language || '',
+              stars: batch[j].stargazers_count || 0,
+              tags: batch[j].ai_tags || [],
+            },
+          });
+        } else {
+          batchErrors++;
+        }
       }
 
-      // 2. 组装 Vectorize 格式
-      const vectorizeVectors: VectorizeVector[] = batch.map((repo, j) => ({
-        id: String(repo.id),
-        values: vectors[j],
-        metadata: {
-          full_name: repo.full_name,
-          description: repo.description || '',
-          language: repo.language || '',
-          stars: repo.stargazers_count || 0,
-          tags: repo.ai_tags || [],
-        },
-      }));
-
-      // 3. upsert 到 Worker
+      // 3. upsert 到 Worker（仅当有成功向量时）
+      //    Vectorize upsert 是原子的，但用返回的 upserted 数量计数更严谨
       const currentBatch = Math.floor(i / batchSize) + 1;
-      onProgress?.({ phase: 'uploading', done: currentBatch, total: totalBatches });
-      await vectorService.upsert(vectorizeVectors, signal);
-      indexed += batch.length;
+      if (vectorizeVectors.length > 0) {
+        onProgress?.({ phase: 'uploading', done: currentBatch, total: totalBatches });
+        const upsertResult = await vectorService.upsert(vectorizeVectors, signal);
+        const upsertedCount = typeof upsertResult?.upserted === 'number'
+          ? Math.min(upsertResult.upserted, vectorizeVectors.length)
+          : vectorizeVectors.length;
+        indexed += upsertedCount;
+        // 仅标记确认 upserted 的 repo（按顺序）
+        for (let j = 0; j < upsertedCount; j++) {
+          const repoId = parseInt(vectorizeVectors[j].id, 10);
+          indexedRepoIds.push(repoId);
+          onRepoIndexed?.(repoId);
+        }
+        // 若 worker 返回的 upserted 少于发送数，差额计入 errors
+        const notUpserted = vectorizeVectors.length - upsertedCount;
+        if (notUpserted > 0) {
+          batchErrors += notUpserted;
+        }
+      }
+      if (batchErrors > 0) {
+        errors += batchErrors;
+        lastError = `${batchErrors} text(s) failed embedding (likely over token limit)`;
+      }
     } catch (err) {
       if (signal?.aborted || (err instanceof Error && err.message === 'Aborted')) {
         throw new Error('Aborted');
@@ -456,5 +601,5 @@ export async function indexAllRepos(
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
   }
 
-  return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined };
+  return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined, indexedRepoIds };
 }
