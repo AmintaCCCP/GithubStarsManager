@@ -539,17 +539,63 @@ export const SearchBar: React.FC = () => {
           const embeddingClient = new EmbeddingClient(activeEmbConfig);
           const vectorService = new VectorSearchService(vsConfig);
 
-          // 1. 前端调用 Embedding API 生成查询向量
+          // 1. HyDE 查询预处理：用 LLM 生成理想仓库描述再嵌入（可选，5 秒超时降级）
+          let embeddingQuery = searchQuery;
+          const hydeConfig = aiConfigs.find(config => config.id === activeAIConfig);
+          if (vsConfig.enableHyDE !== false && hydeConfig) {
+            const hydeAbort = new AbortController();
+            let hydeTimer: ReturnType<typeof setTimeout> | null = null;
+            try {
+              setSearchPhase(t('AI 分析查询...', 'AI analyzing query...'));
+              const { AIService } = await import('../services/aiService');
+              const hydeService = new AIService(hydeConfig, language);
+              embeddingQuery = await Promise.race([
+                hydeService.generateHyDEQuery(searchQuery, hydeAbort.signal).catch(() => searchQuery),
+                new Promise<string>((resolve) => {
+                  hydeTimer = setTimeout(() => {
+                    hydeAbort.abort();
+                    resolve(searchQuery);
+                  }, 5000);
+                }),
+              ]);
+              if (embeddingQuery !== searchQuery) {
+                console.log('🔮 HyDE generated:', embeddingQuery.slice(0, 100));
+              }
+            } catch (hydeError) {
+              console.warn('HyDE failed, using raw query:', hydeError);
+              embeddingQuery = searchQuery;
+            } finally {
+              if (hydeTimer) clearTimeout(hydeTimer);
+            }
+          }
+
+          // 2. 前端调用 Embedding API 生成查询向量
           setSearchPhase(t('生成查询向量...', 'Generating query vector...'));
-          const queryVectors = await embeddingClient.embed([searchQuery], 'query');
+          const queryVectors = await embeddingClient.embed([embeddingQuery], 'query');
           if (queryVectors && queryVectors.length > 0) {
             // 2. 前端将查询向量发送到 Worker
             setSearchPhase(t('检索向量库...', 'Searching vector index...'));
-            const vectorResults = await vectorService.query(queryVectors[0], { topK: 30, threshold: 0.3 });
+            const vectorResults = await vectorService.query(queryVectors[0], {
+              topK: vsConfig.searchTopK ?? 30,
+              threshold: vsConfig.searchThreshold ?? 0.35,
+            });
 
             if (vectorResults.length > 0) {
-              // 3. 从本地仓库数据中取出匹配结果，按相似度排序
-              const scoreMap = new Map(vectorResults.map(r => [r.id, r.score]));
+              // 3. 轻量关键词加分：精确匹配的字段给予分数微调
+              const queryLower = searchQuery.toLowerCase();
+              const boostedResults = vectorResults.map(r => {
+                let bonus = 0;
+                const name = (r.metadata?.full_name || '').toLowerCase();
+                const desc = (r.metadata?.description || '').toLowerCase();
+                const tags = (r.metadata?.tags || []).map(tag => tag.toLowerCase());
+                if (name.includes(queryLower)) bonus += 0.05;
+                if (desc.includes(queryLower)) bonus += 0.03;
+                if (tags.some(tag => tag.includes(queryLower))) bonus += 0.02;
+                return { ...r, score: r.score + bonus };
+              });
+
+              // 4. 从本地仓库数据中取出匹配结果，按相似度排序
+              const scoreMap = new Map(boostedResults.map(r => [r.id, r.score]));
               const scoredRepos = filtered
                 .filter(repo => scoreMap.has(String(repo.id)))
                 .map(repo => ({
@@ -560,26 +606,35 @@ export const SearchBar: React.FC = () => {
                 .map(item => item.repo);
 
               if (scoredRepos.length > 0) {
-                // 4. AI 校验：用 LLM 对向量搜索结果进行二次排序
+                // 4. AI 语义重排序：用 LLM 对向量搜索结果做真正的语义排序
                 let reranked = scoredRepos;
                 let rerankSucceeded = false;
                 const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
-                if (rerankConfig) {
+                if (rerankConfig && vsConfig.enableReranking !== false) {
                   try {
-                    setSearchPhase(t('AI 校验排序...', 'AI reranking...'));
+                    setSearchPhase(t('AI 语义重排序...', 'AI semantic reranking...'));
                     const { AIService } = await import('../services/aiService');
                     const rerankService = new AIService(rerankConfig, language);
-                    reranked = await rerankService.searchRepositoriesWithReranking(scoredRepos, searchQuery);
+                    reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, searchQuery);
                     rerankSucceeded = true;
-                    console.log('🤖 AI reranked results:', reranked.length);
+                    console.log('🤖 AI semantically reranked results:', reranked.length);
                   } catch (rerankError) {
-                    console.warn('AI reranking failed, using vector order:', rerankError);
+                    console.warn('AI semantic reranking failed, using vector order:', rerankError);
                   }
                 }
 
-                // If AI reranking succeeded, preserve its order; otherwise sort by vector score
+                // 保存 LLM 重排序顺序，applyFilters 可能按 UI 排序覆盖它
+                const rerankOrder = rerankSucceeded
+                  ? new Map(reranked.map((repo, index) => [String(repo.id), index]))
+                  : null;
                 const finalFiltered = applyFilters([...reranked]);
-                if (!rerankSucceeded) {
+                if (rerankOrder) {
+                  // 恢复 LLM 语义排序顺序
+                  finalFiltered.sort((a, b) =>
+                    (rerankOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+                    - (rerankOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER)
+                  );
+                } else {
                   finalFiltered.sort((a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0));
                 }
                 console.log('🎯 Vector search results:', finalFiltered.length);

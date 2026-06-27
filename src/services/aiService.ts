@@ -624,7 +624,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
     });
 
     try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const jsonMatch = content.match(/\[[\s\S]*?\]/);
       const ids = JSON.parse(jsonMatch ? jsonMatch[0] : content);
       if (!Array.isArray(ids)) return gists;
       const gistById = new Map(gists.map(gist => [gist.id, gist]));
@@ -643,6 +643,71 @@ AI Summary: ${gist.ai_summary || 'None'}`;
     } catch (error) {
       logger.warn('ai', 'Failed to parse gist reranking result', error);
       return gists;
+    }
+  }
+
+  /**
+   * 对仓库列表做真正的语义重排序（参照 gist 重排序模式）
+   * 将候选仓库摘要发送给 LLM，让其按相关性排序返回 ID 列表
+   * @param repositories 候选仓库列表（通常是向量搜索的 top-K 结果）
+   * @param query 用户搜索查询
+   * @returns 按语义相关性排序的仓库列表
+   */
+  async searchRepositoriesWithSemanticReranking(repositories: Repository[], query: string, signal?: AbortSignal): Promise<Repository[]> {
+    if (repositories.length === 0) return [];
+
+    // 限制候选数量，控制 token 消耗
+    // 注意：searchTopK 配置与此上限独立；若 searchTopK > 50，超出部分不会被重排序
+    const candidates = repositories.slice(0, 50);
+
+    const repoSummaries = candidates.map((repo, index) => {
+      const stars = repo.stargazers_count >= 1000
+        ? `${(repo.stargazers_count / 1000).toFixed(0)}k`
+        : String(repo.stargazers_count || 0);
+      const tags = (repo.ai_tags || []).slice(0, 5).join(', ');
+      const desc = (repo.ai_summary || repo.description || '').slice(0, 150);
+      const parts = [`${index + 1}. ID: ${repo.id} | ${repo.full_name}`];
+      if (desc) parts.push(`   ${desc}`);
+      const meta = [repo.language, `★${stars}`];
+      if (tags) meta.push(`Tags: ${tags}`);
+      parts.push(`   ${meta.join(' | ')}`);
+      return parts.join('\n');
+    }).join('\n\n');
+
+    const system = this.language === 'zh'
+      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出最相关的，按相关性从高到低返回 ID 数组 JSON。只输出 JSON 数组，不要输出额外文字。'
+      : 'You are a GitHub repository search reranking assistant. Given a user query and candidate repositories, return a JSON array of repository IDs ordered from most to least relevant. Output only the JSON array, no extra text.';
+
+    const content = await this.requestText({
+      system,
+      user: `Query: ${query}\n\nRepositories:\n${this.sanitizeForPrompt(repoSummaries)}`,
+      temperature: 0.1,
+      maxTokens: 800,
+      signal,
+    });
+
+    try {
+      const jsonMatch = content.match(/\[[\s\S]*?\]/);
+      const ids = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+      if (!Array.isArray(ids)) return repositories;
+
+      const repoById = new Map(repositories.map(r => [String(r.id), r]));
+      const seen = new Set<string>();
+      const ranked = ids
+        .map((id: unknown) => String(id))
+        .filter(id => {
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+        .map(id => repoById.get(id))
+        .filter((r): r is Repository => !!r);
+      const rankedIds = new Set(ranked.map(r => r.id));
+      // 未被 LLM 排到的仓库追加到末尾（保留原始顺序）
+      return [...ranked, ...repositories.filter(r => !rankedIds.has(r.id))];
+    } catch (error) {
+      logger.warn('ai', 'Failed to parse semantic reranking result', error);
+      return repositories;
     }
   }
 
@@ -1089,6 +1154,31 @@ ${repoInfo}
 
     // Fallback to basic search
     return this.performBasicSearch(repositories, query);
+  }
+
+  /**
+   * HyDE (Hypothetical Document Embedding) 查询预处理
+   * 根据用户查询生成一个"理想仓库描述"，用该描述生成向量而非原始查询
+   * 对短查询、中文查询、概念查询效果显著提升
+   * @param query 用户原始查询
+   * @param signal 可选 AbortSignal
+   * @returns 生成的理想仓库描述（用于向量嵌入）
+   */
+  async generateHyDEQuery(query: string, signal?: AbortSignal): Promise<string> {
+    const system = this.language === 'zh'
+      ? '你是一个搜索助手。根据用户的搜索意图，生成一段 2-3 句话的理想 GitHub 仓库描述，包含相关技术术语、编程语言和使用场景。只输出描述文本，不要输出其他内容。'
+      : 'You are a search assistant. Given a user search query, generate a 2-3 sentence description of the ideal GitHub repository that would perfectly match this query. Include relevant technical terms, programming languages, and use cases. Output only the description, no extra text.';
+
+    const content = await this.requestText({
+      system,
+      user: `Search query: "${query}"`,
+      temperature: 0.3,
+      maxTokens: 200,
+      signal,
+    });
+
+    // 清理可能的引号或多余空白
+    return content.replace(/^["']|["']$/g, '').trim() || query;
   }
 
   /**
