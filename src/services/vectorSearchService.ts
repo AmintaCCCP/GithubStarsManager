@@ -257,7 +257,7 @@ export class VectorSearchService {
     options: { topK?: number; threshold?: number } = {},
     signal?: AbortSignal,
   ): Promise<VectorQueryResult[]> {
-    const { topK = 20, threshold = 0.3 } = options;
+    const { topK = 20, threshold = 0.35 } = options;
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
       body: JSON.stringify({ vector, topK, threshold }),
@@ -319,24 +319,46 @@ export class VectorSearchService {
 // ============================================================
 
 /**
+ * 嵌入文本格式版本。
+ * buildEmbeddingText 的输出格式变化时必须递增，
+ * 使增量索引能检测到格式变化并强制重新索引所有向量。
+ */
+export const EMBEDDING_FORMAT_VERSION = 2;
+
+/**
  * 拼接仓库文本用于 embedding
  * @param repo 仓库数据
  * @param readmeContent README 内容（可选）
  * @param maxChars README 最大字符数，默认 6000
  */
 export function buildEmbeddingText(repo: Repository, readmeContent?: string, maxChars = 6000): string {
-  const parts = [
-    repo.full_name,
-    repo.description || '',
-    repo.custom_description || '',
-    repo.ai_summary || '',
-    (repo.topics || []).join(', '),
-    (repo.ai_tags || []).join(', '),
-    (repo.custom_tags || []).join(', '),
-    repo.language || '',
-  ];
+  const parts: string[] = [];
+
+  // 结构化字段标签，帮助 embedding 模型理解字段角色和权重
+  if (repo.full_name) parts.push(`Repository: ${repo.full_name}`);
+
+  // 去重：description 和 ai_summary 内容重叠时，跳过较短的 description
+  const description = repo.description || '';
+  const aiSummary = repo.ai_summary || '';
+  const customDesc = repo.custom_description || '';
+
+  if (description && !aiSummary.includes(description)) {
+    parts.push(`Description: ${description}`);
+  }
+  if (customDesc) parts.push(`About: ${customDesc}`);
+  if (aiSummary) parts.push(`Summary: ${aiSummary}`);
+
+  // 合并 topics 和 tags，去重
+  const allTopics = [...new Set([
+    ...(repo.topics || []),
+    ...(repo.ai_tags || []),
+    ...(repo.custom_tags || []),
+  ])];
+  if (allTopics.length > 0) parts.push(`Topics: ${allTopics.join(', ')}`);
+
+  if (repo.language) parts.push(`Language: ${repo.language}`);
+
   // README 内容提供最丰富的语义信息
-  // 跳过常见的装饰性徽章/图片头部
   if (readmeContent) {
     const cleaned = readmeContent
       .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // 移除链接徽章 [![...](...)](...) — 必须在图片之前
@@ -345,9 +367,9 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
       .replace(/\n{3,}/g, '\n\n') // 压缩多余空行
       .trim();
     const truncated = cleaned.slice(0, maxChars);
-    if (truncated) parts.push(truncated);
+    if (truncated) parts.push(`README:\n${truncated}`);
   }
-  return parts.filter(Boolean).join('\n');
+  return parts.join('\n');
 }
 
 /**
@@ -469,6 +491,10 @@ export async function indexAllRepos(
     readmeMaxChars?: number;
     incremental?: boolean;
     onRepoIndexed?: (repoId: number) => void;
+    /** 当前存储的格式版本号 */
+    formatVersion?: number;
+    /** 最新格式版本号（EMBEDDING_FORMAT_VERSION） */
+    currentFormatVersion?: number;
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number; error?: string; indexedRepoIds: number[] }> {
   const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed } = options;
@@ -481,8 +507,12 @@ export async function indexAllRepos(
   let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
   // 增量模式下跳过已索引且内容未更新的仓库
   if (incremental) {
+    // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
+    const formatVersionChanged = options.formatVersion !== undefined && options.currentFormatVersion !== undefined
+      && options.formatVersion < options.currentFormatVersion;
     indexable = indexable.filter((r) => {
       if (!r.vector_indexed_at) return true; // 从未索引
+      if (formatVersionChanged) return true; // 格式版本升级，需要重新索引
       // 取 last_edited 与 analyzed_at 中较新者作为内容时间，更新后需要重新索引
       const contentTime = [r.last_edited, r.analyzed_at]
         .filter((t): t is string => !!t)
