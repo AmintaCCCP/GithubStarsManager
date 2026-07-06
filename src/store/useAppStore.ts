@@ -578,6 +578,13 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
 // 持久化历史配置缺失 embeddingFormatVersion 时的回退版本：旧值为 1，确保旧用户触发一次重建
 const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
 
+const isKnownEmbeddingFormatVersion = (value: unknown): value is number => (
+  typeof value === 'number'
+  && Number.isInteger(value)
+  && value >= LEGACY_EMBEDDING_FORMAT_VERSION
+  && value <= EMBEDDING_FORMAT_VERSION
+);
+
 const normalizeVectorSearchConfig = (
   raw: unknown,
   embeddingConfigs: unknown
@@ -602,12 +609,8 @@ const normalizeVectorSearchConfig = (
     : defaultVectorSearchConfig.searchTopK;
   // 持久化的 embeddingFormatVersion 缺失或越界时一律回落到 legacy 版本 1，触发一次全量重建；
   // 不使用 defaultVectorSearchConfig.embeddingFormatVersion（= 最新版），否则旧用户会跳过重建
-  const hasFormatVersion = typeof config.embeddingFormatVersion === 'number'
-    && Number.isInteger(config.embeddingFormatVersion)
-    && config.embeddingFormatVersion >= 1
-    && config.embeddingFormatVersion <= EMBEDDING_FORMAT_VERSION;
-  const embeddingFormatVersion = hasFormatVersion
-    ? (config.embeddingFormatVersion as number)
+  const embeddingFormatVersion = isKnownEmbeddingFormatVersion(config.embeddingFormatVersion)
+    ? config.embeddingFormatVersion
     : LEGACY_EMBEDDING_FORMAT_VERSION;
 
   return {
@@ -628,6 +631,25 @@ const normalizeVectorSearchConfig = (
     enableReranking: typeof config.enableReranking === 'boolean'
       ? config.enableReranking
       : defaultVectorSearchConfig.enableReranking,
+    embeddingFormatVersion,
+  };
+};
+
+const mergeVectorSearchConfig = (
+  current: VectorSearchConfig,
+  patch: Partial<VectorSearchConfig>
+): VectorSearchConfig => {
+  const currentVersion = isKnownEmbeddingFormatVersion(current.embeddingFormatVersion)
+    ? current.embeddingFormatVersion
+    : defaultVectorSearchConfig.embeddingFormatVersion;
+  const patchVersion = patch.embeddingFormatVersion;
+  const embeddingFormatVersion = isKnownEmbeddingFormatVersion(patchVersion)
+    ? Math.max(currentVersion, patchVersion)
+    : currentVersion;
+
+  return {
+    ...current,
+    ...patch,
     embeddingFormatVersion,
   };
 };
@@ -1453,7 +1475,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Vector Search actions
       setVectorSearchConfig: (config) => set((state) => ({
-        vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
+        vectorSearchConfig: mergeVectorSearchConfig(state.vectorSearchConfig, config)
       })),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setVectorIndexingState: (indexingState) => set((state) => ({
