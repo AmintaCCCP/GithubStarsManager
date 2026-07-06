@@ -1,14 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Repository, defaultReleaseSourceSettings } from '../types';
+import { EmbeddingConfig, Repository, defaultReleaseSourceSettings } from '../types';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
+let normalizePersistedState: typeof import('./useAppStore').normalizePersistedState;
 
 beforeAll(async () => {
   const { indexedDBStorage } = await vi.importActual<typeof import('../services/indexedDbStorage')>('../services/indexedDbStorage');
   window.localStorage?.removeItem?.('github-stars-manager');
   await indexedDBStorage.removeItem('github-stars-manager');
-  ({ useAppStore } = await vi.importActual<typeof import('./useAppStore')>('./useAppStore'));
+  ({ useAppStore, normalizePersistedState } = await vi.importActual<typeof import('./useAppStore')>('./useAppStore'));
 });
 
 const createRepository = (id: number, overrides: Partial<Repository> = {}): Repository => ({
@@ -63,6 +64,81 @@ describe('useAppStore release source settings', () => {
     useAppStore.getState().removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, 'OWNER/repo');
 
     expect(useAppStore.getState().releaseSourceSettings.customReleaseRepos).toHaveLength(0);
+  });
+});
+
+describe('useAppStore vector search config normalization', () => {
+  const embeddingConfig: EmbeddingConfig = {
+    id: 'emb-1',
+    name: 'Test Embedding',
+    apiType: 'openai-compatible',
+    baseUrl: 'https://example.com/v1',
+    apiKey: 'test-key',
+    model: 'test-model',
+    dimensions: 1024,
+    isActive: true,
+  };
+
+  it('preserves full vectorSearchConfig during persisted-state hydration', () => {
+    const normalized = normalizePersistedState({
+      embeddingConfigs: [embeddingConfig],
+      activeEmbeddingConfig: embeddingConfig.id,
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: 'https://worker.example.com',
+        authToken: 'worker-token',
+        embeddingConfigId: embeddingConfig.id,
+        indexMode: 'description',
+        readmeMaxChars: 4096,
+        searchThreshold: 0,
+        searchTopK: 12,
+        enableHyDE: false,
+        enableReranking: false,
+        embeddingFormatVersion: 2,
+      },
+    }, useAppStore.getState());
+
+    expect(normalized.vectorSearchConfig).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.com',
+      authToken: 'worker-token',
+      embeddingConfigId: embeddingConfig.id,
+      indexMode: 'description',
+      readmeMaxChars: 4096,
+      searchThreshold: 0,
+      searchTopK: 12,
+      enableHyDE: false,
+      enableReranking: false,
+      embeddingFormatVersion: 2,
+    });
+  });
+
+  it('defaults missing vectorSearchConfig fields for old persisted state', () => {
+    const normalized = normalizePersistedState({
+      embeddingConfigs: [embeddingConfig],
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: 'https://worker.example.com',
+        authToken: 'worker-token',
+        embeddingConfigId: embeddingConfig.id,
+        indexMode: 'readme',
+        readmeMaxChars: 6000,
+      },
+    }, useAppStore.getState());
+
+    expect(normalized.vectorSearchConfig).toMatchObject({
+      enabled: true,
+      workerUrl: 'https://worker.example.com',
+      authToken: 'worker-token',
+      embeddingConfigId: embeddingConfig.id,
+      indexMode: 'readme',
+      readmeMaxChars: 6000,
+      searchThreshold: 0.35,
+      searchTopK: 30,
+      enableHyDE: true,
+      enableReranking: true,
+      embeddingFormatVersion: 1,
+    });
   });
 });
 
