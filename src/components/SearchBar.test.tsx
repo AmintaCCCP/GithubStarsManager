@@ -190,7 +190,7 @@ describe('SearchBar', () => {
         expect.objectContaining({ name: 'nested-rain' }),
       ]);
 
-      fireEvent.compositionEnd(input, { currentTarget: { value: 'rain' } });
+      fireEvent.compositionEnd(input);
 
       act(() => {
         vi.advanceTimersByTime(300);

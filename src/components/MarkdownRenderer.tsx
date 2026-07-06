@@ -848,16 +848,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         }
       );
 
-      if (hasImagesOnly) {
-        return (
-          <div className="text-gray-900 dark:text-text-secondary mb-2 leading-relaxed flex flex-wrap items-center justify-center gap-3">
-            {children}
-          </div>
-        );
-      }
-
       return (
-        <p className="text-gray-900 dark:text-text-secondary mb-2 leading-relaxed">
+        <p className={`text-gray-900 dark:text-text-secondary mb-2 leading-relaxed ${
+          hasImagesOnly
+            ? 'flex flex-wrap items-center justify-center gap-3'
+            : ''
+        }`}>
           {children}
         </p>
       );
