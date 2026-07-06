@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EmbeddingConfig, Repository, defaultReleaseSourceSettings } from '../types';
-import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
+import { EmbeddingConfig, Repository, VectorSearchConfig, defaultReleaseSourceSettings } from '../types';
+import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
@@ -149,6 +149,94 @@ describe('useAppStore vector search config normalization', () => {
     );
 
     expect(normalized.vectorSearchConfig?.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
+  });
+
+  const baseVectorSearchConfig: VectorSearchConfig = {
+    enabled: true,
+    workerUrl: 'https://worker.example.com',
+    authToken: 'worker-token',
+    embeddingConfigId: embeddingConfig.id,
+    indexMode: 'readme',
+    readmeMaxChars: 6000,
+    searchThreshold: 0.35,
+    searchTopK: 30,
+    enableHyDE: true,
+    enableReranking: true,
+    embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
+  };
+
+  beforeEach(() => {
+    useAppStore.setState({
+      embeddingConfigs: [embeddingConfig],
+      vectorSearchConfig: { ...baseVectorSearchConfig },
+    });
+  });
+
+  it('does not downgrade embeddingFormatVersion from stale runtime config updates', () => {
+    useAppStore.getState().setVectorSearchConfig({ embeddingFormatVersion: 1 });
+
+    expect(useAppStore.getState().vectorSearchConfig.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
+  });
+
+  it('merges ordinary stale backend fields while preserving current embeddingFormatVersion', () => {
+    useAppStore.getState().setVectorSearchConfig({
+      workerUrl: 'https://stale-backend.example.com',
+      authToken: 'stale-token',
+      embeddingFormatVersion: 1,
+    });
+
+    expect(useAppStore.getState().vectorSearchConfig).toMatchObject({
+      workerUrl: 'https://stale-backend.example.com',
+      authToken: 'stale-token',
+      embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
+    });
+  });
+
+  it('allows runtime upgrades from legacy to the latest embeddingFormatVersion', () => {
+    useAppStore.setState({
+      vectorSearchConfig: { ...baseVectorSearchConfig, embeddingFormatVersion: 1 },
+    });
+
+    useAppStore.getState().setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
+
+    expect(useAppStore.getState().vectorSearchConfig.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
+  });
+
+  it('ignores invalid runtime embeddingFormatVersion updates', () => {
+    useAppStore.getState().setVectorSearchConfig({
+      embeddingFormatVersion: EMBEDDING_FORMAT_VERSION + 1,
+    });
+
+    expect(useAppStore.getState().vectorSearchConfig.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
+  });
+
+  it('keeps incremental indexing scoped to newly analyzed repos after a stale backend config sync', async () => {
+    useAppStore.getState().setVectorSearchConfig({ embeddingFormatVersion: 1 });
+    expect(useAppStore.getState().vectorSearchConfig.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
+
+    const indexedIds: number[] = [];
+    const client = {
+      embed: vi.fn(async (texts: string[]) => texts.map((_, i) => [i, i + 1, i + 2])),
+    } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = {
+      upsert: vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length })),
+    } as unknown as Parameters<typeof indexAllRepos>[2];
+
+    const result = await indexAllRepos([
+      createRepository(1, { analyzed_at: '2026-01-04T00:00:00.000Z', vector_indexed_at: '2026-01-05T00:00:00.000Z' }),
+      createRepository(2, { analyzed_at: '2026-01-04T00:00:00.000Z', vector_indexed_at: '2026-01-05T00:00:00.000Z' }),
+      createRepository(3, { analyzed_at: '2026-01-06T00:00:00.000Z', vector_indexed_at: undefined }),
+      createRepository(4, { analyzed_at: undefined, vector_indexed_at: undefined }),
+    ], client, vectorService, {
+      incremental: true,
+      formatVersion: useAppStore.getState().vectorSearchConfig.embeddingFormatVersion,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedIds.push(repoId),
+    });
+
+    expect(indexedIds).toEqual([3]);
+    expect(result.indexedRepoIds).toEqual([3]);
   });
 });
 
