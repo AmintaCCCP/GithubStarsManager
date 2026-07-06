@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
+import { EmbeddingClient, VectorSearchService } from '../services/vectorSearchService';
 import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
 import { Repository } from '../types';
@@ -538,7 +539,6 @@ export const SearchBar: React.FC = () => {
 
       if (vsConfig?.enabled && vsConfig?.workerUrl && activeEmbConfig) {
         try {
-          const { VectorSearchService, EmbeddingClient } = await import('../services/vectorSearchService');
           const embeddingClient = new EmbeddingClient(activeEmbConfig);
           const vectorService = new VectorSearchService(vsConfig);
 
@@ -550,7 +550,6 @@ export const SearchBar: React.FC = () => {
             let hydeTimer: ReturnType<typeof setTimeout> | null = null;
             try {
               setSearchPhase(t('AI 分析查询...', 'AI analyzing query...'));
-              const { AIService } = await import('../services/aiService');
               const hydeService = new AIService(hydeConfig, language);
               embeddingQuery = await Promise.race([
                 hydeService.generateHyDEQuery(searchQuery, hydeAbort.signal).catch(() => searchQuery),
@@ -616,7 +615,6 @@ export const SearchBar: React.FC = () => {
                 if (rerankConfig && vsConfig.enableReranking !== false) {
                   try {
                     setSearchPhase(t('AI 语义重排序...', 'AI semantic reranking...'));
-                    const { AIService } = await import('../services/aiService');
                     const rerankService = new AIService(rerankConfig, language);
                     reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, searchQuery);
                     rerankSucceeded = true;

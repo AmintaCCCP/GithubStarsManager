@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Repository } from '../types';
 import {
   looksLikeLengthError,
   truncateForRetry,
   embedWithFallback,
+  indexAllRepos,
+  EMBEDDING_FORMAT_VERSION,
 } from './vectorSearchService';
 
 // Minimal mock: only the `.embed` method is used by embedWithFallback.
@@ -12,6 +15,37 @@ const makeClient = (
 ) => ({ embed: vi.fn(embedImpl) }) as unknown as Parameters<typeof embedWithFallback>[1];
 
 const vec = (n: number) => [n, n + 1, n + 2];
+
+const makeRepository = (id: number, overrides: Partial<Repository> = {}): Repository => ({
+  id,
+  name: `repo-${id}`,
+  full_name: `owner/repo-${id}`,
+  description: `Repository ${id}`,
+  html_url: `https://github.com/owner/repo-${id}`,
+  stargazers_count: 10,
+  forks_count: 1,
+  forks: 1,
+  language: 'TypeScript',
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-02T00:00:00.000Z',
+  pushed_at: '2026-01-03T00:00:00.000Z',
+  owner: {
+    login: 'owner',
+    avatar_url: 'https://github.com/avatar.png',
+  },
+  topics: ['test'],
+  analyzed_at: '2026-01-04T00:00:00.000Z',
+  vector_indexed_at: '2026-01-05T00:00:00.000Z',
+  ...overrides,
+});
+
+const makeIndexClient = () => ({
+  embed: vi.fn(async (texts: string[]) => texts.map((_, i) => vec(i))),
+}) as unknown as Parameters<typeof indexAllRepos>[1];
+
+const makeVectorService = () => ({
+  upsert: vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length })),
+}) as unknown as Parameters<typeof indexAllRepos>[2];
 
 // 硅基流动真实的长度超限 payload（code 20015）
 const LENGTH_ERROR = () =>
@@ -64,6 +98,43 @@ describe('truncateForRetry', () => {
     const long = 'x'.repeat(10000);
     const result = truncateForRetry(long, 256);
     expect(result.length).toBe(256);
+  });
+});
+
+const incrementalFilteringRepos = () => [
+  makeRepository(1),
+  makeRepository(2, { vector_indexed_at: undefined }),
+  makeRepository(3, {
+    vector_indexed_at: '2026-01-05T00:00:00.000Z',
+    last_edited: '2026-01-06T00:00:00.000Z',
+  }),
+  makeRepository(4, { analyzed_at: undefined, vector_indexed_at: undefined }),
+  makeRepository(5, { analysis_failed: true, vector_indexed_at: undefined }),
+];
+
+describe('indexAllRepos incremental filtering', () => {
+  // formatVersion / expected：当前版本只索引新增/更新；旧版本或缺省（#234 回归路径）触发全量重建
+  it.each([
+    { formatVersion: EMBEDDING_FORMAT_VERSION, expected: [2, 3], expectation: 'current format version skips indexed unchanged repos' },
+    { formatVersion: EMBEDDING_FORMAT_VERSION - 1, expected: [1, 2, 3], expectation: 'old format version reindexes all indexable repos' },
+    { formatVersion: undefined, expected: [1, 2, 3], expectation: 'missing format version is treated as legacy and reindexes all indexable repos' },
+  ])('$expectation', async ({ formatVersion, expected }) => {
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedIds: number[] = [];
+    const result = await indexAllRepos(incrementalFilteringRepos(), client, vectorService, {
+      incremental: true,
+      formatVersion,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedIds.push(repoId),
+    });
+
+    expect(client.embed).toHaveBeenCalledTimes(1);
+    expect(vectorService.upsert).toHaveBeenCalledTimes(1);
+    expect(indexedIds).toEqual(expected);
+    expect(result.indexedRepoIds).toEqual(expected);
+    expect(result.indexed).toBe(expected.length);
   });
 });
 

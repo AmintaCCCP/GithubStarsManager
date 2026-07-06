@@ -12,7 +12,11 @@ import {
   ChevronRight,
   Zap,
 } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
+import {
+  LEGACY_EMBEDDING_FORMAT_VERSION,
+  isKnownEmbeddingFormatVersion,
+  useAppStore,
+} from '../../store/useAppStore';
 import {
   EmbeddingClient,
   VectorSearchService,
@@ -156,7 +160,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       searchTopK: formSearchTopK,
       enableHyDE: formEnableHyDE,
       enableReranking: formEnableReranking,
-      embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
     });
     setWorkerSaved(true);
     setTimeout(() => setWorkerSaved(false), 2000);
@@ -231,9 +234,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       .pop() || '';
     return contentTime > r.vector_indexed_at;
   }).length;
+  const indexableCount = repositories.filter((r) => r.analyzed_at && !r.analysis_failed).length;
 
   // 嵌入文本格式版本升级时，即使无内容更新也需要触发增量索引来重建所有向量
-  const formatVersionNeedsReindex = (vectorSearchConfig.embeddingFormatVersion ?? 1) < EMBEDDING_FORMAT_VERSION;
+  const storedEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(vectorSearchConfig.embeddingFormatVersion)
+    ? vectorSearchConfig.embeddingFormatVersion
+    : LEGACY_EMBEDDING_FORMAT_VERSION;
+  const formatVersionNeedsReindex = storedEmbeddingFormatVersion < EMBEDDING_FORMAT_VERSION;
+  const incrementalTargetCount = formatVersionNeedsReindex ? indexableCount : unindexedCount;
 
   const createClients = useCallback(() => {
     if (!activeConfig) return null;
@@ -347,8 +355,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
 
     try {
-      // 每次点击时读取最新的 repositories，避免闭包捕获过期数据
-      const currentRepos = useAppStore.getState().repositories;
+      // 每次点击时读取最新的 repositories / vectorSearchConfig，避免闭包捕获过期数据
+      const currentState = useAppStore.getState();
+      const currentRepos = currentState.repositories;
+      const currentEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
+        ? currentState.vectorSearchConfig.embeddingFormatVersion
+        : LEGACY_EMBEDDING_FORMAT_VERSION;
 
       // 记录索引前无 vector_indexed_at 的 repo，用于精确计算新增数量
       const newlyIndexedRepoIds = new Set(
@@ -368,7 +380,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         indexMode: formIndexMode,
         readmeMaxChars: formReadmeMaxChars,
         incremental: true,
-        formatVersion: vectorSearchConfig.embeddingFormatVersion,
+        formatVersion: currentEmbeddingFormatVersion,
         currentFormatVersion: EMBEDDING_FORMAT_VERSION,
         onRepoIndexed: (repoId) => {
           stampedRepoIds.push(repoId);
@@ -427,7 +439,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion, setVectorSearchConfig]);
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, setVectorSearchConfig]);
 
   const handleAbortIndexing = useCallback(() => {
     abortController?.abort();
@@ -885,14 +897,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </button>
           <button
             onClick={handleIncrementalIndex}
-            disabled={isIndexing || !isConfigComplete || (unindexedCount === 0 && !formatVersionNeedsReindex)}
+            disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
-            {unindexedCount > 0 && (
+            {incrementalTargetCount > 0 && (
               <span className="ml-1 px-2 py-0.5 text-xs bg-brand-indigo text-white rounded-full">
-                {unindexedCount}
+                {incrementalTargetCount}
               </span>
             )}
           </button>
