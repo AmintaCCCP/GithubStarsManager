@@ -12,7 +12,11 @@ import {
   ChevronRight,
   Zap,
 } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
+import {
+  LEGACY_EMBEDDING_FORMAT_VERSION,
+  isKnownEmbeddingFormatVersion,
+  useAppStore,
+} from '../../store/useAppStore';
 import {
   EmbeddingClient,
   VectorSearchService,
@@ -233,7 +237,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const indexableCount = repositories.filter((r) => r.analyzed_at && !r.analysis_failed).length;
 
   // 嵌入文本格式版本升级时，即使无内容更新也需要触发增量索引来重建所有向量
-  const formatVersionNeedsReindex = (vectorSearchConfig.embeddingFormatVersion ?? 1) < EMBEDDING_FORMAT_VERSION;
+  const storedEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(vectorSearchConfig.embeddingFormatVersion)
+    ? vectorSearchConfig.embeddingFormatVersion
+    : LEGACY_EMBEDDING_FORMAT_VERSION;
+  const formatVersionNeedsReindex = storedEmbeddingFormatVersion < EMBEDDING_FORMAT_VERSION;
   const incrementalTargetCount = formatVersionNeedsReindex ? indexableCount : unindexedCount;
 
   const createClients = useCallback(() => {
@@ -351,7 +358,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       // 每次点击时读取最新的 repositories / vectorSearchConfig，避免闭包捕获过期数据
       const currentState = useAppStore.getState();
       const currentRepos = currentState.repositories;
-      const currentEmbeddingFormatVersion = currentState.vectorSearchConfig.embeddingFormatVersion;
+      const currentEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
+        ? currentState.vectorSearchConfig.embeddingFormatVersion
+        : LEGACY_EMBEDDING_FORMAT_VERSION;
 
       // 记录索引前无 vector_indexed_at 的 repo，用于精确计算新增数量
       const newlyIndexedRepoIds = new Set(

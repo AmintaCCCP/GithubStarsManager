@@ -576,9 +576,9 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
 };
 
 // 持久化历史配置缺失 embeddingFormatVersion 时的回退版本：旧值为 1，确保旧用户触发一次重建
-const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
+export const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
 
-const isKnownEmbeddingFormatVersion = (value: unknown): value is number => (
+export const isKnownEmbeddingFormatVersion = (value: unknown): value is number => (
   typeof value === 'number'
   && Number.isInteger(value)
   && value >= LEGACY_EMBEDDING_FORMAT_VERSION
