@@ -42,6 +42,7 @@ import {
   defaultHeaderMenuConfig,
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
+import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
 import {
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   normalizeReleaseSourceSettings,
@@ -559,7 +560,101 @@ const normalizeNumberSet = (value: unknown): Set<number> => {
   return new Set<number>();
 };
 
-const normalizePersistedState = (
+// 新安装/重置配置的默认：已是最新格式版本，避免首次增量索引被误判为需要全量重建
+const defaultVectorSearchConfig: VectorSearchConfig = {
+  enabled: false,
+  workerUrl: '',
+  authToken: '',
+  embeddingConfigId: '',
+  indexMode: 'readme',
+  readmeMaxChars: 6000,
+  searchThreshold: 0.35,
+  searchTopK: 30,
+  enableHyDE: true,
+  enableReranking: true,
+  embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
+};
+
+// 持久化历史配置缺失 embeddingFormatVersion 时的回退版本：旧值为 1，确保旧用户触发一次重建
+export const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
+
+export const isKnownEmbeddingFormatVersion = (value: unknown): value is number => (
+  typeof value === 'number'
+  && Number.isInteger(value)
+  && value >= LEGACY_EMBEDDING_FORMAT_VERSION
+  && value <= EMBEDDING_FORMAT_VERSION
+);
+
+const normalizeVectorSearchConfig = (
+  raw: unknown,
+  embeddingConfigs: unknown
+): VectorSearchConfig => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...defaultVectorSearchConfig };
+  }
+
+  const config = raw as Record<string, unknown>;
+  const configId = typeof config.embeddingConfigId === 'string' ? config.embeddingConfigId : '';
+  // 仅在确实存在 embeddingConfigId 时才查找 embedding 配置，避免每次 hydration 都遍历 embeddingConfigs
+  const hasValidConfig = configId
+    ? (Array.isArray(embeddingConfigs)
+        ? embeddingConfigs.some((cfg) => cfg && typeof cfg === 'object' && (cfg as { id?: unknown }).id === configId)
+        : false)
+    : false;
+  const searchThreshold = typeof config.searchThreshold === 'number' && Number.isFinite(config.searchThreshold) && config.searchThreshold >= 0 && config.searchThreshold <= 1
+    ? config.searchThreshold
+    : defaultVectorSearchConfig.searchThreshold;
+  const searchTopK = typeof config.searchTopK === 'number' && Number.isInteger(config.searchTopK) && config.searchTopK >= 5 && config.searchTopK <= 50
+    ? config.searchTopK
+    : defaultVectorSearchConfig.searchTopK;
+  // 持久化的 embeddingFormatVersion 缺失或越界时一律回落到 legacy 版本 1，触发一次全量重建；
+  // 不使用 defaultVectorSearchConfig.embeddingFormatVersion（= 最新版），否则旧用户会跳过重建
+  const embeddingFormatVersion = isKnownEmbeddingFormatVersion(config.embeddingFormatVersion)
+    ? config.embeddingFormatVersion
+    : LEGACY_EMBEDDING_FORMAT_VERSION;
+
+  return {
+    ...defaultVectorSearchConfig,
+    enabled: config.enabled === true && hasValidConfig,
+    workerUrl: typeof config.workerUrl === 'string' ? config.workerUrl : defaultVectorSearchConfig.workerUrl,
+    authToken: typeof config.authToken === 'string' ? config.authToken : defaultVectorSearchConfig.authToken,
+    embeddingConfigId: hasValidConfig ? configId : defaultVectorSearchConfig.embeddingConfigId,
+    indexMode: config.indexMode === 'description' ? 'description' : 'readme',
+    readmeMaxChars: typeof config.readmeMaxChars === 'number' && config.readmeMaxChars > 0
+      ? config.readmeMaxChars
+      : defaultVectorSearchConfig.readmeMaxChars,
+    searchThreshold,
+    searchTopK,
+    enableHyDE: typeof config.enableHyDE === 'boolean'
+      ? config.enableHyDE
+      : defaultVectorSearchConfig.enableHyDE,
+    enableReranking: typeof config.enableReranking === 'boolean'
+      ? config.enableReranking
+      : defaultVectorSearchConfig.enableReranking,
+    embeddingFormatVersion,
+  };
+};
+
+const mergeVectorSearchConfig = (
+  current: VectorSearchConfig,
+  patch: Partial<VectorSearchConfig>
+): VectorSearchConfig => {
+  const currentVersion = isKnownEmbeddingFormatVersion(current.embeddingFormatVersion)
+    ? current.embeddingFormatVersion
+    : defaultVectorSearchConfig.embeddingFormatVersion;
+  const patchVersion = patch.embeddingFormatVersion;
+  const embeddingFormatVersion = isKnownEmbeddingFormatVersion(patchVersion)
+    ? Math.max(currentVersion, patchVersion)
+    : currentVersion;
+
+  return {
+    ...current,
+    ...patch,
+    embeddingFormatVersion,
+  };
+};
+
+export const normalizePersistedState = (
   persisted: PersistedAppState | undefined,
   currentState: AppState & AppActions
 ): Partial<AppState & AppActions> => {
@@ -639,23 +734,10 @@ const normalizePersistedState = (
     webdavConfigs: Array.isArray(safePersisted.webdavConfigs) ? safePersisted.webdavConfigs : [],
     embeddingConfigs: Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [],
     activeEmbeddingConfig: typeof safePersisted.activeEmbeddingConfig === 'string' ? safePersisted.activeEmbeddingConfig : null,
-    vectorSearchConfig: (() => {
-      const raw = safePersisted.vectorSearchConfig;
-      const embCfgs = Array.isArray(safePersisted.embeddingConfigs) ? safePersisted.embeddingConfigs : [];
-      const embIds = new Set(embCfgs.map((c: { id: string }) => c.id));
-      if (raw && typeof raw === 'object') {
-        const configId = typeof raw.embeddingConfigId === 'string' ? raw.embeddingConfigId : '';
-        return {
-          enabled: !!raw.enabled && embIds.has(configId),
-          workerUrl: typeof raw.workerUrl === 'string' ? raw.workerUrl : '',
-          authToken: typeof raw.authToken === 'string' ? raw.authToken : '',
-          embeddingConfigId: embIds.has(configId) ? configId : '',
-          indexMode: raw.indexMode === 'description' ? 'description' as const : 'readme' as const,
-          readmeMaxChars: typeof raw.readmeMaxChars === 'number' && raw.readmeMaxChars > 0 ? raw.readmeMaxChars : 6000,
-        };
-      }
-      return { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme' as const, readmeMaxChars: 6000 };
-    })(),
+    vectorSearchConfig: normalizeVectorSearchConfig(
+      safePersisted.vectorSearchConfig,
+      safePersisted.embeddingConfigs
+    ),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1051,7 +1133,7 @@ export const useAppStore = create<AppState & AppActions>()(
       activeAIConfig: null,
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
-      vectorSearchConfig: { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 },
+      vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       webdavConfigs: [],
@@ -1393,7 +1475,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Vector Search actions
       setVectorSearchConfig: (config) => set((state) => ({
-        vectorSearchConfig: { ...state.vectorSearchConfig, ...config }
+        vectorSearchConfig: mergeVectorSearchConfig(state.vectorSearchConfig, config)
       })),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setVectorIndexingState: (indexingState) => set((state) => ({
@@ -2310,22 +2392,13 @@ export const useAppStore = create<AppState & AppActions>()(
     (state as Record<string, unknown>).activeEmbeddingConfig = null;
   }
 
-  // 初始化 vectorSearchConfig
-  if (state && !(state as Record<string, unknown>).vectorSearchConfig) {
-    (state as Record<string, unknown>).vectorSearchConfig = { enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 };
-  }
-  // 迁移：为旧配置添加缺失字段
+  // 初始化/迁移 vectorSearchConfig
   if (state) {
-    const vsc = (state as Record<string, unknown>).vectorSearchConfig as Record<string, unknown> | undefined;
-    if (vsc && typeof vsc === 'object') {
-      if (vsc.indexMode !== 'description' && vsc.indexMode !== 'readme') vsc.indexMode = 'readme';
-      if (typeof vsc.readmeMaxChars !== 'number' || vsc.readmeMaxChars <= 0) vsc.readmeMaxChars = 6000;
-      if (typeof vsc.searchThreshold !== 'number') vsc.searchThreshold = 0.35;
-      if (typeof vsc.searchTopK !== 'number') vsc.searchTopK = 30;
-      if (typeof vsc.enableHyDE !== 'boolean') vsc.enableHyDE = true;
-      if (typeof vsc.enableReranking !== 'boolean') vsc.enableReranking = true;
-      if (typeof vsc.embeddingFormatVersion !== 'number') vsc.embeddingFormatVersion = 1;
-    }
+    const stateRecord = state as Record<string, unknown>;
+    stateRecord.vectorSearchConfig = normalizeVectorSearchConfig(
+      stateRecord.vectorSearchConfig,
+      stateRecord.embeddingConfigs
+    );
   }
 
         return state as PersistedAppState;
