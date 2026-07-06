@@ -107,6 +107,7 @@ export const SearchBar: React.FC = () => {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   
   const allCategories = useMemo(() => 
     getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
@@ -251,33 +252,35 @@ export const SearchBar: React.FC = () => {
 
   // Real-time search effect for repository name matching
   useEffect(() => {
-    if (searchQuery && isRealTimeSearch) {
+    if (searchQuery.trim() && isRealTimeSearch && !isComposing) {
       const timeoutId = setTimeout(() => {
         performRealTimeSearch(searchQuery);
       }, 300); // 300ms debounce to avoid too frequent searches
 
       return () => clearTimeout(timeoutId);
-    } else if (!searchQuery) {
-      // Reset to show all repositories when search is empty
+    } else if (!searchQuery.trim()) {
+      // Reset to show all repositories when search is empty or whitespace-only
       performBasicFilter();
     }
     // Search helpers are intentionally kept as local closures; the explicit deps below
     // cover the state they read without causing a search loop on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, isRealTimeSearch, repositories, allCategories]);
+  }, [searchQuery, isRealTimeSearch, isComposing, repositories, allCategories]);
 
-  // Handle composition events for better IME support (Chinese input)
+  const updateRealTimeSearchState = (value: string) => {
+    setIsRealTimeSearch(Boolean(value.trim()));
+  };
+
+  // Handle composition events for IME input (Chinese/Japanese/Korean).
+  // Track composition separately so the debounce pauses for preedit text without
+  // relying on composition events to re-arm real-time search after typing.
   const handleCompositionStart = () => {
-    // Pause real-time search during IME composition
-    setIsRealTimeSearch(false);
+    setIsComposing(true);
   };
 
   const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
-    // Resume real-time search after IME composition ends
-    const value = e.currentTarget.value;
-    if (value) {
-      setIsRealTimeSearch(true);
-    }
+    setIsComposing(false);
+    updateRealTimeSearchState(e.currentTarget.value);
   };
 
   const performRealTimeSearch = (query: string) => {
@@ -712,12 +715,9 @@ export const SearchBar: React.FC = () => {
       setSearchFilters({ query: '' });
     }
 
-    // Enable real-time search mode when user starts typing
-    if (value && !isRealTimeSearch) {
-      setIsRealTimeSearch(true);
-    } else if (!value && isRealTimeSearch) {
-      setIsRealTimeSearch(false);
-    }
+    // Keep real-time search armed whenever the input has searchable text.
+    // A separate composing flag pauses debounce while IME preedit text is active.
+    updateRealTimeSearchState(value);
 
     // Show search history when input is focused and empty
     if (!value && searchHistory.length > 0) {
