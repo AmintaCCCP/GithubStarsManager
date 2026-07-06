@@ -476,7 +476,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <div className="my-2 px-3 py-2 bg-gray-100 dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-2 text-xs">
+      <span className="my-2 px-3 py-2 bg-gray-100 dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-2 text-xs">
         <svg className="w-4 h-4 text-gray-500 dark:text-text-tertiary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
@@ -490,7 +490,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
         >
           {language === 'zh' ? '重试' : 'Retry'}
         </button>
-      </div>
+      </span>
     );
   }
 
@@ -527,17 +527,17 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </span>
         </span>
       ) : (
-        <div className="my-4 flex flex-col items-center group/img">
+        <span className="my-4 flex flex-col items-center group/img">
           {isLoading && (
-            <div className="w-full max-w-md h-16 bg-light-surface dark:bg-panel-dark rounded-lg flex items-center justify-center animate-pulse gap-2">
+            <span className="w-full max-w-md h-16 bg-light-surface dark:bg-panel-dark rounded-lg flex items-center justify-center animate-pulse gap-2">
               <svg className="w-5 h-5 text-gray-300 dark:text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="text-xs text-gray-400 dark:text-text-quaternary">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
-            </div>
+            </span>
           )}
 
-          <div className={`relative inline-block rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 ${isLoading ? 'hidden' : ''}`}>
+          <span className={`relative inline-block rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 ${isLoading ? 'hidden' : ''}`}>
             <img
               ref={imgRef}
               src={imageUrl}
@@ -559,11 +559,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               onError={handleImageError}
               onClick={handleImageClick}
             />
-            <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none" />
-          </div>
+            <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none" />
+          </span>
 
           {!isLoading && !hasError && (
-            <div data-translate="false" className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiary opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
+            <span data-translate="false" className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiary opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
               <span>
                 {isInsideLink
                   ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')
@@ -576,11 +576,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               {naturalWidth > 0 && (
                 <span>{naturalWidth} × {naturalHeight}</span>
               )}
-            </div>
+            </span>
           )}
 
           {!isLoading && !hasError && isInsideLink && parentLinkHref && (
-            <div
+            <span
               data-translate="false"
               className="text-center mt-1 text-xs text-brand-violet dark:text-brand-violet opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
               onClick={(e) => {
@@ -595,9 +595,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               <span className="truncate max-w-[200px]" title={parentLinkHref}>
                 {truncateUrl(parentLinkHref)}
               </span>
-            </div>
+            </span>
           )}
-        </div>
+        </span>
       )}
 
       {isZoomed && createPortal(
@@ -847,12 +847,17 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           return false;
         }
       );
+
+      if (hasImagesOnly) {
+        return (
+          <div className="text-gray-900 dark:text-text-secondary mb-2 leading-relaxed flex flex-wrap items-center justify-center gap-3">
+            {children}
+          </div>
+        );
+      }
+
       return (
-        <p className={`text-gray-900 dark:text-text-secondary mb-2 leading-relaxed ${
-          hasImagesOnly
-            ? 'flex flex-wrap items-center justify-center gap-3'
-            : ''
-        }`}>
+        <p className="text-gray-900 dark:text-text-secondary mb-2 leading-relaxed">
           {children}
         </p>
       );

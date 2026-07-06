@@ -132,8 +132,10 @@ describe('ForkTimeline owner filtering', () => {
     } as unknown as GitHubApiService));
   });
 
-  it('shows only personal-account forks by default', () => {
+  it('shows only personal-account forks by default', async () => {
     render(<ForkTimeline />);
+
+    await screen.findByLabelText('选择 Fork 拥有者');
 
     expect(screen.getByText('personal-fork')).toBeInTheDocument();
     expect(screen.queryByText('org-fork')).not.toBeInTheDocument();

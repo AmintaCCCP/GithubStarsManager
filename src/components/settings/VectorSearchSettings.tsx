@@ -336,7 +336,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     } finally {
       setAbortController(null);
     }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, vectorSearchConfig.embeddingFormatVersion, setVectorSearchConfig]);
+  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, setVectorSearchConfig]);
 
   const handleIncrementalIndex = useCallback(async () => {
     const clients = createClients();
