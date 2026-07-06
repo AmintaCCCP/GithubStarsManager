@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmbeddingConfig, Repository, defaultReleaseSourceSettings } from '../types';
+import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
@@ -139,6 +140,15 @@ describe('useAppStore vector search config normalization', () => {
       enableReranking: true,
       embeddingFormatVersion: 1,
     });
+  });
+
+  it('uses the latest format version for a fresh/reset config so new users are not forced into a full reindex', () => {
+    const normalized = normalizePersistedState(
+      { embeddingConfigs: [embeddingConfig] },
+      useAppStore.getState()
+    );
+
+    expect(normalized.vectorSearchConfig?.embeddingFormatVersion).toBe(EMBEDDING_FORMAT_VERSION);
   });
 });
 
