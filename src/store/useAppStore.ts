@@ -560,6 +560,7 @@ const normalizeNumberSet = (value: unknown): Set<number> => {
   return new Set<number>();
 };
 
+// 新安装/重置配置的默认：已是最新格式版本，避免首次增量索引被误判为需要全量重建
 const defaultVectorSearchConfig: VectorSearchConfig = {
   enabled: false,
   workerUrl: '',
@@ -571,8 +572,11 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
   searchTopK: 30,
   enableHyDE: true,
   enableReranking: true,
-  embeddingFormatVersion: 1,
+  embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
 };
+
+// 持久化历史配置缺失 embeddingFormatVersion 时的回退版本：旧值为 1，确保旧用户触发一次重建
+const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
 
 const normalizeVectorSearchConfig = (
   raw: unknown,
@@ -584,7 +588,7 @@ const normalizeVectorSearchConfig = (
 
   const config = raw as Record<string, unknown>;
   const configId = typeof config.embeddingConfigId === 'string' ? config.embeddingConfigId : '';
-  // 仅在确实存在 embeddingConfigId 时才构建 embedding id 集合，避免每次 hydration 都遍历 embeddingConfigs
+  // 仅在确实存在 embeddingConfigId 时才查找 embedding 配置，避免每次 hydration 都遍历 embeddingConfigs
   const hasValidConfig = configId
     ? (Array.isArray(embeddingConfigs)
         ? embeddingConfigs.some((cfg) => cfg && typeof cfg === 'object' && (cfg as { id?: unknown }).id === configId)
@@ -596,12 +600,15 @@ const normalizeVectorSearchConfig = (
   const searchTopK = typeof config.searchTopK === 'number' && Number.isInteger(config.searchTopK) && config.searchTopK >= 5 && config.searchTopK <= 50
     ? config.searchTopK
     : defaultVectorSearchConfig.searchTopK;
-  const embeddingFormatVersion = typeof config.embeddingFormatVersion === 'number'
+  // 持久化的 embeddingFormatVersion 缺失或越界时一律回落到 legacy 版本 1，触发一次全量重建；
+  // 不使用 defaultVectorSearchConfig.embeddingFormatVersion（= 最新版），否则旧用户会跳过重建
+  const hasFormatVersion = typeof config.embeddingFormatVersion === 'number'
     && Number.isInteger(config.embeddingFormatVersion)
     && config.embeddingFormatVersion >= 1
-    && config.embeddingFormatVersion <= EMBEDDING_FORMAT_VERSION
-      ? config.embeddingFormatVersion
-      : defaultVectorSearchConfig.embeddingFormatVersion;
+    && config.embeddingFormatVersion <= EMBEDDING_FORMAT_VERSION;
+  const embeddingFormatVersion = hasFormatVersion
+    ? (config.embeddingFormatVersion as number)
+    : LEGACY_EMBEDDING_FORMAT_VERSION;
 
   return {
     ...defaultVectorSearchConfig,
