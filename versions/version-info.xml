@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <versions>
   <version>
-    <number>0.6.9</number>
-    <releaseDate>2026-07-08</releaseDate>
-    <changelog>
-      <item>fix: Stabilized real-time search during IME composition — results now pause during text composition (e.g., Chinese/Japanese input) and resume after completion.</item>
-      <item>fix: Resetting search to whitespace correctly restores the full repository list instead of showing stale results.</item>
-      <item>fix: Fixed incremental-index button triggering full reindex on every reload by preserving embeddingFormatVersion across store hydration.</item>
-      <item>fix: Centralized vector search config defaults and normalization for consistent persistence, preventing config drift.</item>
-      <item>fix: Added safe value clamping for vector search config thresholds to prevent corrupted values from reaching the worker.</item>
-    </changelog>
-    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.9</downloadUrl>
-  </version>
-  <version>
     <number>0.1.2</number>
     <releaseDate>2025-08-02</releaseDate>
     <changelog>
@@ -473,5 +461,17 @@
       <item>fix: Added EMBEDDING_FORMAT_VERSION tracking to auto-trigger full reindex when embedding text format changes. (PR #231)</item>
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.8</downloadUrl>
+  </version>
+  <version>
+    <number>0.6.9</number>
+    <releaseDate>2026-07-08</releaseDate>
+    <changelog>
+      <item>fix: Stabilized real-time search during IME composition — results now pause during text composition (e.g., Chinese/Japanese input) and resume after completion.</item>
+      <item>fix: Resetting search to whitespace correctly restores the full repository list instead of showing stale results.</item>
+      <item>fix: Fixed incremental-index button triggering full reindex on every reload by preserving embeddingFormatVersion across store hydration.</item>
+      <item>fix: Centralized vector search config defaults and normalization for consistent persistence, preventing config drift.</item>
+      <item>fix: Added safe value clamping for vector search config thresholds to prevent corrupted values from reaching the worker.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.9</downloadUrl>
   </version>
 </versions>
