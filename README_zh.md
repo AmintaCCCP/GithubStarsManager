@@ -440,5 +440,10 @@ npm run dev
 
 ## 星标历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AmintaCCCP/GithubStarsManager&type=Date)](https://www.star-history.com/#AmintaCCCP/GithubStarsManager&Date)
-
+<a href="https://www.star-history.com/?type=date&repos=AmintaCCCP%2FGithubStarsManager">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AmintaCCCP/GithubStarsManager&type=date&theme=dark&legend=top-left&sealed_token=46W7TFJ9FB1XLxW3s1C_cCrjYJUnm_7182jR7SStg1gxmkU35yXXh0-aIkUyu1QNemgFVXRedHbBj3jdmi1xHLfq1MAn0UNCc_4xCTriY7CxWA9fo8zbQsGym6oHvRqDXGkNfII64VHVbR7vXVYorXXVXYk577vK_0MF8o9L96i6CtrW_vSrPbBq_4RP" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AmintaCCCP/GithubStarsManager&type=date&legend=top-left&sealed_token=46W7TFJ9FB1XLxW3s1C_cCrjYJUnm_7182jR7SStg1gxmkU35yXXh0-aIkUyu1QNemgFVXRedHbBj3jdmi1xHLfq1MAn0UNCc_4xCTriY7CxWA9fo8zbQsGym6oHvRqDXGkNfII64VHVbR7vXVYorXXVXYk577vK_0MF8o9L96i6CtrW_vSrPbBq_4RP" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=AmintaCCCP/GithubStarsManager&type=date&legend=top-left&sealed_token=46W7TFJ9FB1XLxW3s1C_cCrjYJUnm_7182jR7SStg1gxmkU35yXXh0-aIkUyu1QNemgFVXRedHbBj3jdmi1xHLfq1MAn0UNCc_4xCTriY7CxWA9fo8zbQsGym6oHvRqDXGkNfII64VHVbR7vXVYorXXVXYk577vK_0MF8o9L96i6CtrW_vSrPbBq_4RP" />
+ </picture>
+</a>
