@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <versions>
   <version>
+    <number>0.6.9</number>
+    <releaseDate>2026-07-08</releaseDate>
+    <changelog>
+      <item>fix: Stabilized real-time search during IME composition — results now pause during text composition (e.g., Chinese/Japanese input) and resume after completion.</item>
+      <item>fix: Resetting search to whitespace correctly restores the full repository list instead of showing stale results.</item>
+      <item>fix: Fixed incremental-index button triggering full reindex on every reload by preserving embeddingFormatVersion across store hydration.</item>
+      <item>fix: Centralized vector search config defaults and normalization for consistent persistence, preventing config drift.</item>
+      <item>fix: Added safe value clamping for vector search config thresholds to prevent corrupted values from reaching the worker.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.9</downloadUrl>
+  </version>
+  <version>
     <number>0.1.2</number>
     <releaseDate>2025-08-02</releaseDate>
     <changelog>
@@ -149,7 +161,7 @@
       <item>Kept backward compatibility by leaving reasoning disabled unless users explicitly enable it.</item>
       <item>Persisted the reasoning setting across frontend config state, backend config APIs, import/export, and database migration.</item>
       <item>Improved compatibility for OpenAI Responses and reasoning-enabled requests with longer request and connection test timeouts.</item>
-      <item>Normalized legacy unsupported reasoning value `minimal` to `low` to prevent request failures with GPT-5 compatible models.</item>
+      <item>Normalized legacy unsupported reasoning value minimal to low to prevent request failures with GPT-5 compatible models.</item>
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.2.7</downloadUrl>
   </version>
@@ -455,10 +467,10 @@
     <number>0.6.8</number>
     <releaseDate>2026-06-27</releaseDate>
     <changelog>
-      <item>feat: Added true incremental vector indexing with `vector_indexed_at` tracking across the full data pipeline, unindexed repo count badge, and concurrent README fetching. (PR #230)</item>
+      <item>feat: Added true incremental vector indexing with vector_indexed_at tracking across the full data pipeline, unindexed repo count badge, and concurrent README fetching. (PR #230)</item>
       <item>feat: Optimized vector search with true semantic reranking, HyDE query preprocessing, structured embedding text, keyword boosting, and configurable search parameters in Settings UI. (PR #231)</item>
-      <item>fix: Fixed JSON parsing greedy regex, variable shadowing in keyword boosting, HyDE timeout cleanup, stale closure issues, and ISO 8601 validation for `vector_indexed_at`. (PR #230, #231)</item>
-      <item>fix: Added `EMBEDDING_FORMAT_VERSION` tracking to auto-trigger full reindex when embedding text format changes. (PR #231)</item>
+      <item>fix: Fixed JSON parsing greedy regex, variable shadowing in keyword boosting, HyDE timeout cleanup, stale closure issues, and ISO 8601 validation for vector_indexed_at. (PR #230, #231)</item>
+      <item>fix: Added EMBEDDING_FORMAT_VERSION tracking to auto-trigger full reindex when embedding text format changes. (PR #231)</item>
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.8</downloadUrl>
   </version>
