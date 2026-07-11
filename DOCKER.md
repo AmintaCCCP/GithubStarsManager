@@ -26,7 +26,7 @@ docker-compose up -d
 
 Available image tags (both images share the same tagging scheme):
 - `latest` — latest build from the `main` branch
-- `v0.6.2`, `0.6.2` — specific version tags
+- `0.6.2`, `0.6`, `0` — specific version tags (semver, `v` prefix stripped)
 - `sha-abc1234` — specific commit builds
 
 Published images:
@@ -37,8 +37,8 @@ To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
 `FRONTEND_IMAGE_TAG` in your `.env` file:
 
 ```bash
-BACKEND_IMAGE_TAG=v0.6.2
-FRONTEND_IMAGE_TAG=v0.6.2
+BACKEND_IMAGE_TAG=0.6.2
+FRONTEND_IMAGE_TAG=0.6.2
 ```
 
 ## Backend Server (docker run)
@@ -95,8 +95,8 @@ To customize secrets and image versions, create a `.env` file in the project roo
 ```bash
 API_SECRET=my-strong-secret
 ENCRYPTION_KEY=my-encryption-key
-BACKEND_IMAGE_TAG=v0.6.2    # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=v0.6.2   # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.6.2    # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.6.2   # pin frontend image version (default: latest)
 # BACKEND_HOST=backend:3000 # target for the frontend's /api proxy (default: backend:3000)
 ```
 
@@ -154,7 +154,9 @@ To build the image locally instead (uses the repository `Dockerfile`):
 
 ```bash
 docker build -t github-stars-manager .
-docker run -d -p 8080:80 --name github-stars-manager github-stars-manager
+docker run -d -p 8080:80 \
+  -e BACKEND_HOST=host.docker.internal:3000 \
+  --name github-stars-manager github-stars-manager
 ```
 
 ## CORS Handling
