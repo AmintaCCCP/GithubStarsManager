@@ -24,11 +24,11 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 # Copy built files from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy custom nginx configuration template (rendered at startup with BACKEND_HOST)
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
 
 # Expose port
 EXPOSE 80
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Render the nginx config (substituting BACKEND_HOST and RESOLVER) and start nginx
+CMD ["sh", "-c", "export BACKEND_HOST=${BACKEND_HOST:-backend:3000}; export RESOLVER=${RESOLVER:-127.0.0.11}; envsubst '${BACKEND_HOST} ${RESOLVER}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]

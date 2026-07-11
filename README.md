@@ -212,10 +212,11 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ### 🐳 Run With Docker
 
-Pre-built backend image is available on GHCR — no local build required:
+Pre-built backend **and frontend** images are available on GHCR — no local build required:
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
@@ -240,7 +241,8 @@ To customize, create a `.env` file:
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=v0.6.2   # pin a specific version (default: latest)
+BACKEND_IMAGE_TAG=0.6.2   # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.6.2  # pin frontend image version (default: latest)
 ```
 
 #### Backend only (docker run)

@@ -24,15 +24,21 @@ docker-compose up -d
 > ```
 > Use a [Personal Access Token](https://github.com/settings/tokens) (with `read:packages` scope) as the password.
 
-Available image tags:
+Available image tags (both images share the same tagging scheme):
 - `latest` — latest build from the `main` branch
-- `v0.6.2`, `0.6.2` — specific version tags
+- `0.6.2`, `0.6`, `0` — specific version tags (semver, `v` prefix stripped)
 - `sha-abc1234` — specific commit builds
 
-To pin a specific version in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` in your `.env` file:
+Published images:
+- Backend: `ghcr.io/amintacccp/github-stars-manager-server`
+- Frontend: `ghcr.io/amintacccp/github-stars-manager-frontend`
+
+To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
+`FRONTEND_IMAGE_TAG` in your `.env` file:
 
 ```bash
-BACKEND_IMAGE_TAG=v0.6.2
+BACKEND_IMAGE_TAG=0.6.2
+FRONTEND_IMAGE_TAG=0.6.2
 ```
 
 ## Backend Server (docker run)
@@ -84,12 +90,14 @@ docker run -d \
 docker-compose up -d
 ```
 
-To customize secrets, create a `.env` file in the project root:
+To customize secrets and image versions, create a `.env` file in the project root:
 
 ```bash
 API_SECRET=my-strong-secret
 ENCRYPTION_KEY=my-encryption-key
-BACKEND_IMAGE_TAG=v0.6.2    # pin backend image version (default: latest)
+BACKEND_IMAGE_TAG=0.6.2    # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.6.2   # pin frontend image version (default: latest)
+# BACKEND_HOST=backend:3000 # target for the frontend's /api proxy (default: backend:3000)
 ```
 
 Then `docker-compose up -d` reads them automatically.
@@ -122,14 +130,33 @@ Then run `docker-compose up -d --build`. The override file takes precedence auto
 
 ### Using Docker directly (frontend only)
 
-```bash
-# Build the image
-docker build -t github-stars-manager .
+The pre-built frontend image is published to GHCR — no local build required:
 
-# Run the container
-docker run -d -p 8080:80 --name github-stars-manager github-stars-manager
+```bash
+# Pull the published image
+docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
+
+# Run the container (point /api proxy at your backend)
+docker run -d -p 8080:80 \
+  -e BACKEND_HOST=host.docker.internal:3000 \
+  --name github-stars-manager \
+  ghcr.io/amintacccp/github-stars-manager-frontend:latest
 
 # The application will be available at http://localhost:8080
+```
+
+> `BACKEND_HOST` sets the upstream the frontend proxies `/api/` to. In Docker Compose
+> it defaults to `backend:3000`. When running standalone, point it at your backend's
+> reachable address (e.g. `host.docker.internal:3000` on Docker Desktop, or the backend
+> container's IP/host on a shared network).
+
+To build the image locally instead (uses the repository `Dockerfile`):
+
+```bash
+docker build -t github-stars-manager .
+docker run -d -p 8080:80 \
+  -e BACKEND_HOST=host.docker.internal:3000 \
+  --name github-stars-manager github-stars-manager
 ```
 
 ## CORS Handling

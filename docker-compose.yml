@@ -2,11 +2,15 @@ version: '3.8'
 
 services:
   frontend:
-    build: .
+    image: ghcr.io/amintacccp/github-stars-manager-frontend:${FRONTEND_IMAGE_TAG:-latest}
+    # Uncomment below (and comment out 'image') to build locally instead:
+    # build: .
     ports:
       - "8080:80"
     depends_on:
       - backend
+    environment:
+      - BACKEND_HOST=${BACKEND_HOST:-backend:3000}
     restart: unless-stopped
 
   backend:
