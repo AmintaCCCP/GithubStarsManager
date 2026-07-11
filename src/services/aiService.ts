@@ -73,6 +73,8 @@ export class AIService {
   private config: AIConfig;
   private language: string;
   private static readonly ANALYSIS_MAX_ATTEMPTS = 3;
+  private static readonly ANALYSIS_MAX_TOKENS = 4096;
+  private static readonly RERANKING_MAX_TOKENS = 4096;
 
   constructor(config: AIConfig, language: string = 'zh') {
     this.config = config;
@@ -514,7 +516,7 @@ ${options.user}` : options.user;
             ? prompt
             : this.createAnalysisRetryPrompt(prompt, lastContent, lastInvalidReason),
           temperature: attempt === 1 ? 0.3 : 0.1,
-          maxTokens: 1000,
+          maxTokens: AIService.ANALYSIS_MAX_TOKENS,
           signal,
         });
 
@@ -620,7 +622,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       system,
       user: `Query: ${query}\n\nGists:\n${this.sanitizeForPrompt(gistSummaries)}`,
       temperature: 0.1,
-      maxTokens: 1200,
+      maxTokens: AIService.RERANKING_MAX_TOKENS,
     });
 
     try {
@@ -682,7 +684,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       system,
       user: `Query: ${query}\n\nRepositories:\n${this.sanitizeForPrompt(repoSummaries)}`,
       temperature: 0.1,
-      maxTokens: 800,
+      maxTokens: AIService.RERANKING_MAX_TOKENS,
       signal,
     });
 
