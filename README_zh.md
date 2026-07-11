@@ -328,10 +328,11 @@ npm run build
 
 ### Docker 部署
 
-GHCR 上有预构建的后端镜像，无需本地构建：
+GHCR 上提供预构建的**后端和前端**镜像，无需本地构建：
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
+docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
@@ -357,7 +358,8 @@ docker-compose up -d
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=v0.6.2   # 固定版本（默认：latest）
+BACKEND_IMAGE_TAG=v0.6.2   # 固定后端版本（默认：latest）
+FRONTEND_IMAGE_TAG=v0.6.2  # 固定前端版本（默认：latest）
 ```
 
 #### 仅后端（docker run）
