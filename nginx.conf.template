@@ -5,7 +5,10 @@ events {
 http {
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
-    resolver      127.0.0.11 ipv6=off valid=30s;
+
+    # Resolver for runtime backend DNS re-resolution (configurable; defaults to
+    # Docker's embedded DNS, override with RESOLVER for Kubernetes/ECS/etc.)
+    resolver ${RESOLVER} ipv6=off valid=30s;
 
     # Hide nginx version
     server_tokens off;
@@ -31,12 +34,12 @@ http {
     server {
         listen       80;
         server_name  localhost;
-        # Backend API proxy
+        # Backend API proxy (configurable via BACKEND_HOST, default: backend:3000)
         location /api/ {
-            set $backend_upstream backend:3000;
+            set $backend_upstream ${BACKEND_HOST};
             proxy_pass http://$backend_upstream;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $proxy_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -60,19 +63,18 @@ http {
                 add_header 'Content-Length' 0 always;
                 return 204;
             }
-            
+
             root   /usr/share/nginx/html;
             index  index.html index.htm;
-            
+
             # Try to serve file, if not found, serve index.html (for SPA routing)
             try_files $uri $uri/ /index.html;
-            
+
             # Add CORS headers for all responses
             add_header 'Access-Control-Allow-Origin' '*' always;
-            add_header 'Access-Control-Allow-Credentials' 'true' always;
             add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
             add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-            
+
             # Add security headers
             add_header X-Frame-Options "SAMEORIGIN" always;
             add_header X-XSS-Protection "1; mode=block" always;
