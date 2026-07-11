@@ -30,6 +30,5 @@ COPY nginx.conf.template /etc/nginx/nginx.conf.template
 # Expose port
 EXPOSE 80
 
-# Render the nginx config (substituting BACKEND_HOST, defaulting to backend:3000)
-# and start nginx
-CMD ["sh", "-c", "export BACKEND_HOST=${BACKEND_HOST:-backend:3000}; envsubst '${BACKEND_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+# Render the nginx config (substituting BACKEND_HOST and RESOLVER) and start nginx
+CMD ["sh", "-c", "export BACKEND_HOST=${BACKEND_HOST:-backend:3000}; export RESOLVER=${RESOLVER:-127.0.0.11}; envsubst '${BACKEND_HOST} ${RESOLVER}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
