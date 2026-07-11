@@ -10,7 +10,7 @@ services:
     depends_on:
       - backend
     environment:
-      - BACKEND_HOST=backend:3000
+      - BACKEND_HOST=${BACKEND_HOST:-backend:3000}
     restart: unless-stopped
 
   backend:
