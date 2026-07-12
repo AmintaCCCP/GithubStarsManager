@@ -277,7 +277,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               </button>
             )}
 
-            {release.body && (
+            {release.body?.trim() && (
               <button
                 onClick={handleToggleSummary}
                 disabled={summary.status === 'loading'}
@@ -475,7 +475,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               </div>
             </div>
           )}
-          {isSummaryExpanded && release.body && (
+          {isSummaryExpanded && release.body?.trim() && (
             <div className="py-2">
               <div className="flex items-center space-x-2 mb-3">
                 <Sparkles className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
