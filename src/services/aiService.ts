@@ -623,9 +623,13 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
       ? '你是一个专业的 GitHub Release 更新日志分析助手。请用简体中文，以通俗易懂的语言总结本次更新。直接输出 Markdown，不要输出任何额外解释、代码块标记或“以下是总结”之类的开场白。排版需易读，使用列表形式，并按重要程度从高到低排序。'
       : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.';
 
+    const repoName = this.sanitizeForPrompt(meta.repoName);
+    const tagName = this.sanitizeForPrompt(meta.tagName);
+    const releaseName = meta.releaseName ? this.sanitizeForPrompt(meta.releaseName) : '';
+
     const user = this.language === 'zh'
       ? `
-以下是 GitHub 仓库 "${meta.repoName}" 的 Release（标签：${meta.tagName}${meta.releaseName ? `，名称：${meta.releaseName}` : ''}）的更新说明。
+以下是 GitHub 仓库 "${repoName}" 的 Release（标签：${tagName}${releaseName ? `，名称：${releaseName}` : ''}）的更新说明。
 
 请完成以下要求：
 1. 用通俗易懂的语言，面向普通用户总结本次更新的要点。
@@ -637,7 +641,7 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
 ${body}
       `.trim()
       : `
-Below is the changelog of a GitHub Release for "${meta.repoName}" (tag: ${meta.tagName}${meta.releaseName ? `, name: ${meta.releaseName}` : ''}).
+Below is the changelog of a GitHub Release for "${repoName}" (tag: ${tagName}${releaseName ? `, name: ${releaseName}` : ''}).
 
 Requirements:
 1. Summarize the update in plain language for general users.
@@ -649,13 +653,20 @@ Changelog:
 ${body}
       `.trim();
 
-    return this.requestText({
+    const response = await this.requestText({
       system,
       user,
       temperature: 0.3,
       maxTokens: 4096,
       signal,
     });
+
+    // 防御性处理：部分模型仍会用 ```markdown 或 ``` 包裹返回内容，
+    // 剥离首尾代码块标记，避免 MarkdownRenderer 将其渲染成代码块。
+    return response
+      .replace(/^```(?:markdown)?[ \t]*\n?/i, '')
+      .replace(/\n?[ \t]*```\s*$/i, '')
+      .trim();
   }
 
   async searchGistsWithReranking(gists: Gist[], query: string): Promise<Gist[]> {
