@@ -1239,6 +1239,7 @@ export const useAppStore = create<AppState & AppActions>()(
         readForks: new Set(),
         analyzingRepositoryIds: new Set(),
         searchResults: [],
+        similarView: null,
         lastSync: null,
       }),
 
