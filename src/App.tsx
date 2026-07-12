@@ -61,14 +61,14 @@ const RepositoriesView = React.memo(({
 }) => {
   const isActive = hasActiveSearchFilters(searchFilters);
   const similarView = useAppStore((state) => state.similarView);
-  const resetSimilarView = useAppStore((state) => state.resetSimilarView);
+  const exitSimilarView = useAppStore((state) => state.exitSimilarView);
 
   // 相似视图下用户发起搜索时，自动退出相似视图（搜索优先于相似浏览，避免界面歧义）
   useEffect(() => {
     if (similarView?.active && isActive) {
-      resetSimilarView();
+      exitSimilarView();
     }
-  }, [similarView?.active, isActive, resetSimilarView]);
+  }, [similarView?.active, isActive, exitSimilarView]);
 
   // 相似仓库视图激活时，列表数据源切换为相似结果，且忽略分类过滤
   const listRepositories = similarView?.active
@@ -168,7 +168,7 @@ function App() {
   const handleCategorySelect = useCallback((category: string) => {
     // 相似仓库视图下点击分类 = 离开相似视图并切换到该分类，避免交互歧义
     if (useAppStore.getState().similarView?.active) {
-      useAppStore.getState().resetSimilarView();
+      useAppStore.getState().exitSimilarView();
     }
     setSelectedCategory(category);
   }, [setSelectedCategory]);

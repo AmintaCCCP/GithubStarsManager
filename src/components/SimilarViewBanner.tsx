@@ -7,6 +7,9 @@ interface SimilarViewBannerProps {
   language: 'zh' | 'en';
 }
 
+/**
+ * 相似仓库视图顶部横幅：展示当前锚点仓库名，并提供"重置"按钮回到查找相似之前的状态。
+ */
 export const SimilarViewBanner: React.FC<SimilarViewBannerProps> = ({
   anchorRepoName,
   onReset,

@@ -433,6 +433,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   };
 
   // 查找相似仓库：利用向量检索匹配语义相关的仓库，并进入相似仓库视图
+  /**
+   * 点击"查找相似仓库"：校验向量搜索就绪后，对源仓库生成 embedding 并在 Worker
+   * 中检索相似仓库，将结果交给 store 进入相似视图。处理加载、空结果与错误态。
+   */
   const handleFindSimilar = async () => {
     if (isFindingSimilar) return;
     if (!vectorSearchAvailable) {
