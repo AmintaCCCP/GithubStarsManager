@@ -602,6 +602,62 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
     });
   }
 
+  /**
+   * 分析单个 release 的更新日志，输出通俗易懂、按重要程度排序的 Markdown 总结。
+   * 用于 Release 列表项的「总结」按钮。直接返回 Markdown 文本，调用方负责渲染。
+   * @param releaseBody release 的正文（Markdown 更新说明）
+   * @param meta release 的元信息
+   * @param signal 可选 AbortSignal
+   */
+  async analyzeReleaseSummary(
+    releaseBody: string,
+    meta: { repoName: string; tagName: string; releaseName?: string },
+    signal?: AbortSignal
+  ): Promise<string> {
+    const body = this.sanitizeForPrompt(releaseBody || '').slice(0, 12000);
+    if (!body.trim()) {
+      throw new Error(this.language === 'zh' ? 'Release 内容为空，无法分析。' : 'Release body is empty, cannot analyze.');
+    }
+
+    const system = this.language === 'zh'
+      ? '你是一个专业的 GitHub Release 更新日志分析助手。请用简体中文，以通俗易懂的语言总结本次更新。直接输出 Markdown，不要输出任何额外解释、代码块标记或“以下是总结”之类的开场白。排版需易读，使用列表形式，并按重要程度从高到低排序。'
+      : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.';
+
+    const user = this.language === 'zh'
+      ? `
+以下是 GitHub 仓库 "${meta.repoName}" 的 Release（标签：${meta.tagName}${meta.releaseName ? `，名称：${meta.releaseName}` : ''}）的更新说明。
+
+请完成以下要求：
+1. 用通俗易懂的语言，面向普通用户总结本次更新的要点。
+2. 尽量区分「新功能 / 特性」与「Bug 修复」两类内容（无对应内容时可省略该分类）。
+3. 使用列表形式（可用子列表），按重要程度从高到低排序，最重要的写在最前面。
+4. 只输出 Markdown 内容，不要加额外说明。
+
+更新说明原文：
+${body}
+      `.trim()
+      : `
+Below is the changelog of a GitHub Release for "${meta.repoName}" (tag: ${meta.tagName}${meta.releaseName ? `, name: ${meta.releaseName}` : ''}).
+
+Requirements:
+1. Summarize the update in plain language for general users.
+2. Separate "New Features" from "Bug Fixes" where applicable (omit a section if empty).
+3. Use lists (nested lists are fine), ordered from most to least important.
+4. Output only Markdown content, no extra commentary.
+
+Changelog:
+${body}
+      `.trim();
+
+    return this.requestText({
+      system,
+      user,
+      temperature: 0.3,
+      maxTokens: 4096,
+      signal,
+    });
+  }
+
   async searchGistsWithReranking(gists: Gist[], query: string): Promise<Gist[]> {
     if (gists.length === 0) return [];
 

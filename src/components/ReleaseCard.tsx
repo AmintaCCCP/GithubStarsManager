@@ -1,11 +1,18 @@
 import React, { memo, useCallback, useRef, useState } from 'react';
-import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import { sendToRpcDownload } from '../services/rpcDownloadService';
+import { AIService } from '../services/aiService';
+
+type SummaryState = {
+  status: 'idle' | 'loading' | 'done' | 'error';
+  content?: string;
+  error?: string;
+};
 
 interface DownloadLink {
   name: string;
@@ -55,7 +62,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   // RPC download support — use refs to avoid stale closure in async handler
-  const { rpcDownloadConfig, backendApiSecret } = useAppStore();
+  const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore();
+  const activeConfig = aiConfigs.find((config) => config.id === activeAIConfig);
+
+  // AI 总结的本地状态（展开态与结果均内聚在卡片内，不持久化）
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [summary, setSummary] = useState<SummaryState>({ status: 'idle' });
   const { toast } = useDialog();
   const downloadingRef = useRef<Record<string, boolean>>({});
   const downloadedRef = useRef<Record<string, boolean>>({});
@@ -89,7 +101,64 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   }, [backendApiSecret, toast, t]);
 
   // 判断是否有任何内容展开
-  const isAnyExpanded = isAssetsExpanded || isReleaseNotesExpanded;
+  const isAnyExpanded = isAssetsExpanded || isReleaseNotesExpanded || isSummaryExpanded;
+
+  const runSummaryAnalysis = useCallback(async () => {
+    if (!activeConfig) {
+      toast(
+        language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.',
+        'error'
+      );
+      return;
+    }
+
+    const config = activeConfig;
+    setSummary({ status: 'loading' });
+    try {
+      const aiService = new AIService(config, language);
+      const content = await aiService.analyzeReleaseSummary(
+        release.body || '',
+        {
+          repoName: release.repository.full_name,
+          tagName: release.tag_name,
+          releaseName: release.name && release.name !== release.tag_name ? release.name : undefined,
+        }
+      );
+      setSummary({ status: 'done', content });
+      setIsSummaryExpanded(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSummary({ status: 'error', error: message });
+      setIsSummaryExpanded(true);
+      toast(
+        language === 'zh' ? `总结生成失败：${message}` : `Summary failed: ${message}`,
+        'error'
+      );
+    }
+  }, [activeConfig, language, release, toast]);
+
+  const handleToggleSummary = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // 已展开时：出错态点击重试，否则收起
+    if (isSummaryExpanded) {
+      if (summary.status === 'error') {
+        await runSummaryAnalysis();
+        return;
+      }
+      setIsSummaryExpanded(false);
+      return;
+    }
+
+    // 已有结论且未展开 → 直接展开（不重复分析）
+    if (summary.status === 'done' && summary.content) {
+      setIsSummaryExpanded(true);
+      return;
+    }
+
+    // 未分析或上次失败 → 触发 AI 分析（按钮转圈，完成后自动展开）
+    await runSummaryAnalysis();
+  }, [isSummaryExpanded, summary, runSummaryAnalysis]);
 
   return (
     <div
@@ -190,6 +259,29 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               </button>
             )}
 
+            {release.body && (
+              <button
+                onClick={handleToggleSummary}
+                disabled={summary.status === 'loading'}
+                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap disabled:opacity-70 ${
+                  isSummaryExpanded
+                    ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-text-secondary'
+                    : 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/[0.08]'
+                }`}
+                title={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : t('AI 总结本次更新', 'AI Summary of this update')}
+                aria-label={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : t('AI 总结本次更新', 'AI Summary of this update')}
+                aria-expanded={isSummaryExpanded}
+              >
+                {summary.status === 'loading' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span className="text-xs font-medium">{t('总结', 'Summary')}</span>
+                {summary.status !== 'loading' && (isSummaryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+              </button>
+            )}
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -223,7 +315,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       {/* 可展开内容区域 */}
       <div
         className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-        style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded) ? '1fr' : '0fr' }}
+        style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded || isSummaryExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
           <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
@@ -360,6 +452,33 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       <ArrowUpRight className="w-3.5 h-3.5" />
                       <span>{t('GitHub', 'GitHub')}</span>
                     </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {isSummaryExpanded && release.body && (
+            <div className="py-2">
+              <div className="flex items-center space-x-2 mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
+                <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
+                  {t('AI 总结', 'AI Summary')}
+                </span>
+              </div>
+
+              <div className="relative">
+                {summary.status === 'loading' && (
+                  <div className="flex items-center justify-center space-x-2 py-6 text-xs text-gray-500 dark:text-text-tertiary">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{t('正在分析更新内容…', 'Analyzing update…')}</span>
+                  </div>
+                )}
+                {summary.status === 'done' && summary.content && (
+                  <MarkdownRenderer content={summary.content} shouldRender={true} />
+                )}
+                {summary.status === 'error' && (
+                  <div className="py-3 text-xs text-red-500 dark:text-red-400">
+                    {t('总结生成失败，请重试。', 'Failed to generate summary. Please try again.')}
                   </div>
                 )}
               </div>
