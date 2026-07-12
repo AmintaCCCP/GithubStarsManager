@@ -330,6 +330,10 @@ interface AppActions {
   setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
   setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
   setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
+
+  // Similar repositories view actions
+  enterSimilarView: (repos: Repository[], anchor: Repository) => void;
+  resetSimilarView: () => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -1136,6 +1140,7 @@ export const useAppStore = create<AppState & AppActions>()(
       vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
+      similarView: null,
       webdavConfigs: [],
       activeWebDAVConfig: null,
       lastBackup: null,
@@ -1480,6 +1485,23 @@ export const useAppStore = create<AppState & AppActions>()(
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setVectorIndexingState: (indexingState) => set((state) => ({
         vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
+      })),
+
+      // Similar repositories view actions
+      enterSimilarView: (repos, anchor) => set((state) => ({
+        similarView: {
+          active: true,
+          anchorRepoFullName: anchor.full_name,
+          anchorRepoName: anchor.name,
+          similarResults: repos,
+          originalSearchResults: state.searchResults,
+        },
+        // 进入相似视图时清空搜索条件，避免与搜索结果混淆（相似视图是列表的"替代"视图）
+        searchFilters: { ...initialSearchFilters },
+      })),
+      resetSimilarView: () => set((state) => ({
+        searchResults: state.similarView?.originalSearchResults ?? state.repositories,
+        similarView: null,
       })),
 
       // Search actions
