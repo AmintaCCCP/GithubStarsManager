@@ -330,6 +330,11 @@ interface AppActions {
   setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
   setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
   setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
+
+  // Similar repositories view actions
+  enterSimilarView: (repos: Repository[], anchor: Repository) => void;
+  resetSimilarView: () => void;
+  exitSimilarView: () => void;
   
   // Search actions
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -1136,6 +1141,7 @@ export const useAppStore = create<AppState & AppActions>()(
       vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
+      similarView: null,
       webdavConfigs: [],
       activeWebDAVConfig: null,
       lastBackup: null,
@@ -1233,6 +1239,7 @@ export const useAppStore = create<AppState & AppActions>()(
         readForks: new Set(),
         analyzingRepositoryIds: new Set(),
         searchResults: [],
+        similarView: null,
         lastSync: null,
       }),
 
@@ -1243,14 +1250,20 @@ export const useAppStore = create<AppState & AppActions>()(
         const searchResultsResult = state.searchResults === state.repositories
           ? repositoriesResult
           : replaceRepositoryInList(state.searchResults, repo);
+        const similarResultsResult = state.similarView
+          ? replaceRepositoryInList(state.similarView.similarResults, repo)
+          : null;
 
-        if (!repositoriesResult.changed && !searchResultsResult.changed) {
+        if (!repositoriesResult.changed && !searchResultsResult.changed && !similarResultsResult?.changed) {
           return state;
         }
 
         return {
           repositories: repositoriesResult.repositories,
-          searchResults: searchResultsResult.repositories
+          searchResults: searchResultsResult.repositories,
+          similarView: similarResultsResult
+            ? { ...state.similarView!, similarResults: similarResultsResult.repositories }
+            : state.similarView,
         };
       }),
       updateRepositoriesMetadata: (updates) => set((state) => {
@@ -1278,14 +1291,20 @@ export const useAppStore = create<AppState & AppActions>()(
         const searchResultsResult = state.searchResults === state.repositories
           ? repositoriesResult
           : applyPatches(state.searchResults);
+        const similarResultsResult = state.similarView
+          ? applyPatches(state.similarView.similarResults)
+          : { repositories: state.similarView?.similarResults ?? [], changed: false };
 
-        if (!repositoriesResult.changed && !searchResultsResult.changed) {
+        if (!repositoriesResult.changed && !searchResultsResult.changed && !similarResultsResult.changed) {
           return state;
         }
 
         return {
           repositories: repositoriesResult.repositories,
           searchResults: searchResultsResult.repositories,
+          similarView: state.similarView
+            ? { ...state.similarView, similarResults: similarResultsResult.repositories }
+            : state.similarView,
         };
       }),
       addRepository: (repo) => set((state) => {
@@ -1340,6 +1359,9 @@ export const useAppStore = create<AppState & AppActions>()(
         return {
           repositories: state.repositories.filter(r => r.id !== repoId),
           searchResults: state.searchResults.filter(r => r.id !== repoId),
+          similarView: state.similarView
+            ? { ...state.similarView, similarResults: state.similarView.similarResults.filter(r => r.id !== repoId) }
+            : state.similarView,
           releases: filteredReleases,
           releaseSubscriptions: nextReleaseSubscriptions,
           readReleases: nextReadReleases,
@@ -1481,6 +1503,39 @@ export const useAppStore = create<AppState & AppActions>()(
       setVectorIndexingState: (indexingState) => set((state) => ({
         vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
       })),
+
+      // Similar repositories view actions
+      /**
+       * 进入"查找相似仓库"视图：保存当前相似结果、锚点仓库，并快照进入前的
+       * searchResults/searchFilters 用于重置恢复（链式查找时保留首次快照）。
+       */
+      enterSimilarView: (repos, anchor) => set((state) => ({
+        similarView: {
+          active: true,
+          anchorRepoFullName: anchor.full_name,
+          anchorRepoName: anchor.name,
+          similarResults: repos,
+          // 链式查找时保留首次进入的快照，避免覆盖重置目标
+          originalSearchResults: state.similarView?.originalSearchResults ?? state.searchResults,
+          originalSearchFilters: state.similarView?.originalSearchFilters ?? state.searchFilters,
+        },
+        // 进入相似视图时清空搜索条件，避免与搜索结果混淆（相似视图是列表的"替代"视图）
+        searchFilters: { ...initialSearchFilters },
+      })),
+      /**
+       * 重置相似视图：恢复进入前的搜索结果与条件（回到"查找相似之前"的状态）。
+       */
+      resetSimilarView: () => set((state) => ({
+        // 重置恢复进入前的搜索结果与条件（回到"查找相似之前"的状态）
+        searchResults: state.similarView?.originalSearchResults ?? state.repositories,
+        searchFilters: state.similarView?.originalSearchFilters ?? { ...initialSearchFilters },
+        similarView: null,
+      })),
+      /**
+       * 退出相似视图（不恢复进入前的搜索状态）：用于用户发起新搜索或切换分类时，
+       * 避免把旧快照覆盖到新的搜索/分类结果上。
+       */
+      exitSimilarView: () => set({ similarView: null }),
 
       // Search actions
       setSearchFilters: (filters) => set((state) => {

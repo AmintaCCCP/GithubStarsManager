@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
+import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
 import { BulkRestoreModal, RestoreConfig } from './BulkRestoreModal';
@@ -40,7 +41,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     searchFilters,
     toggleReleaseSubscription,
     batchUnsubscribeReleases,
-    releaseSubscriptions
+    releaseSubscriptions,
+    similarView,
+    resetSimilarView
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -1003,6 +1006,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   return (
     <div className="space-y-6">
 
+      {/* Similar repositories view banner */}
+      {similarView?.active && (
+        <SimilarViewBanner
+          anchorRepoName={similarView.anchorRepoName}
+          onReset={resetSimilarView}
+          language={language}
+        />
+      )}
 
       {/* Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 sm:p-4 gap-3 sm:gap-0">
