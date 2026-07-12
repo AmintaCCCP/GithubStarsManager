@@ -633,3 +633,59 @@ export async function indexAllRepos(
 
   return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined, indexedRepoIds };
 }
+
+/**
+ * 查找与源仓库语义相似的仓库。
+ *
+ * 流程：
+ * 1. 拼接源仓库文本并 embed（purpose='query'）
+ * 2. 调用 Worker 的 /query 接口获取相似向量 id 列表
+ * 3. 从全量仓库中映射回 Repository，过滤掉源仓库自身
+ *
+ * @returns 相似仓库数组（按相似度降序，已排除源仓库）
+ */
+export async function findSimilarRepositories(
+  sourceRepo: Repository,
+  opts: {
+    embeddingClient: EmbeddingClient;
+    vectorService: VectorSearchService;
+    allRepos: Repository[];
+    topK: number;
+    threshold: number;
+    signal?: AbortSignal;
+  }
+): Promise<Repository[]> {
+  const { embeddingClient, vectorService, allRepos, topK, threshold, signal } = opts;
+
+  // 1. 生成源仓库查询向量
+  const text = buildEmbeddingText(sourceRepo);
+  const vectors = await embeddingClient.embed([text], 'query', signal);
+  if (!vectors || vectors.length === 0 || !Array.isArray(vectors[0])) {
+    throw new Error('Failed to generate embedding for source repository');
+  }
+  const queryVector = vectors[0];
+
+  // 2. 向量检索（多取 1 个以容纳源仓库自身，随后过滤）
+  const matches = await vectorService.query(
+    queryVector,
+    { topK: topK + 1, threshold },
+    signal
+  );
+
+  // 3. 映射回 Repository，建立 id -> repo 索引
+  const repoById = new Map<number, Repository>();
+  for (const repo of allRepos) {
+    repoById.set(repo.id, repo);
+  }
+
+  const sourceId = String(sourceRepo.id);
+  const results: Repository[] = [];
+  for (const match of matches) {
+    // 过滤掉源仓库自身
+    if (match.id === sourceId) continue;
+    const repo = repoById.get(parseInt(match.id, 10));
+    if (repo) results.push(repo);
+  }
+
+  return results;
+}
