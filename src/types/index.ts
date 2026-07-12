@@ -267,6 +267,7 @@ export interface SimilarViewState {
   anchorRepoName: string;        // 锚点仓库名
   similarResults: Repository[];  // 相似结果，渲染用
   originalSearchResults: Repository[]; // 进入前的 searchResults 快照，重置恢复用
+  originalSearchFilters: SearchFilters; // 进入前的 searchFilters 快照，重置恢复用
 }
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
