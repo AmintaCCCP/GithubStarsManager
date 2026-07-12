@@ -474,4 +474,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.6.9</downloadUrl>
   </version>
+  <version>
+    <number>0.7.0</number>
+    <releaseDate>2026-07-12</releaseDate>
+    <changelog>
+      <item>feat: Published a pre-built, multi-architecture (amd64 + arm64) frontend Docker image to GHCR so users can run it directly or via docker-compose without building locally; the Nginx backend proxy is now configurable via BACKEND_HOST, and Docker/README docs plus .dockerignore were updated. (PR #240)</item>
+      <item>feat: Added a "Find similar repositories" action on repository cards powered by the vector search index — hovering a card reveals a Find similar button that replaces the list with the most similar repositories, supports chained lookups, and provides a reset banner; similar mode exits on new search or category filter. (PR #242)</item>
+      <item>feat: Added an AI "Summary" toggle button on Release cards that calls the configured AI service to generate an importance-ranked Markdown summary (new features / bug fixes) of the release notes in the UI language, with loading state, expand/collapse animation, inline error display, and retry. (PR #243)</item>
+      <item>fix: Raised the AI analysis and semantic reranking max token budget to 4096 so thinking-capable models finish their reasoning chain and emit valid JSON instead of truncating and returning empty content. (PR #241)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.0</downloadUrl>
+  </version>
 </versions>
