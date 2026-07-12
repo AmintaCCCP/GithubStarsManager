@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../services/vectorSearchService';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../services/autoSync';
@@ -105,7 +106,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     setAnalyzingRepository,
     language,
     updateRepository,
-    deleteRepository
+    deleteRepository,
+    vectorSearchConfig,
+    vectorSearchStatus,
+    embeddingConfigs,
+    activeEmbeddingConfig,
+    repositories,
+    enterSimilarView
   } = useAppStore(
     useCallback(
       (state) => ({
@@ -115,7 +122,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         setAnalyzingRepository: state.setAnalyzingRepository,
         language: state.language,
         updateRepository: state.updateRepository,
-        deleteRepository: state.deleteRepository
+        deleteRepository: state.deleteRepository,
+        vectorSearchConfig: state.vectorSearchConfig,
+        vectorSearchStatus: state.vectorSearchStatus,
+        embeddingConfigs: state.embeddingConfigs,
+        activeEmbeddingConfig: state.activeEmbeddingConfig,
+        repositories: state.repositories,
+        enterSimilarView: state.enterSimilarView
       }),
       []
     ),
@@ -145,6 +158,26 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isLocallyAnalyzing, setIsLocallyAnalyzing] = useState(false);
   const isAnalyzing = isLocallyAnalyzing || isStoreAnalyzing;
+
+  // 向量搜索是否可用（开关开启 + Worker 已连接 + 有索引 + Embedding 配置完整）
+  // 仅在可用时显示"查找相似仓库"按钮，避免无效点击
+  const vectorSearchAvailable = useMemo(() => {
+    const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
+    const configComplete = !!activeConfig
+      && !!activeConfig.baseUrl
+      && !!activeConfig.model
+      && (activeConfig.apiType === 'ollama' || !!activeConfig.apiKey);
+    return (
+      vectorSearchConfig.enabled
+      && !!vectorSearchStatus?.connected
+      && (vectorSearchStatus?.vectorCount ?? 0) > 0
+      && configComplete
+      && !!vectorSearchConfig.workerUrl
+      && !!vectorSearchConfig.authToken
+    );
+  }, [embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus]);
+
+  const [isFindingSimilar, setIsFindingSimilar] = useState(false);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -397,6 +430,68 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // Convert GitHub URL to DeepWiki URL
   const getDeepWikiUrl = (githubUrl: string) => {
     return githubUrl.replace('github.com', 'deepwiki.com');
+  };
+
+  // 查找相似仓库：利用向量检索匹配语义相关的仓库，并进入相似仓库视图
+  const handleFindSimilar = async () => {
+    if (isFindingSimilar) return;
+    if (!vectorSearchAvailable) {
+      toast(
+        language === 'zh'
+          ? '向量搜索未就绪：请先在设置中开启向量搜索并完成索引。'
+          : 'Vector search is not ready. Please enable vector search and build the index in settings first.',
+        'error'
+      );
+      return;
+    }
+
+    const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
+    if (!activeConfig) return;
+
+    setIsFindingSimilar(true);
+    try {
+      const embeddingClient = new EmbeddingClient({
+        ...activeConfig,
+        apiType: activeConfig.apiType,
+        baseUrl: activeConfig.baseUrl,
+        apiKey: activeConfig.apiKey,
+        model: activeConfig.model,
+        dimensions: activeConfig.dimensions,
+      });
+      const vectorService = new VectorSearchService({
+        enabled: true,
+        workerUrl: vectorSearchConfig.workerUrl,
+        authToken: vectorSearchConfig.authToken,
+        embeddingConfigId: activeEmbeddingConfig || '',
+      });
+
+      const similar = await findSimilarRepositories(repository, {
+        embeddingClient,
+        vectorService,
+        allRepos: repositories,
+        topK: vectorSearchConfig.searchTopK ?? 30,
+        threshold: vectorSearchConfig.searchThreshold ?? 0.35,
+      });
+
+      enterSimilarView(similar, repository);
+
+      if (similar.length === 0) {
+        toast(
+          language === 'zh'
+            ? '未找到相似的仓库。'
+            : 'No similar repositories found.',
+          'info'
+        );
+      }
+    } catch (error) {
+      console.error('Find similar repositories failed:', error);
+      const errorMessage = error instanceof Error && error.message
+        ? error.message
+        : (language === 'zh' ? '查找相似仓库失败，请检查向量搜索配置。' : 'Failed to find similar repositories. Please check vector search configuration.');
+      toast(errorMessage, 'error');
+    } finally {
+      setIsFindingSimilar(false);
+    }
   };
 
   // Convert GitHub URL to Zread URL
@@ -1039,13 +1134,28 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           </div>
         </div>
 
-        {/* Update Time - Single Row */}
+        {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
         <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
-          <div className="flex items-center space-x-1">
-            <Calendar className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">
+          <div className="relative flex items-center space-x-1 min-w-0">
+            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
+            <span className={`truncate transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
             </span>
+
+            {vectorSearchAvailable && !selectionMode && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleFindSimilar();
+                }}
+                disabled={isFindingSimilar}
+                className="absolute inset-y-0 left-0 flex items-center space-x-1 text-brand-violet dark:text-brand-violet font-medium opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
+              >
+                {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                <span>{language === 'zh' ? '查找相似仓库' : 'Find similar'}</span>
+              </button>
+            )}
           </div>
 
           {/* 选择按钮 */}

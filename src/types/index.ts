@@ -259,6 +259,15 @@ export interface VectorIndexingState {
   phaseTotal: number;
   result: { indexed: number; skipped: number; errors: number; error?: string } | null;
 }
+
+// 相似仓库视图状态：进入"查找相似仓库"后保存当前上下文，重置时恢复
+export interface SimilarViewState {
+  active: boolean;
+  anchorRepoFullName: string;   // 当前锚点仓库 full_name（横幅展示）
+  anchorRepoName: string;        // 锚点仓库名
+  similarResults: Repository[];  // 相似结果，渲染用
+  originalSearchResults: Repository[]; // 进入前的 searchResults 快照，重置恢复用
+}
 export type AIReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type MiMoPlan = 'api' | 'token-plan';
 
@@ -393,6 +402,9 @@ export interface AppState {
   vectorSearchConfig: VectorSearchConfig;
   vectorSearchStatus?: VectorSearchStatus;
   vectorIndexingState: VectorIndexingState;
+
+  // Similar repositories view (triggered by "查找相似仓库")
+  similarView: SimilarViewState | null;
 
   // WebDAV
   webdavConfigs: WebDAVConfig[];

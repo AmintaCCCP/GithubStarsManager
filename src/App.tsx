@@ -60,6 +60,20 @@ const RepositoriesView = React.memo(({
   onCategorySelect: (category: string) => void;
 }) => {
   const isActive = hasActiveSearchFilters(searchFilters);
+  const similarView = useAppStore((state) => state.similarView);
+  const resetSimilarView = useAppStore((state) => state.resetSimilarView);
+
+  // 相似视图下用户发起搜索时，自动退出相似视图（搜索优先于相似浏览，避免界面歧义）
+  useEffect(() => {
+    if (similarView?.active && isActive) {
+      resetSimilarView();
+    }
+  }, [similarView?.active, isActive, resetSimilarView]);
+
+  // 相似仓库视图激活时，列表数据源切换为相似结果，且忽略分类过滤
+  const listRepositories = similarView?.active
+    ? similarView.similarResults
+    : (isActive ? searchResults : repositories);
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
@@ -71,8 +85,8 @@ const RepositoriesView = React.memo(({
       <div className="flex-1 space-y-6">
         <SearchBar />
         <RepositoryList
-          repositories={isActive ? searchResults : repositories}
-          selectedCategory={selectedCategory}
+          repositories={listRepositories}
+          selectedCategory={similarView?.active ? 'all' : selectedCategory}
         />
       </div>
     </div>
@@ -152,6 +166,10 @@ function App() {
   }, []);
 
   const handleCategorySelect = useCallback((category: string) => {
+    // 相似仓库视图下点击分类 = 离开相似视图并切换到该分类，避免交互歧义
+    if (useAppStore.getState().similarView?.active) {
+      useAppStore.getState().resetSimilarView();
+    }
     setSelectedCategory(category);
   }, [setSelectedCategory]);
 
