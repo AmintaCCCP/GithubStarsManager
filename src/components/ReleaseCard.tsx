@@ -286,8 +286,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                     ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-text-secondary'
                     : 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/[0.08]'
                 }`}
-                title={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : t('AI 总结本次更新', 'AI Summary of this update')}
-                aria-label={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : t('AI 总结本次更新', 'AI Summary of this update')}
+                title={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
+                aria-label={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
                 aria-expanded={isSummaryExpanded}
               >
                 {summary.status === 'loading' ? (
