@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -69,6 +69,14 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [summary, setSummary] = useState<SummaryState>({ status: 'idle' });
   const { toast } = useDialog();
+  // 管理进行中的 AI 请求，组件卸载或重新发起时取消，避免内存泄漏与无效网络开销
+  const summaryAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      summaryAbortRef.current?.abort();
+    };
+  }, []);
   const downloadingRef = useRef<Record<string, boolean>>({});
   const downloadedRef = useRef<Record<string, boolean>>({});
   const [, forceUpdate] = useState(0);
@@ -112,6 +120,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       return;
     }
 
+    // 取消上一次未完成的请求
+    summaryAbortRef.current?.abort();
+    const controller = new AbortController();
+    summaryAbortRef.current = controller;
+
     const config = activeConfig;
     setSummary({ status: 'loading' });
     try {
@@ -122,11 +135,16 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           repoName: release.repository.full_name,
           tagName: release.tag_name,
           releaseName: release.name && release.name !== release.tag_name ? release.name : undefined,
-        }
+        },
+        controller.signal
       );
       setSummary({ status: 'done', content });
       setIsSummaryExpanded(true);
     } catch (error) {
+      // 主动取消（卸载/重新发起）时静默处理，不更新状态、不弹错误
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       setSummary({ status: 'error', error: message });
       setIsSummaryExpanded(true);
@@ -134,18 +152,18 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         language === 'zh' ? `总结生成失败：${message}` : `Summary failed: ${message}`,
         'error'
       );
+    } finally {
+      if (summaryAbortRef.current === controller) {
+        summaryAbortRef.current = null;
+      }
     }
   }, [activeConfig, language, release, toast]);
 
   const handleToggleSummary = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 已展开时：出错态点击重试，否则收起
+    // 已展开时：一律收起（出错态也先收起，再次点击已收起的错误态才会重试）
     if (isSummaryExpanded) {
-      if (summary.status === 'error') {
-        await runSummaryAnalysis();
-        return;
-      }
       setIsSummaryExpanded(false);
       return;
     }
