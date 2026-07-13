@@ -16,6 +16,7 @@ import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
 import logsRouter from './routes/logs.js';
+import { initMcp } from './mcp/index.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -44,6 +45,9 @@ export function createApp(): express.Express {
 
   // Wave 4: Logs route
   app.use(logsRouter);
+
+  // MCP server (Streamable HTTP at /mcp + SSE fallback at /mcp/sse), mounted only when enabled
+  initMcp(app);
 
   // Global error handler
   app.use(errorHandler);

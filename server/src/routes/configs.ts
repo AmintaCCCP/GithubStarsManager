@@ -754,4 +754,72 @@ router.put('/api/configs/vector-search', (req, res) => {
   }
 });
 
+// GET /api/configs/mcp
+router.get('/api/configs/mcp', (req, res) => {
+  try {
+    const db = getDb();
+    const shouldDecrypt = req.query.decrypt === 'true';
+    const row = db.prepare('SELECT * FROM mcp_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
+
+    if (!row) {
+      res.json({ enabled: false, port: 0, token: '', tokenStatus: 'empty' });
+      return;
+    }
+
+    let token = '';
+    let tokenStatus: SecretStatus = 'empty';
+    if (row.token_encrypted) {
+      const result = getMaskedSecretResult({
+        encryptedValue: row.token_encrypted,
+        encryptionKey: config.encryptionKey,
+        kind: 'AI API key',
+      });
+      token = shouldDecrypt ? result.decryptedValue : maskApiKey(result.decryptedValue);
+      tokenStatus = result.status;
+    }
+
+    res.json({
+      enabled: !!row.enabled,
+      port: typeof row.port === 'number' ? row.port : 0,
+      token,
+      tokenStatus,
+    });
+  } catch (err) {
+    logger.errorFromError('configs.getMcp', 'GET /api/configs/mcp error', err);
+    res.status(500).json({ error: 'Failed to fetch MCP config', code: 'FETCH_MCP_CONFIG_FAILED' });
+  }
+});
+
+// PUT /api/configs/mcp
+router.put('/api/configs/mcp', (req, res) => {
+  try {
+    const db = getDb();
+    const { enabled, port, token } = req.body as Record<string, unknown>;
+
+    let encryptedToken = '';
+    const hasToken = Object.prototype.hasOwnProperty.call(req.body, 'token');
+    if (hasToken && token === '') {
+      encryptedToken = '';
+    } else if (token && typeof token === 'string' && !token.startsWith('***')) {
+      encryptedToken = encrypt(token, config.encryptionKey);
+    } else {
+      const existing = db.prepare('SELECT token_encrypted FROM mcp_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
+      encryptedToken = (existing?.token_encrypted as string) ?? '';
+    }
+
+    const isEnabled = enabled === true || enabled === 1;
+    const mcpPort = typeof port === 'number' && port > 0 ? port : 0;
+
+    db.prepare(`
+      INSERT OR REPLACE INTO mcp_configs (id, enabled, port, token_encrypted, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run('default', isEnabled ? 1 : 0, mcpPort, encryptedToken);
+
+    res.json({ updated: true });
+  } catch (err) {
+    logger.errorFromError('configs.updateMcp', 'PUT /api/configs/mcp error', err);
+    res.status(500).json({ error: 'Failed to update MCP config', code: 'UPDATE_MCP_CONFIG_FAILED' });
+  }
+});
+
 export default router;
