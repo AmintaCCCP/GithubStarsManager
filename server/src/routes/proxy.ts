@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
-import { proxyRequest, ProxyConfig, validateUrl } from '../services/proxyService.js';
+import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
 
 function getProxyConfig(): ProxyConfig | null {
@@ -218,7 +218,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       // Warn if API key is transmitted over non-HTTPS connection
       try {
         const parsed = new URL(baseUrl);
-        if (parsed.protocol !== 'https:') {
+        if (parsed.protocol !== 'https:' && !isPrivateOrLoopback(parsed.hostname)) {
           logger.warn('proxy.ai', `AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
         }
       } catch { /* invalid URL, will be caught by validateUrl later */ }
@@ -236,7 +236,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       reasoningEffort = normalizeReasoningEffort(aiConfig.reasoning_effort);
       try {
         const parsed = new URL(baseUrl);
-        if (parsed.protocol !== 'https:') {
+        if (parsed.protocol !== 'https:' && !isPrivateOrLoopback(parsed.hostname)) {
           logger.warn('proxy.ai', `AI API key transmitted over ${parsed.protocol} (not HTTPS). Consider using HTTPS for security.`);
         }
       } catch { /* invalid URL, will be caught by validateUrl later */ }
@@ -295,6 +295,8 @@ router.post('/api/proxy/ai', async (req, res) => {
       body: effectiveRequestBody,
       timeout,
       proxyConfig,
+      // 用户自有配置来源的 AI 地址：放行回环/私有网段（本地 Ollama 等）
+      allowPrivate: true,
     });
 
     res.status(result.status).json(result.data);
@@ -357,6 +359,8 @@ router.post('/api/proxy/webdav', async (req, res) => {
       body: requestBody,
       timeout: 60000,
       proxyConfig,
+      // 用户自有配置来源的 WebDAV 地址：放行回环/私有网段（局域网 NAS 等）
+      allowPrivate: true,
     });
 
     res.status(result.status).json(result.data);
@@ -806,9 +810,9 @@ router.post('/api/download/rpc', async (req, res) => {
       return;
     }
 
-    // SSRF protection: validate the download URL
+    // SSRF protection: validate the download URL (allow user-owned private/loopback targets)
     try {
-      validateUrl(url);
+      validateUrl(url, { allowPrivate: true });
     } catch (e) {
       res.status(400).json({ success: false, error: e instanceof Error ? e.message : 'Invalid URL' });
       return;
