@@ -148,14 +148,14 @@ export function initMcpRendererBridge(): void {
   // 启动时若已启用 MCP，则恢复主进程的 MCP 服务并推送初始快照
   const initial = useAppStore.getState();
   if (initial.mcpConfig.enabled && initial.mcpConfig.token) {
-    window.electronAPI?.startMcp?.({ port: initial.mcpConfig.port, token: initial.mcpConfig.token });
+    window.electronAPI?.startMcp?.({ port: initial.mcpConfig.port || 18789, token: initial.mcpConfig.token });
     window.electronAPI?.pushMcpSnapshot?.(buildSnapshot());
   }
 
   useAppStore.subscribe((state, prev) => {
     if (state.mcpConfig.enabled && (!prev.mcpConfig.enabled || state.mcpConfig.token !== prev.mcpConfig.token)) {
       // 刚启用或令牌变更，立即推送一次
-      window.electronAPI?.startMcp?.({ port: state.mcpConfig.port, token: state.mcpConfig.token });
+      window.electronAPI?.startMcp?.({ port: state.mcpConfig.port || 18789, token: state.mcpConfig.token });
       window.electronAPI?.pushMcpSnapshot?.(buildSnapshot());
       return;
     }
@@ -167,7 +167,8 @@ export function initMcpRendererBridge(): void {
       state.repositories !== prev.repositories ||
       state.releases !== prev.releases ||
       state.customCategories !== prev.customCategories ||
-      state.vectorSearchConfig !== prev.vectorSearchConfig;
+      state.vectorSearchConfig !== prev.vectorSearchConfig ||
+      state.mcpConfig !== prev.mcpConfig;
     if (!relevantChanged) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(push, 2000);

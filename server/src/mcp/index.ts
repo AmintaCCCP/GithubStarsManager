@@ -130,7 +130,6 @@ export function initMcp(app: Express): void {
         });
         const server = buildServer(state);
         await server.connect(transport);
-        await transport.start();
       } catch (err) {
         logger.errorFromError('mcp.sse', 'SSE connection error', err as Error);
         if (!res.headersSent) res.status(500).json({ error: 'internal error' });

@@ -123,9 +123,9 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  createWindow();
-
-  // 加载内置 MCP 服务模块（仅当用户在设置中启用 MCP 时才会真正监听端口）
+  // 加载内置 MCP 服务模块并注册 IPC 处理器（必须早于 createWindow，
+  // 否则渲染进程在启用 MCP 时发出的 mcp:start / mcp:snapshot 会早于
+  // 主进程注册处理器，导致持久化的启用状态被错过。）
   try {
     mcpModule = await import('./mcpServer.mjs');
     mcpModule.setSemanticHandler(async (query, topK) => {
@@ -158,6 +158,8 @@ app.whenReady().then(async () => {
   } catch (e) {
     console.error('[GSM] Failed to load MCP module:', e);
   }
+
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -424,7 +426,6 @@ async function startMcp({ port, token }) {
         sseTransports.set(transport.sessionId, transport);
         res.on('close', () => sseTransports.delete(transport.sessionId));
         await server.connect(transport);
-        await transport.start();
       } else if (pathname === '/mcp/sse/messages' && req.method === 'POST') {
         const sid = url.searchParams.get('sessionId');
         const transport = sid ? sseTransports.get(sid) : undefined;
@@ -503,15 +504,6 @@ try {
   execSync('npm install', { stdio: 'inherit', cwd: electronDir });
 } catch (error) {
   console.error('安装依赖失败:', error.message);
-  process.exit(1);
-}
-
-// 6b. 安装 electron + electron-builder（构建期完成，用户无感；原 main 分支的实现）
-console.log('📥 安装 electron + electron-builder（构建依赖）...');
-try {
-  execSync('npm install --save-dev electron electron-builder', { stdio: 'inherit' });
-} catch (error) {
-  console.error('安装 electron/electron-builder 失败:', error.message);
   process.exit(1);
 }
 

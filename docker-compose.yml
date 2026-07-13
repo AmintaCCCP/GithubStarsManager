@@ -18,9 +18,10 @@ services:
     # Uncomment below (and comment out 'image') to build locally instead:
     # build: ./server
     ports:
-      # Published to the host so local MCP clients (e.g. Claude Desktop/Cursor)
-      # can reach the MCP endpoint at http://localhost:3000/mcp
-      - "${BACKEND_HOST_PORT:-3000}:3000"
+      # Published to the localhost interface only (loopback) so local MCP
+      # clients (e.g. Claude Desktop/Cursor) can reach the MCP endpoint at
+      # http://localhost:3000/mcp without exposing it on all host interfaces.
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3000}:3000"
     expose:
       - "3000"
     environment:
