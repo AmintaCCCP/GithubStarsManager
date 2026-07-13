@@ -4,6 +4,15 @@ export const DB_NAME = 'github-stars-manager-db';
 const STORE_NAME = 'app_state';
 const DB_VERSION = 1;
 
+// Freshness metadata embedded alongside every persisted snapshot so we can pick
+// the *newest* valid copy regardless of collection size (a newer snapshot may
+// legitimately contain fewer repositories after intentional deletions, and equal
+// sizes can hide newer edits to settings/tags/metadata).
+const META_KEY = '__gsm_meta';
+interface SnapshotMeta {
+  ts: number;
+}
+
 const canUseIndexedDB = () => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 2000): Promise<T> => {
@@ -107,14 +116,34 @@ const idbDelete = async (key: string): Promise<void> => {
 };
 
 /**
- * Snapshot helpers — used to pick the *richest* available copy so a stale or
- * empty IndexedDB value can never shadow good data held in localStorage (and
- * vice-versa). Persistence must never silently drop historical user data.
+ * Snapshot helpers — used to pick the *newest valid* available copy so a
+ * stale snapshot can never shadow good data, and to repair divergence between
+ * IndexedDB and localStorage.
  */
 interface PersistSnapshot {
   state?: Record<string, unknown>;
   version?: number;
+  [META_KEY]?: SnapshotMeta;
 }
+
+const normalizeValue = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value ?? null);
+  } catch {
+    return 'null';
+  }
+};
+
+const stamp = (raw: string): string => {
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    obj[META_KEY] = { ts: Date.now() } as SnapshotMeta;
+    return JSON.stringify(obj);
+  } catch {
+    return raw;
+  }
+};
 
 const parseSnapshot = (raw: string | null): PersistSnapshot | null => {
   if (!raw) return null;
@@ -174,15 +203,19 @@ const registerFlushListeners = (): void => {
 
 /**
  * IndexedDB-backed Zustand persist storage with seamless migration:
- * - Reads from IndexedDB and localStorage, preferring whichever copy holds the
- *   richest (non-empty) snapshot — a stale/empty IndexedDB value can no
- *   longer shadow good data held in the other store.
- * - On read, if localStorage holds the only good copy it is migrated into
- *   IndexedDB so the two stay consistent.
- * - Writes go to IndexedDB (large-data friendly) and a localStorage mirror is
- *   kept as an unload-safe fallback. The only good copy is never destroyed.
- * - localStorage is also used as the sole store when IndexedDB is unavailable
- *   or a write fails, so persistence works in constrained environments.
+ * - Reads from IndexedDB and localStorage, selecting the *newest valid*
+ *   snapshot via embedded write timestamps — never by collection size, so a
+ *   stale (but larger) copy can no longer be restored; if neither copy
+ *   carries freshness metadata (legacy recovery), richness is the fallback.
+ * - After selecting, the divergent/older store is repaired from the chosen
+ *   snapshot so the two copies stay consistent.
+ * - Writes go to IndexedDB (large-data friendly) and a localStorage mirror
+ *   carrying the same timestamp; the mirror is best-effort (quota-limited)
+ *   and used as an unload-safe fallback. The only good copy is never
+ *   destroyed.
+ * - localStorage is also used as the sole store when IndexedDB is
+ *   unavailable or a write fails, so persistence works in constrained
+ *   environments.
  */
 export const indexedDBStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -201,30 +234,51 @@ export const indexedDBStorage: StateStorage = {
       const idbOk = isNonEmptySnapshot(idbSnap);
       const lsOk = isNonEmptySnapshot(lsSnap);
 
-      let chosen: string | null;
+      let selected: string | null;
       if (idbOk && lsOk) {
-        // Both have data: prefer the richer copy to avoid stale rollback.
-        chosen = snapshotRichness(idbSnap) >= snapshotRichness(lsSnap) ? idbRaw : lsRaw;
+        const idbTs = idbSnap?.[META_KEY]?.ts;
+        const lsTs = lsSnap?.[META_KEY]?.ts;
+        if (typeof idbTs === 'number' && typeof lsTs === 'number') {
+          // Both carry freshness metadata: pick the newest; tie-break by richness.
+          selected =
+            idbTs > lsTs || (idbTs === lsTs && snapshotRichness(idbSnap) >= snapshotRichness(lsSnap))
+              ? idbRaw
+              : lsRaw;
+        } else if (typeof idbTs === 'number') {
+          // Only IndexedDB has metadata (current build) → it is the newer copy.
+          selected = idbRaw;
+        } else if (typeof lsTs === 'number') {
+          selected = lsRaw;
+        } else {
+          // Legacy recovery: neither carries metadata, fall back to richness.
+          selected = snapshotRichness(idbSnap) >= snapshotRichness(lsSnap) ? idbRaw : lsRaw;
+        }
       } else if (idbOk) {
-        chosen = idbRaw;
+        selected = idbRaw;
       } else if (lsOk) {
-        chosen = lsRaw;
+        selected = lsRaw;
       } else {
         // Neither has meaningful data; return whatever exists.
-        chosen = idbRaw ?? lsRaw;
+        selected = idbRaw ?? lsRaw;
       }
 
-      // If localStorage held the only good copy, migrate it into IndexedDB.
-      if (lsOk && !idbOk && lsRaw) {
-        try {
-          await withTimeout(idbSet(name, lsRaw));
-          console.info('[storage] migrated state from localStorage to IndexedDB');
-        } catch (error) {
-          console.warn('[storage] IndexedDB migration write failed, keeping localStorage', error);
+      // Repair the divergent/older store from the selected snapshot so the two
+      // copies converge (idempotent; skipped silently on failure).
+      if (selected) {
+        if (selected === idbRaw && selected !== lsRaw) {
+          if (!safeLocalStorageSet(name, selected)) {
+            console.warn('[storage] localStorage repair write failed (quota?)');
+          }
+        } else if (selected === lsRaw && selected !== idbRaw) {
+          try {
+            await withTimeout(idbSet(name, stamp(selected)));
+          } catch (error) {
+            console.warn('[storage] IndexedDB repair write failed', error);
+          }
         }
       }
 
-      return chosen;
+      return selected;
     } catch (error) {
       console.warn('[storage] IndexedDB get failed, fallback to localStorage:', error);
       return safeLocalStorageGet(name);
@@ -234,21 +288,26 @@ export const indexedDBStorage: StateStorage = {
   setItem: async (name: string, value: string): Promise<void> => {
     if (typeof window === 'undefined') return;
 
-    latestValue = { name, value };
+    const stamped = stamp(normalizeValue(value));
+    latestValue = { name, value: stamped };
     registerFlushListeners();
 
     // Primary path: IndexedDB first (large data friendly)
     if (canUseIndexedDB()) {
       try {
-        await withTimeout(idbSet(name, value));
+        await withTimeout(idbSet(name, stamped));
+        // Best-effort mirror so localStorage also carries freshness metadata and
+        // can be used as an unload-safe fallback. Quota failures are non-fatal.
+        if (!safeLocalStorageSet(name, stamped)) {
+          console.warn('[storage] localStorage mirror write failed (quota?)');
+        }
         return;
       } catch (error) {
         console.warn('[storage] IndexedDB set failed, fallback to localStorage:', error);
       }
     }
 
-    // Keep a localStorage mirror as a reliable, unload-safe copy.
-    if (!safeLocalStorageSet(name, value)) {
+    if (!safeLocalStorageSet(name, stamped)) {
       throw new Error('[storage] localStorage fallback write failed');
     }
   },
