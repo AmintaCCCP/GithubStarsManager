@@ -17,6 +17,10 @@ services:
     image: ghcr.io/amintacccp/github-stars-manager-server:${BACKEND_IMAGE_TAG:-latest}
     # Uncomment below (and comment out 'image') to build locally instead:
     # build: ./server
+    ports:
+      # Published to the host so local MCP clients (e.g. Claude Desktop/Cursor)
+      # can reach the MCP endpoint at http://localhost:3000/mcp
+      - "${BACKEND_HOST_PORT:-3000}:3000"
     expose:
       - "3000"
     environment:
