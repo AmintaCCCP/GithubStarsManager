@@ -38,10 +38,17 @@ export interface ValidateUrlOptions {
   allowPrivate?: boolean;
 }
 
-/** 归一化 hostname：去掉 IPv6 方括号，并把 IPv4 映射型 IPv6（如 [::ffff:169.254.169.254]）
- *  还原为对应的 IPv4 字符串，使 SSRF 过滤看到真实的目标地址。 */
+/** 归一化 hostname：去掉 IPv6 方括号、去掉结尾点号（防 `localhost.`/`127.0.0.1.` 绕过），
+ *  并把 IPv4 映射型 IPv6（如 [::ffff:169.254.169.254]）还原为对应的 IPv4 字符串，
+ *  使 SSRF 过滤看到真实的目标地址。 */
 function normalizeHostname(hostname: string): string {
-  const h = hostname.replace(/^\[(.+)\]$/, '$1').toLowerCase();
+  // Strip trailing dot first to prevent SSRF bypasses (e.g. "localhost." or "127.0.0.1.")
+  const h = hostname.replace(/\.$/, '').replace(/^\[(.+)\]$/, '$1').toLowerCase();
+  // Handle hybrid IPv4-mapped IPv6 written with dotted decimals (::ffff:169.254.169.254)
+  if (h.startsWith('::ffff:') && h.includes('.')) {
+    return h.slice(7);
+  }
+  // Handle IPv4-mapped IPv6 written in hex form (::ffff:a9fe:a9fe)
   const mapped = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
   if (mapped) {
     const octets = [mapped[1], mapped[2]].flatMap((hex) => {
@@ -53,11 +60,23 @@ function normalizeHostname(hostname: string): string {
   return h;
 }
 
-/** 判断 hostname 是否为回环地址或私有网段。 */
+/** IPv6 私有/本地网段前缀：唯一本地地址 fc00::/7、链路本地 fe80::/10、组播 ff00::/8 */
+function isPrivateOrLocalIpv6(h: string): boolean {
+  if (!h.includes(':')) return false;
+  return (
+    h.startsWith('fc') || h.startsWith('fd') ||
+    h.startsWith('fe8') || h.startsWith('fe9') ||
+    h.startsWith('fea') || h.startsWith('feb') ||
+    h.startsWith('ff')
+  );
+}
+
+/** 判断 hostname 是否为回环地址或私有网段（含 IPv6 私有/本地网段）。 */
 export function isPrivateOrLoopback(hostname: string): boolean {
   const h = normalizeHostname(hostname);
   if (BLOCKED_HOSTS.has(h)) return true;
   if (PRIVATE_IP_PATTERNS.some(p => p.test(h))) return true;
+  if (isPrivateOrLocalIpv6(h)) return true;
   return false;
 }
 
@@ -83,12 +102,15 @@ export function validateUrl(rawUrl: string, opts: ValidateUrlOptions = {}): void
     return;
   }
 
-  // 严格模式（默认）：拦截回环地址与私有网段。
+  // 严格模式（默认）：拦截回环地址与私有网段（含 IPv6 私有/本地网段）。
   if (BLOCKED_HOSTS.has(hostname)) {
     throw new Error(`Blocked proxy request: hostname '${hostname}' is not allowed`);
   }
   if (PRIVATE_IP_PATTERNS.some(p => p.test(hostname))) {
     throw new Error(`Blocked proxy request: private IP '${hostname}' is not allowed`);
+  }
+  if (isPrivateOrLocalIpv6(hostname)) {
+    throw new Error(`Blocked proxy request: private IPv6 address '${hostname}' is not allowed`);
   }
 }
 

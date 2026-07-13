@@ -44,6 +44,23 @@ describe('validateUrl', () => {
       expect(() => validateUrl('http://[::ffff:127.0.0.1]/x')).toThrow(/is not allowed/);
       expect(() => validateUrl('http://[::ffff:192.168.1.10]/x')).toThrow(/private IP/);
     });
+
+    it('blocks trailing-dot SSRF bypasses', () => {
+      expect(() => validateUrl('http://localhost./x')).toThrow(/hostname 'localhost' is not allowed/);
+      expect(() => validateUrl('http://127.0.0.1./x')).toThrow(/hostname '127.0.0.1' is not allowed/);
+      expect(() => validateUrl('http://169.254.169.254./x')).toThrow(/hostname '169.254.169.254' is not allowed/);
+    });
+
+    it('blocks IPv6 private/local ranges', () => {
+      expect(() => validateUrl('http://[fd00::1]/x')).toThrow(/private IPv6 address/);
+      expect(() => validateUrl('http://[fe80::1]/x')).toThrow(/private IPv6 address/);
+      expect(() => validateUrl('http://[fc00::1]/x')).toThrow(/private IPv6 address/);
+      expect(() => validateUrl('http://[ff02::1]/x')).toThrow(/private IPv6 address/);
+    });
+
+    it('still allows public IPv6 addresses in strict mode', () => {
+      expect(() => validateUrl('http://[2001:db8::1]/x')).not.toThrow();
+    });
   });
 
   describe('lenient mode (allowPrivate) for user-owned configs', () => {
@@ -77,9 +94,24 @@ describe('validateUrl', () => {
       expect(isPrivateOrLoopback('172.20.1.1')).toBe(true);
     });
 
+    it('detects tailing-dot and IPv4-mapped bypass forms', () => {
+      expect(isPrivateOrLoopback('localhost.')).toBe(true);
+      expect(isPrivateOrLoopback('127.0.0.1.')).toBe(true);
+      expect(isPrivateOrLoopback('[::ffff:127.0.0.1]')).toBe(true);
+      expect(isPrivateOrLoopback('[::ffff:192.168.1.10]')).toBe(true);
+    });
+
+    it('detects IPv6 private/local ranges', () => {
+      expect(isPrivateOrLoopback('fd00::1')).toBe(true);
+      expect(isPrivateOrLoopback('fe80::1')).toBe(true);
+      expect(isPrivateOrLoopback('fc00::1')).toBe(true);
+      expect(isPrivateOrLoopback('ff02::1')).toBe(true);
+    });
+
     it('returns false for public hosts', () => {
       expect(isPrivateOrLoopback('api.openai.com')).toBe(false);
       expect(isPrivateOrLoopback('8.8.8.8')).toBe(false);
+      expect(isPrivateOrLoopback('2001:db8::1')).toBe(false);
     });
   });
 });

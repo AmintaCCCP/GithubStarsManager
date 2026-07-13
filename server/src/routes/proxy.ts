@@ -287,6 +287,10 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
 
+    // 宽松档（放行回环/私有网段）只用于「用户已保存的 AI 配置」(configId)。
+    // 内联 config 路径（任意客户端均可携带目标地址）保持严格档，避免 SSRF 放宽被滥用。
+    const allowPrivate = Boolean(configId);
+
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({
       url: targetUrl,
@@ -295,8 +299,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       body: effectiveRequestBody,
       timeout,
       proxyConfig,
-      // 用户自有配置来源的 AI 地址：放行回环/私有网段（本地 Ollama 等）
-      allowPrivate: true,
+      allowPrivate,
     });
 
     res.status(result.status).json(result.data);

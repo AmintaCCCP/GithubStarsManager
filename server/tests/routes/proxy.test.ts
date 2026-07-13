@@ -186,8 +186,12 @@ describe('proxyRequest', () => {
     expect(result.headers).toEqual({});
   });
 
-  it('should return 502 on network error', async () => {
-    mockAxios.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+  it('should return 502 with PROXY_CONNECTION_REFUSED on ECONNREFUSED', async () => {
+    mockAxios.mockRejectedValueOnce({
+      isAxiosError: true,
+      code: 'ECONNREFUSED',
+      message: 'connect ECONNREFUSED',
+    });
 
     const result = await proxyRequest({
       url: 'https://down.example.com/api',
@@ -196,9 +200,9 @@ describe('proxyRequest', () => {
 
     expect(result.status).toBe(502);
     expect(result.data).toEqual({
-      error: 'Bad Gateway',
-      code: 'BAD_GATEWAY',
-      details: 'ECONNREFUSED',
+      error: 'Proxy connection refused',
+      code: 'PROXY_CONNECTION_REFUSED',
+      details: 'connect ECONNREFUSED',
     });
     expect(result.headers).toEqual({});
   });
