@@ -18,6 +18,7 @@ import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import { initMcpRendererBridge } from './services/mcpRendererBridge';
 import type { AppState, SearchFilters } from './types';
 
 /**
@@ -144,6 +145,7 @@ function App() {
     const initBackend = async () => {
       try {
         await backend.init();
+        initMcpRendererBridge();
         if (backend.isAvailable && !cancelled) {
           await syncFromBackend();
           if (!cancelled) {

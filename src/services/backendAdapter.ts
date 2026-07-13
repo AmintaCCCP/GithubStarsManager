@@ -1,7 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 import { logger } from './logger';
 
-import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
+import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig, McpConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 
@@ -649,6 +649,34 @@ class BackendAdapter {
     return res.json() as Promise<VectorSearchConfig>;
   }
 
+
+  // === MCP Config ===
+
+  async syncMcpConfig(config: McpConfig): Promise<void> {
+    if (!this._backendUrl) return;
+
+    const res = await this.fetchWithRetry(`${this._backendUrl}/configs/mcp`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(config)
+    }, 30000, 3);
+    if (!res.ok) await this.throwTranslatedError(res, 'Sync MCP config error');
+  }
+
+  async fetchMcpConfig(): Promise<McpConfig> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/mcp?decrypt=true`, {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch MCP config error');
+    const data = await res.json() as Record<string, unknown>;
+    return {
+      enabled: data.enabled === true || data.enabled === 1,
+      port: typeof data.port === 'number' ? data.port : 0,
+      token: typeof data.token === 'string' ? data.token : '',
+    };
+  }
 
   // === Settings (active selections) ===
 

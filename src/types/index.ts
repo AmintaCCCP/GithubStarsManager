@@ -319,6 +319,13 @@ export interface RpcDownloadConfig {
   secret?: string;
 }
 
+// MCP 服务配置（只读，Streamable HTTP / SSE 供 agent 调用）
+export interface McpConfig {
+  enabled: boolean;
+  port: number;          // 桌面端监听端口（后端模式忽略，挂在后端同端口 /mcp）
+  token: string;         // 鉴权令牌，首次启用时生成，可重置
+}
+
 export interface SearchFilters {
   query: string;
   tags: string[];
@@ -403,6 +410,9 @@ export interface AppState {
   vectorSearchConfig: VectorSearchConfig;
   vectorSearchStatus?: VectorSearchStatus;
   vectorIndexingState: VectorIndexingState;
+
+  // MCP 服务
+  mcpConfig: McpConfig;
 
   // Similar repositories view (triggered by "查找相似仓库")
   similarView: SimilarViewState | null;

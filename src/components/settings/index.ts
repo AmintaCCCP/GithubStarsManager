@@ -9,3 +9,4 @@ export { NetworkPanel } from './NetworkPanel';
 export { DiagnosticLogsPanel } from './DiagnosticLogsPanel';
 export { MenuManagementPanel } from './MenuManagementPanel';
 export { VectorSearchSettings } from './VectorSearchSettings';
+export { McpSettings } from './McpSettings';

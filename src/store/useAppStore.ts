@@ -13,6 +13,7 @@ import {
   EmbeddingConfig,
   VectorSearchConfig,
   VectorSearchStatus,
+  McpConfig,
   VectorIndexingState,
   ProxyConfig,
   RpcDownloadConfig,
@@ -330,6 +331,9 @@ interface AppActions {
   setVectorSearchConfig: (config: Partial<VectorSearchConfig>) => void;
   setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
   setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
+
+  // MCP 服务 actions
+  setMcpConfig: (config: Partial<McpConfig>) => void;
 
   // Similar repositories view actions
   enterSimilarView: (repos: Repository[], anchor: Repository) => void;
@@ -658,6 +662,34 @@ const mergeVectorSearchConfig = (
     embeddingFormatVersion,
   };
 };
+
+// MCP 服务默认配置
+const DEFAULT_MCP_PORT = 18789;
+const defaultMcpConfig: McpConfig = {
+  enabled: false,
+  port: DEFAULT_MCP_PORT,
+  token: '',
+};
+
+const normalizeMcpConfig = (raw: unknown): McpConfig => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...defaultMcpConfig };
+  }
+  const config = raw as Record<string, unknown>;
+  const port = typeof config.port === 'number' && Number.isInteger(config.port) && config.port > 0
+    ? config.port
+    : DEFAULT_MCP_PORT;
+  return {
+    enabled: config.enabled === true,
+    port,
+    token: typeof config.token === 'string' ? config.token : '',
+  };
+};
+
+const mergeMcpConfig = (current: McpConfig, patch: Partial<McpConfig>): McpConfig => ({
+  ...current,
+  ...patch,
+});
 
 export const normalizePersistedState = (
   persisted: PersistedAppState | undefined,
@@ -1140,6 +1172,7 @@ export const useAppStore = create<AppState & AppActions>()(
       activeEmbeddingConfig: null,
       vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
+      mcpConfig: { ...defaultMcpConfig },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       similarView: null,
       webdavConfigs: [],
@@ -1502,6 +1535,11 @@ export const useAppStore = create<AppState & AppActions>()(
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setVectorIndexingState: (indexingState) => set((state) => ({
         vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
+      })),
+
+      // MCP 服务 actions
+      setMcpConfig: (config) => set((state) => ({
+        mcpConfig: mergeMcpConfig(state.mcpConfig, config)
       })),
 
       // Similar repositories view actions
@@ -2195,6 +2233,9 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化向量搜索状态（vectorCount 等，跨重启保留）
         vectorSearchStatus: state.vectorSearchStatus,
 
+        // 持久化 MCP 服务配置
+        mcpConfig: state.mcpConfig,
+
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -2454,6 +2495,8 @@ export const useAppStore = create<AppState & AppActions>()(
       stateRecord.vectorSearchConfig,
       stateRecord.embeddingConfigs
     );
+    // 初始化/迁移 mcpConfig
+    stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
   }
 
         return state as PersistedAppState;

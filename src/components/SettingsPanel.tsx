@@ -13,6 +13,7 @@ import {
   ScrollText,
   Layout,
   Search,
+  Plug,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { isElectron } from '../services/electronProxy';
@@ -29,9 +30,10 @@ import {
   DiagnosticLogsPanel,
   MenuManagementPanel,
   VectorSearchSettings,
+  McpSettings,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch';
+type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -258,7 +260,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch']),
+    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp']),
     []
   );
 
@@ -361,6 +363,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('向量搜索', 'Vector Search'),
       icon: <Search className="w-5 h-5" />,
     },
+    ...((isElectron() || backend.isAvailable) ? [{
+      id: 'mcp' as SettingsTab,
+      label: t('MCP服务', 'MCP Server'),
+      icon: <Plug className="w-5 h-5" />,
+    }] : []),
   ];
 
   const renderTabContent = () => {
@@ -388,6 +395,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <NetworkPanel t={t} />;
         case 'vectorSearch':
           return <VectorSearchSettings t={t} />;
+        case 'mcp':
+          return <McpSettings t={t} />;
         default:
           return null;
       }

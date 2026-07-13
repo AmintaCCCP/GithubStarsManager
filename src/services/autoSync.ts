@@ -35,6 +35,7 @@ const _lastHash = {
   webdav: '',
   embedding: '',
   vectorSearch: '',
+  mcp: '',
   settings: '',
 };
 
@@ -67,17 +68,18 @@ export async function syncFromBackend(): Promise<void> {
 
   const startTime = Date.now();
   try {
-    const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
+    const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, mcpResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
       backend.fetchAIConfigs(),
       backend.fetchWebDAVConfigs(),
       backend.fetchEmbeddingConfigs(),
       backend.fetchVectorSearchConfig(),
+      backend.fetchMcpConfig(),
       backend.fetchSettings(),
     ]);
 
-    const changed = { repos: false, releases: false, ai: false, webdav: false, embedding: false, vectorSearch: false, settings: false };
+    const changed = { repos: false, releases: false, ai: false, webdav: false, embedding: false, vectorSearch: false, mcp: false, settings: false };
 
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
@@ -126,6 +128,14 @@ export async function syncFromBackend(): Promise<void> {
       if (hash !== _lastHash.vectorSearch) {
         hashes.vectorSearch = hash;
         changed.vectorSearch = true;
+      }
+    }
+
+    if (mcpResult.status === 'fulfilled') {
+      const hash = quickHash(mcpResult.value);
+      if (hash !== _lastHash.mcp) {
+        hashes.mcp = hash;
+        changed.mcp = true;
       }
     }
 
@@ -239,6 +249,10 @@ export async function syncFromBackend(): Promise<void> {
       state.setVectorSearchConfig(backendConfig);
       _lastHash.vectorSearch = hashes.vectorSearch;
     }
+    if (changed.mcp && mcpResult.status === 'fulfilled') {
+      state.setMcpConfig(mcpResult.value);
+      _lastHash.mcp = hashes.mcp;
+    }
     // Sync active selections from settings
     if (changed.settings && settingsResult.status === 'fulfilled') {
       const settings = settingsResult.value;
@@ -326,6 +340,7 @@ export async function syncToBackend(): Promise<void> {
       backend.syncWebDAVConfigs(state.webdavConfigs),
       backend.syncEmbeddingConfigs(state.embeddingConfigs),
       backend.syncVectorSearchConfig(state.vectorSearchConfig),
+      backend.syncMcpConfig(state.mcpConfig),
       backend.syncSettings({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -338,7 +353,7 @@ export async function syncToBackend(): Promise<void> {
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       }),
     ]);
-    const [reposSync, releasesSync, aiSync, webdavSync, embeddingSync, vectorSearchSync, settingsSync] = results;
+    const [reposSync, releasesSync, aiSync, webdavSync, embeddingSync, vectorSearchSync, mcpSync, settingsSync] = results;
 
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
@@ -356,6 +371,7 @@ export async function syncToBackend(): Promise<void> {
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
     if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
     if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = quickHash(state.vectorSearchConfig);
+    if (mcpSync.status === 'fulfilled') _lastHash.mcp = quickHash(state.mcpConfig);
     if (settingsSync.status === 'fulfilled') {
       _lastHash.settings = quickHash({
         activeAIConfig: state.activeAIConfig,
