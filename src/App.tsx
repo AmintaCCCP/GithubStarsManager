@@ -142,12 +142,34 @@ function App() {
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
 
+    // Wait until zustand persist has finished hydrating from IndexedDB.
+    // Sync must never run against the empty *initial* state — doing so defeats
+    // the isBootstrapEmpty guard in autoSync and overwrites good local data
+    // with an empty snapshot (the data-loss incident root cause).
+    const waitForHydration = (): Promise<void> =>
+      new Promise((resolve) => {
+        if (useAppStore.getState().hasHydrated) {
+          resolve();
+          return;
+        }
+        const unsubscribe = useAppStore.subscribe((state) => {
+          if (state.hasHydrated) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+
     const initBackend = async () => {
       try {
         await backend.init();
         initMcpRendererBridge();
         if (backend.isAvailable && !cancelled) {
-          await syncFromBackend();
+          // Block on hydration so the first pull never reads the empty initial state.
+          await waitForHydration();
+          if (!cancelled) {
+            await syncFromBackend();
+          }
           if (!cancelled) {
             unsubscribe = startAutoSync();
           }

@@ -54,6 +54,14 @@ function setRepositorySyncVisualState(isSyncing: boolean): void {
  * Silent: errors logged to console only.
  */
 export async function syncFromBackend(): Promise<void> {
+  // Defense in depth: never pull from backend before persist hydration
+  // completes. Before hydration, state.repositories is the empty initial
+  // value, which defeats the isBootstrapEmpty guard and would overwrite
+  // good local data with an empty snapshot (data-loss root cause).
+  if (!useAppStore.getState().hasHydrated) {
+    return;
+  }
+
   if (
     !backend.isAvailable ||
     _isSyncingFromBackendActive ||

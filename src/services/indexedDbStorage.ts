@@ -292,6 +292,31 @@ export const indexedDBStorage: StateStorage = {
     latestValue = { name, value: stamped };
     registerFlushListeners();
 
+    // Defensive gate: never let an empty/invalid snapshot clobber a
+    // non-empty one. A failed hydration (migrate/merge error or an
+    // unreadable snapshot) otherwise writes the initial empty state over
+    // good data and wipes the user's entire history in one write.
+    if (!isNonEmptySnapshot(parseSnapshot(stamped))) {
+      try {
+        const [idbRaw, lsRaw] = await Promise.all([
+          canUseIndexedDB() ? withTimeout(idbGet(name)).catch(() => null) : Promise.resolve(null),
+          Promise.resolve(safeLocalStorageGet(name)),
+        ]);
+        const existingOk =
+          isNonEmptySnapshot(parseSnapshot(idbRaw)) ||
+          isNonEmptySnapshot(parseSnapshot(lsRaw));
+        if (existingOk) {
+          console.warn('[storage] refusing to overwrite non-empty data with an empty snapshot');
+          return;
+        }
+      } catch {
+        // If we cannot verify the existing copy, refuse the empty write
+        // rather than risk clobbering good data.
+        console.warn('[storage] refusing empty write (cannot verify existing data)');
+        return;
+      }
+    }
+
     // Primary path: IndexedDB first (large data friendly)
     if (canUseIndexedDB()) {
       try {
