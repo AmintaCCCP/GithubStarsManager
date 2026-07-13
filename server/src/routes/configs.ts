@@ -762,7 +762,7 @@ router.get('/api/configs/mcp', (req, res) => {
     const row = db.prepare('SELECT * FROM mcp_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
 
     if (!row) {
-      res.json({ enabled: false, port: 0, token: '', tokenStatus: 'empty' });
+      res.json({ enabled: false, port: 18789, token: '', tokenStatus: 'empty' });
       return;
     }
 
@@ -780,7 +780,7 @@ router.get('/api/configs/mcp', (req, res) => {
 
     res.json({
       enabled: !!row.enabled,
-      port: typeof row.port === 'number' ? row.port : 0,
+      port: typeof row.port === 'number' ? row.port : 18789,
       token,
       tokenStatus,
     });
@@ -808,6 +808,14 @@ router.put('/api/configs/mcp', (req, res) => {
     }
 
     const isEnabled = enabled === true || enabled === 1;
+
+    if (isEnabled && !encryptedToken) {
+      res.status(400).json({
+        error: 'MCP token is required when enabled',
+        code: 'MCP_TOKEN_REQUIRED',
+      });
+      return;
+    }
 
     if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
       res.status(400).json({

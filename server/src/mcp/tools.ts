@@ -24,7 +24,8 @@ export function registerMcpTools(server: McpServer, provider: McpDataProvider, v
         isAnalyzed: z.boolean().optional().describe('Only include AI-analyzed repositories when true'),
         sortBy: z.enum(['stars', 'updated', 'name', 'starred']).optional(),
         sortOrder: z.enum(['desc', 'asc']).optional(),
-        limit: z.number().optional().describe('Max results (1-200, default 50)'),
+        limit: z.number().int().min(1).max(200).optional().describe('Max results (1-200, default 50)'),
+        offset: z.number().int().min(0).optional().describe('Results to skip for pagination'),
       },
     },
     async (args) => {
@@ -39,6 +40,7 @@ export function registerMcpTools(server: McpServer, provider: McpDataProvider, v
         sortBy: args.sortBy,
         sortOrder: args.sortOrder,
         limit: args.limit,
+        offset: args.offset,
       });
       return json(repos);
     }
@@ -101,7 +103,7 @@ export function registerMcpTools(server: McpServer, provider: McpDataProvider, v
         'List recent releases of starred repositories, optionally filtered by publish date (ISO string, inclusive).',
       inputSchema: {
         since: z.string().optional().describe('Only releases published at or after this ISO datetime'),
-        limit: z.number().optional().describe('Max results (1-200, default 50)'),
+        limit: z.number().int().min(1).max(200).optional().describe('Max results (1-200, default 50)'),
       },
     },
     async (args) => {
@@ -129,7 +131,7 @@ export function registerMcpTools(server: McpServer, provider: McpDataProvider, v
           'Semantic / natural-language search over starred repositories using the configured vector index. Returns repositories ranked by embedding similarity to the query.',
         inputSchema: {
           query: z.string().describe('Natural-language query, e.g. "a lightweight Rust CLI for PDF merging"'),
-          topK: z.number().optional().describe('Number of results (default 10)'),
+          topK: z.number().int().min(1).max(50).optional().describe('Number of results (1-50, default 10)'),
         },
       },
       async (args) => {

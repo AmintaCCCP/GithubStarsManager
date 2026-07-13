@@ -2233,8 +2233,9 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化向量搜索状态（vectorCount 等，跨重启保留）
         vectorSearchStatus: state.vectorSearchStatus,
 
-        // 持久化 MCP 服务配置
-        mcpConfig: state.mcpConfig,
+        // 持久化 MCP 服务配置（仅 enabled/port；token 不存入快照，
+        // 运行时从加密的后端存储按需取回，避免明文令牌落入 IndexedDB/localStorage 与备份）
+        mcpConfig: { enabled: state.mcpConfig.enabled, port: state.mcpConfig.port },
 
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,

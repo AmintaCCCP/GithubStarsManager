@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import axios from 'axios';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { logger } from '../services/logger.js';
 import type {
   McpDataProvider,
   McpListFilter,
@@ -169,20 +170,25 @@ export class SqliteMcpProvider implements McpDataProvider {
   async semanticSearch(query: string, topK: number): Promise<Array<{ fullName: string; score: number }>> {
     const v = this.readVectorConfig();
     if (!v || !v.enabled || !v.workerUrl || !v.embeddingConfigId) {
+      // Vector search not configured — not a failure; surface as an empty result.
       return [];
     }
     const embRow = this.db
       .prepare('SELECT * FROM embedding_configs WHERE id = ?')
       .get(v.embeddingConfigId) as Record<string, unknown> | undefined;
-    if (!embRow) return [];
+    if (!embRow) {
+      // No embedding configuration — not a failure; surface as an empty result.
+      return [];
+    }
 
     let apiKey = '';
     if (embRow.api_key_encrypted) {
       try {
         apiKey = decrypt(embRow.api_key_encrypted as string, config.encryptionKey);
       } catch {
-        // Corrupted key / encryption-key mismatch — semantic search cannot proceed
-        return [];
+        // Corrupted key / encryption-key mismatch — a genuine config failure that
+        // must be surfaced rather than reported as "no matches".
+        throw new Error('Semantic search unavailable: embedding API key could not be decrypted');
       }
     }
     const baseUrl = (embRow.base_url as string) ?? '';
@@ -190,7 +196,11 @@ export class SqliteMcpProvider implements McpDataProvider {
     const apiType = (embRow.api_type as string) ?? 'openai';
 
     const vector = await this.embedQuery(apiType, baseUrl, apiKey, model, query);
-    if (!vector) return [];
+    if (!vector) {
+      // Embedding provider auth/timeout/outage — surface instead of faking a
+      // zero-result search.
+      throw new Error('Semantic search unavailable: embedding request failed');
+    }
 
     try {
       const res = await axios.post(
@@ -205,8 +215,11 @@ export class SqliteMcpProvider implements McpDataProvider {
           score: typeof m.score === 'number' ? m.score : 0,
         }))
         .filter((m) => !!m.fullName);
-    } catch {
-      return [];
+    } catch (err) {
+      // Vector-worker outage/auth/timeout — surface so the client can distinguish
+      // an outage from a valid zero-result search.
+      logger.errorFromError('mcp.semantic', 'Vector worker query failed', err as Error);
+      throw new Error('Semantic search unavailable: vector search worker request failed');
     }
   }
 
@@ -246,7 +259,8 @@ export class SqliteMcpProvider implements McpDataProvider {
       );
       if (apiType === 'cohere') return (res.data?.embeddings?.[0] as number[]) ?? null;
       return (res.data?.data?.[0]?.embedding as number[]) ?? null;
-    } catch {
+    } catch (err) {
+      logger.errorFromError('mcp.embed', 'Embedding request failed', err as Error);
       return null;
     }
   }

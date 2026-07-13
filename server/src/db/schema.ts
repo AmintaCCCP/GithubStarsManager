@@ -138,7 +138,7 @@ export function initializeSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS mcp_configs (
       id TEXT PRIMARY KEY DEFAULT 'default',
       enabled INTEGER NOT NULL DEFAULT 0,
-      port INTEGER NOT NULL DEFAULT 0,
+      port INTEGER NOT NULL DEFAULT 18789,
       token_encrypted TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))

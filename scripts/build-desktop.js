@@ -359,13 +359,19 @@ function getStats() {
   return { totalRepositories: repos.length, analyzedCount: repos.filter((r) => r.analyzed).length, byLanguage, byCategory, topTags: topTags().slice(0, 20) };
 }
 
+function buildServer() {
+  // A fresh McpServer per request/connection: connect() owns the transport
+  // and only supports one active connection, so a shared instance can break
+  // the second client.
+  const s = new McpServer({ name: 'github-stars-manager', version: '0.7.0' }, { capabilities: { tools: {} } });
+  registerTools(s);
+  return s;
+}
+
 async function startMcp({ port, token }) {
   authToken = token || '';
   if (!authToken) throw new Error('MCP token is required');
   if (httpServer) await stopMcp();
-
-  const server = new McpServer({ name: 'github-stars-manager', version: '0.7.0' }, { capabilities: { tools: {} } });
-  registerTools(server);
 
   const listenPort = port && Number.isInteger(port) && port > 0 ? port : 18789;
 
@@ -416,6 +422,7 @@ async function startMcp({ port, token }) {
     }
 
     try {
+      const server = buildServer();
       if (pathname === '/mcp') {
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => transport.close().catch(() => undefined));

@@ -134,7 +134,10 @@ export function initMcpRendererBridge(): void {
         }))
         .filter((m) => !!m.fullName);
     } catch {
-      return [];
+      // Surface delegated failures (auth/embedding/vector-worker outage) so
+      // Electron MCP clients can distinguish an outage from a valid zero-result
+      // search, rather than silently reporting "no matches".
+      throw new Error('Semantic search failed');
     }
   };
 
@@ -153,13 +156,29 @@ export function initMcpRendererBridge(): void {
   }
 
   useAppStore.subscribe((state, prev) => {
-    if (state.mcpConfig.enabled && (!prev.mcpConfig.enabled || state.mcpConfig.token !== prev.mcpConfig.token)) {
-      // 刚启用或令牌变更，立即推送一次
-      window.electronAPI?.startMcp?.({ port: state.mcpConfig.port || 18789, token: state.mcpConfig.token });
-      window.electronAPI?.pushMcpSnapshot?.(buildSnapshot());
+    // Disabled: stop the embedded server if it was running, so it doesn't
+    // linger with a stale snapshot.
+    if (!state.mcpConfig.enabled) {
+      if (prev.mcpConfig.enabled) {
+        window.electronAPI?.stopMcp?.();
+      }
       return;
     }
-    if (!state.mcpConfig.enabled) return;
+
+    // Enabled: (re)start when enabling, the token changes, or the port
+    // changes — the latter previously never rebound the running server.
+    if (
+      !prev.mcpConfig.enabled ||
+      state.mcpConfig.token !== prev.mcpConfig.token ||
+      state.mcpConfig.port !== prev.mcpConfig.port
+    ) {
+      if (state.mcpConfig.token) {
+        window.electronAPI?.startMcp?.({ port: state.mcpConfig.port || 18789, token: state.mcpConfig.token });
+        window.electronAPI?.pushMcpSnapshot?.(buildSnapshot());
+      }
+      return;
+    }
+
     // Only schedule a (debounced) snapshot push when data the snapshot actually
     // depends on changed. Plain UI state changes (e.g. selection, loading flags)
     // reuse the same references, so we skip the expensive rebuild.

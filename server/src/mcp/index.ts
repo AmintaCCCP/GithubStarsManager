@@ -88,16 +88,16 @@ export function initMcp(app: Express): void {
 
     // ── Streamable HTTP (primary, MCP 2025 spec) ──
     app.all('/mcp', async (req, res) => {
-      const state = loadMcpState();
-      if (!state) {
-        res.status(404).json({ error: 'not found' });
-        return;
-      }
-      if (!tokenMatches(extractBearer(req), state.token)) {
-        unauthorized(res);
-        return;
-      }
       try {
+        const state = loadMcpState();
+        if (!state) {
+          res.status(404).json({ error: 'not found' });
+          return;
+        }
+        if (!tokenMatches(extractBearer(req), state.token)) {
+          unauthorized(res);
+          return;
+        }
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => {
           transport.close().catch(() => undefined);
@@ -113,16 +113,16 @@ export function initMcp(app: Express): void {
 
     // ── SSE fallback (for clients not yet supporting Streamable HTTP) ──
     app.get('/mcp/sse', async (req, res) => {
-      const state = loadMcpState();
-      if (!state) {
-        res.status(404).json({ error: 'not found' });
-        return;
-      }
-      if (!tokenMatches(extractBearer(req), state.token)) {
-        unauthorized(res);
-        return;
-      }
       try {
+        const state = loadMcpState();
+        if (!state) {
+          res.status(404).json({ error: 'not found' });
+          return;
+        }
+        if (!tokenMatches(extractBearer(req), state.token)) {
+          unauthorized(res);
+          return;
+        }
         const transport = new SSEServerTransport('/mcp/sse/messages', res);
         sseTransports.set(transport.sessionId, transport);
         res.on('close', () => {
@@ -137,22 +137,22 @@ export function initMcp(app: Express): void {
     });
 
     app.post('/mcp/sse/messages', async (req, res) => {
-      const state = loadMcpState();
-      if (!state) {
-        res.status(404).json({ error: 'not found' });
-        return;
-      }
-      if (!tokenMatches(extractBearer(req), state.token)) {
-        unauthorized(res);
-        return;
-      }
-      const sessionId = req.query.sessionId as string | undefined;
-      const transport = sessionId ? sseTransports.get(sessionId) : undefined;
-      if (!transport) {
-        res.status(404).json({ error: 'unknown session' });
-        return;
-      }
       try {
+        const state = loadMcpState();
+        if (!state) {
+          res.status(404).json({ error: 'not found' });
+          return;
+        }
+        if (!tokenMatches(extractBearer(req), state.token)) {
+          unauthorized(res);
+          return;
+        }
+        const sessionId = req.query.sessionId as string | undefined;
+        const transport = sessionId ? sseTransports.get(sessionId) : undefined;
+        if (!transport) {
+          res.status(404).json({ error: 'unknown session' });
+          return;
+        }
         await transport.handlePostMessage(req, res, req.body);
       } catch (err) {
         logger.errorFromError('mcp.sseMsg', 'SSE message error', err as Error);

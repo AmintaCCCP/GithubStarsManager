@@ -79,7 +79,7 @@ class BackendAdapter {
     }
     return headers;
   }
-  private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
+  private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000, sensitive = false): Promise<Response> {
     const startTime = Date.now();
     const method = (options?.method || 'GET').toUpperCase();
     const path = url.replace(/^https?:\/\/[^/]+/, '');
@@ -143,6 +143,23 @@ class BackendAdapter {
           const text = await cloned.text();
           if (text.length > 0) {
             responseBody = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+            if (sensitive) {
+              // Redact secret fields (e.g. decrypted MCP token) before logging.
+              try {
+                const parsed = JSON.parse(text) as Record<string, unknown>;
+                responseBody = JSON.stringify(
+                  Object.fromEntries(
+                    Object.entries(parsed).map(([k, v]) => [
+                      k,
+                      /token|secret|api[_-]?key|password/i.test(k) ? '***' : v,
+                    ])
+                  ),
+                  2
+                );
+              } catch {
+                responseBody = '[redacted]';
+              }
+            }
           }
         } catch { /* body not readable */ }
         logger.debug('backendAdapter', 'Backend request', {
@@ -168,14 +185,14 @@ class BackendAdapter {
    * Retry wrapper with exponential backoff for transient network errors.
    * Covers browser fetch (Chrome/Firefox/Safari) and Node.js undici fetch.
    */
-  private async fetchWithRetry(url: string, options?: RequestInit, timeoutMs = 30000, maxRetries = 3): Promise<Response> {
+  private async fetchWithRetry(url: string, options?: RequestInit, timeoutMs = 30000, maxRetries = 3, sensitive = false): Promise<Response> {
     const retryStartTime = Date.now();
     const method = (options?.method || 'GET').toUpperCase();
     const path = url.replace(/^https?:\/\/[^/]+/, '');
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return await this.fetchWithTimeout(url, options, timeoutMs);
+        return await this.fetchWithTimeout(url, options, timeoutMs, sensitive);
       } catch (err) {
         lastError = err as Error;
         const isRetryable =
@@ -668,7 +685,7 @@ class BackendAdapter {
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/mcp?decrypt=true`, {
       headers: this.getAuthHeaders()
-    });
+    }, 30000, true);
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch MCP config error');
     const data = await res.json() as Record<string, unknown>;
     return {

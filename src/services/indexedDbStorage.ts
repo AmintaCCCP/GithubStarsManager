@@ -271,7 +271,9 @@ export const indexedDBStorage: StateStorage = {
           }
         } else if (selected === lsRaw && selected !== idbRaw) {
           try {
-            await withTimeout(idbSet(name, stamp(selected)));
+            // Repair verbatim: preserve the selected snapshot's original
+            // timestamp so it never appears newer than a concurrent genuine write.
+            await withTimeout(idbSet(name, selected));
           } catch (error) {
             console.warn('[storage] IndexedDB repair write failed', error);
           }
@@ -289,8 +291,6 @@ export const indexedDBStorage: StateStorage = {
     if (typeof window === 'undefined') return;
 
     const stamped = stamp(normalizeValue(value));
-    latestValue = { name, value: stamped };
-    registerFlushListeners();
 
     // Defensive gate: never let an empty/invalid snapshot clobber a
     // non-empty one. A failed hydration (migrate/merge error or an
@@ -316,6 +316,13 @@ export const indexedDBStorage: StateStorage = {
         return;
       }
     }
+
+    // Only cache the value for unload-time flush *after* the empty-write gate
+    // has accepted it. Caching a rejected write would let pagehide/visibilitychange
+    // persist the empty snapshot to localStorage, bypassing the guard and
+    // destroying the only good copy in localStorage-only environments.
+    latestValue = { name, value: stamped };
+    registerFlushListeners();
 
     // Primary path: IndexedDB first (large data friendly)
     if (canUseIndexedDB()) {
