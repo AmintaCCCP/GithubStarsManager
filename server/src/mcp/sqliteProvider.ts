@@ -100,6 +100,11 @@ export class SqliteMcpProvider implements McpDataProvider {
       where.push(filter.isAnalyzed ? 'analyzed_at IS NOT NULL' : 'analyzed_at IS NULL');
     }
 
+    // When a tag filter is present we cannot paginate in SQL first (matches could
+    // fall outside the page window), so we load candidates, filter in memory, then
+    // apply the caller's offset/limit. Otherwise we keep the SQL LIMIT/OFFSET.
+    const hasTagFilter = !!(filter.tags && filter.tags.length);
+
     const sql = `
       SELECT * FROM repositories
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -112,20 +117,22 @@ export class SqliteMcpProvider implements McpDataProvider {
               ? 'updated_at'
               : 'stargazers_count'
       } ${filter.sortOrder === 'asc' ? 'ASC' : 'DESC'}
-      LIMIT ? OFFSET ?
+      ${hasTagFilter ? '' : 'LIMIT ? OFFSET ?'}
     `;
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200);
     const offset = Math.max(filter.offset ?? 0, 0);
-    params.push(limit, offset);
+    if (!hasTagFilter) params.push(limit, offset);
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     let results = rows.map(mapSummary);
 
-    if (filter.tags && filter.tags.length) {
-      const tags = filter.tags.map((t) => t.toLowerCase());
-      results = results.filter((r) =>
-        [...r.customTags, ...r.aiTags, ...r.topics].some((t) => tags.includes(t.toLowerCase()))
-      );
+    if (hasTagFilter) {
+      const tags = filter.tags!.map((t) => t.toLowerCase());
+      results = results
+        .filter((r) =>
+          [...r.customTags, ...r.aiTags, ...r.topics].some((t) => tags.includes(t.toLowerCase()))
+        )
+        .slice(offset, offset + limit);
     }
     return Promise.resolve(results);
   }
@@ -169,7 +176,15 @@ export class SqliteMcpProvider implements McpDataProvider {
       .get(v.embeddingConfigId) as Record<string, unknown> | undefined;
     if (!embRow) return [];
 
-    const apiKey = embRow.api_key_encrypted ? decrypt(embRow.api_key_encrypted as string, config.encryptionKey) : '';
+    let apiKey = '';
+    if (embRow.api_key_encrypted) {
+      try {
+        apiKey = decrypt(embRow.api_key_encrypted as string, config.encryptionKey);
+      } catch {
+        // Corrupted key / encryption-key mismatch — semantic search cannot proceed
+        return [];
+      }
+    }
     const baseUrl = (embRow.base_url as string) ?? '';
     const model = (embRow.model as string) ?? '';
     const apiType = (embRow.api_type as string) ?? 'openai';
@@ -229,7 +244,7 @@ export class SqliteMcpProvider implements McpDataProvider {
         apiType === 'cohere' ? { model, texts: [text], input_type: 'search_query' } : { input: [text], model },
         { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 15000 }
       );
-      if (apiType === 'cohere') return (res.data?.embeddings?.[0]?.values as number[]) ?? null;
+      if (apiType === 'cohere') return (res.data?.embeddings?.[0] as number[]) ?? null;
       return (res.data?.data?.[0]?.embedding as number[]) ?? null;
     } catch {
       return null;

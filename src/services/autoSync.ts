@@ -250,7 +250,17 @@ export async function syncFromBackend(): Promise<void> {
       _lastHash.vectorSearch = hashes.vectorSearch;
     }
     if (changed.mcp && mcpResult.status === 'fulfilled') {
-      state.setMcpConfig(mcpResult.value);
+      const backendMcp = mcpResult.value;
+      const localMcp = state.mcpConfig;
+      // Preserve local token when the backend returns a masked/empty value or a
+      // decrypt failure, so a sync never overwrites a valid local token.
+      if ((backendMcp as Record<string, unknown>).tokenStatus === 'decrypt_failed' || !backendMcp.token) {
+        if (localMcp.token) {
+          logger.warn('sync.decryptFailed', 'Backend decrypt_failed/empty for MCP token, preserving local value');
+          (backendMcp as Record<string, unknown>).token = localMcp.token;
+        }
+      }
+      state.setMcpConfig(backendMcp);
       _lastHash.mcp = hashes.mcp;
     }
     // Sync active selections from settings

@@ -194,6 +194,8 @@ let snapshot = { repositories: [], releases: [], categories: [], vectorEnabled: 
 let authToken = '';
 let httpServer = null;
 let semanticHandler = null;
+let sseTransports = new Map();
+const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB cap on request bodies
 
 export function setSnapshot(s) {
   if (s && typeof s === 'object') snapshot = s;
@@ -355,18 +357,7 @@ function getStats() {
   return { totalRepositories: repos.length, analyzedCount: repos.filter((r) => r.analyzed).length, byLanguage, byCategory, topTags: topTags().slice(0, 20) };
 }
 
-async function handleRequest(server, transport, req, res, body) {
-  if (!tokenMatches(extractBearer(req), authToken)) {
-    res.statusCode = 401;
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ error: 'unauthorized' }));
-    return;
-  }
-  await server.connect(transport);
-  await transport.handleRequest(req, res, body);
-}
-
-export async function startMcp({ port, token }) {
+async function startMcp({ port, token }) {
   authToken = token || '';
   if (!authToken) throw new Error('MCP token is required');
   if (httpServer) await stopMcp();
@@ -374,59 +365,109 @@ export async function startMcp({ port, token }) {
   const server = new McpServer({ name: 'github-stars-manager', version: '0.7.0' }, { capabilities: { tools: {} } });
   registerTools(server);
 
-  const sseTransports = new Map();
+  const listenPort = port && Number.isInteger(port) && port > 0 ? port : 18789;
+
   const httpServerInstance = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
+    const pathname = url.pathname;
+
+    // Authenticate BEFORE buffering any body, so an unauthenticated caller
+    // cannot exhaust memory by streaming a huge payload.
+    const protectedPath =
+      pathname === '/mcp' || pathname === '/mcp/sse' || pathname === '/mcp/sse/messages';
+    if (protectedPath && !tokenMatches(extractBearer(req), authToken)) {
+      res.statusCode = 401;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: 'unauthorized' }));
+      return;
+    }
+
+    // Buffer + parse body (capped) only for write methods that need it.
     let body = undefined;
     if (req.method === 'POST' || req.method === 'PUT') {
       const chunks = [];
-      for await (const c of req) chunks.push(c);
-      try { body = JSON.parse(Buffer.concat(chunks).toString() || '{}'); } catch { body = undefined; }
+      let size = 0;
+      try {
+        for await (const c of req) {
+          size += c.length;
+          if (size > MAX_BODY_BYTES) {
+            res.statusCode = 413;
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({ error: 'payload too large' }));
+            req.destroy();
+            return;
+          }
+          chunks.push(c);
+        }
+        const raw = Buffer.concat(chunks).toString('utf8');
+        if (raw) {
+          try { body = JSON.parse(raw); } catch { body = undefined; }
+        }
+      } catch {
+        if (!res.headersSent) {
+          res.statusCode = 400;
+          res.setHeader('content-type', 'application/json');
+          res.end(JSON.stringify({ error: 'bad request' }));
+        }
+        return;
+      }
     }
 
     try {
-      if (url.pathname === '/mcp') {
+      if (pathname === '/mcp') {
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => transport.close().catch(() => undefined));
-        await handleRequest(server, transport, req, res, body);
-      } else if (url.pathname === '/mcp/sse' && req.method === 'GET') {
-        if (!tokenMatches(extractBearer(req), authToken)) {
-          res.statusCode = 401;
-          res.setHeader('content-type', 'application/json');
-          res.end(JSON.stringify({ error: 'unauthorized' }));
-          return;
-        }
+        await server.connect(transport);
+        await transport.handleRequest(req, res, body);
+      } else if (pathname === '/mcp/sse' && req.method === 'GET') {
         const transport = new SSEServerTransport('/mcp/sse/messages', res);
         sseTransports.set(transport.sessionId, transport);
         res.on('close', () => sseTransports.delete(transport.sessionId));
         await server.connect(transport);
         await transport.start();
-      } else if (url.pathname === '/mcp/sse/messages' && req.method === 'POST') {
-        if (!tokenMatches(extractBearer(req), authToken)) {
-          res.statusCode = 401;
-          res.setHeader('content-type', 'application/json');
-          res.end(JSON.stringify({ error: 'unauthorized' }));
-          return;
-        }
+      } else if (pathname === '/mcp/sse/messages' && req.method === 'POST') {
         const sid = url.searchParams.get('sessionId');
         const transport = sid ? sseTransports.get(sid) : undefined;
-        if (!transport) { res.statusCode = 404; res.end(JSON.stringify({ error: 'unknown session' })); return; }
+        if (!transport) {
+          res.statusCode = 404;
+          res.setHeader('content-type', 'application/json');
+          res.end(JSON.stringify({ error: 'unknown session' }));
+          return;
+        }
         await transport.handlePostMessage(req, res, body);
       } else {
         res.statusCode = 404;
+        res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify({ error: 'not found' }));
       }
     } catch (e) {
-      if (!res.headersSent) { res.statusCode = 500; res.end(JSON.stringify({ error: 'internal error' })); }
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: 'internal error' }));
+      }
     }
   });
 
-  await new Promise((resolve) => httpServerInstance.listen(port, '127.0.0.1', resolve));
+  // Surface listen errors (e.g. EADDRINUSE) instead of crashing silently.
+  await new Promise((resolve, reject) => {
+    const onError = (err) => reject(err);
+    httpServerInstance.once('error', onError);
+    httpServerInstance.listen(listenPort, '127.0.0.1', () => {
+      httpServerInstance.removeListener('error', onError);
+      resolve();
+    });
+  });
   httpServer = httpServerInstance;
-  console.log('[GSM] MCP server listening on 127.0.0.1:' + port + '/mcp');
+  console.log('[GSM] MCP server listening on 127.0.0.1:' + listenPort + '/mcp');
 }
 
 export async function stopMcp() {
+  // Close any open SSE transports first so clients are notified.
+  for (const transport of sseTransports.values()) {
+    try { await transport.close(); } catch { /* ignore */ }
+  }
+  sseTransports.clear();
   if (httpServer) {
     await new Promise((resolve) => httpServer.close(resolve));
     httpServer = null;
@@ -462,6 +503,15 @@ try {
   execSync('npm install', { stdio: 'inherit', cwd: electronDir });
 } catch (error) {
   console.error('安装依赖失败:', error.message);
+  process.exit(1);
+}
+
+// 6b. 安装 electron + electron-builder（构建期完成，用户无感；原 main 分支的实现）
+console.log('📥 安装 electron + electron-builder（构建依赖）...');
+try {
+  execSync('npm install --save-dev electron electron-builder', { stdio: 'inherit' });
+} catch (error) {
+  console.error('安装 electron/electron-builder 失败:', error.message);
   process.exit(1);
 }
 

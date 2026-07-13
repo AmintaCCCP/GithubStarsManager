@@ -53,7 +53,8 @@ export const McpSettings: React.FC<McpSettingsProps> = ({ t }) => {
       }
       if (isElectronMode) {
         if (merged.enabled) {
-          window.electronAPI?.startMcp?.({ port: merged.port, token: merged.token });
+          // Port 0 / unset falls back to the default listen port in the main process.
+          window.electronAPI?.startMcp?.({ port: merged.port || 18789, token: merged.token });
         } else {
           window.electronAPI?.stopMcp?.();
         }
@@ -176,8 +177,16 @@ export const McpSettings: React.FC<McpSettingsProps> = ({ t }) => {
                 </label>
                 <input
                   type="number"
+                  min={1}
+                  max={65535}
                   value={mcpConfig.port || 18789}
-                  onChange={(e) => applyConfig({ port: Number(e.target.value) || 18789 })}
+                  onChange={(e) => {
+                    const raw = Number(e.target.value);
+                    const clamped = Number.isNaN(raw)
+                      ? 18789
+                      : Math.min(65535, Math.max(1, Math.trunc(raw)));
+                    applyConfig({ port: clamped });
+                  }}
                   className="w-32 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-indigo/50"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">

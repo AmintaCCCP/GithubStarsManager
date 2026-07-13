@@ -808,12 +808,24 @@ router.put('/api/configs/mcp', (req, res) => {
     }
 
     const isEnabled = enabled === true || enabled === 1;
-    const mcpPort = typeof port === 'number' && port > 0 ? port : 0;
+
+    if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+      res.status(400).json({
+        error: 'Invalid port: must be an integer between 1 and 65535',
+        code: 'INVALID_PORT',
+      });
+      return;
+    }
 
     db.prepare(`
-      INSERT OR REPLACE INTO mcp_configs (id, enabled, port, token_encrypted, updated_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `).run('default', isEnabled ? 1 : 0, mcpPort, encryptedToken);
+      INSERT INTO mcp_configs (id, enabled, port, token_encrypted, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        enabled = excluded.enabled,
+        port = excluded.port,
+        token_encrypted = excluded.token_encrypted,
+        updated_at = datetime('now')
+    `).run('default', isEnabled ? 1 : 0, port, encryptedToken);
 
     res.json({ updated: true });
   } catch (err) {

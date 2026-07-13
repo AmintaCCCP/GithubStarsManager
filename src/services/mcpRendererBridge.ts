@@ -160,6 +160,15 @@ export function initMcpRendererBridge(): void {
       return;
     }
     if (!state.mcpConfig.enabled) return;
+    // Only schedule a (debounced) snapshot push when data the snapshot actually
+    // depends on changed. Plain UI state changes (e.g. selection, loading flags)
+    // reuse the same references, so we skip the expensive rebuild.
+    const relevantChanged =
+      state.repositories !== prev.repositories ||
+      state.releases !== prev.releases ||
+      state.customCategories !== prev.customCategories ||
+      state.vectorSearchConfig !== prev.vectorSearchConfig;
+    if (!relevantChanged) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(push, 2000);
   });
