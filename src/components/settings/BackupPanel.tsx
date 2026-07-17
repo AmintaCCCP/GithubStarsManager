@@ -155,16 +155,18 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         }
 
         // 恢复 Release 订阅、来源(Watch/自定义)与已读状态。
-        // 旧版 1.0 备份无这些字段 —— setter 内部经 normalizeReleaseSourceSettings 对 null/缺字段安全回退为默认空，保持向后兼容。
+        // 旧版 1.0 备份无这些字段 —— 仅在字段存在时回填，且对数组元素做数字过滤，与 store 的 normalizeNumberSet 行为一致，防止损坏/被篡改的备份混入非数字类型污染 Set<number>。
         try {
           if (Array.isArray(backupData.releaseSubscriptions)) {
-            useAppStore.setState({ releaseSubscriptions: new Set<number>(backupData.releaseSubscriptions) });
+            const validSubscriptions = backupData.releaseSubscriptions.filter((id: unknown): id is number => typeof id === 'number');
+            useAppStore.setState({ releaseSubscriptions: new Set<number>(validSubscriptions) });
           }
-          if (backupData.releaseSourceSettings !== undefined) {
-            setReleaseSourceSettings(backupData.releaseSourceSettings ?? null);
+          if (backupData.releaseSourceSettings) {
+            setReleaseSourceSettings(backupData.releaseSourceSettings);
           }
           if (Array.isArray(backupData.readReleases)) {
-            useAppStore.setState({ readReleases: new Set<number>(backupData.readReleases) });
+            const validReads = backupData.readReleases.filter((id: unknown): id is number => typeof id === 'number');
+            useAppStore.setState({ readReleases: new Set<number>(validReads) });
           }
         } catch (e) {
           console.warn('恢复 Release 订阅与已读状态时发生问题：', e);
