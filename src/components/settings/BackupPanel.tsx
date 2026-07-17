@@ -40,6 +40,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     setProxyConfig,
     setRpcDownloadConfig,
     setBackendApiSecret,
+    setReleaseSourceSettings,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -81,9 +82,15 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           secret: includeKeysInBackup ? rpcDownloadConfig.secret : (rpcDownloadConfig.secret ? '***' : ''),
         },
         backendApiSecret: includeKeysInBackup ? backendApiSecret : (backendApiSecret ? '***' : null),
+
+        // Release 订阅、来源(Watch/自定义)与已读状态 —— 此前遗漏，导致 WebDAV 恢复后铃铛订阅与 Watch 仓库丢失
+        releaseSubscriptions: Array.from(useAppStore.getState().releaseSubscriptions),
+        releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+        readReleases: Array.from(useAppStore.getState().readReleases),
+
         includeKeysInBackup,
         exportedAt: new Date().toISOString(),
-        version: '1.0'
+        version: '1.1'
       };
 
       const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
@@ -145,6 +152,22 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         }
         if (Array.isArray(backupData.releases)) {
           setReleases(backupData.releases);
+        }
+
+        // 恢复 Release 订阅、来源(Watch/自定义)与已读状态。
+        // 旧版 1.0 备份无这些字段 —— setter 内部经 normalizeReleaseSourceSettings 对 null/缺字段安全回退为默认空，保持向后兼容。
+        try {
+          if (Array.isArray(backupData.releaseSubscriptions)) {
+            useAppStore.setState({ releaseSubscriptions: new Set<number>(backupData.releaseSubscriptions) });
+          }
+          if (backupData.releaseSourceSettings !== undefined) {
+            setReleaseSourceSettings(backupData.releaseSourceSettings ?? null);
+          }
+          if (Array.isArray(backupData.readReleases)) {
+            useAppStore.setState({ readReleases: new Set<number>(backupData.readReleases) });
+          }
+        } catch (e) {
+          console.warn('恢复 Release 订阅与已读状态时发生问题：', e);
         }
 
         try {
@@ -415,6 +438,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
           <li>• {t('自定义分类', 'Custom categories')}</li>
           <li>• {t('AI 服务配置', 'AI service configurations')}</li>
           <li>• {t('WebDAV 配置', 'WebDAV configurations')}</li>
+          <li>• {t('Release 订阅、来源与已读状态', 'Release subscriptions, sources & read state')}</li>
         </ul>
       </div>
     </div>
