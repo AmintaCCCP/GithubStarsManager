@@ -11,10 +11,11 @@ describe('normalizeMcpHost', () => {
     expect(normalizeMcpHost('[::]')).toBe(MCP_DEFAULT_HOST);
   });
 
-  it('normalizes localhost aliases', () => {
+  it('normalizes localhost / IPv6 loopback aliases to 127.0.0.1', () => {
     expect(normalizeMcpHost('localhost')).toBe(MCP_DEFAULT_HOST);
     expect(normalizeMcpHost('127.0.0.1')).toBe('127.0.0.1');
-    expect(normalizeMcpHost('::1')).toBe('::1');
+    expect(normalizeMcpHost('::1')).toBe(MCP_DEFAULT_HOST);
+    expect(normalizeMcpHost('[::1]')).toBe(MCP_DEFAULT_HOST);
   });
 
   it('forces non-loopback hosts to loopback', () => {
