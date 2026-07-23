@@ -196,6 +196,12 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Match app EmbeddingClient URL rules in vectorSearchService.ts:
+ * - openai / siliconflow: `${baseUrl}/v1/embeddings` (baseUrl usually host without /v1)
+ * - openai-compatible: baseUrl is the full embeddings endpoint
+ * - ollama: `${baseUrl}/api/embed` with { model, input }
+ */
 async function embedQuery(
   texts: string[],
   emb: Record<string, unknown>
@@ -211,32 +217,42 @@ async function embedQuery(
     }
   }
 
-  let baseUrl = String(emb.base_url || '').replace(/\/$/, '');
+  const baseUrl = String(emb.base_url || '').replace(/\/+$/, '');
   let url: string;
-  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   let body: Record<string, unknown>;
 
   if (apiType === 'ollama') {
-    url = `${baseUrl || 'http://127.0.0.1:11434'}/api/embeddings`;
-    body = { model, prompt: texts[0] };
+    url = `${baseUrl || 'http://127.0.0.1:11434'}/api/embed`;
+    body = { model, input: texts };
   } else if (apiType === 'gemini') {
-    const keyQ = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '';
-    url = `${baseUrl || 'https://generativelanguage.googleapis.com'}/v1beta/models/${model}:embedContent${keyQ}`;
-    body = { content: { parts: [{ text: texts[0] }] } };
+    const root = baseUrl || 'https://generativelanguage.googleapis.com';
+    url = `${root}/v1beta/models/${model}:batchEmbedContents?key=${encodeURIComponent(apiKey)}`;
+    body = {
+      requests: texts.map((t) => ({
+        model: `models/${model}`,
+        content: { parts: [{ text: t }] },
+        taskType: 'RETRIEVAL_QUERY',
+      })),
+    };
   } else if (apiType === 'cohere') {
     url = `${baseUrl || 'https://api.cohere.com'}/v1/embed`;
     headers.Authorization = `Bearer ${apiKey}`;
     body = { model, texts, input_type: 'search_query' };
-  } else {
-    // openai / openai-compatible / siliconflow
+  } else if (apiType === 'openai-compatible') {
     if (!baseUrl) {
-      baseUrl =
-        apiType === 'siliconflow'
-          ? 'https://api.siliconflow.cn/v1'
-          : 'https://api.openai.com/v1';
+      throw new Error('openai-compatible base_url is required (full embeddings endpoint)');
     }
-    url = `${baseUrl}/embeddings`;
-    headers.Authorization = `Bearer ${apiKey}`;
+    url = baseUrl;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    body = { model, input: texts };
+  } else {
+    // openai / siliconflow
+    const root =
+      baseUrl ||
+      (apiType === 'siliconflow' ? 'https://api.siliconflow.cn' : 'https://api.openai.com');
+    url = /\/v1$/i.test(root) ? `${root}/embeddings` : `${root}/v1/embeddings`;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     body = { model, input: texts };
   }
 
@@ -247,19 +263,23 @@ async function embedQuery(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Embedding API error ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`Embedding API error ${res.status} (${apiType} ${url}): ${text.slice(0, 200)}`);
   }
   const data = (await res.json()) as Record<string, unknown>;
 
   if (apiType === 'ollama') {
+    const embeddings = data.embeddings as number[][] | undefined;
+    if (embeddings?.[0]) return embeddings[0];
     const embVec = data.embedding as number[] | undefined;
-    if (!embVec) throw new Error('Ollama embedding missing');
-    return embVec;
+    if (embVec) return embVec;
+    throw new Error('Ollama embedding missing');
   }
   if (apiType === 'gemini') {
+    const batch = data.embeddings as Array<{ values?: number[] }> | undefined;
+    if (batch?.[0]?.values) return batch[0].values;
     const embObj = data.embedding as { values?: number[] } | undefined;
-    if (!embObj?.values) throw new Error('Gemini embedding missing');
-    return embObj.values;
+    if (embObj?.values) return embObj.values;
+    throw new Error('Gemini embedding missing');
   }
   if (apiType === 'cohere') {
     const embeddings = data.embeddings as number[][] | undefined;
