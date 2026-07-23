@@ -221,6 +221,7 @@ With Docker Compose, the backend MCP endpoints are exposed through nginx (fronte
 **Notes**
 
 - MCP uses a **separate token** from `API_SECRET` (backend UI auth). Resetting the MCP token does not break app↔backend sync.
+- The MCP bearer is **stable**: stored encrypted in SQLite (`mcp_token`) on the backend, and in IndexedDB with other app state on desktop. It is created once when you first enable MCP and **only changes if you click Reset Token**.
 - Pure frontend (no backend) does not show the MCP settings page.
 - `gsm_vector_search` appears only when Vector Search is configured and enabled in the app.
 - Enabling MCP is additive: existing SQLite data is unchanged; disabling MCP only stops the endpoint.

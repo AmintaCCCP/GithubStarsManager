@@ -54,8 +54,6 @@ import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
-/** Desktop-only MCP bearer; session-scoped so it never lands in IndexedDB. */
-const MCP_TOKEN_SESSION_KEY = 'github-stars-manager-mcp-token';
 
 /** Menu IDs that must always remain visible — enforced at store level */
 const REQUIRED_HEADER_MENU_IDS: ReadonlySet<HeaderMenuId> = new Set(['repositories', 'settings']);
@@ -219,20 +217,6 @@ const writeSessionBackendSecret = (secret: string | null): void => {
     window.sessionStorage.setItem(BACKEND_SECRET_SESSION_KEY, secret);
   } else {
     window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
-  }
-};
-
-const readSessionMcpToken = (): string => {
-  if (typeof window === 'undefined') return '';
-  return window.sessionStorage.getItem(MCP_TOKEN_SESSION_KEY) || '';
-};
-
-const writeSessionMcpToken = (token: string): void => {
-  if (typeof window === 'undefined') return;
-  if (token) {
-    window.sessionStorage.setItem(MCP_TOKEN_SESSION_KEY, token);
-  } else {
-    window.sessionStorage.removeItem(MCP_TOKEN_SESSION_KEY);
   }
 };
 
@@ -788,12 +772,9 @@ export const normalizePersistedState = (
       safePersisted.vectorSearchConfig,
       safePersisted.embeddingConfigs
     ),
-    mcpConfig: (() => {
-      const base = normalizeMcpConfig((safePersisted as Record<string, unknown>).mcpConfig);
-      // Token never comes from IndexedDB; restore desktop token from session only
-      const sessionToken = readSessionMcpToken();
-      return sessionToken ? { ...base, token: sessionToken } : base;
-    })(),
+// Persist full mcpConfig including token so Agent configs stay stable across restarts
+    // unless the user explicitly resets the token.
+    mcpConfig: normalizeMcpConfig((safePersisted as Record<string, unknown>).mcpConfig),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1192,10 +1173,7 @@ export const useAppStore = create<AppState & AppActions>()(
       vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
-      mcpConfig: {
-        ...defaultMcpConfig,
-        token: readSessionMcpToken(),
-      },
+      mcpConfig: { ...defaultMcpConfig },
       similarView: null,
       webdavConfigs: [],
       activeWebDAVConfig: null,
@@ -1556,14 +1534,9 @@ export const useAppStore = create<AppState & AppActions>()(
       })),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setMcpConfig: (config) =>
-        set((state) => {
-          const next = normalizeMcpConfig({ ...state.mcpConfig, ...config });
-          // Keep desktop token in sessionStorage only (never IndexedDB partialize)
-          if (Object.prototype.hasOwnProperty.call(config, 'token')) {
-            writeSessionMcpToken(next.token || '');
-          }
-          return { mcpConfig: next };
-        }),
+        set((state) => ({
+          mcpConfig: normalizeMcpConfig({ ...state.mcpConfig, ...config }),
+        })),
       setVectorIndexingState: (indexingState) => set((state) => ({
         vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
       })),
@@ -2259,15 +2232,8 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化向量搜索状态（vectorCount 等，跨重启保留）
         vectorSearchStatus: state.vectorSearchStatus,
 
-        // MCP: persist enable/bind prefs only. Token is desktop-local secret kept
-        // in memory + Electron main; backend tokens must not land in IndexedDB.
-        // Local token is re-issued on enable if missing (settings / bridge).
-        mcpConfig: {
-          enabled: state.mcpConfig.enabled,
-          host: state.mcpConfig.host,
-          port: state.mcpConfig.port,
-          token: '',
-        },
+        // MCP prefs + bearer token (stable across restarts; only changes on user reset)
+        mcpConfig: state.mcpConfig,
 
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,

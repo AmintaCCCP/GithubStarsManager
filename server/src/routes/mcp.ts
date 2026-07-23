@@ -15,12 +15,12 @@ const router = Router();
  * GET /api/mcp/status
  * Protected by existing API_SECRET auth (via /api middleware).
  * Token is returned in full for owner UI (viewable anytime) when present.
- * Does not create a token until MCP has been enabled at least once.
+ * Mint only when enabled and missing — never rotates an existing token.
  */
 router.get('/api/mcp/status', (_req, res) => {
   try {
     const enabled = isMcpEnabled();
-    // Only mint a token when already enabled (or one already exists)
+    // Only mint when already enabled and no token exists yet (first enable path)
     let token = getMcpTokenPlain() || '';
     if (enabled && !token) {
       token = ensureMcpToken();
