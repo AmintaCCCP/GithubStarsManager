@@ -94,33 +94,57 @@ async function fetchWithTimeout(url, init, timeoutMs = FETCH_TIMEOUT_MS) {
   }
 }
 
+/**
+ * Build embedding request URL/body to match app EmbeddingClient
+ * (src/services/vectorSearchService.ts). Critical: siliconflow/openai use
+ * `${baseUrl}/v1/embeddings` where baseUrl is typically host WITHOUT trailing /v1
+ * (e.g. https://api.siliconflow.cn → .../v1/embeddings).
+ */
 async function embedQuery(text, emb) {
   const apiType = emb.apiType || 'openai';
   const model = emb.model || '';
   const apiKey = emb.apiKey || '';
-  let baseUrl = String(emb.baseUrl || '').replace(/\/$/, '');
+  const baseUrl = String(emb.baseUrl || '').replace(/\/+$/, '');
   let url;
   const headers = { 'Content-Type': 'application/json' };
   let body;
 
   if (apiType === 'ollama') {
-    url = `${baseUrl || 'http://127.0.0.1:11434'}/api/embeddings`;
-    body = { model, prompt: text };
+    // App: POST /api/embed with { model, input }
+    url = `${baseUrl || 'http://127.0.0.1:11434'}/api/embed`;
+    body = { model, input: [text] };
   } else if (apiType === 'gemini') {
-    const keyQ = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '';
-    url = `${baseUrl || 'https://generativelanguage.googleapis.com'}/v1beta/models/${model}:embedContent${keyQ}`;
-    body = { content: { parts: [{ text }] } };
+    // App: batchEmbedContents for query purpose
+    const root = baseUrl || 'https://generativelanguage.googleapis.com';
+    url = `${root}/v1beta/models/${model}:batchEmbedContents?key=${encodeURIComponent(apiKey)}`;
+    body = {
+      requests: [
+        {
+          model: `models/${model}`,
+          content: { parts: [{ text }] },
+          taskType: 'RETRIEVAL_QUERY',
+        },
+      ],
+    };
   } else if (apiType === 'cohere') {
+    // App: POST ${baseUrl}/v1/embed
     url = `${baseUrl || 'https://api.cohere.com'}/v1/embed`;
     headers.Authorization = `Bearer ${apiKey}`;
     body = { model, texts: [text], input_type: 'search_query' };
+  } else if (apiType === 'openai-compatible') {
+    // App: use baseUrl as full embeddings endpoint URL
+    if (!baseUrl) throw new Error('openai-compatible baseUrl is required (full embeddings endpoint)');
+    url = baseUrl;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    body = { model, input: [text] };
   } else {
-    if (!baseUrl) {
-      baseUrl =
-        apiType === 'siliconflow' ? 'https://api.siliconflow.cn/v1' : 'https://api.openai.com/v1';
-    }
-    url = `${baseUrl}/embeddings`;
-    headers.Authorization = `Bearer ${apiKey}`;
+    // openai / siliconflow — App appends /v1/embeddings to host baseUrl
+    const root =
+      baseUrl ||
+      (apiType === 'siliconflow' ? 'https://api.siliconflow.cn' : 'https://api.openai.com');
+    // Avoid double /v1 if user already stored .../v1
+    url = /\/v1$/i.test(root) ? `${root}/embeddings` : `${root}/v1/embeddings`;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     body = { model, input: [text] };
   }
 
@@ -131,17 +155,23 @@ async function embedQuery(text, emb) {
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Embedding API error ${res.status}: ${errText.slice(0, 200)}`);
+    throw new Error(
+      `Embedding API error ${res.status} (${apiType} ${url}): ${errText.slice(0, 200)}`
+    );
   }
   const data = await res.json();
 
   if (apiType === 'ollama') {
-    if (!Array.isArray(data.embedding)) throw new Error('Ollama embedding missing');
-    return data.embedding;
+    // App: { embeddings: [[...]] }
+    if (Array.isArray(data.embeddings?.[0])) return data.embeddings[0];
+    if (Array.isArray(data.embedding)) return data.embedding;
+    throw new Error('Ollama embedding missing');
   }
   if (apiType === 'gemini') {
-    if (!data.embedding?.values) throw new Error('Gemini embedding missing');
-    return data.embedding.values;
+    // batchEmbedContents: { embeddings: [{ values: [...] }] }
+    if (Array.isArray(data.embeddings?.[0]?.values)) return data.embeddings[0].values;
+    if (Array.isArray(data.embedding?.values)) return data.embedding.values;
+    throw new Error('Gemini embedding missing');
   }
   if (apiType === 'cohere') {
     if (!data.embeddings?.[0]) throw new Error('Cohere embedding missing');
