@@ -3,16 +3,30 @@ import type {
   Repository,
   Category,
   VectorSearchConfig,
+  EmbeddingConfig,
   McpServiceConfig,
 } from '../types';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
 
+/** Secrets stay in main-process memory only (IPC snapshot); not written to disk by MCP server. */
+export interface McpVectorRuntimeConfig {
+  enabled: boolean;
+  workerUrl: string;
+  authToken: string;
+  searchThreshold?: number;
+  searchTopK?: number;
+  embedding: Pick<
+    EmbeddingConfig,
+    'apiType' | 'baseUrl' | 'apiKey' | 'model' | 'dimensions'
+  > | null;
+}
+
 export interface McpDataSnapshot {
   repositories: Repository[];
   customCategories: Category[];
-  vectorSearchConfig: Pick<VectorSearchConfig, 'enabled' | 'workerUrl' | 'embeddingConfigId'>;
+  vectorSearchConfig: McpVectorRuntimeConfig;
   snapshotAt: string;
 }
 
