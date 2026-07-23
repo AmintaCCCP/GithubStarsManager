@@ -13,6 +13,7 @@ import {
   EmbeddingConfig,
   VectorSearchConfig,
   VectorSearchStatus,
+  McpServiceConfig,
   VectorIndexingState,
   ProxyConfig,
   RpcDownloadConfig,
@@ -331,6 +332,9 @@ interface AppActions {
   setVectorSearchStatus: (status: VectorSearchStatus | undefined) => void;
   setVectorIndexingState: (state: Partial<VectorIndexingState>) => void;
 
+  // MCP service (local prefs; backend SQLite is source of truth when connected)
+  setMcpConfig: (config: Partial<McpServiceConfig>) => void;
+
   // Similar repositories view actions
   enterSimilarView: (repos: Repository[], anchor: Repository) => void;
   resetSimilarView: () => void;
@@ -580,6 +584,41 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
   embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
 };
 
+export const defaultMcpConfig: McpServiceConfig = {
+  enabled: false,
+  host: '127.0.0.1',
+  port: 3927,
+  token: '',
+};
+
+const normalizeMcpHost = (raw: unknown): string => {
+  if (typeof raw !== 'string' || !raw.trim()) return defaultMcpConfig.host;
+  const host = raw.trim();
+  // Desktop MCP must stay loopback-only
+  if (host === '0.0.0.0' || host === '::' || host === '[::]') return '127.0.0.1';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    return host === 'localhost' ? '127.0.0.1' : host;
+  }
+  return '127.0.0.1';
+};
+
+const normalizeMcpConfig = (raw: unknown): McpServiceConfig => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...defaultMcpConfig };
+  }
+  const config = raw as Record<string, unknown>;
+  const port =
+    typeof config.port === 'number' && Number.isInteger(config.port) && config.port >= 1 && config.port <= 65535
+      ? config.port
+      : defaultMcpConfig.port;
+  return {
+    enabled: config.enabled === true,
+    host: normalizeMcpHost(config.host),
+    port,
+    token: typeof config.token === 'string' ? config.token : '',
+  };
+};
+
 // 持久化历史配置缺失 embeddingFormatVersion 时的回退版本：旧值为 1，确保旧用户触发一次重建
 export const LEGACY_EMBEDDING_FORMAT_VERSION = 1;
 
@@ -743,6 +782,7 @@ export const normalizePersistedState = (
       safePersisted.vectorSearchConfig,
       safePersisted.embeddingConfigs
     ),
+    mcpConfig: normalizeMcpConfig((safePersisted as Record<string, unknown>).mcpConfig),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;
@@ -1141,6 +1181,7 @@ export const useAppStore = create<AppState & AppActions>()(
       vectorSearchConfig: { ...defaultVectorSearchConfig },
       vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
+      mcpConfig: { ...defaultMcpConfig },
       similarView: null,
       webdavConfigs: [],
       activeWebDAVConfig: null,
@@ -1500,6 +1541,10 @@ export const useAppStore = create<AppState & AppActions>()(
         vectorSearchConfig: mergeVectorSearchConfig(state.vectorSearchConfig, config)
       })),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
+      setMcpConfig: (config) =>
+        set((state) => ({
+          mcpConfig: normalizeMcpConfig({ ...state.mcpConfig, ...config }),
+        })),
       setVectorIndexingState: (indexingState) => set((state) => ({
         vectorIndexingState: { ...state.vectorIndexingState, ...indexingState }
       })),
@@ -2195,6 +2240,9 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化向量搜索状态（vectorCount 等，跨重启保留）
         vectorSearchStatus: state.vectorSearchStatus,
 
+        // 持久化 MCP 本地偏好（token 可查看/复制；后端连接时以服务端为准）
+        mcpConfig: state.mcpConfig,
+
         // 持久化WebDAV配置
         webdavConfigs: state.webdavConfigs,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -2319,6 +2367,12 @@ export const useAppStore = create<AppState & AppActions>()(
         if (state && !state.vectorSearchStatus) {
           console.log('Migrating from old version: initializing vectorSearchStatus');
           state.vectorSearchStatus = { connected: false, vectorCount: 0, dimensions: 0 };
+        }
+
+        // Additive: MCP config defaults when missing (upgrade). Old builds ignore this key on downgrade.
+        if (state) {
+          const stateRecord = state as Record<string, unknown>;
+          stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
         }
 
         // 迁移仓库数据中的旧标记
@@ -2454,6 +2508,7 @@ export const useAppStore = create<AppState & AppActions>()(
       stateRecord.vectorSearchConfig,
       stateRecord.embeddingConfigs
     );
+    stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
   }
 
         return state as PersistedAppState;

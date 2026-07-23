@@ -260,6 +260,17 @@ export interface VectorIndexingState {
   result: { indexed: number; skipped: number; errors: number; error?: string } | null;
 }
 
+/** Local (Electron) / client-side MCP service preferences. Server is source of truth when backend is on. */
+export interface McpServiceConfig {
+  enabled: boolean;
+  /** Local bind host for Electron standalone MCP (default 127.0.0.1) */
+  host: string;
+  /** Local bind port for Electron standalone MCP (default 3927) */
+  port: number;
+  /** Plaintext MCP bearer token — viewable anytime; regenerate via reset */
+  token: string;
+}
+
 // 相似仓库视图状态：进入"查找相似仓库"后保存当前上下文，重置时恢复
 export interface SimilarViewState {
   active: boolean;
@@ -449,6 +460,9 @@ export interface AppState {
 
   // Backend
   backendApiSecret: string | null;
+
+  // MCP (local Electron prefs; backend uses SQLite settings when available)
+  mcpConfig: McpServiceConfig;
 
   // Network Proxy
   proxyConfig: ProxyConfig;

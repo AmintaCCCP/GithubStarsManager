@@ -8,6 +8,7 @@ const SENSITIVE_FIELD_NAMES = new Set([
   'apiKey', 'api_key', 'api_key_encrypted', 'password', 'password_encrypted',
   'secret', 'token', 'githubToken', 'accessToken', 'authorization',
   'x-api-key', 'credentials', 'passwd', 'pwd', 'backendApiSecret',
+  'mcp_token', 'mcpToken', 'authToken', 'auth_token_encrypted',
 ]);
 
 // URL query param keys to redact
@@ -85,6 +86,7 @@ export function sanitizeForLog(input: unknown, seen: WeakSet<object> = new WeakS
 
 function sanitizeString(value: string): string {
   if (isGitHubToken(value)) return maskSecret(value);
+  if (value.startsWith('gsm_mcp_')) return maskSecret(value);
   if (looksLikeSecret(value)) return maskSecret(value);
   if (EMAIL_RE.test(value)) return maskEmail(value);
   if (value.startsWith('http://') || value.startsWith('https://')) return redactUrl(value);
