@@ -40,6 +40,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   const [showToken, setShowToken] = useState(false);
   const [backendMode, setBackendMode] = useState(false);
   const [vectorAvailable, setVectorAvailable] = useState<boolean | null>(null);
+  // Defaults for Electron local; backend overwrites via /api/mcp/status
   const [endpoints, setEndpoints] = useState({
     streamableHttp: '/mcp',
     sse: '/sse',
@@ -62,6 +63,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   const mcpHttpUrl = `${baseUrl}${endpoints.streamableHttp}`;
   const mcpSseUrl = `${baseUrl}${endpoints.sse}`;
 
+  // Streamable HTTP is primary. Legacy SSE config is shown separately for clients that still need it.
   const agentConfigJson = useMemo(() => {
     const config = {
       mcpServers: {
@@ -75,6 +77,21 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     };
     return JSON.stringify(config, null, 2);
   }, [mcpHttpUrl, mcpConfig.token]);
+
+  const agentSseConfigJson = useMemo(() => {
+    const config = {
+      mcpServers: {
+        'github-stars-manager': {
+          // Some older MCP clients expect the SSE GET URL (not Streamable HTTP)
+          url: mcpSseUrl,
+          headers: {
+            Authorization: `Bearer ${mcpConfig.token || '<token>'}`,
+          },
+        },
+      },
+    };
+    return JSON.stringify(config, null, 2);
+  }, [mcpSseUrl, mcpConfig.token]);
 
   const refreshFromBackend = useCallback(async () => {
     if (!backend.isAvailable) {
@@ -427,9 +444,25 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           </pre>
           <p className="text-xs text-gray-500 dark:text-text-tertiary mt-2">
             {language === 'zh'
-              ? '粘贴到 Claude Code / Cursor 的 MCP 配置中。Header 使用上面的 Token。'
-              : 'Paste into Claude Code / Cursor MCP settings. Use the token above in the Authorization header.'}
+              ? '优先使用 Streamable HTTP（上面 JSON）。若客户端只支持旧版 SSE，用下方 SSE URL：GET 打开流后 POST 到 messages。'
+              : 'Prefer Streamable HTTP (JSON above). If the client only supports legacy SSE, use the SSE URL below: GET opens the stream, then POST to messages.'}
           </p>
+          <div className="flex items-center justify-between mb-2 mt-4">
+            <span className="text-sm text-gray-700 dark:text-text-secondary">
+              {t('SSE 兼容配置 (JSON)', 'SSE-compatible config (JSON)')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void copyText('sse-json', agentSseConfigJson)}
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {copiedKey === 'sse-json' ? t('已复制', 'Copied') : t('复制 SSE JSON', 'Copy SSE JSON')}
+            </button>
+          </div>
+          <pre className="text-xs font-mono p-3 rounded-lg bg-light-bg dark:bg-black/30 overflow-x-auto text-gray-800 dark:text-text-secondary border border-black/[0.04] dark:border-white/[0.04]">
+            {agentSseConfigJson}
+          </pre>
         </div>
       </div>
 

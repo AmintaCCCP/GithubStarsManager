@@ -243,6 +243,14 @@ function createMcpLocalServer(getState) {
   /** @type {import('http').Server | null} */
   let server = null;
   let lastError = null;
+  /** @type {Map<string, import('http').ServerResponse>} */
+  const sseStreams = new Map();
+
+  function writeSse(res, event, data) {
+    if (res.writableEnded) return;
+    if (event) res.write(`event: ${event}\n`);
+    res.write(`data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`);
+  }
 
   function handleJsonRpc(body, snapshot) {
     const method = body?.method;
@@ -342,20 +350,91 @@ function createMcpLocalServer(getState) {
       }
 
       const url = new URL(req.url || '/', `http://${host}:${port}`);
-      if (url.pathname !== '/mcp' && url.pathname !== '/sse') {
+      const pathname = url.pathname;
+
+      // ── Legacy SSE transport (MCP HTTP+SSE): GET open stream, POST messages ──
+      // Paths aligned with backend: /sse + /messages (also /mcp/sse + /mcp/sse/messages)
+      const isSseOpen =
+        (req.method === 'GET' || req.method === 'HEAD') &&
+        (pathname === '/sse' || pathname === '/mcp/sse');
+      const isSseMessage =
+        req.method === 'POST' &&
+        (pathname === '/messages' || pathname === '/mcp/sse/messages');
+
+      if (isSseOpen) {
+        const sessionId = crypto.randomUUID();
+        const messagesPath =
+          pathname === '/mcp/sse' ? '/mcp/sse/messages' : '/messages';
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        // MCP SSE handshake: first event points client to the POST endpoint
+        writeSse(res, 'endpoint', `${messagesPath}?sessionId=${sessionId}`);
+        sseStreams.set(sessionId, res);
+        // Keepalive comments so proxies don't drop the stream
+        const keepAlive = setInterval(() => {
+          if (!res.writableEnded) res.write(': ping\n\n');
+        }, 15000);
+        const cleanup = () => {
+          clearInterval(keepAlive);
+          sseStreams.delete(sessionId);
+        };
+        res.on('close', cleanup);
+        res.on('error', cleanup);
+        req.on('close', cleanup);
+        return;
+      }
+
+      if (isSseMessage) {
+        const sessionId = url.searchParams.get('sessionId') || '';
+        const stream = sseStreams.get(sessionId);
+        if (!stream || stream.writableEnded) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'unknown session', code: 'MCP_UNKNOWN_SESSION' }));
+          return;
+        }
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            const body = raw ? JSON.parse(raw) : {};
+            const messages = Array.isArray(body) ? body : [body];
+            for (const msg of messages) {
+              const out = handleJsonRpc(msg, current.snapshot);
+              // notifications have no response
+              if (out) writeSse(stream, 'message', out);
+            }
+            // MCP SSE: acknowledge POST with 202; actual result rides the SSE stream
+            res.writeHead(202).end();
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON-RPC', detail: lastError }));
+          }
+        });
+        return;
+      }
+
+      // ── Streamable HTTP (primary): JSON-RPC over POST /mcp ──
+      if (pathname !== '/mcp') {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Not found' }));
         return;
       }
 
-      if (req.method === 'GET') {
-        // Minimal health / capability probe
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        // Health / capability probe (not SSE — use /sse for that)
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
             status: 'ok',
             transport: 'json-rpc-http',
             path: '/mcp',
+            sse: '/sse',
             mode: 'electron-local',
           })
         );
@@ -407,6 +486,14 @@ function createMcpLocalServer(getState) {
   }
 
   async function stop() {
+    for (const [, stream] of sseStreams) {
+      try {
+        if (!stream.writableEnded) stream.end();
+      } catch {
+        /* ignore */
+      }
+    }
+    sseStreams.clear();
     if (!server) return { success: true };
     await new Promise((resolve) => {
       server.close(() => resolve());
