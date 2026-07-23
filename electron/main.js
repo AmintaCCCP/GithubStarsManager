@@ -16,9 +16,11 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: false,
-      allowRunningInsecureContent: true,
-      devTools: true, // 生产环境也允许 DevTools 便于排障
+      // Production: keep same-origin + block mixed content. Local files load via loadFile.
+      // Dev may relax for Vite HMR / local services if needed later — keep secure by default.
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      devTools: isDev,
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../build/icon.png'),
@@ -31,12 +33,16 @@ function createWindow() {
     trafficLightPosition: { x: 20, y: 20 } // macOS 交通灯按钮位置
   });
 
-  // 添加错误处理和加载事件
+  // 添加错误处理和加载事件（fallback 只尝试一次，避免 did-fail-load 死循环）
+  let fallbackAttempted = false;
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('Failed to load:', errorCode, errorDescription, validatedURL);
-    // 如果主页面加载失败，尝试加载 fallback 页面
     const fallbackPath = path.join(__dirname, '../dist/index.html');
-    if (fs.existsSync(fallbackPath)) {
+    const alreadyOnFallback =
+      typeof validatedURL === 'string' &&
+      (validatedURL.includes('/dist/index.html') || validatedURL.endsWith('dist/index.html'));
+    if (!fallbackAttempted && !alreadyOnFallback && fs.existsSync(fallbackPath)) {
+      fallbackAttempted = true;
       console.log('Loading fallback page:', fallbackPath);
       mainWindow.loadFile(fallbackPath);
     }
@@ -231,7 +237,9 @@ async function applyProxy(config) {
       proxyRules: proxyUrl,
       proxyBypassRules: '<local>;localhost;127.0.0.1'
     });
-    console.log('[Proxy] Applied:', proxyUrl);
+    // Never log credentials embedded in proxy URLs
+    const redactedProxyUrl = proxyUrl.replace(/\/\/[^@/]+@/, '//***:***@');
+    console.log('[Proxy] Applied:', redactedProxyUrl);
   } else {
     await mainWindow.webContents.session.setProxy({ proxyRules: 'direct://' });
     console.log('[Proxy] Disabled, using direct connection');
@@ -268,12 +276,17 @@ ipcMain.handle('test-proxy', async (event, config) => {
         socket.setTimeout(5000);
         socket.write(greeting);
         let step = 0;
-        socket.on('data', (data) => {
+        let buffered = Buffer.alloc(0);
+        socket.on('data', (chunk) => {
+          buffered = Buffer.concat([buffered, chunk]);
           if (step === 0) {
+            if (buffered.length < 2) return;
+            const data = buffered;
             if (data[0] !== 0x05) { socket.destroy(); resolve({ success: false, error: 'Invalid SOCKS5 version' }); return; }
             if (data[1] === 0xFF) { socket.destroy(); resolve({ success: false, error: 'No acceptable auth method' }); return; }
             if (data[1] === 0x02 && config.username && config.password) {
               step = 1;
+              buffered = Buffer.alloc(0);
               const userBuf = Buffer.from(config.username, 'utf8');
               const passBuf = Buffer.from(config.password, 'utf8');
               const authReq = Buffer.alloc(3 + userBuf.length + passBuf.length);
@@ -284,6 +297,8 @@ ipcMain.handle('test-proxy', async (event, config) => {
               socket.write(authReq);
             } else { socket.destroy(); resolve({ success: true }); }
           } else if (step === 1) {
+            if (buffered.length < 2) return;
+            const data = buffered;
             socket.destroy();
             resolve(data[0] === 0x01 && data[1] === 0x00
               ? { success: true }
@@ -332,12 +347,8 @@ const mcpServer = createMcpLocalServer(() => ({
   snapshot: mcpSnapshot,
 }));
 
-function normalizeMcpHost(rawHost) {
-  const host = typeof rawHost === 'string' && rawHost.trim() ? rawHost.trim() : '127.0.0.1';
-  if (host === '0.0.0.0' || host === '::' || host === '[::]' || host === '::1' || host === '[::1]' || host === 'localhost') {
-    return '127.0.0.1';
-  }
-  if (host === '127.0.0.1') return host;
+/** Desktop MCP must only bind loopback. */
+function normalizeMcpHost(_rawHost) {
   return '127.0.0.1';
 }
 
@@ -385,15 +396,19 @@ app.whenReady().then(() => {
   if (savedProxy.enabled && savedProxy.host && savedProxy.port) {
     applyProxy(savedProxy);
   }
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    const focused = BrowserWindow.getFocusedWindow();
-    if (focused && !focused.isDestroyed()) {
-      focused.webContents.toggleDevTools();
-    }
-  });
+  // DevTools shortcut only in development
+  if (isDev) {
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      const focused = BrowserWindow.getFocusedWindow();
+      if (focused && !focused.isDestroyed()) {
+        focused.webContents.toggleDevTools();
+      }
+    });
+  }
 });
 
 app.on('window-all-closed', () => {
+  void mcpServer.stop();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -401,6 +416,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  void mcpServer.stop();
 });
 
 app.on('activate', () => {
