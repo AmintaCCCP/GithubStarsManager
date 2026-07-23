@@ -57,6 +57,168 @@ function projectRepo(repo, max = 400) {
   };
 }
 
+function getVectorAvailability(snapshot) {
+  const vs = snapshot?.vectorSearchConfig;
+  if (!vs || !vs.enabled) {
+    return { available: false, reason: 'vector_search_disabled' };
+  }
+  const workerUrl = String(vs.workerUrl || '').trim();
+  if (!workerUrl) {
+    return { available: false, reason: 'worker_url_missing' };
+  }
+  const emb = vs.embedding;
+  if (!emb || !emb.model) {
+    return { available: false, reason: 'embedding_config_missing' };
+  }
+  const apiType = emb.apiType || 'openai';
+  if (apiType !== 'ollama' && !emb.apiKey) {
+    return { available: false, reason: 'embedding_api_key_missing' };
+  }
+  return {
+    available: true,
+    reason: null,
+    embeddingModel: emb.model,
+    workerUrl,
+  };
+}
+
+const FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url, init, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function embedQuery(text, emb) {
+  const apiType = emb.apiType || 'openai';
+  const model = emb.model || '';
+  const apiKey = emb.apiKey || '';
+  let baseUrl = String(emb.baseUrl || '').replace(/\/$/, '');
+  let url;
+  const headers = { 'Content-Type': 'application/json' };
+  let body;
+
+  if (apiType === 'ollama') {
+    url = `${baseUrl || 'http://127.0.0.1:11434'}/api/embeddings`;
+    body = { model, prompt: text };
+  } else if (apiType === 'gemini') {
+    const keyQ = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '';
+    url = `${baseUrl || 'https://generativelanguage.googleapis.com'}/v1beta/models/${model}:embedContent${keyQ}`;
+    body = { content: { parts: [{ text }] } };
+  } else if (apiType === 'cohere') {
+    url = `${baseUrl || 'https://api.cohere.com'}/v1/embed`;
+    headers.Authorization = `Bearer ${apiKey}`;
+    body = { model, texts: [text], input_type: 'search_query' };
+  } else {
+    if (!baseUrl) {
+      baseUrl =
+        apiType === 'siliconflow' ? 'https://api.siliconflow.cn/v1' : 'https://api.openai.com/v1';
+    }
+    url = `${baseUrl}/embeddings`;
+    headers.Authorization = `Bearer ${apiKey}`;
+    body = { model, input: [text] };
+  }
+
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Embedding API error ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+
+  if (apiType === 'ollama') {
+    if (!Array.isArray(data.embedding)) throw new Error('Ollama embedding missing');
+    return data.embedding;
+  }
+  if (apiType === 'gemini') {
+    if (!data.embedding?.values) throw new Error('Gemini embedding missing');
+    return data.embedding.values;
+  }
+  if (apiType === 'cohere') {
+    if (!data.embeddings?.[0]) throw new Error('Cohere embedding missing');
+    return data.embeddings[0];
+  }
+  if (!data.data?.[0]?.embedding) throw new Error('OpenAI-compatible embedding missing');
+  return data.data[0].embedding;
+}
+
+async function runVectorSearch(query, args, snapshot) {
+  const availability = getVectorAvailability(snapshot);
+  if (!availability.available) {
+    return { available: false, reason: availability.reason || 'unavailable' };
+  }
+
+  const vs = snapshot.vectorSearchConfig;
+  const emb = vs.embedding;
+  const topK = Math.min(50, Math.max(1, Number(args?.topK) || vs.searchTopK || 20));
+  const threshold =
+    typeof args?.threshold === 'number'
+      ? args.threshold
+      : typeof vs.searchThreshold === 'number'
+        ? vs.searchThreshold
+        : 0.35;
+
+  let vector;
+  try {
+    vector = await embedQuery(String(query || ''), emb);
+  } catch (err) {
+    return {
+      available: false,
+      reason: `embedding_failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const workerUrl = String(vs.workerUrl).replace(/\/$/, '');
+  const workerToken = vs.authToken || '';
+  let res;
+  try {
+    res = await fetchWithTimeout(`${workerUrl}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
+      },
+      body: JSON.stringify({ vector, topK, threshold }),
+    });
+  } catch (err) {
+    return {
+      available: false,
+      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    return {
+      available: false,
+      reason: `worker_query_failed: ${res.status} ${errText.slice(0, 120)}`,
+    };
+  }
+
+  const data = await res.json();
+  const matches = Array.isArray(data.matches) ? data.matches : [];
+  const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
+  const byId = new Map(repos.map((r) => [String(r.id), r]));
+
+  const enriched = matches
+    .map((m) => {
+      const repo = byId.get(String(m.id));
+      if (!repo) return null;
+      return { score: m.score, ...projectRepo(repo) };
+    })
+    .filter(Boolean);
+
+  return { available: true, total: enriched.length, matches: enriched };
+}
+
 function getTools(vectorAvailable) {
   const tools = [
     {
@@ -118,10 +280,14 @@ function getTools(vectorAvailable) {
     tools.push({
       name: 'gsm_vector_search',
       description:
-        'Vector search is configured in the app but runs on the backend Worker; in Electron local mode use gsm_search_repos or connect backend MCP.',
+        'Semantic vector search over starred repositories (uses the app embedding + Vectorize worker config).',
       inputSchema: {
         type: 'object',
-        properties: { query: { type: 'string' } },
+        properties: {
+          query: { type: 'string' },
+          topK: { type: 'number' },
+          threshold: { type: 'number' },
+        },
         required: ['query'],
       },
     });
@@ -129,14 +295,10 @@ function getTools(vectorAvailable) {
   return tools;
 }
 
-function callTool(name, args, snapshot) {
+async function callTool(name, args, snapshot) {
   const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
   const categories = Array.isArray(snapshot?.customCategories) ? snapshot.customCategories : [];
-  const vectorEnabled = !!(
-    snapshot?.vectorSearchConfig?.enabled &&
-    snapshot?.vectorSearchConfig?.workerUrl &&
-    snapshot?.vectorSearchConfig?.embeddingConfigId
-  );
+  const vectorInfo = getVectorAvailability(snapshot);
 
   const text = (data) => ({
     content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
@@ -151,11 +313,13 @@ function callTool(name, args, snapshot) {
         repositoryCount: repos.length,
         snapshotAt: snapshot?.snapshotAt || null,
         vector: {
-          available: vectorEnabled,
-          reason: vectorEnabled
-            ? 'configured_in_app_use_backend_mcp_for_live_vector'
-            : 'vector_search_disabled',
+          available: vectorInfo.available,
+          reason: vectorInfo.reason,
+          embeddingModel: vectorInfo.embeddingModel || null,
         },
+        toolsNote: vectorInfo.available
+          ? 'gsm_vector_search is available'
+          : 'gsm_vector_search is not listed until vector search is configured and enabled in the app',
       });
     case 'gsm_search_repos': {
       let list = performBasicTextSearch(repos, args?.query || '');
@@ -221,12 +385,17 @@ function callTool(name, args, snapshot) {
         byLanguage,
       });
     }
-    case 'gsm_vector_search':
-      return text({
-        available: false,
-        reason:
-          'Electron local MCP does not call embedding/worker APIs. Use backend-hosted MCP for gsm_vector_search, or gsm_search_repos for keyword search.',
-      });
+    case 'gsm_vector_search': {
+      if (!vectorInfo.available) {
+        return text({
+          available: false,
+          reason: vectorInfo.reason || 'vector_search_disabled',
+          hint: 'Enable Vector Search in Settings and ensure embedding + worker are configured, then retry.',
+        });
+      }
+      const result = await runVectorSearch(args?.query || '', args, snapshot);
+      return text(result);
+    }
     default:
       return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
   }
@@ -252,14 +421,10 @@ function createMcpLocalServer(getState) {
     res.write(`data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`);
   }
 
-  function handleJsonRpc(body, snapshot) {
+  async function handleJsonRpc(body, snapshot) {
     const method = body?.method;
     const id = body?.id ?? null;
-    const vectorAvailable = !!(
-      snapshot?.vectorSearchConfig?.enabled &&
-      snapshot?.vectorSearchConfig?.workerUrl &&
-      snapshot?.vectorSearchConfig?.embeddingConfigId
-    );
+    const vectorInfo = getVectorAvailability(snapshot);
 
     if (method === 'initialize') {
       return {
@@ -282,13 +447,13 @@ function createMcpLocalServer(getState) {
       return {
         jsonrpc: '2.0',
         id,
-        result: { tools: getTools(vectorAvailable) },
+        result: { tools: getTools(vectorInfo.available) },
       };
     }
     if (method === 'tools/call') {
       const name = body?.params?.name;
       const args = body?.params?.arguments || {};
-      const result = callTool(name, args, snapshot);
+      const result = await callTool(name, args, snapshot);
       return { jsonrpc: '2.0', id, result };
     }
     return {
@@ -411,13 +576,13 @@ function createMcpLocalServer(getState) {
         }
         const chunks = [];
         req.on('data', (c) => chunks.push(c));
-        req.on('end', () => {
+        req.on('end', async () => {
           try {
             const raw = Buffer.concat(chunks).toString('utf8');
             const body = raw ? JSON.parse(raw) : {};
             const messages = Array.isArray(body) ? body : [body];
             for (const msg of messages) {
-              const out = handleJsonRpc(msg, current.snapshot);
+              const out = await handleJsonRpc(msg, current.snapshot);
               // notifications have no response
               if (out) writeSse(stream, 'message', out);
             }
@@ -462,14 +627,14 @@ function createMcpLocalServer(getState) {
 
       const chunks = [];
       req.on('data', (c) => chunks.push(c));
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const raw = Buffer.concat(chunks).toString('utf8');
           const body = raw ? JSON.parse(raw) : {};
           const messages = Array.isArray(body) ? body : [body];
           const responses = [];
           for (const msg of messages) {
-            const out = handleJsonRpc(msg, current.snapshot);
+            const out = await handleJsonRpc(msg, current.snapshot);
             if (out) responses.push(out);
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });

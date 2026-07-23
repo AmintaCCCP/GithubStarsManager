@@ -63,13 +63,31 @@ async function pushLifecycle(): Promise<void> {
       return;
     }
 
+    const vs = state.vectorSearchConfig;
+    const emb =
+      state.embeddingConfigs.find((c) => c.id === vs.embeddingConfigId) ||
+      state.embeddingConfigs.find((c) => c.id === state.activeEmbeddingConfig) ||
+      null;
+
     await api.pushSnapshot({
       repositories: state.repositories,
       customCategories: state.customCategories,
+      // Pass runtime secrets only over IPC to main (never logged / never disk-persisted by MCP)
       vectorSearchConfig: {
-        enabled: state.vectorSearchConfig.enabled,
-        workerUrl: state.vectorSearchConfig.workerUrl,
-        embeddingConfigId: state.vectorSearchConfig.embeddingConfigId,
+        enabled: !!vs.enabled,
+        workerUrl: vs.workerUrl || '',
+        authToken: vs.authToken || '',
+        searchThreshold: vs.searchThreshold,
+        searchTopK: vs.searchTopK,
+        embedding: emb
+          ? {
+              apiType: emb.apiType,
+              baseUrl: emb.baseUrl || '',
+              apiKey: emb.apiKey || '',
+              model: emb.model || '',
+              dimensions: emb.dimensions,
+            }
+          : null,
       },
       snapshotAt: new Date().toISOString(),
     });
