@@ -126,6 +126,8 @@ ipcMain.handle('proxy:test', async () => ({
 
 // IPC — MCP
 ipcMain.handle('mcp:setConfig', async (_e, config) => {
+  const previousHost = mcpConfig.host;
+  const previousPort = mcpConfig.port;
   const rawHost =
     typeof config?.host === 'string' && config.host.trim() ? config.host.trim() : '127.0.0.1';
   // Never allow non-loopback binds for the desktop MCP token surface
@@ -144,7 +146,9 @@ ipcMain.handle('mcp:setConfig', async (_e, config) => {
         : 3927,
     token: typeof config?.token === 'string' ? config.token : '',
   };
-  if (!mcpConfig.enabled) {
+  // Stop on disable OR bind address change so the next start() rebinds (not early-return on old listener)
+  const addressChanged = mcpConfig.host !== previousHost || mcpConfig.port !== previousPort;
+  if (!mcpConfig.enabled || addressChanged) {
     await mcpServer.stop();
   }
   return { success: true };

@@ -71,6 +71,36 @@ async function handleStreamable(req: Request, res: Response): Promise<void> {
   }
 }
 
+/** Shared SSE connect + cleanup so all SSE entrypoints close transport on disconnect. */
+async function connectSse(messagesPath: string, res: Response): Promise<void> {
+  const transport = new SSEServerTransport(messagesPath, res);
+  sseSessions.set(transport.sessionId, transport);
+  res.on('close', () => {
+    sseSessions.delete(transport.sessionId);
+    const maybeClose = (transport as { close?: () => Promise<void> }).close;
+    if (typeof maybeClose === 'function') {
+      void maybeClose.call(transport).catch(() => undefined);
+    }
+  });
+  const server = createMcpServer();
+  await server.connect(transport);
+}
+
+async function handleSseMessage(req: Request, res: Response): Promise<void> {
+  const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
+  const transport = sseSessions.get(sessionId);
+  if (!transport) {
+    res.status(404).json({ error: 'unknown session', code: 'MCP_UNKNOWN_SESSION' });
+    return;
+  }
+  try {
+    await transport.handlePostMessage(req, res, req.body);
+  } catch (err) {
+    logger.errorFromError('mcp.sse', 'SSE message failed', err);
+    if (!res.headersSent) res.status(500).json({ error: 'SSE message failed' });
+  }
+}
+
 /**
  * Mount MCP Streamable HTTP (/mcp) and legacy SSE (/mcp/sse + /mcp/sse/messages).
  * Auth uses MCP token (not API_SECRET). Config is read per request — no token write on mount.
@@ -80,71 +110,31 @@ export function mountMcpRoutes(app: Express): void {
     void handleStreamable(req, res);
   });
 
-  // Legacy SSE under /mcp/* so a single nginx location /mcp can proxy if needed;
-  // dedicated /mcp/sse still works with explicit nginx blocks.
-  app.get('/mcp/sse', mcpAuthMiddleware, async (req, res) => {
+  app.get('/mcp/sse', mcpAuthMiddleware, async (_req, res) => {
     try {
-      const transport = new SSEServerTransport('/mcp/sse/messages', res);
-      sseSessions.set(transport.sessionId, transport);
-      res.on('close', () => {
-        sseSessions.delete(transport.sessionId);
-        const maybeClose = (transport as { close?: () => Promise<void> }).close;
-        if (typeof maybeClose === 'function') {
-          void maybeClose.call(transport).catch(() => undefined);
-        }
-      });
-      const server = createMcpServer();
-      await server.connect(transport);
+      await connectSse('/mcp/sse/messages', res);
     } catch (err) {
       logger.errorFromError('mcp.sse', 'SSE connection failed', err);
       if (!res.headersSent) res.status(500).end();
     }
   });
 
-  app.post('/mcp/sse/messages', mcpAuthMiddleware, async (req, res) => {
-    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
-    const transport = sseSessions.get(sessionId);
-    if (!transport) {
-      res.status(404).json({ error: 'unknown session', code: 'MCP_UNKNOWN_SESSION' });
-      return;
-    }
-    try {
-      await transport.handlePostMessage(req, res, req.body);
-    } catch (err) {
-      logger.errorFromError('mcp.sse', 'SSE message failed', err);
-      if (!res.headersSent) res.status(500).json({ error: 'SSE message failed' });
-    }
+  app.post('/mcp/sse/messages', mcpAuthMiddleware, (req, res) => {
+    void handleSseMessage(req, res);
   });
 
   // Backward-compatible aliases (older docs / clients)
-  app.get('/sse', mcpAuthMiddleware, async (req, res) => {
+  app.get('/sse', mcpAuthMiddleware, async (_req, res) => {
     try {
-      const transport = new SSEServerTransport('/messages', res);
-      sseSessions.set(transport.sessionId, transport);
-      res.on('close', () => {
-        sseSessions.delete(transport.sessionId);
-      });
-      const server = createMcpServer();
-      await server.connect(transport);
+      await connectSse('/messages', res);
     } catch (err) {
       logger.errorFromError('mcp.sse', 'SSE connection failed', err);
       if (!res.headersSent) res.status(500).end();
     }
   });
 
-  app.post('/messages', mcpAuthMiddleware, async (req, res) => {
-    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
-    const transport = sseSessions.get(sessionId);
-    if (!transport) {
-      res.status(404).json({ error: 'unknown session', code: 'MCP_UNKNOWN_SESSION' });
-      return;
-    }
-    try {
-      await transport.handlePostMessage(req, res, req.body);
-    } catch (err) {
-      logger.errorFromError('mcp.sse', 'SSE message failed', err);
-      if (!res.headersSent) res.status(500).json({ error: 'SSE message failed' });
-    }
+  app.post('/messages', mcpAuthMiddleware, (req, res) => {
+    void handleSseMessage(req, res);
   });
 
   logger.info(

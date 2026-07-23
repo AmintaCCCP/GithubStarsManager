@@ -133,11 +133,7 @@ export function applyRepoFilters<T extends Repository>(
     );
   }
 
-  if (
-    searchFilters.isEdited !== undefined &&
-    !options.skipEditedFilter &&
-    allCategories.length >= 0
-  ) {
+  if (searchFilters.isEdited !== undefined && !options.skipEditedFilter) {
     filtered = filtered.filter((repo) => {
       const customized = isRepoCustomized(repo, allCategories);
       return searchFilters.isEdited ? customized : !customized;

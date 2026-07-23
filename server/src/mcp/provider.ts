@@ -180,6 +180,22 @@ export function getVectorAvailability(): VectorAvailability {
   };
 }
 
+const FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function embedQuery(
   texts: string[],
   emb: Record<string, unknown>
@@ -224,7 +240,7 @@ async function embedQuery(
     body = { model, input: texts };
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -296,7 +312,7 @@ export async function vectorSearch(
   }
 
   const workerUrl = String(vs.worker_url).replace(/\/$/, '');
-  const res = await fetch(`${workerUrl}/query`, {
+  const res = await fetchWithTimeout(`${workerUrl}/query`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
