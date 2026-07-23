@@ -26,7 +26,7 @@ dist-ssr
 *.sw?
 .env
 release
-electron
+# electron/ sources are committed (main, preload, MCP). Do not ignore the whole dir.
 
 # Backend server data
 server/data/*.db

@@ -28,6 +28,7 @@
 | **AI 摘要与分类** | 使用 AI 生成标签、主题和简短 README 概览 |
 | **语义搜索** | 按意图而非精确名称查找仓库 |
 | **向量语义搜索** | 将仓库描述/README 嵌入 Cloudflare Vectorize 向量库，自然语言查询实现高精度语义匹配 |
+| **MCP 服务** | 可选 Streamable HTTP / SSE，供 Claude Code、Cursor 等 Agent 检索 AI 加工后的星标；需后端或 Electron/客户端（纯前端模式不显示）；设置中开关，无需额外安装 |
 | **Release 追踪** | 订阅仓库并在统一时间线查看新版本 |
 | **一键下载** | 展开 Release 资产并即时下载 |
 | **智能资产过滤** | 按关键词匹配资产 (dmg / mac / arm64 / aarch64) |

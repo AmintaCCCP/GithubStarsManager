@@ -5,10 +5,10 @@ import { AIService } from '../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../services/vectorSearchService';
 import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
-import { Repository } from '../types';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
+import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NumberInput } from './ui/NumberInput';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
@@ -312,196 +312,30 @@ export const SearchBar: React.FC = () => {
     setSearchResults(filtered);
   };
 
-  const performBasicTextSearch = (repos: typeof repositories, query: string) => {
-    const normalizedQuery = query.toLowerCase();
-    
-    return repos.filter(repo => {
-      const searchableText = [
-        repo.name,
-        repo.full_name,
-        repo.description || '',
-        repo.custom_description || '',
-        repo.language || '',
-        ...(repo.topics || []),
-        repo.ai_summary || '',
-        ...(repo.ai_tags || []),
-        ...(repo.ai_platforms || []),
-        ...(repo.custom_tags || []),
-      ].join(' ').toLowerCase();
-      
-      const queryWords = normalizedQuery.split(/\s+/);
-      return queryWords.every(word => searchableText.includes(word));
-    });
-  };
+  const performBasicTextSearch = (repos: typeof repositories, query: string) =>
+    basicTextSearch(repos, query);
 
   const applyFilters = (repos: typeof repositories) => {
-    let filtered = repos;
-
-    // Language filter
-    if (searchFilters.languages.length > 0) {
-      filtered = filtered.filter(repo => 
-        repo.language && searchFilters.languages.includes(repo.language)
-      );
-    }
-
-    // Tag filter - 包含AI标签、GitHub topics和用户自定义标签
-    if (searchFilters.tags.length > 0) {
-      filtered = filtered.filter(repo => {
-        const repoTags = [
-          ...(repo.ai_tags || []),
-          ...(repo.topics || []),
-          ...(repo.custom_tags || [])
-        ];
-        return searchFilters.tags.some(tag => repoTags.includes(tag));
-      });
-    }
-
-    // Platform filter
-    if (searchFilters.platforms.length > 0) {
-      filtered = filtered.filter(repo => {
-        const repoPlatforms = repo.ai_platforms || [];
-        return searchFilters.platforms.some(platform => repoPlatforms.includes(platform));
-      });
-    }
-
-    // AI analyzed filter - 与 analysisFailed 互斥
-    if (searchFilters.isAnalyzed !== undefined && searchFilters.analysisFailed === undefined) {
-      filtered = filtered.filter(repo => 
-        searchFilters.isAnalyzed ? (!!repo.analyzed_at && !repo.analysis_failed) : !repo.analyzed_at
-      );
-    }
-
-    // Release subscription filter
-    if (searchFilters.isSubscribed !== undefined) {
-      filtered = filtered.filter(repo => 
-        searchFilters.isSubscribed ? releaseSubscriptions.has(repo.id) : !releaseSubscriptions.has(repo.id)
-      );
-    }
-
-    // 自定义筛选
-    if (searchFilters.isEdited !== undefined) {
-      filtered = filtered.filter(repo =>
-        searchFilters.isEdited ? isRepoCustomized(repo, allCategories) : !isRepoCustomized(repo, allCategories)
-      );
-    }
-
-    // Category locked filter - 检查分类是否被锁定
-    if (searchFilters.isCategoryLocked !== undefined) {
-      filtered = filtered.filter(repo => {
-        const isLocked = !!repo.category_locked;
-        return searchFilters.isCategoryLocked ? isLocked : !isLocked;
-      });
-    }
-
-    // Analysis failed filter - 检查分析是否失败（需要有分析记录且标记为失败），与 isAnalyzed 互斥
-    if (searchFilters.analysisFailed !== undefined && searchFilters.isAnalyzed === undefined) {
-      filtered = filtered.filter(repo => {
-        const hasFailed = !!(repo.analyzed_at && repo.analysis_failed);
-        return searchFilters.analysisFailed ? hasFailed : !hasFailed;
-      });
-    }
-
-    // Star count filter
-    if (searchFilters.minStars !== undefined) {
-      filtered = filtered.filter(repo => repo.stargazers_count >= searchFilters.minStars!);
-    }
-    if (searchFilters.maxStars !== undefined) {
-      filtered = filtered.filter(repo => repo.stargazers_count <= searchFilters.maxStars!);
-    }
-
-    // Sort
-    const getSortValue = (repo: Repository): number | string => {
-      switch (searchFilters.sortBy) {
-        case 'stars':
-          return repo.stargazers_count;
-        case 'updated':
-          return new Date(repo.pushed_at || repo.updated_at).getTime();
-        case 'name':
-          return repo.name.toLowerCase();
-        case 'starred':
-          return repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
-        default:
-          return new Date(repo.pushed_at || repo.updated_at).getTime();
-      }
-    };
-
-    filtered.sort((a, b) => {
-      const aValue = getSortValue(a);
-      const bValue = getSortValue(b);
-      if (aValue < bValue) return searchFilters.sortOrder === 'desc' ? 1 : -1;
-      if (aValue > bValue) return searchFilters.sortOrder === 'desc' ? -1 : 1;
-      return 0;
+    const filtered = applyRepoFilters(repos, searchFilters, {
+      releaseSubscriptions,
+      allCategories,
     });
 
-    // 如果分类锁定筛选导致结果为0，自动清除该筛选条件
+    // 如果分类锁定筛选导致结果为0，自动清除该筛选条件（UI 侧副作用保留在此）
     if (searchFilters.isCategoryLocked !== undefined && filtered.length === 0) {
-      // 检查是否是分类锁定筛选导致的结果为空
-      const filteredWithoutCategoryLock = repos.filter(repo => {
-        // 复制当前的筛选条件，但排除分类锁定
-        let tempFiltered = true;
-
-        // Language filter
-        if (searchFilters.languages.length > 0) {
-          tempFiltered = tempFiltered && !!(repo.language && searchFilters.languages.includes(repo.language));
-        }
-
-        // Tag filter
-        if (searchFilters.tags.length > 0) {
-          const repoTags = [...(repo.ai_tags || []), ...(repo.topics || []), ...(repo.custom_tags || [])];
-          tempFiltered = tempFiltered && searchFilters.tags.some(tag => repoTags.includes(tag));
-        }
-
-        // Platform filter
-        if (searchFilters.platforms.length > 0) {
-          const repoPlatforms = repo.ai_platforms || [];
-          tempFiltered = tempFiltered && searchFilters.platforms.some(platform => repoPlatforms.includes(platform));
-        }
-
-        // AI analyzed filter
-        if (searchFilters.isAnalyzed !== undefined && searchFilters.analysisFailed === undefined) {
-          tempFiltered = tempFiltered && (searchFilters.isAnalyzed ? (!!repo.analyzed_at && !repo.analysis_failed) : !repo.analyzed_at);
-        }
-
-        // Release subscription filter
-        if (searchFilters.isSubscribed !== undefined) {
-          tempFiltered = tempFiltered && (searchFilters.isSubscribed ? releaseSubscriptions.has(repo.id) : !releaseSubscriptions.has(repo.id));
-        }
-
-        // Edited filter
-        if (searchFilters.isEdited !== undefined) {
-          const customized = isRepoCustomized(repo, allCategories);
-          tempFiltered = tempFiltered && (searchFilters.isEdited ? customized : !customized);
-        }
-
-        // Analysis failed filter
-        if (searchFilters.analysisFailed !== undefined && searchFilters.isAnalyzed === undefined) {
-          const hasFailed = !!(repo.analyzed_at && repo.analysis_failed);
-          tempFiltered = tempFiltered && (searchFilters.analysisFailed ? hasFailed : !hasFailed);
-        }
-
-        // Star count filter
-        if (searchFilters.minStars !== undefined) {
-          tempFiltered = tempFiltered && repo.stargazers_count >= searchFilters.minStars;
-        }
-        if (searchFilters.maxStars !== undefined) {
-          tempFiltered = tempFiltered && repo.stargazers_count <= searchFilters.maxStars;
-        }
-
-        return tempFiltered;
-      });
-
-      // 如果去掉分类锁定筛选后有结果，说明是分类锁定导致的结果为空，自动清除
-      if (filteredWithoutCategoryLock.length > 0) {
+      const withoutLock = applyRepoFilters(
+        repos,
+        { ...searchFilters, isCategoryLocked: undefined },
+        { releaseSubscriptions, allCategories }
+      );
+      if (withoutLock.length > 0) {
         console.log('分类锁定筛选导致结果为空，自动清除该筛选条件');
         setSearchFilters({ isCategoryLocked: undefined });
-        // 返回去掉分类锁定筛选的结果
-        return filteredWithoutCategoryLock.sort((a, b) => {
-          const aValue = getSortValue(a);
-          const bValue = getSortValue(b);
-          if (aValue < bValue) return searchFilters.sortOrder === 'desc' ? 1 : -1;
-          if (aValue > bValue) return searchFilters.sortOrder === 'desc' ? -1 : 1;
-          return 0;
-        });
+        return sortRepositories(
+          withoutLock,
+          searchFilters.sortBy,
+          searchFilters.sortOrder
+        );
       }
     }
 
