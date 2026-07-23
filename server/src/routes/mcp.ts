@@ -62,7 +62,15 @@ router.put('/api/mcp/config', (req, res) => {
     }
 
     let token = getMcpTokenPlain();
+    // Only mint/reset when MCP is (or remains) enabled — never create tokens while disabled
     if (body.resetToken) {
+      if (!isMcpEnabled()) {
+        res.status(400).json({
+          error: 'Cannot reset token while MCP is disabled',
+          code: 'MCP_DISABLED',
+        });
+        return;
+      }
       token = resetMcpToken();
     } else if (isMcpEnabled() && !token) {
       token = ensureMcpToken();

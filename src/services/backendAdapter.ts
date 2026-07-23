@@ -121,7 +121,8 @@ class BackendAdapter {
           const parsed = JSON.parse(options.body);
           // Mask any apiKey/password fields recursively
           requestBody = JSON.stringify(parsed, (key, val) => {
-            if (/api[_-]?key|password|secret|token|authorization/i.test(key)) return '***';
+            if (/api[_-]?key|password|secret|token|authorization|mcp/i.test(key)) return '***';
+            if (typeof val === 'string' && val.startsWith('gsm_mcp_')) return '***';
             return val;
           }, 2);
         } catch {

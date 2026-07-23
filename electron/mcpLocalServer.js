@@ -312,17 +312,30 @@ function createMcpLocalServer(getState) {
     if (!state.config?.enabled) {
       return { success: false, error: 'MCP disabled' };
     }
+    const normalizeHost = (raw) => {
+      const h = typeof raw === 'string' && raw.trim() ? raw.trim() : '127.0.0.1';
+      if (
+        h === '0.0.0.0' ||
+        h === '::' ||
+        h === '[::]' ||
+        h === '::1' ||
+        h === '[::1]' ||
+        h === 'localhost'
+      ) {
+        return '127.0.0.1';
+      }
+      return h === '127.0.0.1' ? h : '127.0.0.1';
+    };
+
     if (server) {
-      return { success: true, url: `http://${state.config.host}:${state.config.port}/mcp` };
+      const h = normalizeHost(state.config?.host);
+      const p = state.config?.port || 3927;
+      return { success: true, url: `http://${h}:${p}/mcp` };
     }
 
     // Hard-bind loopback only — never listen on 0.0.0.0 for local MCP token auth
-    const requestedHost = state.config.host || '127.0.0.1';
-    const host =
-      requestedHost === '0.0.0.0' || requestedHost === '::' || requestedHost === '[::]'
-        ? '127.0.0.1'
-        : requestedHost;
-    const port = state.config.port || 3927;
+    const host = normalizeHost(state.config?.host);
+    const port = state.config?.port || 3927;
 
     server = http.createServer((req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');

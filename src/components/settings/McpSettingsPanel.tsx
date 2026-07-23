@@ -120,12 +120,11 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     void refreshFromBackend();
   }, [refreshFromBackend]);
 
-  // Electron: ensure local token exists when enabling without backend.
+  // Electron: mint local token only when MCP is enabled (never while disabled).
   // Lifecycle (start/stop/snapshot) lives in mcpElectronBridge (App session).
   useEffect(() => {
     if (!backendMode && isElectronApp && mcpConfig.enabled && !mcpConfig.token) {
-      const token = generateLocalToken();
-      setMcpConfig({ token });
+      setMcpConfig({ token: generateLocalToken() });
     }
   }, [backendMode, isElectronApp, mcpConfig.enabled, mcpConfig.token, setMcpConfig]);
 
@@ -176,6 +175,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   };
 
   const handleResetToken = async () => {
+    if (!mcpConfig.enabled) {
+      toast(
+        t('请先开启 MCP 服务再重置 Token', 'Enable MCP before resetting the token'),
+        'error'
+      );
+      return;
+    }
     const ok = await confirm(
       t('重置 MCP Token', 'Reset MCP Token'),
       t(
@@ -188,7 +194,8 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     setSaving(true);
     try {
       if (backendMode && backend.isAvailable) {
-        const result = await backend.updateMcpConfig({ resetToken: true, enabled: mcpConfig.enabled });
+        const result = await backend.updateMcpConfig({ resetToken: true, enabled: true });
+        // Backend token is session/UI only — store still holds local electron prefs separately
         setMcpConfig({ token: result.token, enabled: result.enabled });
       } else {
         setMcpConfig({ token: generateLocalToken() });
@@ -404,6 +411,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               type="button"
               onClick={() => void copyText('http', mcpHttpUrl)}
               className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              aria-label={t('复制 Streamable HTTP 地址', 'Copy Streamable HTTP URL')}
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
@@ -419,6 +427,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               type="button"
               onClick={() => void copyText('sse', mcpSseUrl)}
               className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              aria-label={t('复制 SSE 地址', 'Copy SSE URL')}
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
