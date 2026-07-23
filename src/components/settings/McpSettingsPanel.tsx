@@ -106,55 +106,14 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     void refreshFromBackend();
   }, [refreshFromBackend]);
 
-  // Electron: ensure local token exists when enabling without backend
+  // Electron: ensure local token exists when enabling without backend.
+  // Lifecycle (start/stop/snapshot) lives in mcpElectronBridge (App session).
   useEffect(() => {
     if (!backendMode && isElectronApp && mcpConfig.enabled && !mcpConfig.token) {
       const token = generateLocalToken();
       setMcpConfig({ token });
     }
   }, [backendMode, isElectronApp, mcpConfig.enabled, mcpConfig.token, setMcpConfig]);
-
-  // Push snapshot / control to Electron main when local MCP is used (debounced)
-  useEffect(() => {
-    if (backendMode || !isElectronApp || !window.electronAPI?.mcp) return;
-    const api = window.electronAPI.mcp;
-    const host =
-      mcpConfig.host === '0.0.0.0' || !mcpConfig.host ? '127.0.0.1' : mcpConfig.host;
-
-    const timer = window.setTimeout(() => {
-      void api.setConfig({
-        enabled: mcpConfig.enabled,
-        host,
-        port: mcpConfig.port,
-        token: mcpConfig.token,
-      });
-      if (mcpConfig.enabled) {
-        const state = useAppStore.getState();
-        void api.pushSnapshot({
-          repositories: state.repositories,
-          customCategories: state.customCategories,
-          vectorSearchConfig: {
-            enabled: state.vectorSearchConfig.enabled,
-            workerUrl: state.vectorSearchConfig.workerUrl,
-            embeddingConfigId: state.vectorSearchConfig.embeddingConfigId,
-          },
-          snapshotAt: new Date().toISOString(),
-        });
-        void api.start();
-      } else {
-        void api.stop();
-      }
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    backendMode,
-    isElectronApp,
-    mcpConfig.enabled,
-    mcpConfig.host,
-    mcpConfig.port,
-    mcpConfig.token,
-  ]);
 
   const copyText = async (key: string, text: string) => {
     try {

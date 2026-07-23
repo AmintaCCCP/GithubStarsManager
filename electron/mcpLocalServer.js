@@ -417,13 +417,14 @@ function createMcpLocalServer(getState) {
 
   function getStatus() {
     const state = getState();
+    const cfg = state?.config || {};
     const host =
-      !state.config.host || state.config.host === '0.0.0.0' || state.config.host === '::'
+      !cfg.host || cfg.host === '0.0.0.0' || cfg.host === '::'
         ? '127.0.0.1'
-        : state.config.host;
+        : cfg.host;
     return {
       running: !!server,
-      url: server ? `http://${host}:${state.config.port || 3927}/mcp` : undefined,
+      url: server ? `http://${host}:${cfg.port || 3927}/mcp` : undefined,
       error: lastError || undefined,
     };
   }

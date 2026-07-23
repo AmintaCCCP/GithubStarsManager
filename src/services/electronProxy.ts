@@ -1,11 +1,13 @@
-import type { ProxyConfig, Repository, Category, VectorSearchConfig } from '../types';
+import type {
+  ProxyConfig,
+  Repository,
+  Category,
+  VectorSearchConfig,
+  McpServiceConfig,
+} from '../types';
 
-export interface McpLocalConfig {
-  enabled: boolean;
-  host: string;
-  port: number;
-  token: string;
-}
+/** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
+export type McpLocalConfig = McpServiceConfig;
 
 export interface McpDataSnapshot {
   repositories: Repository[];

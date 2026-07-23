@@ -18,6 +18,7 @@ import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
+import { startMcpElectronBridge, stopMcpElectronBridge } from './services/mcpElectronBridge';
 import type { AppState, SearchFilters } from './types';
 
 /**
@@ -127,6 +128,13 @@ function App() {
     if (sessionStorage.getItem('gsm:frontend-debug') === 'true') {
       logger.setLevel('debug');
     }
+  }, []);
+
+  // Electron local MCP: keep start/stop + snapshots for the whole session
+  // (not only while MCP settings panel is mounted).
+  useEffect(() => {
+    startMcpElectronBridge();
+    return () => stopMcpElectronBridge();
   }, []);
 
   useEffect(() => {
