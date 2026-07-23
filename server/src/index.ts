@@ -16,13 +16,27 @@ import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
 import proxyRouter from './routes/proxy.js';
 import logsRouter from './routes/logs.js';
+import mcpAdminRouter from './routes/mcp.js';
+import { mountMcpRoutes } from './mcp/http.js';
 
 export function createApp(): express.Express {
   const app = express();
 
-  // Middleware
+  // Keep default helmet (incl. CSP). MCP is a machine API; agents are not browser-CSP clients.
   app.use(helmet());
-  app.use(cors({ exposedHeaders: ['X-Log-Count'] }));
+  app.use(
+    cors({
+      exposedHeaders: ['X-Log-Count', 'Mcp-Session-Id', 'mcp-session-id'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-MCP-Token',
+        'Mcp-Session-Id',
+        'mcp-session-id',
+        'Last-Event-ID',
+      ],
+    })
+  );
   app.use(morgan('combined', { stream: morganLoggerStream }));
   app.use(express.json({ limit: '50mb' }));
 
@@ -44,6 +58,13 @@ export function createApp(): express.Express {
 
   // Wave 4: Logs route
   app.use(logsRouter);
+
+  // MCP admin API (protected by API_SECRET via /api middleware above)
+  app.use(mcpAdminRouter);
+
+  // MCP Streamable HTTP + legacy SSE (own token auth; not under /api)
+  // Mount always; each request is gated on live SQLite settings (no write on mount).
+  mountMcpRoutes(app);
 
   // Global error handler
   app.use(errorHandler);
@@ -81,7 +102,8 @@ function startServer(): void {
 }
 
 // Only start server when run directly (not imported for tests)
-const isMainModule = process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
+const isMainModule =
+  process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
 if (isMainModule) {
   startServer();
 }

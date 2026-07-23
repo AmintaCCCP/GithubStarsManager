@@ -1,9 +1,33 @@
-import type { ProxyConfig } from '../types';
+import type { ProxyConfig, Repository, Category, VectorSearchConfig } from '../types';
+
+export interface McpLocalConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  token: string;
+}
+
+export interface McpDataSnapshot {
+  repositories: Repository[];
+  customCategories: Category[];
+  vectorSearchConfig: Pick<VectorSearchConfig, 'enabled' | 'workerUrl' | 'embeddingConfigId'>;
+  snapshotAt: string;
+}
+
+export interface McpElectronAPI {
+  setConfig: (config: McpLocalConfig) => Promise<{ success: boolean; error?: string }>;
+  getConfig: () => Promise<McpLocalConfig | null>;
+  pushSnapshot: (snapshot: McpDataSnapshot) => Promise<{ success: boolean }>;
+  start: () => Promise<{ success: boolean; error?: string; url?: string }>;
+  stop: () => Promise<{ success: boolean }>;
+  getStatus: () => Promise<{ running: boolean; url?: string; error?: string }>;
+}
 
 interface ElectronAPI {
   setProxy: (config: ProxyConfig) => Promise<{ success: boolean }>;
   getProxy: () => Promise<ProxyConfig>;
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;
+  mcp?: McpElectronAPI;
 }
 
 declare global {

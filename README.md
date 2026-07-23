@@ -31,6 +31,7 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | **AI Summaries & Categories** | Generate tags, topics, and short README overviews using AI |
 | **Semantic Search** | Find repos by intent, not exact names |
 | **Vector Semantic Search** | Embed repo descriptions/READMEs into a Cloudflare Vectorize index; query with natural language for high-precision semantic matching |
+| **MCP Server** | Optional Streamable HTTP / SSE endpoint so agents (Claude Code, Cursor, etc.) can search AI-enriched stars; toggle in Settings, no extra install |
 | **Release Tracking** | Subscribe to repos and see new versions in one unified timeline |
 | **One‑click Downloads** | Expand release assets and download instantly |
 | **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |

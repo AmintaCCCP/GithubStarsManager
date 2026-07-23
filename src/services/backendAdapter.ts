@@ -764,6 +764,41 @@ class BackendAdapter {
       followers: number;
     }> }>;
   }
+
+  // === MCP admin (backend-hosted Streamable HTTP / SSE) ===
+
+  async getMcpStatus(): Promise<{
+    enabled: boolean;
+    token: string;
+    endpoints: { streamableHttp: string; sse: string; messages: string };
+    vectorAvailable: boolean;
+    vectorReason: string | null;
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/mcp/status`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch MCP status error');
+    return res.json();
+  }
+
+  async updateMcpConfig(body: {
+    enabled?: boolean;
+    resetToken?: boolean;
+  }): Promise<{
+    enabled: boolean;
+    token: string;
+    endpoints: { streamableHttp: string; sse: string; messages: string };
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/mcp/config`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Update MCP config error');
+    return res.json();
+  }
 }
 
 export const backend = new BackendAdapter();

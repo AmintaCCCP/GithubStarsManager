@@ -1,0 +1,8 @@
+{
+  "name": "github-stars-manager-desktop",
+  "version": "1.0.0",
+  "description": "GitHub Stars Manager Desktop App",
+  "main": "main.js",
+  "author": "GitHub Stars Manager",
+  "license": "MIT"
+}
