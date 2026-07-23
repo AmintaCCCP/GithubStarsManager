@@ -18,7 +18,11 @@ import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync } from './services/autoSync';
-import { startMcpElectronBridge, stopMcpElectronBridge } from './services/mcpElectronBridge';
+import {
+  startMcpElectronBridge,
+  stopMcpElectronBridge,
+  refreshMcpElectronBridge,
+} from './services/mcpElectronBridge';
 import type { AppState, SearchFilters } from './types';
 
 /**
@@ -130,10 +134,9 @@ function App() {
     }
   }, []);
 
-  // Electron local MCP: keep start/stop + snapshots for the whole session
-  // (not only while MCP settings panel is mounted).
+  // Electron local MCP: start after backend discovery so we don't bind :3927
+  // when agents should use backend /mcp instead.
   useEffect(() => {
-    startMcpElectronBridge();
     return () => stopMcpElectronBridge();
   }, []);
 
@@ -160,6 +163,12 @@ function App() {
         }
       } catch (err) {
         console.error('Failed to initialize backend:', err);
+      } finally {
+        // After backend probe (success or not), wire desktop MCP lifecycle
+        if (!cancelled) {
+          startMcpElectronBridge();
+          refreshMcpElectronBridge();
+        }
       }
     };
 

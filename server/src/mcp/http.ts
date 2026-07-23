@@ -104,10 +104,27 @@ async function handleSseMessage(req: Request, res: Response): Promise<void> {
 /**
  * Mount MCP Streamable HTTP (/mcp) and legacy SSE (/mcp/sse + /mcp/sse/messages).
  * Auth uses MCP token (not API_SECRET). Config is read per request — no token write on mount.
+ *
+ * Stateless Streamable HTTP is POST-only (SDK guidance): GET/DELETE return 405 so clients
+ * do not open orphan SSE streams on /mcp. Use /mcp/sse for legacy SSE.
  */
 export function mountMcpRoutes(app: Express): void {
-  app.all('/mcp', mcpAuthMiddleware, (req, res) => {
+  app.post('/mcp', mcpAuthMiddleware, (req, res) => {
     void handleStreamable(req, res);
+  });
+  app.get('/mcp', mcpAuthMiddleware, (_req, res) => {
+    res.status(405).json({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Method not allowed. Use POST for Streamable HTTP or GET /mcp/sse for legacy SSE.' },
+      id: null,
+    });
+  });
+  app.delete('/mcp', mcpAuthMiddleware, (_req, res) => {
+    res.status(405).json({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Method not allowed.' },
+      id: null,
+    });
   });
 
   app.get('/mcp/sse', mcpAuthMiddleware, async (_req, res) => {
