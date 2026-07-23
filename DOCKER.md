@@ -187,10 +187,18 @@ This Docker setup does not affect the existing desktop packaging workflows. The 
 
 With Docker Compose, the backend MCP endpoints are exposed through nginx (frontend container) so agents on the host do not need a published backend port:
 
-| Endpoint | URL (default compose) |
-|----------|------------------------|
-| Streamable HTTP | `http://localhost:8080/mcp` |
-| Legacy SSE | `http://localhost:8080/mcp/sse` |
+| Endpoint | URL (default compose) | Notes |
+|----------|------------------------|--------|
+| Streamable HTTP | `http://localhost:8080/mcp` | Preferred for Claude Code / modern clients |
+| Legacy SSE | `http://localhost:8080/mcp/sse` | GET opens `text/event-stream`; client then POSTs to `/mcp/sse/messages?sessionId=…` |
+| Legacy SSE (alias) | `http://localhost:8080/sse` | Same protocol; messages at `/messages?sessionId=…` |
+
+**Desktop (Electron)** after enabling MCP in Settings:
+
+| Endpoint | URL |
+|----------|-----|
+| Streamable HTTP | `http://127.0.0.1:3927/mcp` |
+| Legacy SSE | `http://127.0.0.1:3927/sse` (messages: `/messages?sessionId=…`) |
 
 1. Open the app → **Settings → MCP Server**.
 2. Toggle **Enable MCP Server** (requires backend connection).
