@@ -1,29 +1,10 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
 
-const isDev = process.env.NODE_ENV === 'development';
-
-/** @type {BrowserWindow | null} */
-let mainWindow = null;
-
-// Proxy state (optional; may be extended later)
-let proxyConfig = { enabled: false, type: 'http', host: '', port: 7890 };
-
-// MCP local state
-let mcpConfig = {
-  enabled: false,
-  host: '127.0.0.1',
-  port: 3927,
-  token: '',
-};
-/** @type {object | null} */
-let mcpSnapshot = null;
-
-const mcpServer = createMcpLocalServer(() => ({
-  config: mcpConfig,
-  snapshot: mcpSnapshot,
-}));
+let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -34,74 +15,180 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-      // Disable webSecurity for local services (aria2 RPC, etc.)
+      enableRemoteModule: false,
       webSecurity: false,
+      allowRunningInsecureContent: true,
+      devTools: true, // 生产环境也允许 DevTools 便于排障
+      preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../dist/icon.svg'),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    icon: path.join(__dirname, '../build/icon.png'),
+    titleBarStyle: 'default', // 使用默认标题栏，避免重叠问题
     show: false,
+    autoHideMenuBar: false, // 显示菜单栏，确保编辑快捷键行为一致
+    frame: true, // 保持窗口框架
+    backgroundColor: '#ffffff', // 设置背景色，避免白屏闪烁
+    titleBarOverlay: false, // 禁用标题栏覆盖
+    trafficLightPosition: { x: 20, y: 20 } // macOS 交通灯按钮位置
+  });
+
+  // 添加错误处理和加载事件
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Failed to load:', errorCode, errorDescription, validatedURL);
+    // 如果主页面加载失败，尝试加载 fallback 页面
+    const fallbackPath = path.join(__dirname, '../dist/index.html');
+    if (fs.existsSync(fallbackPath)) {
+      console.log('Loading fallback page:', fallbackPath);
+      mainWindow.loadFile(fallbackPath);
+    }
+  });
+
+  mainWindow.webContents.on('dom-ready', () => {
+    if (isDev) console.log('DOM ready');
+    // 注入一些基础样式，防止白屏
+    mainWindow.webContents.insertCSS('body { background-color: #ffffff; }');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (isDev) console.log('Page finished loading');
+    // 页面加载完成后显示窗口
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
   });
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // 生产环境：尝试多个可能的路径
+    const possiblePaths = [
+      path.join(__dirname, '../dist/index.html'),
+      path.join(process.resourcesPath, 'app.asar/dist/index.html'),
+      path.join(process.resourcesPath, 'app/dist/index.html'),
+      path.join(process.resourcesPath, 'dist/index.html'),
+      path.join(__dirname, '../build/index.html')
+    ];
+
+    let indexPath = null;
+    for (const testPath of possiblePaths) {
+      try {
+        if (fs.existsSync(testPath)) {
+          indexPath = testPath;
+          break;
+        }
+      } catch (error) {
+        // 忽略文件系统错误，继续尝试下一个路径
+        continue;
+      }
+    }
+
+    if (indexPath) {
+      console.log('Loading application from:', indexPath);
+      mainWindow.loadFile(indexPath).catch(error => {
+        console.error('Failed to load file:', error);
+        // 加载失败时显示错误页面
+        mainWindow.loadURL('data:text/html,<h1>Application Load Error</h1><p>Could not load the main application. Please restart the app.</p>');
+      });
+    } else {
+      console.error('Could not find index.html in any expected location');
+      console.log('Checked paths:', possiblePaths);
+      console.log('Current directory:', __dirname);
+      console.log('Process resources path:', process.resourcesPath);
+      // 显示详细的错误信息
+      const errorHtml = '<h1>Application Not Found</h1><p>Could not locate the application files.</p><p>Please reinstall the application.</p>';
+      mainWindow.loadURL('data:text/html,' + encodeURIComponent(errorHtml));
+    }
   }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    if (process.platform === 'darwin') {
-      const template = [
-        {
-          label: 'GitHub Stars Manager',
-          submenu: [
-            { role: 'about' },
-            { type: 'separator' },
-            { role: 'services' },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideothers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { role: 'quit' },
-          ],
-        },
-        {
-          label: 'Edit',
-          submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
-            { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
-            { role: 'selectAll' },
-          ],
-        },
-        {
-          label: 'View',
-          submenu: [
-            { role: 'reload' },
-            { role: 'forceReload' },
-            { role: 'toggleDevTools' },
-            { type: 'separator' },
-            { role: 'resetZoom' },
-            { role: 'zoomIn' },
-            { role: 'zoomOut' },
-            { type: 'separator' },
-            { role: 'togglefullscreen' },
-          ],
-        },
-        {
-          label: 'Window',
-          submenu: [{ role: 'minimize' }, { role: 'close' }],
-        },
-      ];
-      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    }
   });
+
+  // 提供稳定的菜单与编辑快捷键（生产环境）
+  const menuTemplate = process.platform === 'darwin' ? [
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    }
+  ] : [
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -113,40 +200,159 @@ function createWindow() {
   });
 }
 
-// IPC — proxy stubs (keep API surface for Network panel)
-ipcMain.handle('proxy:set', async (_e, config) => {
-  proxyConfig = { ...proxyConfig, ...config };
+const PROXY_CONFIG_PATH = path.join(app.getPath('userData'), 'proxy-config.json');
+
+function loadProxyConfig() {
+  try {
+    if (fs.existsSync(PROXY_CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(PROXY_CONFIG_PATH, 'utf-8'));
+    }
+  } catch (e) { console.error('Failed to load proxy config:', e); }
+  return { enabled: false, type: 'http', host: '', port: 7890 };
+}
+
+function saveProxyConfig(config) {
+  fs.writeFileSync(PROXY_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+async function applyProxy(config) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (config.enabled && config.host && config.port) {
+    let auth = '';
+    if (config.username) {
+      auth = config.password
+        ? encodeURIComponent(config.username) + ':' + encodeURIComponent(config.password) + '@'
+        : encodeURIComponent(config.username) + '@';
+    }
+    const proxyUrl = config.type === 'socks5'
+      ? 'socks5://' + auth + config.host + ':' + config.port
+      : 'http://' + auth + config.host + ':' + config.port;
+    await mainWindow.webContents.session.setProxy({
+      proxyRules: proxyUrl,
+      proxyBypassRules: '<local>;localhost;127.0.0.1'
+    });
+    console.log('[Proxy] Applied:', proxyUrl);
+  } else {
+    await mainWindow.webContents.session.setProxy({ proxyRules: 'direct://' });
+    console.log('[Proxy] Disabled, using direct connection');
+  }
+}
+
+ipcMain.handle('set-proxy', async (event, config) => {
+  saveProxyConfig(config);
+  await applyProxy(config);
   return { success: true };
 });
-ipcMain.handle('proxy:get', async () => proxyConfig);
-ipcMain.handle('proxy:test', async () => ({
-  success: false,
-  error: 'Proxy test not implemented in this build',
+
+ipcMain.handle('get-proxy', () => {
+  return loadProxyConfig();
+});
+
+ipcMain.handle('test-proxy', async (event, config) => {
+  const net = require('net');
+  const connectToProxy = () => new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    socket.setTimeout(5000);
+    socket.on('connect', () => resolve(socket));
+    socket.on('timeout', () => { socket.destroy(); reject(new Error('Connection timeout')); });
+    socket.on('error', (err) => reject(err));
+    socket.connect(config.port, config.host);
+  });
+  try {
+    if (config.type === 'socks5') {
+      const socket = await connectToProxy();
+      return await new Promise((resolve) => {
+        const greeting = config.username
+          ? Buffer.from([0x05, 0x02, 0x00, 0x02])
+          : Buffer.from([0x05, 0x01, 0x00]);
+        socket.setTimeout(5000);
+        socket.write(greeting);
+        let step = 0;
+        socket.on('data', (data) => {
+          if (step === 0) {
+            if (data[0] !== 0x05) { socket.destroy(); resolve({ success: false, error: 'Invalid SOCKS5 version' }); return; }
+            if (data[1] === 0xFF) { socket.destroy(); resolve({ success: false, error: 'No acceptable auth method' }); return; }
+            if (data[1] === 0x02 && config.username && config.password) {
+              step = 1;
+              const userBuf = Buffer.from(config.username, 'utf8');
+              const passBuf = Buffer.from(config.password, 'utf8');
+              const authReq = Buffer.alloc(3 + userBuf.length + passBuf.length);
+              authReq[0] = 0x01; authReq[1] = userBuf.length;
+              userBuf.copy(authReq, 2);
+              authReq[2 + userBuf.length] = passBuf.length;
+              passBuf.copy(authReq, 3 + userBuf.length);
+              socket.write(authReq);
+            } else { socket.destroy(); resolve({ success: true }); }
+          } else if (step === 1) {
+            socket.destroy();
+            resolve(data[0] === 0x01 && data[1] === 0x00
+              ? { success: true }
+              : { success: false, error: 'SOCKS5 authentication failed' });
+          }
+        });
+        socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'SOCKS5 handshake timeout' }); });
+        socket.on('error', (err) => resolve({ success: false, error: err.message }));
+      });
+    } else {
+      const socket = await connectToProxy();
+      return await new Promise((resolve) => {
+        socket.setTimeout(5000);
+        const authHeader = config.username && config.password
+          ? 'Proxy-Authorization: Basic ' + Buffer.from(config.username + ':' + config.password).toString('base64') + '\r\n'
+          : '';
+        socket.write('CONNECT httpbin.org:443 HTTP/1.1\r\nHost: httpbin.org:443\r\n' + authHeader + '\r\n');
+        let responseData = '';
+        socket.on('data', (data) => {
+          responseData += data.toString();
+          if (responseData.includes('\r\n\r\n')) {
+            socket.destroy();
+            if (responseData.includes('200')) resolve({ success: true });
+            else if (responseData.includes('407')) resolve({ success: false, error: 'Proxy authentication required' });
+            else resolve({ success: false, error: 'Proxy rejected: ' + (responseData.split('\r\n')[0] || 'Unknown') });
+          }
+        });
+        socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'HTTP proxy handshake timeout' }); });
+        socket.on('error', (err) => resolve({ success: false, error: err.message }));
+      });
+    }
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+
+// ── MCP local server (read-only tools for agents) ──
+let mcpConfig = {
+  enabled: false,
+  host: '127.0.0.1',
+  port: 3927,
+  token: '',
+};
+let mcpSnapshot = null;
+const mcpServer = createMcpLocalServer(() => ({
+  config: mcpConfig,
+  snapshot: mcpSnapshot,
 }));
 
-// IPC — MCP
+function normalizeMcpHost(rawHost) {
+  const host = typeof rawHost === 'string' && rawHost.trim() ? rawHost.trim() : '127.0.0.1';
+  if (host === '0.0.0.0' || host === '::' || host === '[::]' || host === '::1' || host === '[::1]' || host === 'localhost') {
+    return '127.0.0.1';
+  }
+  if (host === '127.0.0.1') return host;
+  return '127.0.0.1';
+}
+
 ipcMain.handle('mcp:setConfig', async (_e, config) => {
   const previousHost = mcpConfig.host;
   const previousPort = mcpConfig.port;
-  const rawHost =
-    typeof config?.host === 'string' && config.host.trim() ? config.host.trim() : '127.0.0.1';
-  // Never allow non-loopback binds for the desktop MCP token surface
-  const host =
-    rawHost === '127.0.0.1' || rawHost === 'localhost' || rawHost === '::1'
-      ? rawHost === 'localhost'
-        ? '127.0.0.1'
-        : rawHost
-      : '127.0.0.1';
   mcpConfig = {
     enabled: !!config?.enabled,
-    host,
+    host: normalizeMcpHost(config?.host),
     port:
       typeof config?.port === 'number' && config.port >= 1 && config.port <= 65535
         ? config.port
         : 3927,
     token: typeof config?.token === 'string' ? config.token : '',
   };
-  // Stop on disable OR bind address change so the next start() rebinds (not early-return on old listener)
   const addressChanged = mcpConfig.host !== previousHost || mcpConfig.port !== previousPort;
   if (!mcpConfig.enabled || addressChanged) {
     await mcpServer.stop();
@@ -173,28 +379,32 @@ ipcMain.handle('mcp:stop', async () => mcpServer.stop());
 
 ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  const savedProxy = loadProxyConfig();
+  if (savedProxy.enabled && savedProxy.host && savedProxy.port) {
+    applyProxy(savedProxy);
+  }
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (focused && !focused.isDestroyed()) {
+      focused.webContents.toggleDevTools();
+    }
+  });
+});
 
 app.on('window-all-closed', () => {
-  void mcpServer.stop();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
-  void mcpServer.stop();
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-});
-
-app.on('web-contents-created', (_event, contents) => {
-  contents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
 });
