@@ -44,6 +44,7 @@ import {
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
+import { MCP_DEFAULT_HOST, MCP_DEFAULT_PORT, normalizeMcpHost } from '../utils/mcpHost';
 import {
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   normalizeReleaseSourceSettings,
@@ -586,20 +587,9 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
 
 export const defaultMcpConfig: McpServiceConfig = {
   enabled: false,
-  host: '127.0.0.1',
-  port: 3927,
+  host: MCP_DEFAULT_HOST,
+  port: MCP_DEFAULT_PORT,
   token: '',
-};
-
-const normalizeMcpHost = (raw: unknown): string => {
-  if (typeof raw !== 'string' || !raw.trim()) return defaultMcpConfig.host;
-  const host = raw.trim();
-  // Desktop MCP must stay loopback-only
-  if (host === '0.0.0.0' || host === '::' || host === '[::]') return '127.0.0.1';
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
-    return host === 'localhost' ? '127.0.0.1' : host;
-  }
-  return '127.0.0.1';
 };
 
 const normalizeMcpConfig = (raw: unknown): McpServiceConfig => {
