@@ -485,4 +485,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.0</downloadUrl>
   </version>
+  <version>
+    <number>0.7.1</number>
+    <releaseDate>2026-07-23</releaseDate>
+    <changelog>
+      <item>feat: Embedded optional read-only MCP server (Streamable HTTP + legacy SSE) so AI agents (Claude Code / Cursor) can search AI-enriched starred repos; supports frontend+backend, Docker (/mcp), and Electron loopback; Settings UI for enable/token/agent JSON. Experimental — back up data before upgrading; only available with backend or desktop client, not pure SPA. (PR #250)</item>
+      <item>fix: Allow user-owned AI / WebDAV / RPC proxy configs to use private/loopback IPs (e.g. local Ollama, LAN NAS) while still blocking cloud metadata and embedded credentials; fixed IPv4-mapped IPv6 bypass. (PR #246, fixes #244)</item>
+      <item>fix: WebDAV backup/restore now preserves release subscriptions (bell), release source settings (Watch / custom), and read-release markers (backup version 1.1; older 1.0 backups remain compatible). (PR #249)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.1</downloadUrl>
+  </version>
 </versions>
