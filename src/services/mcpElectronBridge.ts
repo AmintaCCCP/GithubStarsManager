@@ -4,6 +4,7 @@
  * not only while the MCP settings panel is mounted.
  */
 import { useAppStore } from '../store/useAppStore';
+import { normalizeMcpHost } from '../utils/mcpHost';
 import { isElectron } from './electronProxy';
 import { backend } from './backendAdapter';
 
@@ -28,10 +29,7 @@ function pushLifecycle(): void {
 
   const state = useAppStore.getState();
   const { mcpConfig } = state;
-  const host =
-    !mcpConfig.host || mcpConfig.host === '0.0.0.0' || mcpConfig.host === '::'
-      ? '127.0.0.1'
-      : mcpConfig.host;
+  const host = normalizeMcpHost(mcpConfig.host);
 
   const api = window.electronAPI.mcp;
   void api.setConfig({

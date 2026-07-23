@@ -13,6 +13,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { backend } from '../../services/backendAdapter';
 import { isElectron } from '../../services/electronProxy';
 import { useDialog } from '../../hooks/useDialog';
+import { MCP_DEFAULT_PORT, normalizeMcpHost } from '../../utils/mcpHost';
 
 interface McpSettingsPanelProps {
   t: (zh: string, en: string) => string;
@@ -49,16 +50,12 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   const isElectronApp = isElectron();
 
   const baseUrl = useMemo(() => {
-    // Electron local MCP always listens on loopback
+    // Electron local MCP always listens on loopback (shared host normalizer)
     if (isElectronApp && !backendMode) {
-      const host =
-        mcpConfig.host === '0.0.0.0' || !mcpConfig.host ? '127.0.0.1' : mcpConfig.host;
-      return `http://${host}:${mcpConfig.port || 3927}`;
+      const host = normalizeMcpHost(mcpConfig.host);
+      return `http://${host}:${mcpConfig.port || MCP_DEFAULT_PORT}`;
     }
     // Backend / Docker: agents should hit the same origin nginx proxies (/mcp)
-    if (backendMode) {
-      return window.location.origin;
-    }
     return window.location.origin;
   }, [backendMode, isElectronApp, mcpConfig.host, mcpConfig.port]);
 
