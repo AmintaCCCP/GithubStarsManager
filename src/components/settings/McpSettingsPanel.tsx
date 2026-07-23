@@ -350,8 +350,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           <button
             type="button"
             onClick={() => void handleResetToken()}
-            disabled={saving}
-            className="text-sm px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary"
+            disabled={saving || !mcpConfig.enabled}
+            title={
+              !mcpConfig.enabled
+                ? t('请先开启 MCP 服务', 'Enable MCP first')
+                : undefined
+            }
+            className="text-sm px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {t('重置 Token', 'Reset Token')}
           </button>
