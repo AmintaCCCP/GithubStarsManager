@@ -69,7 +69,10 @@ export function setMcpTokenPlain(token: string): void {
   setSettingRaw(MCP_SETTING_TOKEN, encrypted);
 }
 
-/** Create token only if missing. Does not enable MCP. */
+/**
+ * Create token only if missing. Does not enable MCP.
+ * Token is durable in SQLite (encrypted); never rotated here — only resetMcpToken() does.
+ */
 export function ensureMcpToken(): string {
   const existing = getMcpTokenPlain();
   if (existing) return existing;
@@ -78,6 +81,7 @@ export function ensureMcpToken(): string {
   return token;
 }
 
+/** Explicit user-initiated rotation only. */
 export function resetMcpToken(): string {
   const token = generateMcpToken();
   setMcpTokenPlain(token);

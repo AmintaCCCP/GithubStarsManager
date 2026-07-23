@@ -120,7 +120,8 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     void refreshFromBackend();
   }, [refreshFromBackend]);
 
-  // Electron: mint local token only when MCP is enabled (never while disabled).
+  // Mint a durable local token only when enabling without one (persisted in IndexedDB).
+  // Never rotate automatically — only user "Reset Token" replaces it.
   // Lifecycle (start/stop/snapshot) lives in mcpElectronBridge (App session).
   useEffect(() => {
     if (!backendMode && isElectronApp && mcpConfig.enabled && !mcpConfig.token) {
@@ -363,8 +364,8 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
         </div>
         <p className="text-xs text-gray-500 dark:text-text-tertiary">
           {t(
-            'Token 可随时查看与复制（非一次性）。请勿泄露；重置后旧配置失效。',
-            'Token is always viewable and copyable (not one-time). Do not share it; reset invalidates old configs.'
+            'Token 会固定保存，重启后不变，可随时查看与复制。仅当你点击「重置 Token」时才会更换，旧配置会失效。请勿泄露。',
+            'Token is stored permanently and stays the same across restarts. It only changes when you click Reset Token (old agent configs then stop working). Do not share it.'
           )}
         </p>
         <div className="flex items-center gap-2">
