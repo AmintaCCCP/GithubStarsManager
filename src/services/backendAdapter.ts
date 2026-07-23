@@ -121,7 +121,8 @@ class BackendAdapter {
           const parsed = JSON.parse(options.body);
           // Mask any apiKey/password fields recursively
           requestBody = JSON.stringify(parsed, (key, val) => {
-            if (/api[_-]?key|password|secret|token|authorization/i.test(key)) return '***';
+            if (/api[_-]?key|password|secret|token|authorization|mcp/i.test(key)) return '***';
+            if (typeof val === 'string' && val.startsWith('gsm_mcp_')) return '***';
             return val;
           }, 2);
         } catch {
@@ -142,7 +143,20 @@ class BackendAdapter {
           const cloned = response.clone();
           const text = await cloned.text();
           if (text.length > 0) {
-            responseBody = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+            const preview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+            // Redact secrets inside JSON (e.g. /mcp/status returns { token: "gsm_mcp_…" })
+            try {
+              const parsed = JSON.parse(preview.endsWith('...[truncated]') ? text.slice(0, 4000) : preview);
+              responseBody = JSON.stringify(parsed, (key, val) => {
+                if (/api[_-]?key|password|secret|token|authorization|mcp/i.test(key)) return '***';
+                if (typeof val === 'string' && val.startsWith('gsm_mcp_')) return '***';
+                return val;
+              }, 2);
+              if (text.length > 4000) responseBody += '\n...[truncated]';
+            } catch {
+              // Non-JSON: strip gsm_mcp_ tokens if present
+              responseBody = preview.replace(/gsm_mcp_[A-Za-z0-9_-]+/g, 'gsm_mcp_***');
+            }
           }
         } catch { /* body not readable */ }
         logger.debug('backendAdapter', 'Backend request', {
@@ -763,6 +777,41 @@ class BackendAdapter {
       public_repos: number;
       followers: number;
     }> }>;
+  }
+
+  // === MCP admin (backend-hosted Streamable HTTP / SSE) ===
+
+  async getMcpStatus(): Promise<{
+    enabled: boolean;
+    token: string;
+    endpoints: { streamableHttp: string; sse: string; messages: string };
+    vectorAvailable: boolean;
+    vectorReason: string | null;
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/mcp/status`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Fetch MCP status error');
+    return res.json();
+  }
+
+  async updateMcpConfig(body: {
+    enabled?: boolean;
+    resetToken?: boolean;
+  }): Promise<{
+    enabled: boolean;
+    token: string;
+    endpoints: { streamableHttp: string; sse: string; messages: string };
+  }> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/mcp/config`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Update MCP config error');
+    return res.json();
   }
 }
 

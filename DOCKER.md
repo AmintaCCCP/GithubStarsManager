@@ -183,3 +183,45 @@ docker stop github-stars-backend && docker rm github-stars-backend
 ## Note on Desktop Packaging
 
 This Docker setup does not affect the existing desktop packaging workflows. The GitHub Actions workflow for building desktop applications remains unchanged and continues to work as before.
+## MCP Server (Agent access)
+
+With Docker Compose, the backend MCP endpoints are exposed through nginx (frontend container) so agents on the host do not need a published backend port:
+
+| Endpoint | URL (default compose) | Notes |
+|----------|------------------------|--------|
+| Streamable HTTP | `http://localhost:8080/mcp` | Preferred for Claude Code / modern clients |
+| Legacy SSE | `http://localhost:8080/mcp/sse` | GET opens `text/event-stream`; client then POSTs to `/mcp/sse/messages?sessionId=…` |
+| Legacy SSE (alias) | `http://localhost:8080/sse` | Same protocol; messages at `/messages?sessionId=…` |
+
+**Desktop (Electron)** after enabling MCP in Settings:
+
+| Endpoint | URL |
+|----------|-----|
+| Streamable HTTP | `http://127.0.0.1:3927/mcp` |
+| Legacy SSE | `http://127.0.0.1:3927/sse` (messages: `/messages?sessionId=…`) |
+
+1. Open the app → **Settings → MCP Server**.
+2. Toggle **Enable MCP Server** (requires backend connection).
+3. Copy the token (always viewable) and the JSON agent config.
+4. Paste into Claude Code / Cursor MCP settings, for example:
+
+```json
+{
+  "mcpServers": {
+    "github-stars-manager": {
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer gsm_mcp_..."
+      }
+    }
+  }
+}
+```
+
+**Notes**
+
+- MCP uses a **separate token** from `API_SECRET` (backend UI auth). Resetting the MCP token does not break app↔backend sync.
+- The MCP bearer is **stable**: stored encrypted in SQLite (`mcp_token`) on the backend, and in IndexedDB with other app state on desktop. It is created once when you first enable MCP and **only changes if you click Reset Token**.
+- Pure frontend (no backend) does not show the MCP settings page.
+- `gsm_vector_search` appears only when Vector Search is configured and enabled in the app.
+- Enabling MCP is additive: existing SQLite data is unchanged; disabling MCP only stops the endpoint.
