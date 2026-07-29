@@ -13,9 +13,9 @@ export function normalizeLicense(v: unknown): string {
   if (v == null || v === '') return NO_LICENSE_SENTINEL;
   if (typeof v === 'object') {
     const l = v as { spdx_id?: unknown; key?: unknown };
-    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id : null;
-    const key = typeof l.key === 'string' ? l.key : null;
-    const resolved = spdx ?? key;
+    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id.trim() : '';
+    const key = typeof l.key === 'string' ? l.key.trim() : '';
+    const resolved = spdx || key;
     if (!resolved) return NO_LICENSE_SENTINEL;
     return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
   }

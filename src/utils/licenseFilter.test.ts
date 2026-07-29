@@ -68,6 +68,19 @@ describe('normalizeLicense', () => {
     // String already carrying the sentinel stays.
     expect(normalizeLicense(NO_LICENSE_SENTINEL)).toBe(NO_LICENSE_SENTINEL);
   });
+
+  it('falls back from blank/whitespace spdx_id to a valid key', () => {
+    // Regression: `spdx_id ?? key` retained an empty-string spdx_id and wrongly returned
+    // the no-license sentinel, discarding a valid key. Trim-first + `||` must select the
+    // first non-empty field (spdx_id preferred, else key).
+    expect(normalizeLicense({ spdx_id: '', key: 'MIT' } as unknown)).toBe('MIT');
+    expect(normalizeLicense({ spdx_id: '   ', key: 'apache-2.0', name: 'Apache' } as unknown))
+      .toBe('apache-2.0');
+    // Both blank → sentinel.
+    expect(normalizeLicense({ spdx_id: '', key: '  ' } as unknown)).toBe(NO_LICENSE_SENTINEL);
+    // key 'Other' still collapses to sentinel once spdx_id is absent/blank.
+    expect(normalizeLicense({ spdx_id: '', key: 'Other' } as unknown)).toBe(NO_LICENSE_SENTINEL);
+  });
 });
 
 describe('buildEmbeddingText license', () => {

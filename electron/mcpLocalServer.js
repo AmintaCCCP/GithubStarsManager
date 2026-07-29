@@ -37,8 +37,8 @@ const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-licens
 function normalizeLicense(v) {
   if (v == null || v === '') return NO_LICENSE_SENTINEL;
   if (typeof v === 'object') {
-    const spdx = typeof v.spdx_id === 'string' ? v.spdx_id : null;
-    const key = typeof v.key === 'string' ? v.key : null;
+    const spdx = typeof v.spdx_id === 'string' ? v.spdx_id.trim() : '';
+    const key = typeof v.key === 'string' ? v.key.trim() : '';
     const resolved = spdx || key;
     if (!resolved) return NO_LICENSE_SENTINEL;
     return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
