@@ -21,6 +21,7 @@ import {
   EmbeddingClient,
   VectorSearchService,
   indexAllRepos,
+  needsReindex,
   EMBEDDING_FORMAT_VERSION,
 } from '../../services/vectorSearchService';
 import { GitHubApiService } from '../../services/githubApi';
@@ -225,18 +226,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     }
   }, [formWorkerUrl, formAuthToken, setVectorSearchStatus]);
 
-  // 未索引数量（已分析、未失败、未向量索引或内容已更新）
+  // 未索引数量（已分析、未失败、未向量索引或内容已更新）。仅计算内容/license 维度，
+  // 不含格式版本升级——后者由 incrementalTargetCount 在 formatVersionNeedsReindex 时另行叠加。
   const unindexedCount = repositories.filter((r) => {
     if (!r.analyzed_at || r.analysis_failed) return false;
-    if (!r.vector_indexed_at) return true;
-    const contentTime = [r.last_edited, r.analyzed_at]
-      .filter((t): t is string => !!t)
-      .sort()
-      .pop() || '';
-    if (contentTime > r.vector_indexed_at) return true;
-    // license 变化（归一化后比对）同样需要重新索引：GitHub 同步可能只更新 license
-    // 而 last_edited/analyzed_at 不变，否则向量元数据中的 license 会过时。
-    return normalizeLicense(r.vector_indexed_license ?? null) !== normalizeLicense(r.license ?? null);
+    return needsReindex(r, false);
   }).length;
   const indexableCount = repositories.filter((r) => r.analyzed_at && !r.analysis_failed).length;
 
@@ -442,15 +436,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         const currentRepos = useAppStore.getState().repositories;
+        // 与 indexAllRepos 增量谓词保持一致（含格式版本升级判定），避免计数漂移。
+        const formatVersionChanged = currentEmbeddingFormatVersion < EMBEDDING_FORMAT_VERSION;
         const attemptedCount = currentRepos.filter((r) => {
           if (!r.analyzed_at || r.analysis_failed) return false;
-          if (!r.vector_indexed_at) return true;
-          const contentTime = [r.last_edited, r.analyzed_at]
-            .filter((t): t is string => !!t)
-            .sort()
-            .pop() || '';
-          if (contentTime > r.vector_indexed_at) return true;
-          return normalizeLicense(r.vector_indexed_license ?? null) !== normalizeLicense(r.license ?? null);
+          return needsReindex(r, formatVersionChanged);
         }).length;
         const skippedCount = currentRepos.length - attemptedCount;
         setVectorIndexingState({
