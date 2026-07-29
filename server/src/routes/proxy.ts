@@ -251,7 +251,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       'Accept': 'application/json',
     };
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'atlascloud' || apiType === 'mimo') {
       // openai-compatible 类型直接使用 baseUrl 作为完整地址
       targetUrl = apiType === 'openai-compatible'
         ? baseUrl.replace(/\/$/, '')
@@ -273,13 +273,16 @@ router.post('/api/proxy/ai', async (req, res) => {
     }
 
     // DeepSeek Reasoner does not support the reasoning parameter
-    const isDeepSeekReasoner = model.trim() === 'deepseek-reasoner';
+    const normalizedModel = model.trim().toLowerCase();
+    const isDeepSeekReasoner = normalizedModel === 'deepseek-reasoner';
+    const isAtlasDeepSeek = apiType === 'atlascloud' && normalizedModel.includes('deepseek');
     const effectiveRequestBody = (
       reasoningEffort
       && !isDeepSeekReasoner
+      && !isAtlasDeepSeek
       && typeof requestBody === 'object'
       && requestBody !== null
-      && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo')
+      && (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'atlascloud' || apiType === 'mimo')
       && !('reasoning' in requestBody)
     )
       ? { ...requestBody, reasoning: { effort: reasoningEffort } }

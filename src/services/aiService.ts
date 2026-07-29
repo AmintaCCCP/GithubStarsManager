@@ -134,7 +134,9 @@ export class AIService {
   }
 
   private isDeepSeekModel(): boolean {
-    return this.getApiType() === 'deepseek';
+    const apiType = this.getApiType();
+    return apiType === 'deepseek'
+      || (apiType === 'atlascloud' && this.config.model.trim().toLowerCase().includes('deepseek'));
   }
 
   private isDeepSeekReasonerModel(): boolean {
@@ -181,7 +183,7 @@ export class AIService {
     const configId = this.config.id;
     const reasoning = this.getOpenAIReasoningPayload();
 
-    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
+    if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'atlascloud' || apiType === 'mimo') {
       const messages = [
         ...(options.system.trim()
           ? [{ role: 'system', content: options.system }]

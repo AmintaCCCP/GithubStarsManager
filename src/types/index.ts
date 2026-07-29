@@ -206,7 +206,7 @@ export interface GistSearchFilters {
   isAnalyzed?: boolean;
 }
 
-export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'mimo' | 'openai-compatible';
+export type AIApiType = 'openai' | 'openai-responses' | 'claude' | 'gemini' | 'deepseek' | 'atlascloud' | 'mimo' | 'openai-compatible';
 
 // Embedding 提供商类型
 export type EmbeddingApiType = 'openai' | 'openai-compatible' | 'gemini' | 'cohere' | 'ollama' | 'siliconflow';

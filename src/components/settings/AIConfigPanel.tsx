@@ -35,8 +35,13 @@ const DEFAULT_API_ENDPOINTS: Record<AIApiType, string> = {
   claude: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   deepseek: 'https://api.deepseek.com',
+  atlascloud: 'https://api.atlascloud.ai/v1',
   mimo: MIMO_PLAN_ENDPOINTS.api,
   'openai-compatible': '',
+};
+
+const DEFAULT_API_MODELS: Partial<Record<AIApiType, string>> = {
+  atlascloud: 'deepseek-ai/deepseek-v4-pro',
 };
 
 function getEndpointPlaceholder(apiType: AIApiType, mimoPlan: MiMoPlan): string {
@@ -48,6 +53,8 @@ function getEndpointPlaceholder(apiType: AIApiType, mimoPlan: MiMoPlan): string 
       return 'https://api.anthropic.com/v1';
     case 'deepseek':
       return 'https://api.deepseek.com';
+    case 'atlascloud':
+      return 'https://api.atlascloud.ai/v1';
     case 'mimo':
       return MIMO_PLAN_ENDPOINTS[mimoPlan];
     case 'openai-compatible':
@@ -65,6 +72,8 @@ function getEndpointHelpText(apiType: AIApiType, t: (zh: string, en: string) => 
       return t('只填到 v1beta 即可，路径会自动生成', 'Only include the version prefix v1beta, the path will be generated automatically');
     case 'deepseek':
       return t('填写到域名即可（如 https://api.deepseek.com），路径会自动生成', 'Only include the domain (e.g. https://api.deepseek.com), the path will be generated automatically');
+    case 'atlascloud':
+      return t('填写到 /v1 即可，Chat Completions 路径会自动生成', 'Only include up to /v1; the Chat Completions path will be generated automatically');
     case 'mimo':
       return t('填写到 /v1 即可（如 https://api.xiaomimimo.com/v1），路径会自动生成', 'Only include up to /v1 (e.g. https://api.xiaomimimo.com/v1), the path will be generated automatically');
     default:
@@ -123,23 +132,23 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     mimoPlan: 'api',
   });
 
-  // Auto-fill baseUrl when API type changes
+  // Auto-fill provider defaults without overwriting custom values.
   const prevApiTypeRef = useRef<AIApiType>('openai');
   useEffect(() => {
     if (form.apiType !== prevApiTypeRef.current) {
+      const previousApiType = prevApiTypeRef.current;
       const nextDefault = DEFAULT_API_ENDPOINTS[form.apiType];
-      const prevDefault = DEFAULT_API_ENDPOINTS[prevApiTypeRef.current];
-      if (nextDefault) {
-        if (form.baseUrl === '' || form.baseUrl === prevDefault) {
-          setForm(prev => ({ ...prev, baseUrl: nextDefault }));
-        }
-      } else if (form.baseUrl === prevDefault) {
-        // Clear baseUrl when switching to a type with no default (e.g., openai-compatible)
-        setForm(prev => ({ ...prev, baseUrl: '' }));
-      }
+      const prevDefault = DEFAULT_API_ENDPOINTS[previousApiType];
+      const nextModel = DEFAULT_API_MODELS[form.apiType];
+      const prevModel = DEFAULT_API_MODELS[previousApiType];
+      setForm(prev => ({
+        ...prev,
+        baseUrl: prev.baseUrl === '' || prev.baseUrl === prevDefault ? nextDefault : prev.baseUrl,
+        model: prev.model === '' || prev.model === prevModel ? (nextModel || '') : prev.model,
+      }));
       prevApiTypeRef.current = form.apiType;
     }
-  }, [form.apiType, form.baseUrl]);
+  }, [form.apiType]);
 
   // Auto-fill baseUrl when MiMo plan changes
   const prevMimoPlanRef = useRef<MiMoPlan>('api');
@@ -455,6 +464,7 @@ Repository information:
                 <option value="claude">Claude</option>
                 <option value="gemini">Gemini</option>
                 <option value="deepseek">DeepSeek</option>
+                <option value="atlascloud">Atlas Cloud</option>
                 <option value="mimo">Xiaomi MiMo</option>
                 <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
               </select>
