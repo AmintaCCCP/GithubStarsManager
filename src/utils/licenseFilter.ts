@@ -26,10 +26,25 @@ const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-licens
 /**
  * 把仓库的 license 值归一化为「SPDX id」或「无 license 哨兵」。
  * 比对大小写不敏感，以收敛历史备份/第三方源写入的小写变体（如 'other'、'none'）。
- * @param v 原始 license 值（SPDX id / 哨兵值 / null / undefined / 空串）
+ *
+ * 防御：`v` 可能并非字符串——历史持久化数据、第三方备份导入，或尚未走 {@link toLicenseSpdxId}
+ * 的 GitHub 原始对象 `{ key, spdx_id, name, url }` 都可能携带非字符串 license。此处不再假设字符串：
+ * 对象形态先还原为 `spdx_id ?? key`（再字符串比对），其余非字符串一律按「无 license」归并，
+ * 避免对对象/数字调用 `.toLowerCase()` 导致客户端渲染崩溃。
+ * @param v 原始 license 值（SPDX id / GitHub 对象 / 数字 / null / undefined / 空串）
  * @returns 归一化后的字符串；无 license 时返回 {@link NO_LICENSE_SENTINEL}
  */
-export function normalizeLicense(v: string | null | undefined): string {
-  if (!v) return NO_LICENSE_SENTINEL;
+export function normalizeLicense(v: unknown): string {
+  if (v == null || v === '') return NO_LICENSE_SENTINEL;
+  if (typeof v === 'object') {
+    // GitHub license 对象：优先 spdx_id（如 'MIT'），回退 key（如 'Other'）
+    const l = v as { spdx_id?: unknown; key?: unknown };
+    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id : null;
+    const key = typeof l.key === 'string' ? l.key : null;
+    const resolved = spdx ?? key;
+    if (!resolved) return NO_LICENSE_SENTINEL;
+    return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
+  }
+  if (typeof v !== 'string') return NO_LICENSE_SENTINEL; // 数字等为非合法 license
   return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
 }

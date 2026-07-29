@@ -35,7 +35,15 @@ function performBasicTextSearch(repos, query) {
 const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
 const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
 function normalizeLicense(v) {
-  if (!v) return NO_LICENSE_SENTINEL;
+  if (v == null || v === '') return NO_LICENSE_SENTINEL;
+  if (typeof v === 'object') {
+    const spdx = typeof v.spdx_id === 'string' ? v.spdx_id : null;
+    const key = typeof v.key === 'string' ? v.key : null;
+    const resolved = spdx || key;
+    if (!resolved) return NO_LICENSE_SENTINEL;
+    return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
+  }
+  if (typeof v !== 'string') return NO_LICENSE_SENTINEL;
   return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
 }
 

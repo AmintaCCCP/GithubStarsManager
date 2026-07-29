@@ -1,6 +1,7 @@
 import { Repository, Gist, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
+import { normalizeLicense } from '../utils/licenseFilter';
 import { logger } from './logger';
 
 interface OpenAIResponseContentPart {
@@ -1317,7 +1318,7 @@ ${repoInfo}
         aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
         customDescription: (repo.custom_description || '').toLowerCase(),
         customTags: (repo.custom_tags || []).join(' ').toLowerCase(),
-        license: (repo.license || '').toLowerCase(),
+        license: normalizeLicense(repo.license).toLowerCase(),
       };
 
       // Check if any query word matches any field
@@ -1439,7 +1440,7 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
-        repo.license || '',
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
 
       // Check if any of the AI-enhanced terms match
@@ -1465,7 +1466,7 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
-        repo.license || '',
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
 
       // Split query into words and check if all words are present
@@ -1490,7 +1491,7 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
-        repo.license || '',
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
 
       // Split query into words and check if all words are present

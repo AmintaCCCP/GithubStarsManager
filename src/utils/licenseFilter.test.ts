@@ -46,6 +46,28 @@ describe('normalizeLicense', () => {
     expect(normalizeLicense('other')).toBe(NO_LICENSE_SENTINEL);
     expect(normalizeLicense('none')).toBe(NO_LICENSE_SENTINEL);
   });
+
+  it('never throws on a non-string license (GitHub object / number / legacy data)', () => {
+    // Regression: performBasicTextSearch / performEnhancedBasicSearch / RepositoryCard call
+    // normalizeLicense(repo.license) during render. A repo that never passed through
+    // toLicenseSpdxId (legacy persisted store, third-party import, or a return path not
+    // yet normalized) can carry a raw GitHub license object { key, spdx_id, ... } or a
+    // number. normalizeLicense must reduce these without calling .toLowerCase() on a
+    // non-string and crashing the client render ("e.toLowerCase is not a function").
+    // GitHub object → resolve SPDX id (spdx_id preferred over key):
+    expect(normalizeLicense({ spdx_id: 'MIT', key: 'MIT', name: 'MIT License', url: 'u' } as unknown))
+      .toBe('MIT');
+    // GitHub "Other" object (no SPDX): key 'Other' → sentinel.
+    expect(normalizeLicense({ key: 'Other', spdx_id: 'NOASSERTION', name: 'Other' } as unknown))
+      .toBe(NO_LICENSE_SENTINEL);
+    // Object missing both string fields → sentinel.
+    expect(normalizeLicense({ name: 'Custom' } as unknown)).toBe(NO_LICENSE_SENTINEL);
+    // Non-string truthy values (number/boolean) → sentinel, no crash.
+    expect(normalizeLicense(123 as unknown)).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense(true as unknown)).toBe(NO_LICENSE_SENTINEL);
+    // String already carrying the sentinel stays.
+    expect(normalizeLicense(NO_LICENSE_SENTINEL)).toBe(NO_LICENSE_SENTINEL);
+  });
 });
 
 describe('buildEmbeddingText license', () => {

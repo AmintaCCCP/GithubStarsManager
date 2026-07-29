@@ -610,7 +610,9 @@ export async function indexAllRepos(
               language: batch[j].language || '',
               stars: batch[j].stargazers_count || 0,
               tags: batch[j].ai_tags || [],
-              license: batch[j].license || '',
+              // 历史/导入数据 license 可能是 GitHub 对象或数字；统一经 normalizeLicense
+              // 降为 SPDX id / 哨兵，避免把 "[object Object]" 写入向量元数据。
+              license: normalizeLicense(batch[j].license),
             },
           });
         } else {
