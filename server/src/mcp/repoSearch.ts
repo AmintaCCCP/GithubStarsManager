@@ -9,8 +9,17 @@
  */
 export const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
 const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
-export function normalizeLicense(v: string | null | undefined): string {
-  if (!v) return NO_LICENSE_SENTINEL;
+export function normalizeLicense(v: unknown): string {
+  if (v == null || v === '') return NO_LICENSE_SENTINEL;
+  if (typeof v === 'object') {
+    const l = v as { spdx_id?: unknown; key?: unknown };
+    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id : null;
+    const key = typeof l.key === 'string' ? l.key : null;
+    const resolved = spdx ?? key;
+    if (!resolved) return NO_LICENSE_SENTINEL;
+    return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
+  }
+  if (typeof v !== 'string') return NO_LICENSE_SENTINEL;
   return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
 }
 

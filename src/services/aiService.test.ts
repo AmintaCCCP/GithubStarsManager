@@ -64,4 +64,23 @@ describe('AIService.searchRepositoriesWithReranking — enhanced basic search fa
     expect(ids).toEqual([1, 2]);
     expect(results).toHaveLength(2);
   });
+
+  it('does not crash when a repo carries a raw GitHub license object (toLowerCase defensive)', async () => {
+    // Regression for "e.toLowerCase is not a function": a repo whose license never passed
+    // through toLicenseSpdxId (legacy persisted store / third-party import) keeps a raw
+    // GitHub object `{ key, spdx_id, ... }`. performEnhancedBasicSearch must reduce it via
+    // normalizeLicense rather than (repo.license || '').toLowerCase().
+    const repoA = makeRepo({
+      id: 3,
+      name: 'react-legacy',
+      full_name: 'acme/react-legacy',
+      stargazers_count: 10,
+      license: { spdx_id: 'MIT', key: 'MIT', name: 'MIT License', url: 'https://api.github.com/licenses/mit' } as never,
+    });
+
+    const service = new AIService(makeConfig() as never, 'en');
+    // Should resolve the license object to 'MIT' and rank the repo — not throw.
+    const results = await service.searchRepositoriesWithReranking([repoA], 'mit');
+    expect(results.map((r) => r.id)).toEqual([3]);
+  });
 });
