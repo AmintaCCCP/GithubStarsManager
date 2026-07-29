@@ -1,5 +1,6 @@
 import type { Category, Repository, SearchFilters } from '../types';
 import { isRepoCustomized } from './repoUtils';
+import { normalizeLicense } from './licenseFilter';
 
 /** Partial filters used by MCP and UI search (all fields optional except when provided). */
 export type RepoSearchFilterInput = Partial<SearchFilters> & {
@@ -27,6 +28,7 @@ export function performBasicTextSearch<T extends Repository>(repos: T[], query: 
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
+      repo.license || '',
     ]
       .join(' ')
       .toLowerCase();
@@ -115,6 +117,14 @@ export function applyRepoFilters<T extends Repository>(
       const repoPlatforms = repo.ai_platforms || [];
       return platforms.some((platform) => repoPlatforms.includes(platform));
     });
+  }
+
+  const licenses = searchFilters.licenses ?? [];
+  if (licenses.length > 0) {
+    // 归一化后比对：SPDX id 精确匹配，无 license（含 NOASSERTION/Other/null）落入 NO_LICENSE_SENTINEL
+    filtered = filtered.filter((repo) =>
+      licenses.includes(normalizeLicense(repo.license))
+    );
   }
 
   if (searchFilters.isAnalyzed !== undefined && searchFilters.analysisFailed === undefined) {

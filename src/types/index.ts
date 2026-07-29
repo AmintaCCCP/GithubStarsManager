@@ -32,6 +32,8 @@ export interface Repository {
   vector_indexed_at?: string;  // ISO timestamp of last successful vector indexing
   last_release_fetch_time?: string;  // ISO timestamp, for incremental sync
   has_fetched_releases?: boolean;   // whether this repo has been synced for releases
+  /** SPDX id（如 'MIT'、'Apache-2.0'）；无许可证/未识别为 null。AI/搜索/过滤均以此为准。 */
+  license?: string | null;
 }
 
 export interface ReleaseAsset {
@@ -344,6 +346,8 @@ export interface SearchFilters {
   isEdited?: boolean; // 新增：是否已编辑
   isCategoryLocked?: boolean; // 新增：分类是否已锁定
   analysisFailed?: boolean; // 新增：分析是否失败
+  /** SPDX id 过滤；过滤面板可采用 `NO_LICENSE_SENTINEL` 表示「无/未声明 license」。 */
+  licenses: string[]; // 新增：开源许可过滤
 }
 
 export interface Category {

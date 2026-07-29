@@ -23,11 +23,20 @@ function performBasicTextSearch(repos, query) {
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
+      repo.license || '',
     ]
       .join(' ')
       .toLowerCase();
     return words.every((w) => text.includes(w));
   });
+}
+
+// License 归一化镜像（与 src/utils/licenseFilter.ts 一致）
+const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
+const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
+function normalizeLicense(v) {
+  if (!v) return NO_LICENSE_SENTINEL;
+  return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
 }
 
 function projectRepo(repo, max = 400) {
@@ -54,6 +63,7 @@ function projectRepo(repo, max = 400) {
     starred_at: repo.starred_at,
     updated_at: repo.updated_at,
     pushed_at: repo.pushed_at,
+    license: repo.license ?? null,
   };
 }
 
@@ -265,6 +275,11 @@ function getTools(vectorAvailable) {
           query: { type: 'string' },
           languages: { type: 'array', items: { type: 'string' } },
           tags: { type: 'array', items: { type: 'string' } },
+          licenses: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'SPDX id list (e.g. ["MIT","Apache-2.0"]); use "__NO_LICENSE__" for repos with no license',
+          },
           category: { type: 'string' },
           minStars: { type: 'number' },
           maxStars: { type: 'number' },
@@ -361,6 +376,9 @@ async function callTool(name, args, snapshot) {
           const tags = [...(r.ai_tags || []), ...(r.topics || []), ...(r.custom_tags || [])];
           return args.tags.some((t) => tags.includes(t));
         });
+      }
+      if (args?.licenses?.length) {
+        list = list.filter((r) => args.licenses.includes(normalizeLicense(r.license)));
       }
       if (args?.category) {
         list = list.filter((r) => r.custom_category === args.category);

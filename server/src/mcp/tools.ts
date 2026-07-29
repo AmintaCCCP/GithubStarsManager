@@ -54,6 +54,10 @@ export function registerMcpTools(server: McpServer): void {
         languages: z.array(z.string()).optional(),
         tags: z.array(z.string()).optional(),
         platforms: z.array(z.string()).optional(),
+        licenses: z
+          .array(z.string())
+          .optional()
+          .describe('SPDX id list (e.g. ["MIT","Apache-2.0"]); use "__NO_LICENSE__" for repos with no license'),
         category: z.string().optional().describe('custom_category exact match'),
         minStars: z.number().optional(),
         maxStars: z.number().optional(),
@@ -71,6 +75,7 @@ export function registerMcpTools(server: McpServer): void {
         languages: args.languages,
         tags: args.tags,
         platforms: args.platforms,
+        licenses: args.licenses,
         category: args.category,
         minStars: args.minStars,
         maxStars: args.maxStars,
