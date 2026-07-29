@@ -101,8 +101,20 @@ describe('applyRepoFilters', () => {
   });
 
   it('aggregates no-license repos via the sentinel', () => {
-    // normalizeLicense collapses 'NOASSERTION' (and null/'Other') to the sentinel
+    // normalizeLicense collapses every no-license shape to the sentinel, so the
+    // "no license" UI bucket is a single stable key regardless of how GitHub
+    // reports the absence: null/'Other' (key-only licenses)/'NOASSERTION'/
+    // 'none'/''/and mixed-case 'noassertion' all collapse to NO_LICENSE_SENTINEL.
+    expect(normalizeLicense(null)).toBe(NO_LICENSE_SENTINEL);
     expect(normalizeLicense('NOASSERTION')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('Other')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('none')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('noassertion')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('NoAssertion')).toBe(NO_LICENSE_SENTINEL);
+
+    // A repo whose stored license collapses to the sentinel is matched by the
+    // "no license" filter. (sample[2] carries license: 'NOASSERTION' → sentinel.)
     const hits = applyRepoFilters(sample, { licenses: [NO_LICENSE_SENTINEL] });
     expect(hits.map((r) => r.id)).toEqual([3]);
   });
