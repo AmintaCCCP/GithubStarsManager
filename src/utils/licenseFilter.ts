@@ -37,11 +37,13 @@ const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-licens
 export function normalizeLicense(v: unknown): string {
   if (v == null || v === '') return NO_LICENSE_SENTINEL;
   if (typeof v === 'object') {
-    // GitHub license 对象：优先 spdx_id（如 'MIT'），回退 key（如 'Other'）
+    // GitHub license 对象：优先 spdx_id（如 'MIT'），回退 key（如 'Other'）。
+    // 注意 trimmed-first + `||`：若 spdx_id 为空白串（≠ null），不可用 `??` 否则会保留空串
+    // 并错误归入「无 license」，应回退到非空 key。
     const l = v as { spdx_id?: unknown; key?: unknown };
-    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id : null;
-    const key = typeof l.key === 'string' ? l.key : null;
-    const resolved = spdx ?? key;
+    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id.trim() : '';
+    const key = typeof l.key === 'string' ? l.key.trim() : '';
+    const resolved = spdx || key;
     if (!resolved) return NO_LICENSE_SENTINEL;
     return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
   }
