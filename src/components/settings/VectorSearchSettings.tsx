@@ -25,6 +25,7 @@ import {
 } from '../../services/vectorSearchService';
 import { GitHubApiService } from '../../services/githubApi';
 import type { EmbeddingApiType, EmbeddingConfig } from '../../types';
+import { normalizeLicense } from '../../utils/licenseFilter';
 
 interface VectorSearchSettingsProps {
   t: (zh: string, en: string) => string;
@@ -232,7 +233,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       .filter((t): t is string => !!t)
       .sort()
       .pop() || '';
-    return contentTime > r.vector_indexed_at;
+    if (contentTime > r.vector_indexed_at) return true;
+    // license 变化（归一化后比对）同样需要重新索引：GitHub 同步可能只更新 license
+    // 而 last_edited/analyzed_at 不变，否则向量元数据中的 license 会过时。
+    return normalizeLicense(r.vector_indexed_license ?? null) !== normalizeLicense(r.license ?? null);
   }).length;
   const indexableCount = repositories.filter((r) => r.analyzed_at && !r.analysis_failed).length;
 
@@ -279,15 +283,26 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     try {
       // 每次点击时读取最新的 repositories，避免闭包捕获过期数据
       const currentRepos = useAppStore.getState().repositories;
+      const now = new Date().toISOString();
+      // 按 id 取 license，用于在 stamp vector_indexed_at 的同时记录本次采用的
+      // 归一化 license（向量增量谓词据此判断 license 变更触发重索引）。
+      const licenseById = new Map(currentRepos.map(r => [r.id, r.license ?? null]));
+      const stampRepo = (id: number) => ({
+        id,
+        patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) },
+      });
 
       // 1. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
       //    用 updateRepositoriesMetadata 避免重置当前过滤的 searchResults
+      //    同步清除 vector_indexed_license，使 license 指纹与 stamp 同进退。
       updateRepositoriesMetadata(
-        currentRepos.filter(r => r.vector_indexed_at).map(r => ({ id: r.id, patch: { vector_indexed_at: undefined } }))
+        currentRepos.filter(r => r.vector_indexed_at).map(r => ({
+          id: r.id,
+          patch: { vector_indexed_at: undefined, vector_indexed_license: undefined },
+        }))
       );
 
       // 2. 全量索引，逐批确认后立即 stamp（中断不丢失已确认进度）
-      const now = new Date().toISOString();
       const stampedRepoIds: number[] = [];
       const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
@@ -305,14 +320,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           // 批量 stamp：每 32 个（一个 batch）刷新一次，减少 UI 刷新频率
           if (stampedRepoIds.length % 32 === 0) {
             const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
-            updateRepositoriesMetadata(batch.map(id => ({ id, patch: { vector_indexed_at: now } })));
+            updateRepositoriesMetadata(batch.map(stampRepo));
           }
         },
       });
 
       // stamp 剩余未刷新的
       if (stampedRepoIds.length > 0) {
-        updateRepositoriesMetadata(stampedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } })));
+        updateRepositoriesMetadata(stampedRepoIds.map(stampRepo));
       }
 
       // 3. cleanup：全量重建后只保留本次成功重建的向量
@@ -368,6 +383,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       );
 
       const now = new Date().toISOString();
+      // 与全量重建一致：stamp 时同步记录本次索引采用的归一化 license，
+      // 供增量谓词下次判断 license 是否变化。
+      const licenseById = new Map(currentRepos.map(r => [r.id, r.license ?? null]));
+      const stampRepo = (id: number) => ({
+        id,
+        patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) },
+      });
       const stampedRepoIds: number[] = [];
       const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => setVectorIndexingState({
@@ -386,14 +408,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           stampedRepoIds.push(repoId);
           if (stampedRepoIds.length % 32 === 0) {
             const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
-            updateRepositoriesMetadata(batch.map(id => ({ id, patch: { vector_indexed_at: now } })));
+            updateRepositoriesMetadata(batch.map(stampRepo));
           }
         },
       });
 
       // stamp 剩余未刷新的
       if (stampedRepoIds.length > 0) {
-        updateRepositoriesMetadata(stampedRepoIds.map(id => ({ id, patch: { vector_indexed_at: now } })));
+        updateRepositoriesMetadata(stampedRepoIds.map(stampRepo));
       }
 
       setVectorIndexingState({ result, isIndexing: false, phase: null });
@@ -427,7 +449,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             .filter((t): t is string => !!t)
             .sort()
             .pop() || '';
-          return contentTime > r.vector_indexed_at;
+          if (contentTime > r.vector_indexed_at) return true;
+          return normalizeLicense(r.vector_indexed_license ?? null) !== normalizeLicense(r.license ?? null);
         }).length;
         const skippedCount = currentRepos.length - attemptedCount;
         setVectorIndexingState({

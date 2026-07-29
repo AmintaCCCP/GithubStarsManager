@@ -79,7 +79,7 @@ export function performBasicTextSearch<T extends McpRepository>(repos: T[], quer
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
-      repo.license || '',
+      normalizeLicense(repo.license),
     ]
       .join(' ')
       .toLowerCase();

@@ -30,6 +30,8 @@ export interface Repository {
   category_locked?: boolean;
   last_edited?: string;
   vector_indexed_at?: string;  // ISO timestamp of last successful vector indexing
+  /** 上次向量索引时采用的 license（SPDX id / null）。增量谓词据此判断 license 是否变化以触发重索引。 */
+  vector_indexed_license?: string | null;
   last_release_fetch_time?: string;  // ISO timestamp, for incremental sync
   has_fetched_releases?: boolean;   // whether this repo has been synced for releases
   /** SPDX id（如 'MIT'、'Apache-2.0'）；无许可证/未识别为 null。AI/搜索/过滤均以此为准。 */

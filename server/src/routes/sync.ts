@@ -108,7 +108,7 @@ router.post('/api/sync/import', (req, res) => {
             owner_login, owner_avatar_url, topics,
             ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
             custom_description, custom_tags, custom_category, category_locked, last_edited,
-            subscribed_to_releases, vector_indexed_at, license
+            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
@@ -116,16 +116,19 @@ router.post('/api/sync/import', (req, res) => {
           if (!r.id || typeof r.id !== 'number') {
             throw new Error(`Invalid repository data: missing or invalid id`);
           }
-          // license：兼容旧备份（无该列→null）、GitHub 对象形态、已规范化的 SPDX 字符串
+          // license：兼容旧备份（无该列→null）、GitHub 对象形态、已规范化的 SPDX 字符串。
+          // 仅当候选字段在运行时确为字符串时才采用，避免 malformed 值（如 spdx_id: 123）
+          // 使 licenseValue 变成非字符串、污染导入事务；否则归一化为 SPDX id 或 null。
           const rawLicense = (r as Record<string, unknown>).license;
-          const licenseValue =
-            typeof rawLicense === 'string'
-              ? rawLicense || null
-              : rawLicense && typeof rawLicense === 'object'
-                ? (rawLicense as { spdx_id?: string; key?: string }).spdx_id ||
-                  (rawLicense as { key?: string }).key ||
-                  null
-                : null;
+          let licenseValue: string | null = null;
+          if (typeof rawLicense === 'string') {
+            licenseValue = rawLicense || null;
+          } else if (rawLicense && typeof rawLicense === 'object') {
+            const obj = rawLicense as { spdx_id?: unknown; key?: unknown };
+            const spdx = typeof obj.spdx_id === 'string' ? obj.spdx_id : null;
+            const key = typeof obj.key === 'string' ? obj.key : null;
+            licenseValue = spdx || key || null;
+          }
           repoStmt.run(
             r.id, r.name, r.full_name, r.description ?? null,
             r.html_url, r.stargazers_count ?? 0, r.language ?? null,
@@ -142,7 +145,11 @@ router.post('/api/sync/import', (req, res) => {
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
             r.subscribed_to_releases ? 1 : 0,
             r.vector_indexed_at ?? null,
-            licenseValue
+            licenseValue,
+            // vector_indexed_license：仅接受字符串（已是规范化 SPDX id），否则 null。
+            // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
+            // 触发一次重索引回填指纹），合预期。
+            typeof r.vector_indexed_license === 'string' ? r.vector_indexed_license || null : null
           );
         }
         counts.repositories = repos.length;

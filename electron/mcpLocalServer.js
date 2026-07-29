@@ -23,7 +23,7 @@ function performBasicTextSearch(repos, query) {
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
-      repo.license || '',
+      normalizeLicense(repo.license),
     ]
       .join(' ')
       .toLowerCase();
@@ -418,11 +418,14 @@ async function callTool(name, args, snapshot) {
     }
     case 'gsm_stats': {
       const byLanguage = {};
+      const byLicense = {};
       let analyzed = 0;
       let subscribed = 0;
       for (const r of repos) {
         const lang = r.language || 'Unknown';
         byLanguage[lang] = (byLanguage[lang] || 0) + 1;
+        const lic = normalizeLicense(r.license);
+        byLicense[lic] = (byLicense[lic] || 0) + 1;
         if (r.analyzed_at && !r.analysis_failed) analyzed += 1;
         if (r.subscribed_to_releases) subscribed += 1;
       }
@@ -431,6 +434,7 @@ async function callTool(name, args, snapshot) {
         analyzed,
         subscribedToReleases: subscribed,
         byLanguage,
+        byLicense,
       });
     }
     case 'gsm_vector_search': {

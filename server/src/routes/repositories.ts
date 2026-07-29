@@ -56,6 +56,7 @@ function transformRepo(row: Record<string, unknown>) {
     subscribed_to_releases: !!row.subscribed_to_releases,
     vector_indexed_at: row.vector_indexed_at ?? undefined,
     license: row.license ?? null,
+    vector_indexed_license: row.vector_indexed_license ?? null,
   };
 }
 
@@ -150,7 +151,7 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases, vector_indexed_at, license
+        subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
@@ -178,7 +179,14 @@ router.put('/api/repositories', (req, res) => {
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases,
         vector_indexed_at = excluded.vector_indexed_at,
-        license = excluded.license
+        -- vector_indexed_license 是「上次向量索引时采用的 license」的照实记录，
+        -- 仅由索引流程（PATCH）写入；批量 upsert/sync 一律保留已存储值，避免被
+        -- 同步流写入的当前 license 覆盖而破坏增量变更检测。
+        vector_indexed_license = COALESCE(repositories.vector_indexed_license, excluded.vector_indexed_license),
+        -- 区分「省略 license 字段」与「显式提供 null/对象」：
+        -- 旧客户端/旧备份不含 license 字段时（@licenseProvided = 0）保留已存储值；
+        -- 显式提供时（@licenseProvided = 1）采用归一化后的 excluded.license（含 null 清空）。
+        license = CASE WHEN @licenseProvided IS 1 THEN excluded.license ELSE repositories.license END
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -210,6 +218,8 @@ router.put('/api/repositories', (req, res) => {
       let count = 0;
       for (const repo of repositories) {
         const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
+        // 仅当 payload 显式提供 license 字段时才覆盖已存储值；省略（旧客户端/旧备份）则保留。
+        const licenseProvided = Object.prototype.hasOwnProperty.call(repo, 'license') ? 1 : 0;
         stmt.run(
           repo.id, repo.name, repo.full_name, repo.description ?? null,
           repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
@@ -226,7 +236,11 @@ router.put('/api/repositories', (req, res) => {
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
           (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
           repo.vector_indexed_at ?? null,
-          toLicenseSpdxId(repo.license)
+          toLicenseSpdxId(repo.license),
+          // 备份中 vector_indexed_license 已是规范化的 SPDX id 字符串或 null；
+          // 非 string 一律清空，避免奇怪类型破坏增量谓词的字符串比较。
+          typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
+          { licenseProvided }
         );
         count++;
       }
@@ -263,6 +277,9 @@ router.patch('/api/repositories/:id', (req, res) => {
       // 规范化：null/undefined/空字符串 → null；仅接受字符串（ISO 时间戳）
       vector_indexed_at: (v) =>
         (v === null || v === undefined || v === '') ? null : v,
+      // vector_indexed_license：规范化为 SPDX id 字符串或 null；非字符串一律清空。
+      vector_indexed_license: (v) =>
+        (v === null || v === undefined || v === '' || typeof v !== 'string') ? null : v,
       description: (v) => v,
       name: (v) => v,
     };

@@ -138,6 +138,94 @@ describe('indexAllRepos incremental filtering', () => {
   });
 });
 
+describe('indexAllRepos incremental filtering — license change invalidation', () => {
+  it('reindexes an indexed repo whose license changed even when content timestamps are unchanged', async () => {
+    // Repo was indexed under MIT; its vector_indexed_at is newer than content, so without
+    // the license fingerprint check it would be skipped. GitHub sync then changes the
+    // license to Apache-2.0 — the incremental predicate must reindex to refresh metadata.
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: 'MIT',
+        license: 'Apache-2.0',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+        // No last_edited / newer analyzed_at => content time predates vector_indexed_at.
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // License differs from the indexed fingerprint => reindex, despite no content-time change.
+    expect(indexedRepoIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+  });
+
+  it('treats a null-vs-no-assertion drift as a license change and reindexes', async () => {
+    // normalizeLicense collapses both null and 'NOASSERTION' to the sentinel, so an indexed
+    // repo whose stored license was null (fingerprint not yet captured) must reindex once to
+    // capture the fingerprint, then settle on subsequent runs.
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: null,
+        license: 'MIT',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // null fingerprint vs MIT license => mismatch => reindex.
+    expect(indexedRepoIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+  });
+
+  it('skips an indexed repo whose license is unchanged', async () => {
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: 'MIT',
+        license: 'MIT',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // No content change and license fingerprint matches => nothing to index.
+    expect(indexedRepoIds).toEqual([]);
+    expect(result.indexedRepoIds).toEqual([]);
+    expect(result.indexed).toBe(0);
+  });
+});
+
 describe('embedWithFallback', () => {
   it('uses fast batch path on success', async () => {
     const client = makeClient(async (texts) => texts.map((_, i) => vec(i)));

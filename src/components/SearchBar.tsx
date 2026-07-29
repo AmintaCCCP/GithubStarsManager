@@ -258,7 +258,7 @@ export const SearchBar: React.FC = () => {
     // Search helpers are intentionally kept as local closures; the explicit deps below
     // cover the state they read without causing a search loop on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.licenses, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {

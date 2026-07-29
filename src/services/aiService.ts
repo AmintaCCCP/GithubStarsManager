@@ -1350,6 +1350,9 @@ ${repoInfo}
         // Platform and language matches
         if (searchableFields.aiPlatforms.includes(word)) score += 0.18;
         if (searchableFields.language.includes(word)) score += 0.12;
+
+        // License matches
+        if (searchableFields.license.includes(word)) score += 0.2;
       });
 
       // Boost for exact matches

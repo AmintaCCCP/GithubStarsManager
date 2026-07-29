@@ -601,7 +601,10 @@ export class GitHubApiService {
     const endpoint = username
       ? `/users/${encodeURIComponent(username)}/subscriptions?page=${page}&per_page=${perPage}`
       : `/user/subscriptions?page=${page}&per_page=${perPage}`;
-    return this.makeRequest<Repository[]>(endpoint);
+    // GitHub 对 watched repos 同样返回原始 license 对象，这里统一归一化为 SPDX id / null，
+    // 与 /user/starred 路径保持一致，避免下游 normalizeLicense 拿到对象时崩溃。
+    const repos = await this.makeRequest<Repository[]>(endpoint);
+    return repos.map((repo) => ({ ...repo, license: toLicenseSpdxId(repo.license) }));
   }
 
   async getAllWatchedRepositories(username?: string): Promise<Repository[]> {

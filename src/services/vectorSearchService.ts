@@ -6,6 +6,7 @@
  */
 
 import type { EmbeddingConfig, VectorSearchConfig, Repository } from '../types';
+import { normalizeLicense } from '../utils/licenseFilter';
 
 // ============================================================
 // EmbeddingClient
@@ -522,7 +523,11 @@ export async function indexAllRepos(
         .filter((t): t is string => !!t)
         .sort()
         .pop() || '';
-      return contentTime > r.vector_indexed_at;
+      if (contentTime > r.vector_indexed_at) return true;
+      // license 变化（归一化后比对）：GitHub 同步可能仅更新 license 而 last_edited 不变，
+      // 此时向量元数据与嵌入文本中的 License 字段会过时，故需重新索引。
+      const indexedLicense = r.vector_indexed_license ?? null;
+      return normalizeLicense(indexedLicense) !== normalizeLicense(r.license ?? null);
     });
   }
   let indexed = 0;
