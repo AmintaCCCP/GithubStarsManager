@@ -3,6 +3,17 @@
  * Kept server-local to avoid coupling the Express package to the Vite app tree.
  */
 
+/**
+ * License 归一化的服务端镜像（与 src/utils/licenseFilter.ts 保持一致）。
+ * 服务端 MCP 无法 import src/ 树，故此处保留一份相同实现；改前端那份时请一并同步。
+ */
+export const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
+const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
+export function normalizeLicense(v: string | null | undefined): string {
+  if (!v) return NO_LICENSE_SENTINEL;
+  return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
+}
+
 export interface McpRepository {
   id: number;
   name: string;
@@ -27,6 +38,7 @@ export interface McpRepository {
   category_locked?: boolean;
   subscribed_to_releases?: boolean;
   owner?: { login: string; avatar_url?: string };
+  license?: string | null;
 }
 
 export interface McpSearchFilters {
@@ -43,6 +55,8 @@ export interface McpSearchFilters {
   isCategoryLocked?: boolean;
   analysisFailed?: boolean;
   category?: string;
+  /** SPDX id 过滤；含 {@link NO_LICENSE_SENTINEL} 表示「无/未声明 license」。 */
+  licenses?: string[];
   limit?: number;
   offset?: number;
 }
@@ -65,6 +79,7 @@ export function performBasicTextSearch<T extends McpRepository>(repos: T[], quer
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
+      repo.license || '',
     ]
       .join(' ')
       .toLowerCase();
@@ -107,6 +122,11 @@ export function applyRepoFilters<T extends McpRepository>(
       const platforms = r.ai_platforms || [];
       return filters.platforms!.some((p) => platforms.includes(p));
     });
+  }
+  if (filters.licenses?.length) {
+    filtered = filtered.filter((r) =>
+      filters.licenses!.includes(normalizeLicense(r.license))
+    );
   }
   if (filters.isAnalyzed !== undefined && filters.analysisFailed === undefined) {
     filtered = filtered.filter((r) =>
@@ -196,5 +216,6 @@ export function projectRepoForAgent(
     starred_at: repo.starred_at,
     updated_at: repo.updated_at,
     pushed_at: repo.pushed_at,
+    license: repo.license ?? null,
   };
 }

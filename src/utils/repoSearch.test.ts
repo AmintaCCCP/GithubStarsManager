@@ -6,6 +6,7 @@ import {
   searchRepositories,
   projectRepoForAgent,
 } from './repoSearch';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from './licenseFilter';
 
 function makeRepo(partial: Partial<Repository> & Pick<Repository, 'id' | 'name' | 'full_name'>): Repository {
   return {
@@ -36,6 +37,7 @@ const sample: Repository[] = [
     ai_tags: ['crdt', 'sync'],
     ai_platforms: ['cli'],
     topics: ['database'],
+    license: 'MIT',
   }),
   makeRepo({
     id: 2,
@@ -46,6 +48,7 @@ const sample: Repository[] = [
     stargazers_count: 50,
     ai_tags: ['webdav'],
     custom_category: 'tools',
+    license: 'GPL-3.0',
   }),
   makeRepo({
     id: 3,
@@ -56,6 +59,7 @@ const sample: Repository[] = [
     stargazers_count: 200,
     analyzed_at: '2024-01-01',
     analysis_failed: true,
+    license: 'NOASSERTION',
   }),
 ];
 
@@ -89,6 +93,18 @@ describe('applyRepoFilters', () => {
   it('sorts by stars desc by default', () => {
     const hits = applyRepoFilters(sample, { sortBy: 'stars', sortOrder: 'desc' });
     expect(hits.map((r) => r.id)).toEqual([1, 3, 2]);
+  });
+
+  it('filters by SPDX id license', () => {
+    const hits = applyRepoFilters(sample, { licenses: ['MIT'] });
+    expect(hits.map((r) => r.id)).toEqual([1]);
+  });
+
+  it('aggregates no-license repos via the sentinel', () => {
+    // normalizeLicense collapses 'NOASSERTION' (and null/'Other') to the sentinel
+    expect(normalizeLicense('NOASSERTION')).toBe(NO_LICENSE_SENTINEL);
+    const hits = applyRepoFilters(sample, { licenses: [NO_LICENSE_SENTINEL] });
+    expect(hits.map((r) => r.id)).toEqual([3]);
   });
 });
 

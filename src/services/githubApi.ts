@@ -40,6 +40,21 @@ interface GitHubStarredItem {
   [key: string]: unknown;
 }
 
+/**
+ * 把 GitHub 返回的 license 值统一为 SPDX id 字符串或 null。
+ * 接受 GitHub 原始对象 `{ key, spdx_id, name, url }`、已规范化的字符串、null。
+ * 优先取 spdx_id（如 "MIT"），无则回退 key（如 "Other"）。
+ */
+function toLicenseSpdxId(license: unknown): string | null {
+  if (license == null) return null;
+  if (typeof license === 'string') return license || null;
+  if (typeof license === 'object') {
+    const l = license as { spdx_id?: string; key?: string };
+    return l.spdx_id || l.key || null;
+  }
+  return null;
+}
+
 interface GitHubRateLimitResponse {
   rate: {
     remaining: number;
@@ -301,10 +316,15 @@ export class GitHubApiService {
         if (item.starred_at && item.repo) {
           return {
             ...item.repo,
+            // 归一化 GitHub 的 license 值（对象/字符串/null）为 SPDX id 字符串或 null
+            license: toLicenseSpdxId(item.repo.license),
             starred_at: item.starred_at
           };
         }
-        return item;
+        return {
+          ...item,
+          license: toLicenseSpdxId(item.license),
+        };
       }) as T;
     }
 

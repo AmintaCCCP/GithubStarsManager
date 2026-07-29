@@ -187,6 +187,7 @@ export interface VectorizeVector {
     language: string;
     stars: number;
     tags: string[];
+    license: string;
   };
 }
 
@@ -199,6 +200,7 @@ export interface VectorQueryResult {
     language: string;
     stars: number;
     tags: string[];
+    license: string;
   };
 }
 
@@ -323,7 +325,7 @@ export class VectorSearchService {
  * buildEmbeddingText 的输出格式变化时必须递增，
  * 使增量索引能检测到格式变化并强制重新索引所有向量。
  */
-export const EMBEDDING_FORMAT_VERSION = 2;
+export const EMBEDDING_FORMAT_VERSION = 3;
 
 /**
  * 拼接仓库文本用于 embedding
@@ -357,6 +359,8 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
   if (allTopics.length > 0) parts.push(`Topics: ${allTopics.join(', ')}`);
 
   if (repo.language) parts.push(`Language: ${repo.language}`);
+  // 开源许可：SPDX id（如 MIT），短文本，对 embedding token 成本可忽略
+  if (repo.license) parts.push(`License: ${repo.license}`);
 
   // README 内容提供最丰富的语义信息
   if (readmeContent) {
@@ -585,6 +589,7 @@ export async function indexAllRepos(
               language: batch[j].language || '',
               stars: batch[j].stargazers_count || 0,
               tags: batch[j].ai_tags || [],
+              license: batch[j].license || '',
             },
           });
         } else {

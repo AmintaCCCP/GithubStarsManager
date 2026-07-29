@@ -48,6 +48,7 @@ const defaultSearchFilters: SearchFilters = {
   tags: [],
   languages: [],
   platforms: [],
+  licenses: [],
   sortBy: 'stars',
   sortOrder: 'desc',
 };

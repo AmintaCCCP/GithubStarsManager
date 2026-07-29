@@ -738,6 +738,7 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       const parts = [`${index + 1}. ID: ${repo.id} | ${repo.full_name}`];
       if (desc) parts.push(`   ${desc}`);
       const meta = [repo.language, `★${stars}`];
+      if (repo.license) meta.push(`License: ${repo.license}`);
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
       return parts.join('\n');
@@ -1315,7 +1316,8 @@ ${repoInfo}
         aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
         aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
         customDescription: (repo.custom_description || '').toLowerCase(),
-        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
+        customTags: (repo.custom_tags || []).join(' ').toLowerCase(),
+        license: (repo.license || '').toLowerCase(),
       };
 
       // Check if any query word matches any field
@@ -1434,8 +1436,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        repo.license || '',
       ].join(' ').toLowerCase();
-      
+
       // Check if any of the AI-enhanced terms match
       return allSearchTerms.some(term => {
         const normalizedTerm = term.toLowerCase();
@@ -1459,8 +1462,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        repo.license || '',
       ].join(' ').toLowerCase();
-      
+
       // Split query into words and check if all words are present
       const queryWords = normalizedQuery.split(/\s+/);
       return queryWords.every(word => searchableText.includes(word));
@@ -1483,8 +1487,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        repo.license || '',
       ].join(' ').toLowerCase();
-      
+
       // Split query into words and check if all words are present
       const queryWords = normalizedQuery.split(/\s+/);
       return queryWords.every(word => searchableText.includes(word));

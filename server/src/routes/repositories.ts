@@ -12,6 +12,21 @@ function parseJsonColumn(value: unknown): unknown[] {
   } catch { return []; }
 }
 
+/**
+ * 把 GitHub 的 license 值统一为 SPDX id 字符串或 null。
+ * 接受三种形态：GitHub 原始对象 `{ key, spdx_id, name, url }`、已规范化的字符串、null。
+ * 优先取 spdx_id（如 "MIT"），无则回退 key（如 "Other" → "NOASSERTION" 由前端归一化处理）。
+ */
+function toLicenseSpdxId(license: unknown): string | null {
+  if (license == null) return null;
+  if (typeof license === 'string') return license || null;
+  if (typeof license === 'object') {
+    const l = license as { spdx_id?: string; key?: string };
+    return l.spdx_id || l.key || null;
+  }
+  return null;
+}
+
 /** Transform a database row into the API response shape, parsing JSON columns. */
 function transformRepo(row: Record<string, unknown>) {
   return {
@@ -40,6 +55,7 @@ function transformRepo(row: Record<string, unknown>) {
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
     vector_indexed_at: row.vector_indexed_at ?? undefined,
+    license: row.license ?? null,
   };
 }
 
@@ -134,8 +150,8 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases, vector_indexed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases, vector_indexed_at, license
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -161,7 +177,8 @@ router.put('/api/repositories', (req, res) => {
         category_locked = excluded.category_locked,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases,
-        vector_indexed_at = excluded.vector_indexed_at
+        vector_indexed_at = excluded.vector_indexed_at,
+        license = excluded.license
     `);
 
     const deleteAllReleases = db.prepare('DELETE FROM releases');
@@ -208,7 +225,8 @@ router.put('/api/repositories', (req, res) => {
           JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
           repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
           (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
-          repo.vector_indexed_at ?? null
+          repo.vector_indexed_at ?? null,
+          toLicenseSpdxId(repo.license)
         );
         count++;
       }
