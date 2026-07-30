@@ -6,6 +6,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
 import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
@@ -745,7 +746,7 @@ export const ReleaseTimeline: React.FC = () => {
              </div>
             {lastRefreshTime && (
               <p className="text-sm text-gray-500 dark:text-text-tertiary">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </p>
             )}
           </div>
@@ -817,7 +818,7 @@ export const ReleaseTimeline: React.FC = () => {
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-gray-500 dark:text-text-tertiary lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </span>
             )}
 
@@ -1210,10 +1211,9 @@ export const ReleaseTimeline: React.FC = () => {
           })
         ) : (
           // 仓库分类视图
-          paginatedRepositoryGroups.map(({ repository, releases }) => {
+          paginatedRepositoryGroups.map(({ repository, releases, latestRelease }) => {
             const isExpanded = expandedRepositories.has(repository.id);
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
-            const latestRelease = releases[0]?.release;
 
             return (
               <div key={repository.id} className="bg-light-bg dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
@@ -1238,18 +1238,23 @@ export const ReleaseTimeline: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                  <div className="flex items-center space-x-2 min-w-0 ml-2">
+                    <div className="text-right min-w-0">
+                      <p className="text-xs text-gray-500 dark:text-text-tertiary hidden sm:block">
                         {releases.length} {t('个版本', 'releases')}
                       </p>
                       {latestRelease && (
-                        <p className="text-xs text-gray-400 dark:text-text-tertiary">
-                          {t('最新:', 'Latest:')} {latestRelease.tag_name}
-                        </p>
+                        <>
+                          <p className="text-xs text-gray-400 dark:text-text-tertiary truncate">
+                            {t('最新:', 'Latest:')} {latestRelease.tag_name}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap">
+                            {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                          </p>
+                        </>
                       )}
                     </div>
-                    <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                    <div className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
                       <ChevronDown className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
                     </div>
                   </div>
