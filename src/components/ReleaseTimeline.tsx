@@ -1210,10 +1210,9 @@ export const ReleaseTimeline: React.FC = () => {
           })
         ) : (
           // 仓库分类视图
-          paginatedRepositoryGroups.map(({ repository, releases }) => {
+          paginatedRepositoryGroups.map(({ repository, releases, latestRelease }) => {
             const isExpanded = expandedRepositories.has(repository.id);
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
-            const latestRelease = releases[0]?.release;
 
             return (
               <div key={repository.id} className="bg-light-bg dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
@@ -1246,6 +1245,9 @@ export const ReleaseTimeline: React.FC = () => {
                       {latestRelease && (
                         <p className="text-xs text-gray-400 dark:text-text-tertiary">
                           {t('最新:', 'Latest:')} {latestRelease.tag_name}
+                          <span className="ml-1.5 text-gray-400 dark:text-text-quaternary">
+                            · {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true })}
+                          </span>
                         </p>
                       )}
                     </div>
