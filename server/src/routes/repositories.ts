@@ -19,10 +19,13 @@ function parseJsonColumn(value: unknown): unknown[] {
  */
 function toLicenseSpdxId(license: unknown): string | null {
   if (license == null) return null;
-  if (typeof license === 'string') return license || null;
+  if (typeof license === 'string') return license.trim() || null;
   if (typeof license === 'object') {
-    const l = license as { spdx_id?: string; key?: string };
-    return l.spdx_id || l.key || null;
+    // 运行时校验：malformed 备份/第三方源可能把 spdx_id/key 写成非字符串
+    const l = license as { spdx_id?: unknown; key?: unknown };
+    const spdx = typeof l.spdx_id === 'string' ? l.spdx_id.trim() : '';
+    const key = typeof l.key === 'string' ? l.key.trim() : '';
+    return spdx || key || null;
   }
   return null;
 }

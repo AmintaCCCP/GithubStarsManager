@@ -6,7 +6,7 @@
  */
 
 import type { EmbeddingConfig, VectorSearchConfig, Repository } from '../types';
-import { normalizeLicense } from '../utils/licenseFilter';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 
 // ============================================================
 // EmbeddingClient
@@ -363,8 +363,12 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
   if (allTopics.length > 0) parts.push(`Topics: ${allTopics.join(', ')}`);
 
   if (repo.language) parts.push(`Language: ${repo.language}`);
-  // 开源许可：SPDX id（如 MIT），短文本，对 embedding token 成本可忽略
-  if (repo.license) parts.push(`License: ${repo.license}`);
+  // 开源许可：先归一化，避免 raw GitHub 对象变成 "[object Object]" 污染 embedding；
+  // 哨兵（无/未声明）不写入，与 null/缺失保持同一语义。
+  {
+    const lic = normalizeLicense(repo.license);
+    if (lic !== NO_LICENSE_SENTINEL) parts.push(`License: ${lic}`);
+  }
 
   // README 内容提供最丰富的语义信息
   if (readmeContent) {
