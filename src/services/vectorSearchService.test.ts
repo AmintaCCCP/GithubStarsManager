@@ -5,6 +5,7 @@ import {
   truncateForRetry,
   embedWithFallback,
   indexAllRepos,
+  needsReindex,
   EMBEDDING_FORMAT_VERSION,
 } from './vectorSearchService';
 
@@ -50,6 +51,49 @@ const makeVectorService = () => ({
 // 硅基流动真实的长度超限 payload（code 20015）
 const LENGTH_ERROR = () =>
   new Error('Embedding API error 400: {"code":20015,"message":"The parameter is invalid.","data":null}');
+
+describe('needsReindex', () => {
+  // 共享：未索引 / 内容更新 / license 变化 / 格式升级——权威谓词，UI 与 indexAllRepos 共用。
+  const indexed = (overrides: Partial<Repository> = {}): Repository => makeRepository(1, {
+    vector_indexed_at: '2026-01-10T00:00:00.000Z',
+    vector_indexed_license: 'MIT',
+    license: 'MIT',
+    analyzed_at: '2026-01-04T00:00:00.000Z',
+    ...overrides,
+  });
+
+  it('needs reindex when a repo was never indexed', () => {
+    expect(needsReindex({ ...indexed(), vector_indexed_at: undefined }, false)).toBe(true);
+  });
+
+  it('needs reindex when content time is newer than vector_indexed_at', () => {
+    expect(needsReindex(indexed({ last_edited: '2026-01-12T00:00:00.000Z' }), false)).toBe(true);
+  });
+
+  it('needs reindex when license changed (normalized drift)', () => {
+    expect(needsReindex(indexed({ license: 'Apache-2.0' }), false)).toBe(true);
+  });
+
+  it('needs reindex when format version changed regardless of content', () => {
+    expect(needsReindex(indexed(), true)).toBe(true);
+  });
+
+  it('does NOT need reindex when content and license are unchanged', () => {
+    expect(needsReindex(indexed(), false)).toBe(false);
+  });
+
+  it('treats null vs NOASSERTION sentinel as equal (no reindex)', () => {
+    // Both normalize to NO_LICENSE_SENTINEL, so null fingerprint ↔ no-assertion license is a match.
+    expect(needsReindex(
+      indexed({ vector_indexed_license: null, license: null }),
+      false,
+    )).toBe(false);
+    expect(needsReindex(
+      indexed({ vector_indexed_license: null, license: 'NOASSERTION' }),
+      false,
+    )).toBe(false);
+  });
+});
 
 describe('looksLikeLengthError', () => {
   it('detects SiliconFlow 20015 length errors', () => {
@@ -135,6 +179,94 @@ describe('indexAllRepos incremental filtering', () => {
     expect(indexedIds).toEqual(expected);
     expect(result.indexedRepoIds).toEqual(expected);
     expect(result.indexed).toBe(expected.length);
+  });
+});
+
+describe('indexAllRepos incremental filtering — license change invalidation', () => {
+  it('reindexes an indexed repo whose license changed even when content timestamps are unchanged', async () => {
+    // Repo was indexed under MIT; its vector_indexed_at is newer than content, so without
+    // the license fingerprint check it would be skipped. GitHub sync then changes the
+    // license to Apache-2.0 — the incremental predicate must reindex to refresh metadata.
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: 'MIT',
+        license: 'Apache-2.0',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+        // No last_edited / newer analyzed_at => content time predates vector_indexed_at.
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // License differs from the indexed fingerprint => reindex, despite no content-time change.
+    expect(indexedRepoIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+  });
+
+  it('treats a null-vs-no-assertion drift as a license change and reindexes', async () => {
+    // normalizeLicense collapses both null and 'NOASSERTION' to the sentinel, so an indexed
+    // repo whose stored license was null (fingerprint not yet captured) must reindex once to
+    // capture the fingerprint, then settle on subsequent runs.
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: null,
+        license: 'MIT',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // null fingerprint vs MIT license => mismatch => reindex.
+    expect(indexedRepoIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+  });
+
+  it('skips an indexed repo whose license is unchanged', async () => {
+    const repos = [
+      makeRepository(1, {
+        vector_indexed_at: '2026-01-10T00:00:00.000Z',
+        vector_indexed_license: 'MIT',
+        license: 'MIT',
+        analyzed_at: '2026-01-04T00:00:00.000Z',
+      }),
+    ];
+
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+    const indexedRepoIds: number[] = [];
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedRepoIds.push(repoId),
+    });
+
+    // No content change and license fingerprint matches => nothing to index.
+    expect(indexedRepoIds).toEqual([]);
+    expect(result.indexedRepoIds).toEqual([]);
+    expect(result.indexed).toBe(0);
   });
 });
 

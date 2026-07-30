@@ -5,6 +5,7 @@ import { logger } from '../services/logger.js';
 import {
   type McpRepository,
   type McpSearchFilters,
+  normalizeLicense,
   projectRepoForAgent,
   searchRepositories,
 } from './repoSearch.js';
@@ -47,6 +48,7 @@ export function transformRepoRow(row: Record<string, unknown>): McpRepository {
     custom_category: (row.custom_category as string | null) ?? null,
     category_locked: !!row.category_locked,
     subscribed_to_releases: !!row.subscribed_to_releases,
+    license: (row.license as string | null) ?? null,
   };
 }
 
@@ -107,6 +109,7 @@ export function searchRepos(filters: McpSearchFilters) {
 export function getStats() {
   const repos = loadAllRepositories();
   const byLanguage: Record<string, number> = {};
+  const byLicense: Record<string, number> = {};
   const tagCounts: Record<string, number> = {};
   let analyzed = 0;
   let subscribed = 0;
@@ -115,6 +118,8 @@ export function getStats() {
   for (const r of repos) {
     const lang = r.language || 'Unknown';
     byLanguage[lang] = (byLanguage[lang] || 0) + 1;
+    const lic = normalizeLicense(r.license);
+    byLicense[lic] = (byLicense[lic] || 0) + 1;
     if (r.analyzed_at && !r.analysis_failed) analyzed += 1;
     if (r.analyzed_at && r.analysis_failed) failed += 1;
     if (r.subscribed_to_releases) subscribed += 1;
@@ -135,6 +140,7 @@ export function getStats() {
     unanalyzed: repos.length - analyzed - failed,
     subscribedToReleases: subscribed,
     byLanguage,
+    byLicense,
     topTags,
   };
 }

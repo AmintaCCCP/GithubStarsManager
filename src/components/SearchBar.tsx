@@ -9,6 +9,7 @@ import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
@@ -107,6 +108,7 @@ export const SearchBar: React.FC = () => {
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
+  const [availableLicenses, setAvailableLicenses] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
   
@@ -186,10 +188,17 @@ export const SearchBar: React.FC = () => {
       ...repositories.flatMap(r => r.custom_tags || [])
     ])];
     const platforms = [...new Set(repositories.flatMap(r => r.ai_platforms || []))] as string[];
+    // 开源许可：归一化为 SPDX id 或 NO_LICENSE_SENTINEL，排序并把「无」项放最后
+    const licenses = [...new Set(repositories.map(r => normalizeLicense(r.license)))].sort((a, b) => {
+      if (a === NO_LICENSE_SENTINEL) return 1;
+      if (b === NO_LICENSE_SENTINEL) return -1;
+      return a.localeCompare(b);
+    });
 
     setAvailableLanguages(languages);
     setAvailableTags(tags);
     setAvailablePlatforms(platforms);
+    setAvailableLicenses(licenses);
 
     // Generate search suggestions from available data
     const suggestions = [
@@ -249,7 +258,7 @@ export const SearchBar: React.FC = () => {
     // Search helpers are intentionally kept as local closures; the explicit deps below
     // cover the state they read without causing a search loop on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
+  }, [searchFilters.languages, searchFilters.tags, searchFilters.platforms, searchFilters.licenses, searchFilters.isAnalyzed, searchFilters.isSubscribed, searchFilters.isEdited, searchFilters.isCategoryLocked, searchFilters.analysisFailed, searchFilters.minStars, searchFilters.maxStars, searchFilters.sortBy, searchFilters.sortOrder, searchFilters.query, repositories, releaseSubscriptions, allCategories]);
 
   // Real-time search effect for repository name matching
   useEffect(() => {
@@ -640,6 +649,14 @@ export const SearchBar: React.FC = () => {
     setSearchFilters({ platforms: newPlatforms });
   };
 
+  const handleLicenseToggle = (license: string) => {
+    const current = searchFilters.licenses ?? [];
+    const newLicenses = current.includes(license)
+      ? current.filter(l => l !== license)
+      : [...current, license];
+    setSearchFilters({ licenses: newLicenses });
+  };
+
   const clearFilters = () => {
     setSearchQuery('');
     setIsRealTimeSearch(false);
@@ -648,6 +665,7 @@ export const SearchBar: React.FC = () => {
       tags: [],
       languages: [],
       platforms: [],
+      licenses: [],
       sortBy: 'stars',
       sortOrder: 'desc',
       minStars: undefined,
@@ -664,6 +682,7 @@ export const SearchBar: React.FC = () => {
     searchFilters.languages.length +
     searchFilters.tags.length +
     searchFilters.platforms.length +
+    (searchFilters.licenses?.length ?? 0) +
     (searchFilters.minStars !== undefined ? 1 : 0) +
     (searchFilters.maxStars !== undefined ? 1 : 0) +
     (searchFilters.isAnalyzed !== undefined ? 1 : 0) +
@@ -748,6 +767,8 @@ export const SearchBar: React.FC = () => {
             starred_at: newRepo.starred_at,
             owner: newRepo.owner,
             topics: newRepo.topics,
+            // 回填历史仓库缺失的 license 字段（GitHub 源元数据，跟随 newRepo）
+            license: newRepo.license ?? null,
           };
         }
         return newRepo;
@@ -1230,6 +1251,32 @@ export const SearchBar: React.FC = () => {
                   >
                     {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
                     <span>{getPlatformDisplayName(platform)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Licenses */}
+          {availableLicenses.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">
+                {t('开源许可', 'License')}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {availableLicenses.map(license => (
+                  <button
+                    key={license}
+                    onClick={() => handleLicenseToggle(license)}
+                    className={`${filterTagBaseClass} ${
+                      (searchFilters.licenses ?? []).includes(license)
+                        ? filterChipActiveClass
+                        : filterChipInactiveClass
+                    }`}
+                  >
+                    {license === NO_LICENSE_SENTINEL
+                      ? t('无/未声明 license', 'No license')
+                      : license}
                   </button>
                 ))}
               </div>

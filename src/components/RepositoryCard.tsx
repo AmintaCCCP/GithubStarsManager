@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../services/vectorSearchService';
@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
 import { FloatingTooltip } from './FloatingTooltip';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { shallow } from 'zustand/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { logger } from '../services/logger';
@@ -1122,20 +1123,31 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Stats */}
       <div className="space-y-3 mt-auto">
         {/* Language and Stars */}
-        <div className="flex items-center space-x-4 text-sm text-gray-700 dark:text-text-secondary">
+        <div className="flex items-center space-x-4 text-xs text-gray-700 dark:text-text-secondary">
           {repository.language && (
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 min-w-0">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: getLanguageColor(repository.language) }}
               />
               <span className="truncate max-w-20">{repository.language}</span>
             </div>
           )}
-          <div className="flex items-center space-x-1">
-            <Star className="w-4 h-4" />
-            <span>{formatNumber(repository.stargazers_count)}</span>
+          <div className="flex items-center space-x-1 flex-shrink-0">
+            <Star className="w-3.5 h-3.5" />
+            <span className="truncate max-w-16">{formatNumber(repository.stargazers_count)}</span>
           </div>
+          {(() => {
+            // license：归一化后展示 SPDX id；无 license 不渲染
+            const lic = normalizeLicense(repository.license);
+            if (lic === NO_LICENSE_SENTINEL) return null;
+            return (
+              <div className="flex items-center space-x-1 min-w-0">
+                <Scale className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate max-w-24">{lic}</span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
@@ -1232,6 +1244,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.repository.category_locked === nextProps.repository.category_locked &&
     prevProps.repository.description === nextProps.repository.description &&
     prevProps.repository.topics === nextProps.repository.topics &&
+    prevProps.repository.license === nextProps.repository.license &&
     prevProps.repository.stargazers_count === nextProps.repository.stargazers_count &&
     prevProps.repository.pushed_at === nextProps.repository.pushed_at &&
     prevProps.repository.updated_at === nextProps.repository.updated_at &&
