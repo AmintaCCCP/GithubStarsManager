@@ -20,13 +20,17 @@ function createWindow() {
       // Dev may relax for Vite HMR / local services if needed later — keep secure by default.
       webSecurity: true,
       allowRunningInsecureContent: false,
-      devTools: isDev,
+      // 生产环境也放开 DevTools（菜单 toggleDevTools role 可作为入口）
+      devTools: true,
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../build/icon.png'),
     titleBarStyle: 'default', // 使用默认标题栏，避免重叠问题
     show: false,
-    autoHideMenuBar: false, // 显示菜单栏，确保编辑快捷键行为一致
+    // Windows/Linux 隐藏原生顶部菜单栏（Edit/View/Window），按 Alt 可临时呼出；
+    // 应用菜单仍通过 Menu.setApplicationMenu 安装，role 快捷键（Ctrl+C/V、Ctrl+Shift+I 等）照常生效。
+    // macOS 顶部菜单为系统级常驻，保持可见。
+    autoHideMenuBar: process.platform === 'darwin' ? false : true,
     frame: true, // 保持窗口框架
     backgroundColor: '#ffffff', // 设置背景色，避免白屏闪烁
     titleBarOverlay: false, // 禁用标题栏覆盖
