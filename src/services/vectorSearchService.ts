@@ -6,6 +6,7 @@
  */
 
 import type { EmbeddingConfig, VectorSearchConfig, Repository } from '../types';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 
 // ============================================================
 // EmbeddingClient
@@ -187,6 +188,9 @@ export interface VectorizeVector {
     language: string;
     stars: number;
     tags: string[];
+    // 可选：此 PR 之前（embedding v2）索引的向量不含 license 键，重索引前以 undefined 出现。
+    // indexAllRepos 写入时会填入字符串；消费方请按可选处理。
+    license?: string;
   };
 }
 
@@ -199,6 +203,8 @@ export interface VectorQueryResult {
     language: string;
     stars: number;
     tags: string[];
+    // 同上：旧向量查询返回时缺该键，按可选处理。
+    license?: string;
   };
 }
 
@@ -323,7 +329,7 @@ export class VectorSearchService {
  * buildEmbeddingText 的输出格式变化时必须递增，
  * 使增量索引能检测到格式变化并强制重新索引所有向量。
  */
-export const EMBEDDING_FORMAT_VERSION = 2;
+export const EMBEDDING_FORMAT_VERSION = 3;
 
 /**
  * 拼接仓库文本用于 embedding
@@ -357,6 +363,12 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
   if (allTopics.length > 0) parts.push(`Topics: ${allTopics.join(', ')}`);
 
   if (repo.language) parts.push(`Language: ${repo.language}`);
+  // 开源许可：先归一化，避免 raw GitHub 对象变成 "[object Object]" 污染 embedding；
+  // 哨兵（无/未声明）不写入，与 null/缺失保持同一语义。
+  {
+    const lic = normalizeLicense(repo.license);
+    if (lic !== NO_LICENSE_SENTINEL) parts.push(`License: ${lic}`);
+  }
 
   // README 内容提供最丰富的语义信息
   if (readmeContent) {
@@ -370,6 +382,32 @@ export function buildEmbeddingText(repo: Repository, readmeContent?: string, max
     if (truncated) parts.push(`README:\n${truncated}`);
   }
   return parts.join('\n');
+}
+
+/**
+ * 判断单个仓库是否需要重新向量索引（增量谓词的权威实现）。
+ *
+ * 以下任一成立即视为需要重索引：
+ *  - 从未索引（`vector_indexed_at` 缺失）；
+ *  - embedding 格式版本升级（由调用方据 `formatVersionChanged` 传入）；
+ *  - 内容时间（`last_edited` 与 `analyzed_at` 中较新者）晚于上次索引时间；
+ *  - license 变化（归一化后比对 `vector_indexed_license` 与 `license`）。
+ *
+ * 该模块与 `VectorSearchSettings.tsx` 的 `unindexedCount` / `attemptedCount` 谓词
+ * 必须保持一致，故统一抽取为可选导出供复用，避免三处副本分别漂移。
+ */
+export function needsReindex(repo: Pick<Repository, 'last_edited' | 'analyzed_at' | 'license' | 'vector_indexed_at' | 'vector_indexed_license'>, formatVersionChanged: boolean): boolean {
+  if (!repo.vector_indexed_at) return true; // 从未索引
+  if (formatVersionChanged) return true; // 格式版本升级，需要重新索引
+  // 取 last_edited 与 analyzed_at 中较新者作为内容时间，更新后需要重新索引
+  const contentTime = [repo.last_edited, repo.analyzed_at]
+    .filter((t): t is string => !!t)
+    .sort()
+    .pop() || '';
+  if (contentTime > repo.vector_indexed_at) return true;
+  // license 变化（归一化后比对）：GitHub 同步可能仅更新 license 而 last_edited 不变，
+  // 此时向量元数据与嵌入文本中的 License 字段会过时，故需重新索引。
+  return normalizeLicense(repo.vector_indexed_license ?? null) !== normalizeLicense(repo.license ?? null);
 }
 
 /**
@@ -510,16 +548,7 @@ export async function indexAllRepos(
     // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
     // 缺失版本号视为 v1（旧格式），仍需触发升级
     const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
-    indexable = indexable.filter((r) => {
-      if (!r.vector_indexed_at) return true; // 从未索引
-      if (formatVersionChanged) return true; // 格式版本升级，需要重新索引
-      // 取 last_edited 与 analyzed_at 中较新者作为内容时间，更新后需要重新索引
-      const contentTime = [r.last_edited, r.analyzed_at]
-        .filter((t): t is string => !!t)
-        .sort()
-        .pop() || '';
-      return contentTime > r.vector_indexed_at;
-    });
+    indexable = indexable.filter((r) => needsReindex(r, formatVersionChanged));
   }
   let indexed = 0;
   let errors = 0;
@@ -585,6 +614,9 @@ export async function indexAllRepos(
               language: batch[j].language || '',
               stars: batch[j].stargazers_count || 0,
               tags: batch[j].ai_tags || [],
+              // 历史/导入数据 license 可能是 GitHub 对象或数字；统一经 normalizeLicense
+              // 降为 SPDX id / 哨兵，避免把 "[object Object]" 写入向量元数据。
+              license: normalizeLicense(batch[j].license),
             },
           });
         } else {

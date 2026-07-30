@@ -23,11 +23,32 @@ function performBasicTextSearch(repos, query) {
       ...(repo.ai_platforms || []),
       ...(repo.custom_tags || []),
       repo.custom_category || '',
+      normalizeLicense(repo.license),
     ]
       .join(' ')
       .toLowerCase();
     return words.every((w) => text.includes(w));
   });
+}
+
+// License 归一化镜像（与 src/utils/licenseFilter.ts 一致）
+const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
+const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
+function normalizeLicense(v) {
+  if (v == null || v === '') return NO_LICENSE_SENTINEL;
+  if (typeof v === 'object') {
+    const spdx = typeof v.spdx_id === 'string' ? v.spdx_id.trim() : '';
+    const key = typeof v.key === 'string' ? v.key.trim() : '';
+    const resolved = spdx || key;
+    if (!resolved) return NO_LICENSE_SENTINEL;
+    return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
+  }
+  if (typeof v !== 'string') return NO_LICENSE_SENTINEL;
+  // 直接字符串路径也需 trim：避免 " Other " / " NOASSERTION " 等空白变体逃过哨兵归并
+  const normalized = v.trim();
+  return !normalized || NOASSERTION_KEYS.has(normalized.toLowerCase())
+    ? NO_LICENSE_SENTINEL
+    : normalized;
 }
 
 function projectRepo(repo, max = 400) {
@@ -54,6 +75,7 @@ function projectRepo(repo, max = 400) {
     starred_at: repo.starred_at,
     updated_at: repo.updated_at,
     pushed_at: repo.pushed_at,
+    license: repo.license ?? null,
   };
 }
 
@@ -265,6 +287,11 @@ function getTools(vectorAvailable) {
           query: { type: 'string' },
           languages: { type: 'array', items: { type: 'string' } },
           tags: { type: 'array', items: { type: 'string' } },
+          licenses: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'SPDX id list (e.g. ["MIT","Apache-2.0"]); use "__NO_LICENSE__" for repos with no license',
+          },
           category: { type: 'string' },
           minStars: { type: 'number' },
           maxStars: { type: 'number' },
@@ -362,6 +389,9 @@ async function callTool(name, args, snapshot) {
           return args.tags.some((t) => tags.includes(t));
         });
       }
+      if (args?.licenses?.length) {
+        list = list.filter((r) => args.licenses.includes(normalizeLicense(r.license)));
+      }
       if (args?.category) {
         list = list.filter((r) => r.custom_category === args.category);
       }
@@ -400,11 +430,14 @@ async function callTool(name, args, snapshot) {
     }
     case 'gsm_stats': {
       const byLanguage = {};
+      const byLicense = {};
       let analyzed = 0;
       let subscribed = 0;
       for (const r of repos) {
         const lang = r.language || 'Unknown';
         byLanguage[lang] = (byLanguage[lang] || 0) + 1;
+        const lic = normalizeLicense(r.license);
+        byLicense[lic] = (byLicense[lic] || 0) + 1;
         if (r.analyzed_at && !r.analysis_failed) analyzed += 1;
         if (r.subscribed_to_releases) subscribed += 1;
       }
@@ -413,6 +446,7 @@ async function callTool(name, args, snapshot) {
         analyzed,
         subscribedToReleases: subscribed,
         byLanguage,
+        byLicense,
       });
     }
     case 'gsm_vector_search': {

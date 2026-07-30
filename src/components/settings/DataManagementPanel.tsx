@@ -442,6 +442,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           tags: [],
           languages: [],
           platforms: [],
+          licenses: [],
           sortBy: 'stars',
           sortOrder: 'desc',
           isAnalyzed: undefined,
@@ -669,7 +670,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
-          useAppStore.setState({ searchFilters: importedData.searchFilters });
+          // 旧备份可能缺少新增的 licenses 字段，导入时默认 [] 保持 SearchFilters 契约
+          const importedFilters = importedData.searchFilters;
+          useAppStore.setState({
+            searchFilters: {
+              ...importedFilters,
+              licenses: importedFilters.licenses ?? [],
+            },
+          });
         }
         if (selectedTypes.includes('uiSettings')) {
           if (importedData.theme === 'light' || importedData.theme === 'dark') {
@@ -968,6 +976,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           tags: [],
           languages: [],
           platforms: [],
+          licenses: [],
           sortBy: 'stars',
           sortOrder: 'desc',
           isAnalyzed: undefined,

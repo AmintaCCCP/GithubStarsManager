@@ -5,6 +5,19 @@ import { config } from '../config.js';
 
 const router = Router();
 
+/** 与前端 NOASSERTION_KEYS 对齐：空白 / NOASSERTION / Other / none 等落 null。 */
+const NO_LICENSE_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
+
+/**
+ * 把导入的 license 字符串规范为 SPDX id 或 null。
+ * trim 后若为空或落入「无 license」集合则返回 null，否则返回 trim 后的原值。
+ */
+function canonicalizeLicenseString(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || NO_LICENSE_KEYS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+}
+
 function maskApiKey(key: string | null | undefined): string {
   if (!key || typeof key !== 'string') return '';
   if (key.length <= 4) return '****';
@@ -108,14 +121,33 @@ router.post('/api/sync/import', (req, res) => {
             owner_login, owner_avatar_url, topics,
             ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
             custom_description, custom_tags, custom_category, category_locked, last_edited,
-            subscribed_to_releases, vector_indexed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
           // 验证必需的字段
           if (!r.id || typeof r.id !== 'number') {
             throw new Error(`Invalid repository data: missing or invalid id`);
           }
+          // license：兼容旧备份（无该列→null）、GitHub 对象形态、已规范化的 SPDX 字符串。
+          // 候选字符串 trim 后，空白 / NOASSERTION / Other / none 统一落 null（与
+          // 前端 normalizeLicense 的「无 license」语义对齐），保证 DB 只存 SPDX-or-null。
+          const rawLicense = (r as Record<string, unknown>).license;
+          let licenseValue: string | null = null;
+          if (typeof rawLicense === 'string') {
+            licenseValue = canonicalizeLicenseString(rawLicense);
+          } else if (rawLicense && typeof rawLicense === 'object') {
+            const obj = rawLicense as { spdx_id?: unknown; key?: unknown };
+            const spdx = typeof obj.spdx_id === 'string' ? obj.spdx_id.trim() : '';
+            const key = typeof obj.key === 'string' ? obj.key.trim() : '';
+            licenseValue = canonicalizeLicenseString(spdx || key);
+          }
+          // vector_indexed_license 与 license 同一套 SPDX-or-null 规则，避免指纹与当前
+          // license 语义分裂（例如 "NOASSERTION" 原样入库后增量谓词永远判定为变更）。
+          const rawVectorLicense = (r as Record<string, unknown>).vector_indexed_license;
+          const vectorIndexedLicense = typeof rawVectorLicense === 'string'
+            ? canonicalizeLicenseString(rawVectorLicense)
+            : null;
           repoStmt.run(
             r.id, r.name, r.full_name, r.description ?? null,
             r.html_url, r.stargazers_count ?? 0, r.language ?? null,
@@ -131,7 +163,11 @@ router.post('/api/sync/import', (req, res) => {
             typeof r.custom_tags === 'string' ? r.custom_tags : JSON.stringify(r.custom_tags ?? []),
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
             r.subscribed_to_releases ? 1 : 0,
-            r.vector_indexed_at ?? null
+            r.vector_indexed_at ?? null,
+            licenseValue,
+            // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
+            // 触发一次重索引回填指纹），合预期。
+            vectorIndexedLicense
           );
         }
         counts.repositories = repos.length;

@@ -150,4 +150,8 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
   addColumnIfMissing(db, 'vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
   addColumnIfMissing(db, 'repositories', 'vector_indexed_at', 'TEXT');
+  addColumnIfMissing(db, 'repositories', 'license', 'TEXT');
+  // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否
+  // 变化：当期 license 与此值不一致时需重新索引，保证 license 变更能使向量元数据失效。
+  addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');
 }

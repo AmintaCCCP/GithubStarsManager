@@ -1,6 +1,7 @@
 import { Repository, Gist, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { logger } from './logger';
 
 interface OpenAIResponseContentPart {
@@ -738,6 +739,11 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       const parts = [`${index + 1}. ID: ${repo.id} | ${repo.full_name}`];
       if (desc) parts.push(`   ${desc}`);
       const meta = [repo.language, `★${stars}`];
+      // 与 embedding 一致：归一化后、非哨兵才写入，避免 raw 对象变成 "[object Object]"
+      {
+        const lic = normalizeLicense(repo.license);
+        if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
+      }
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
       return parts.join('\n');
@@ -1315,7 +1321,8 @@ ${repoInfo}
         aiTags: (repo.ai_tags || []).join(' ').toLowerCase(),
         aiPlatforms: (repo.ai_platforms || []).join(' ').toLowerCase(),
         customDescription: (repo.custom_description || '').toLowerCase(),
-        customTags: (repo.custom_tags || []).join(' ').toLowerCase()
+        customTags: (repo.custom_tags || []).join(' ').toLowerCase(),
+        license: normalizeLicense(repo.license).toLowerCase(),
       };
 
       // Check if any query word matches any field
@@ -1348,6 +1355,9 @@ ${repoInfo}
         // Platform and language matches
         if (searchableFields.aiPlatforms.includes(word)) score += 0.18;
         if (searchableFields.language.includes(word)) score += 0.12;
+
+        // License matches
+        if (searchableFields.license.includes(word)) score += 0.2;
       });
 
       // Boost for exact matches
@@ -1434,8 +1444,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
-      
+
       // Check if any of the AI-enhanced terms match
       return allSearchTerms.some(term => {
         const normalizedTerm = term.toLowerCase();
@@ -1459,8 +1470,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
-      
+
       // Split query into words and check if all words are present
       const queryWords = normalizedQuery.split(/\s+/);
       return queryWords.every(word => searchableText.includes(word));
@@ -1483,8 +1495,9 @@ Reply in JSON format:
         repo.ai_summary || '',
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
+        normalizeLicense(repo.license),
       ].join(' ').toLowerCase();
-      
+
       // Split query into words and check if all words are present
       const queryWords = normalizedQuery.split(/\s+/);
       return queryWords.every(word => searchableText.includes(word));
