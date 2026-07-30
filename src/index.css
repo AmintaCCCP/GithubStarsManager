@@ -986,3 +986,52 @@ textarea::-webkit-resizer {
     box-shadow: none;
   }
 }
+
+/* ---- 窗口级原生滚动条（仅作用于 document 滚动容器，不影响各组件 opt-in 滚动条类） ---- */
+
+/* 消灭窗口底部横向滚动条（App 根用 min-h-screen 且 body 未限横向的根因） */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* 重绘窗口右侧竖向原生滚动条：thin、半透明灰、dark 适配，hover 变深 */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+/* dark 类挂在 <html> 上（见 App.tsx），用 html.dark 而非 .dark html */
+html.dark {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8);
+}
+
+html.dark::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+html.dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.8);
+}
+
+
