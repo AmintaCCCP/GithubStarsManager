@@ -1238,21 +1238,23 @@ export const ReleaseTimeline: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                  <div className="flex items-center space-x-2 min-w-0 ml-2">
+                    <div className="text-right min-w-0">
+                      <p className="text-xs text-gray-500 dark:text-text-tertiary hidden sm:block">
                         {releases.length} {t('个版本', 'releases')}
                       </p>
                       {latestRelease && (
-                        <p className="text-xs text-gray-400 dark:text-text-tertiary">
-                          {t('最新:', 'Latest:')} {latestRelease.tag_name}
-                          <span className="ml-1.5 text-gray-400 dark:text-text-quaternary">
-                            · {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
-                          </span>
-                        </p>
+                        <>
+                          <p className="text-xs text-gray-400 dark:text-text-tertiary truncate">
+                            {t('最新:', 'Latest:')} {latestRelease.tag_name}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap">
+                            {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                          </p>
+                        </>
                       )}
                     </div>
-                    <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                    <div className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
                       <ChevronDown className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
                     </div>
                   </div>
