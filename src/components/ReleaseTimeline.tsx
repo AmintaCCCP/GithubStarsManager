@@ -6,6 +6,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { forceSyncToBackend } from '../services/autoSync';
 import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
@@ -745,7 +746,7 @@ export const ReleaseTimeline: React.FC = () => {
              </div>
             {lastRefreshTime && (
               <p className="text-sm text-gray-500 dark:text-text-tertiary">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </p>
             )}
           </div>
@@ -817,7 +818,7 @@ export const ReleaseTimeline: React.FC = () => {
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-gray-500 dark:text-text-tertiary lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </span>
             )}
 
@@ -1246,7 +1247,7 @@ export const ReleaseTimeline: React.FC = () => {
                         <p className="text-xs text-gray-400 dark:text-text-tertiary">
                           {t('最新:', 'Latest:')} {latestRelease.tag_name}
                           <span className="ml-1.5 text-gray-400 dark:text-text-quaternary">
-                            · {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true })}
+                            · {formatDistanceToNow(new Date(latestRelease.published_at), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                           </span>
                         </p>
                       )}
