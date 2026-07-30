@@ -1,7 +1,7 @@
 import { Repository, Gist, AIConfig, AIApiType } from '../types';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
-import { normalizeLicense } from '../utils/licenseFilter';
+import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { logger } from './logger';
 
 interface OpenAIResponseContentPart {
@@ -739,7 +739,11 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       const parts = [`${index + 1}. ID: ${repo.id} | ${repo.full_name}`];
       if (desc) parts.push(`   ${desc}`);
       const meta = [repo.language, `★${stars}`];
-      if (repo.license) meta.push(`License: ${repo.license}`);
+      // 与 embedding 一致：归一化后、非哨兵才写入，避免 raw 对象变成 "[object Object]"
+      {
+        const lic = normalizeLicense(repo.license);
+        if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
+      }
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
       return parts.join('\n');

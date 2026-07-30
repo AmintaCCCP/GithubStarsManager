@@ -47,6 +47,15 @@ describe('normalizeLicense', () => {
     expect(normalizeLicense('none')).toBe(NO_LICENSE_SENTINEL);
   });
 
+  it('trims scalar strings before sentinel matching and SPDX pass-through', () => {
+    // 直接字符串路径此前未 trim，" Other " 会成为独立 facet，拆分过滤/统计。
+    expect(normalizeLicense(' Other ')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('  NOASSERTION  ')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense(' none ')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('   ')).toBe(NO_LICENSE_SENTINEL);
+    expect(normalizeLicense('  MIT  ')).toBe('MIT');
+  });
+
   it('never throws on a non-string license (GitHub object / number / legacy data)', () => {
     // Regression: performBasicTextSearch / performEnhancedBasicSearch / RepositoryCard call
     // normalizeLicense(repo.license) during render. A repo that never passed through

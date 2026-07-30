@@ -20,7 +20,11 @@ export function normalizeLicense(v: unknown): string {
     return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
   }
   if (typeof v !== 'string') return NO_LICENSE_SENTINEL;
-  return NOASSERTION_KEYS.has(v.toLowerCase()) ? NO_LICENSE_SENTINEL : v;
+  // 直接字符串路径也需 trim：避免 " Other " / " NOASSERTION " 等空白变体逃过哨兵归并
+  const normalized = v.trim();
+  return !normalized || NOASSERTION_KEYS.has(normalized.toLowerCase())
+    ? NO_LICENSE_SENTINEL
+    : normalized;
 }
 
 export interface McpRepository {
