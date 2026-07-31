@@ -495,4 +495,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.1</downloadUrl>
   </version>
+  <version>
+    <number>0.7.2</number>
+    <releaseDate>2026-07-31</releaseDate>
+    <changelog>
+      <item>feat: Added end-to-end repository license recognition — license metadata is now fetched, stored, and normalized across the whole pipeline (GitHub API → DB → AI/embedding/search → UI filter → MCP server). Repository cards display a license badge, and the filter panel supports filtering by license (including "No license"). License is also included in AI context, vector embeddings, and MCP search, which gained a licenses filter parameter, byLicense stats, and a projected license field. Note: repository metadata fields changed (EMBEDDING_FORMAT_VERSION bumped to 3), so please re-index your vector search index. (PR #254, closes #251)</item>
+      <item>feat: Repository-grouped release cards now show the latest release date (relative time) next to the newest tag, consistent with the card header. (PR #256, closes #255)</item>
+      <item>feat: Windows/Linux: the native menu bar is now hidden by default (press Alt to reveal temporarily) while keeping all keyboard shortcuts (copy/paste/DevTools). Restyled the window scrollbars with a slim translucent design and dark-mode hover states, and eliminated the horizontal scrollbar at the bottom of the window. (PR #257, closes #252)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.2</downloadUrl>
+  </version>
 </versions>
