@@ -295,3 +295,65 @@ describe('useAppStore repository performance guards', () => {
     expect(useAppStore.getState().analyzingRepositoryIds).toBe(previousAnalyzingIds);
   });
 });
+
+describe('useAppStore auth localStorage mirror (Issue #259)', () => {
+  const AUTH_MIRROR_KEY = 'github-stars-manager-auth';
+  const user = { id: 1, login: 'test-user', name: 'Test', avatar_url: 'https://x/a.png', email: null };
+
+  beforeEach(() => {
+    window.localStorage?.removeItem?.(AUTH_MIRROR_KEY);
+  });
+
+  it('persists auth to the synchronous localStorage mirror on login', () => {
+    useAppStore.getState().setGitHubToken('ghp_xxx');
+    useAppStore.getState().setUser(user);
+
+    const raw = window.localStorage.getItem(AUTH_MIRROR_KEY);
+    const mirror = JSON.parse(raw || '{}');
+    expect(mirror.githubToken).toBe('ghp_xxx');
+    expect(mirror.user.login).toBe('test-user');
+  });
+
+  it('persists backendApiSecret to the mirror and clears on logout', () => {
+    useAppStore.getState().setBackendApiSecret('secret-1');
+    let parsed = JSON.parse(window.localStorage.getItem(AUTH_MIRROR_KEY) || '{}');
+    expect(parsed.backendApiSecret).toBe('secret-1');
+
+    useAppStore.getState().logout();
+    expect(window.localStorage.getItem(AUTH_MIRROR_KEY)).toBeNull();
+    // The in-memory secret and the sessionStorage cache must also be torn down;
+    // otherwise the backend keeps authenticating a logged-out user (and on v10
+    // the secret is re-persisted to IndexedDB on the next partialize).
+    expect(useAppStore.getState().backendApiSecret).toBeNull();
+    expect(window.sessionStorage.getItem('github-stars-manager-backend-secret')).toBeNull();
+  });
+
+  it('restores auth from the mirror when the persisted snapshot lacks credentials', () => {
+    // Simulate the reported bug: async IndexedDB write never landed, so the
+    // persisted snapshot has empty auth while the mirror holds the real values.
+    window.localStorage.setItem(
+      AUTH_MIRROR_KEY,
+      JSON.stringify({ user, githubToken: 'ghp_restored', backendApiSecret: null })
+    );
+
+    const normalized = normalizePersistedState({}, useAppStore.getState());
+    expect(normalized.user).toEqual(user);
+    expect(normalized.githubToken).toBe('ghp_restored');
+    expect(normalized.isAuthenticated).toBe(true);
+  });
+
+  it('prefers persisted credentials over the mirror when both exist', () => {
+    window.localStorage.setItem(
+      AUTH_MIRROR_KEY,
+      JSON.stringify({ user, githubToken: 'ghp_mirror', backendApiSecret: null })
+    );
+    const otherUser = { id: 2, login: 'other', name: 'Other', avatar_url: 'https://x/b.png', email: null };
+
+    const normalized = normalizePersistedState(
+      { user: otherUser, githubToken: 'ghp_persisted' },
+      useAppStore.getState()
+    );
+    expect(normalized.user).toEqual(otherUser);
+    expect(normalized.githubToken).toBe('ghp_persisted');
+  });
+});

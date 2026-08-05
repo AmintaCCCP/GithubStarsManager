@@ -54,6 +54,48 @@ import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
+const AUTH_MIRROR_KEY = 'github-stars-manager-auth';
+
+interface AuthMirror {
+  user: GitHubUser | null;
+  githubToken: string | null;
+  backendApiSecret: string | null;
+}
+
+const readAuthMirror = (): AuthMirror | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_MIRROR_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthMirror>;
+    return {
+      user: parsed.user ?? null,
+      githubToken: typeof parsed.githubToken === 'string' ? parsed.githubToken : null,
+      backendApiSecret: typeof parsed.backendApiSecret === 'string' ? parsed.backendApiSecret : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeAuthMirror = (auth: AuthMirror): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(AUTH_MIRROR_KEY, JSON.stringify(auth));
+  } catch {
+    // Quota/security errors are expected in constrained environments; the
+    // IndexedDB persist path remains the fallback there.
+  }
+};
+
+const clearAuthMirror = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(AUTH_MIRROR_KEY);
+  } catch {
+    // ignore
+  }
+};
 
 /** Menu IDs that must always remain visible — enforced at store level */
 const REQUIRED_HEADER_MENU_IDS: ReadonlySet<HeaderMenuId> = new Set(['repositories', 'settings']);
@@ -493,6 +535,7 @@ type PersistedAppState = Partial<
     | 'user'
     | 'githubToken'
     | 'isAuthenticated'
+    | 'backendApiSecret'
     | 'repositories'
     | 'gists'
     | 'starredGists'
@@ -695,6 +738,19 @@ export const normalizePersistedState = (
 ): Partial<AppState & AppActions> => {
   const safePersisted = persisted ?? {};
   const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
+  const authMirror = readAuthMirror();
+
+  // Effective auth: persisted values win; the synchronous localStorage mirror
+  // back-fills when the IndexedDB snapshot lost them (asynchronous unload write).
+  const resolvedUser = safePersisted.user ?? authMirror?.user ?? null;
+  const resolvedGithubToken =
+    typeof safePersisted.githubToken === 'string'
+      ? safePersisted.githubToken
+      : (authMirror?.githubToken ?? null);
+  const resolvedBackendApiSecret =
+    typeof safePersisted.backendApiSecret === 'string'
+      ? safePersisted.backendApiSecret
+      : (authMirror?.backendApiSecret ?? null);
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const gists = Array.isArray(safePersisted.gists) ? safePersisted.gists : [];
@@ -727,6 +783,12 @@ export const normalizePersistedState = (
   return {
     ...currentState,
     ...safePersisted,
+    // Auth fallback: if the IndexedDB snapshot is missing the login credentials
+    // (e.g. async unload write never completed), restore from the synchronous
+    // localStorage mirror. Persisted values always win over the mirror.
+    user: resolvedUser,
+    githubToken: resolvedGithubToken,
+    backendApiSecret: resolvedBackendApiSecret,
     theme:
       safePersisted.theme === 'light' || safePersisted.theme === 'dark'
         ? safePersisted.theme
@@ -793,7 +855,7 @@ export const normalizePersistedState = (
     collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
     assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
-    isAuthenticated: !!(safePersisted.user && safePersisted.githubToken),
+    isAuthenticated: !!(resolvedUser && resolvedGithubToken),
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseShowMode: safePersisted.releaseShowMode === 'unread' ? 'unread' : 'all',
     releaseLatestMode: safePersisted.releaseLatestMode === 'latest' ? 'latest' : 'all',
@@ -1251,31 +1313,50 @@ export const useAppStore = create<AppState & AppActions>()(
       setUser: (user) => {
         logger.info('store.setUser', 'Setting user', { hasUser: !!user });
         set({ user, isAuthenticated: !!user });
+        const { githubToken, backendApiSecret } = useAppStore.getState();
+        writeAuthMirror({ user, githubToken, backendApiSecret });
       },
       setGitHubToken: (token) => {
         logger.info('store.setGitHubToken', 'Setting GitHub token', { hasToken: !!token });
         set({ githubToken: token });
+        const { user, backendApiSecret } = useAppStore.getState();
+        writeAuthMirror({ user, githubToken: token, backendApiSecret });
       },
-      logout: () => set({
-        user: null,
-        githubToken: null,
-        isAuthenticated: false,
-        repositories: [],
-        gists: [],
-        starredGists: [],
-        gistSearchResults: [],
-        analyzingGistIds: new Set(),
-        releases: [],
-        releaseSubscriptions: new Set(),
-        releaseSourceSettings: defaultReleaseSourceSettings,
-        readReleases: new Set(),
-        forks: [],
-        readForks: new Set(),
-        analyzingRepositoryIds: new Set(),
-        searchResults: [],
-        similarView: null,
-        lastSync: null,
-      }),
+      setBackendApiSecret: (backendApiSecret) => {
+        writeSessionBackendSecret(backendApiSecret);
+        set({ backendApiSecret });
+        const { user, githubToken } = useAppStore.getState();
+        writeAuthMirror({ user, githubToken, backendApiSecret });
+      },
+      logout: () => {
+        // Full credential teardown: clear the localStorage auth mirror, the
+        // sessionStorage API_SECRET, and the in-memory secret. Without this,
+        // `backendApiSecret` survives logout in memory AND in the v10 IndexedDB
+        // snapshot, so the backend would still authenticate a logged-out user.
+        clearAuthMirror();
+        writeSessionBackendSecret(null);
+        set({
+          user: null,
+          githubToken: null,
+          backendApiSecret: null,
+          isAuthenticated: false,
+          repositories: [],
+          gists: [],
+          starredGists: [],
+          gistSearchResults: [],
+          analyzingGistIds: new Set(),
+          releases: [],
+          releaseSubscriptions: new Set(),
+          releaseSourceSettings: defaultReleaseSourceSettings,
+          readReleases: new Set(),
+          forks: [],
+          readForks: new Set(),
+          analyzingRepositoryIds: new Set(),
+          searchResults: [],
+          similarView: null,
+          lastSync: null,
+        });
+      },
 
       // Repository actions
       setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
@@ -2030,10 +2111,6 @@ export const useAppStore = create<AppState & AppActions>()(
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
       setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
-      setBackendApiSecret: (backendApiSecret) => {
-        writeSessionBackendSecret(backendApiSecret);
-        set({ backendApiSecret });
-      },
       setProxyConfig: (updates) => set((state) => ({
         proxyConfig: { ...state.proxyConfig, ...updates }
       })),
@@ -2198,7 +2275,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 9,
+      version: 10,
       storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -2269,7 +2346,9 @@ export const useAppStore = create<AppState & AppActions>()(
         isSidebarCollapsed: state.isSidebarCollapsed,
         headerMenuConfig: state.headerMenuConfig,
 
-        // backendApiSecret: 保留在内存中，不持久化（安全考虑）
+        // 持久化后端 API Secret（跨会话/跨标签保留，配合修复 #259）。同时保留
+        // localStorage 镜像（AUTH_MIRROR_KEY）作为异步 IndexedDB 写入失败时的兜底。
+        backendApiSecret: state.backendApiSecret,
 
         // 持久化搜索排序设置
         searchFilters: {
@@ -2486,6 +2565,11 @@ export const useAppStore = create<AppState & AppActions>()(
     (state as Record<string, unknown>).headerMenuConfig = defaultHeaderMenuConfig;
   }
 
+  // v9→v10: 初始化 backendApiSecret（旧版仅存 sessionStorage；migrate 前置为 null）
+  if (state && typeof (state as Record<string, unknown>).backendApiSecret !== 'string') {
+    (state as Record<string, unknown>).backendApiSecret = null;
+  }
+
   // 初始化 embeddingConfigs
   if (state && !Array.isArray((state as Record<string, unknown>).embeddingConfigs)) {
     (state as Record<string, unknown>).embeddingConfigs = [];
@@ -2522,10 +2606,19 @@ export const useAppStore = create<AppState & AppActions>()(
           customCategoriesCount: normalized.customCategories?.length || 0,
         });
 
-        return {
+        // Keep the synchronous localStorage mirror aligned with the hydrated
+        // auth state (covers restores that came from IndexedDB or the mirror).
+        const merged = {
           ...currentState,
           ...normalized,
         };
+        writeAuthMirror({
+          user: merged.user ?? null,
+          githubToken: typeof merged.githubToken === 'string' ? merged.githubToken : null,
+          backendApiSecret: typeof merged.backendApiSecret === 'string' ? merged.backendApiSecret : null,
+        });
+
+        return merged;
       },
       onRehydrateStorage: (state) => {
         const hydrationStart = Date.now();
