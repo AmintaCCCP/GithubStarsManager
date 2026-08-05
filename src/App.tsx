@@ -156,10 +156,14 @@ function App() {
       try {
         await backend.init();
         if (backend.isAvailable && !cancelled) {
-          await syncFromBackend();
           // Issue #259: recover a session on a fresh browser/device. Only acts
           // when there is no local session and the backend is authenticated.
+          // Run before the backend data pull so auth can complete before the
+          // app decides whether to render LoginScreen.
           await tryRestoreAuthFromBackend();
+          if (!cancelled) {
+            await syncFromBackend();
+          }
           if (!cancelled) {
             unsubscribe = startAutoSync();
           }

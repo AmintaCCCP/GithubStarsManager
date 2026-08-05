@@ -316,7 +316,7 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
 
   it('persists backendApiSecret to the mirror and clears on logout', () => {
     useAppStore.getState().setBackendApiSecret('secret-1');
-    let parsed = JSON.parse(window.localStorage.getItem(AUTH_MIRROR_KEY) || '{}');
+    const parsed = JSON.parse(window.localStorage.getItem(AUTH_MIRROR_KEY) || '{}');
     expect(parsed.backendApiSecret).toBe('secret-1');
 
     useAppStore.getState().logout();

@@ -31,8 +31,11 @@ Object.defineProperty(window, 'ResizeObserver', {
 
 window.fetch = vi.fn();
 
-// jsdom without an origin URL does not expose localStorage; provide a minimal
-// in-memory shim so persistence paths (e.g. the auth mirror in useAppStore) are testable.
+// Node >=22 exposes an experimental global `localStorage` (undefined unless
+// `--localstorage-file` is passed), which vitest copies in and shadows jsdom's
+// real Storage even once a non-opaque test origin is configured. Provide a
+// minimal in-memory Storage fallback only when none is available so persistence
+// paths (e.g. the auth mirror in useAppStore) stay testable.
 const storageShim = (): Storage => {
   let store: Record<string, string> = {};
   return {
