@@ -14,6 +14,7 @@ import releasesRouter from './routes/releases.js';
 import categoriesRouter from './routes/categories.js';
 import configsRouter from './routes/configs.js';
 import syncRouter from './routes/sync.js';
+import authRestoreRouter from './routes/authRestore.js';
 import proxyRouter from './routes/proxy.js';
 import logsRouter from './routes/logs.js';
 import mcpAdminRouter from './routes/mcp.js';
@@ -52,6 +53,7 @@ export function createApp(): express.Express {
   app.use(categoriesRouter);
   app.use(configsRouter);
   app.use(syncRouter);
+  app.use(authRestoreRouter);
 
   // Wave 3: Proxy routes
   app.use(proxyRouter);
