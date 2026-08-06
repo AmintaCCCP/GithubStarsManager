@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { backend } from '../../services/backendAdapter';
+import { tryRestoreAuthFromBackend } from '../../services/autoSync';
 import { useDialog } from '../../hooks/useDialog';
 
 interface BackendPanelProps {
@@ -71,6 +72,9 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         setStatus('connected');
         setHealth({ version: healthData.version, timestamp: healthData.timestamp });
         toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
+        // Issue #259: after the one-time secret bootstrap succeeds on a fresh
+        // browser/device, try to recover the stored GitHub session.
+        void tryRestoreAuthFromBackend();
       } else {
         setStatus('disconnected');
         setHealth(null);
