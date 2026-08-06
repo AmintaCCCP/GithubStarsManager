@@ -89,6 +89,21 @@ export function shouldPreserveLocalVectorSearch(
   return backendEmpty && localConfigured;
 }
 
+/**
+ * True when the backend's stored vector-search authToken is unusable (empty or
+ * failed to decrypt) but the local client has a working token to preserve. The
+ * caller must then queue a repair push: during a pull the store subscription is
+ * suppressed, so without it the preserved token would never reach the backend,
+ * the stored fingerprint (with the local token) would never match the backend's
+ * empty token, and the poll→push loop would run forever.
+ */
+export function shouldQueueVectorSearchRepairPush(backendConfig: unknown, localConfig: unknown): boolean {
+  const b = (backendConfig ?? {}) as Record<string, unknown>;
+  const l = (localConfig ?? {}) as Record<string, unknown>;
+  const backendTokenUnusable = b.authTokenStatus === 'decrypt_failed' || !b.authToken;
+  return backendTokenUnusable && !!l.authToken;
+}
+
 function setRepositorySyncVisualState(isSyncing: boolean): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('gsm:repository-sync-visual-state', { detail: { isSyncing } }));
@@ -328,12 +343,14 @@ export async function syncFromBackend(): Promise<void> {
       if (shouldPreserveLocalVectorSearch(backendConfig, localConfig, _lastHash.vectorSearch === '')) {
         _hasPendingPush = true;
       } else {
-        // Preserve local authToken if backend returned empty or decrypt_failed
-        if ((backendConfig as Record<string, unknown>).authTokenStatus === 'decrypt_failed' || !backendConfig.authToken) {
-          if (localConfig.authToken) {
-            logger.warn('sync.decryptFailed', 'Backend decrypt_failed for vector search authToken, preserving local value');
-            backendConfig.authToken = localConfig.authToken;
-          }
+        // Preserve local authToken if backend returned empty or decrypt_failed,
+        // and queue a repair push so the backend is re-synced with it. Without
+        // the push the preserved token stays local-only and the poll loop keeps
+        // re-detecting the backend/effective fingerprint mismatch.
+        if (shouldQueueVectorSearchRepairPush(backendConfig, localConfig)) {
+          logger.warn('sync.decryptFailed', 'Backend decrypt_failed for vector search authToken, preserving local value');
+          backendConfig.authToken = localConfig.authToken;
+          _hasPendingPush = true;
         }
         state.setVectorSearchConfig(backendConfig);
         // Fingerprint the effective store config (after merge/normalization) so it

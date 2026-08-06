@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldPreserveLocalVectorSearch, vectorSearchFingerprint } from './autoSync';
+import { shouldPreserveLocalVectorSearch, shouldQueueVectorSearchRepairPush, vectorSearchFingerprint } from './autoSync';
 
 const canonical = {
   enabled: true,
@@ -106,5 +106,52 @@ describe('shouldPreserveLocalVectorSearch (bootstrap guard)', () => {
       { enabled: true, workerUrl: '', embeddingConfigId: '' },
       true,
     )).toBe(false);
+  });
+});
+
+describe('shouldQueueVectorSearchRepairPush (decrypt_failed / empty token)', () => {
+  it('queues a repair push when the backend token is decrypt_failed and local has one', () => {
+    expect(shouldQueueVectorSearchRepairPush(
+      { authTokenStatus: 'decrypt_failed', authToken: '' },
+      { authToken: 'local-token' },
+    )).toBe(true);
+  });
+
+  it('queues a repair push when the backend token is empty but local has one', () => {
+    expect(shouldQueueVectorSearchRepairPush(
+      { authToken: '', authTokenStatus: 'empty' },
+      { authToken: 'local-token' },
+    )).toBe(true);
+  });
+
+  it('does not queue when the backend token is usable', () => {
+    expect(shouldQueueVectorSearchRepairPush(
+      { authToken: 'backend-token', authTokenStatus: 'ok' },
+      { authToken: 'local-token' },
+    )).toBe(false);
+  });
+
+  it('does not queue when the local client has no token to preserve', () => {
+    expect(shouldQueueVectorSearchRepairPush(
+      { authTokenStatus: 'decrypt_failed', authToken: '' },
+      { authToken: '' },
+    )).toBe(false);
+  });
+
+  it('converges after two pull cycles once the repair push lands', () => {
+    const localConfig = { workerUrl: 'https://example.com', authToken: 'local-token', embeddingConfigId: 'emb_1' };
+
+    // Cycle 1: backend token is unusable; repair push must be queued.
+    const cycle1Backend = { workerUrl: 'https://example.com', authTokenStatus: 'decrypt_failed', authToken: '', embeddingConfigId: 'emb_1' };
+    expect(shouldQueueVectorSearchRepairPush(cycle1Backend, localConfig)).toBe(true);
+    // Effective store config now carries the preserved local token.
+    const effectiveAfterRepair = { ...cycle1Backend, authToken: localConfig.authToken };
+
+    // Cycle 2: the repair push landed, backend now returns the token.
+    const cycle2Backend = { ...cycle1Backend, authTokenStatus: 'ok', authToken: localConfig.authToken };
+
+    // The stored fingerprint (effective config, cycle 1) must match the backend
+    // payload (cycle 2) so the second poll detects no change.
+    expect(vectorSearchFingerprint(effectiveAfterRepair)).toBe(vectorSearchFingerprint(cycle2Backend));
   });
 });
