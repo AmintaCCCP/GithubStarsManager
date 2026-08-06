@@ -129,6 +129,11 @@ export function initializeSchema(db: Database.Database): void {
       embedding_config_id TEXT,
       index_mode TEXT NOT NULL DEFAULT 'readme',
       readme_max_chars INTEGER NOT NULL DEFAULT 6000,
+      search_threshold REAL DEFAULT 0.35,
+      search_top_k INTEGER DEFAULT 30,
+      enable_hyde INTEGER DEFAULT 1,
+      enable_reranking INTEGER DEFAULT 1,
+      embedding_format_version INTEGER,
       status_json TEXT,
       last_sync_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -149,6 +154,11 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
   addColumnIfMissing(db, 'vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
   addColumnIfMissing(db, 'vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
+  addColumnIfMissing(db, 'vector_search_configs', 'search_threshold', 'REAL DEFAULT 0.35');
+  addColumnIfMissing(db, 'vector_search_configs', 'search_top_k', 'INTEGER DEFAULT 30');
+  addColumnIfMissing(db, 'vector_search_configs', 'enable_hyde', 'INTEGER DEFAULT 1');
+  addColumnIfMissing(db, 'vector_search_configs', 'enable_reranking', 'INTEGER DEFAULT 1');
+  addColumnIfMissing(db, 'vector_search_configs', 'embedding_format_version', 'INTEGER');
   addColumnIfMissing(db, 'repositories', 'vector_indexed_at', 'TEXT');
   addColumnIfMissing(db, 'repositories', 'license', 'TEXT');
   // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否

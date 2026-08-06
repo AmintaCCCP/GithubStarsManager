@@ -681,7 +681,7 @@ router.get('/api/configs/vector-search', (req, res) => {
     const row = db.prepare('SELECT * FROM vector_search_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
 
     if (!row) {
-      res.json({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 });
+      res.json({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000, searchThreshold: 0.35, searchTopK: 30, enableHyDE: true, enableReranking: true });
       return;
     }
 
@@ -710,6 +710,11 @@ router.get('/api/configs/vector-search', (req, res) => {
       embeddingConfigId: row.embedding_config_id ?? '',
       indexMode: row.index_mode ?? 'readme',
       readmeMaxChars: row.readme_max_chars ?? 6000,
+      searchThreshold: typeof row.search_threshold === 'number' ? row.search_threshold : 0.35,
+      searchTopK: typeof row.search_top_k === 'number' ? row.search_top_k : 30,
+      enableHyDE: row.enable_hyde === 1,
+      enableReranking: row.enable_reranking === 1,
+      embeddingFormatVersion: typeof row.embedding_format_version === 'number' ? row.embedding_format_version : undefined,
       status,
       lastSyncAt: row.last_sync_at ?? null,
     });
@@ -724,6 +729,7 @@ router.put('/api/configs/vector-search', (req, res) => {
   try {
     const db = getDb();
     const { enabled, workerUrl, authToken, embeddingConfigId, indexMode, readmeMaxChars, status, lastSyncAt } = req.body as Record<string, unknown>;
+    const { searchThreshold, searchTopK, enableHyDE, enableReranking, embeddingFormatVersion } = req.body as Record<string, unknown>;
 
     let encryptedToken = '';
     const hasAuthToken = Object.prototype.hasOwnProperty.call(req.body, 'authToken');
@@ -741,11 +747,22 @@ router.put('/api/configs/vector-search', (req, res) => {
     const statusJson = status ? JSON.stringify(status) : null;
     const mode = indexMode === 'description' ? 'description' : 'readme';
     const maxChars = typeof readmeMaxChars === 'number' && readmeMaxChars > 0 ? readmeMaxChars : 6000;
+    const threshold = typeof searchThreshold === 'number' && Number.isFinite(searchThreshold) && searchThreshold >= 0 && searchThreshold <= 1
+      ? searchThreshold
+      : 0.35;
+    const topK = typeof searchTopK === 'number' && Number.isInteger(searchTopK) && searchTopK >= 5 && searchTopK <= 50
+      ? searchTopK
+      : 30;
+    const hyde = enableHyDE === true ? 1 : 0;
+    const reranking = enableReranking === true ? 1 : 0;
+    const formatVersion = typeof embeddingFormatVersion === 'number' && Number.isInteger(embeddingFormatVersion) && embeddingFormatVersion >= 1
+      ? embeddingFormatVersion
+      : null;
 
     db.prepare(`
-      INSERT OR REPLACE INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id, index_mode, readme_max_chars, status_json, last_sync_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run('default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', mode, maxChars, statusJson, lastSyncAt ?? null);
+      INSERT OR REPLACE INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id, index_mode, readme_max_chars, search_threshold, search_top_k, enable_hyde, enable_reranking, embedding_format_version, status_json, last_sync_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run('default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', mode, maxChars, threshold, topK, hyde, reranking, formatVersion, statusJson, lastSyncAt ?? null);
 
     res.json({ updated: true });
   } catch (err) {
