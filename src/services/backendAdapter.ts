@@ -737,6 +737,27 @@ class BackendAdapter {
     }
   }
 
+  /**
+   * Restore the GitHub token stored on the backend for cross-browser/device
+   * session recovery. Only callable when the backend is reachable AND this
+   * client already authenticates (Bearer API_SECRET) — the backend never hands
+   * it out to unauthenticated callers.
+   */
+  async restoreAuth(): Promise<{ github_token: string | null } | null> {
+    if (!this._backendUrl) return null;
+
+    try {
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/sync/auth`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      }, 8000);
+      if (!res.ok) return null;
+      return res.json() as Promise<{ github_token: string | null }>;
+    } catch {
+      return null;
+    }
+  }
+
   // === GitHub Search Proxy ===
 
   async searchRepositories(queryParams: Record<string, string>): Promise<{ items: Repository[] }> {
