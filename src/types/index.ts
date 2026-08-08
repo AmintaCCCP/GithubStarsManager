@@ -352,6 +352,8 @@ export interface SearchFilters {
   licenses: string[]; // 新增：开源许可过滤
 }
 
+export type CategoryMatchMode = 'legacy' | 'effective';
+
 export interface Category {
   id: string;
   name: string;
@@ -445,6 +447,7 @@ export interface AppState {
   defaultCategoryOverrides: Record<string, Partial<Category>>;
   categoryOrder: string[]; // 新增：分类排序顺序
   collapsedSidebarCategoryCount: number; // 新增：折叠状态下显示的分类个数
+  categoryMatchMode: CategoryMatchMode; // 分类匹配模式：按卡片展示标签（含自定义）或仅AI标签
   
   // Asset Filters
   assetFilters: AssetFilter[]; // 新增：资源过滤器
