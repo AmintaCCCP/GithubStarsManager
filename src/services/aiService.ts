@@ -490,7 +490,7 @@ ${options.user}` : options.user;
     throw new Error('No content received from AI service');
   }
 
-  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], signal?: AbortSignal): Promise<RepositoryAnalysisResult> {
+  async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string, signal?: AbortSignal): Promise<RepositoryAnalysisResult> {
     const startTime = Date.now();
     const configId = this.config.id;
     const { full_name } = repository;
@@ -499,8 +499,8 @@ ${options.user}` : options.user;
     logger.info('ai', 'AI analysis started', { owner, repo, configId });
 
     const prompt = this.config.useCustomPrompt && this.config.customPrompt
-      ? this.createCustomAnalysisPrompt(repository, readmeContent, customCategories)
-      : this.createAnalysisPrompt(repository, readmeContent, customCategories);
+      ? this.createCustomAnalysisPrompt(repository, readmeContent, customCategories, categoryHints)
+      : this.createAnalysisPrompt(repository, readmeContent, customCategories, categoryHints);
 
     try {
       const system = this.language === 'zh'
@@ -828,7 +828,7 @@ ${previousOutput}
     `.trim();
   }
 
-  private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
+  private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string): string {
     const repoInfo = `
 ${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
 ${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(repository.description || (this.language === 'zh' ? '无描述' : 'No description'))}
@@ -844,16 +844,23 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
       ? `\n\n${this.language === 'zh' ? '可用的应用分类' : 'Available Application Categories'}: ${customCategories.join(', ')}`
       : '';
 
-    // 替换自定义提示词中的占位符
     let customPrompt = this.config.customPrompt || '';
     customPrompt = customPrompt.replace(/\{REPO_INFO\}/g, repoInfo);
     customPrompt = customPrompt.replace(/\{CATEGORIES_INFO\}/g, categoriesInfo);
     customPrompt = customPrompt.replace(/\{LANGUAGE\}/g, this.language);
+    const sanitizedHints = this.sanitizeForPrompt(categoryHints || '');
+    if (customPrompt.includes('{CATEGORIES_HINT}')) {
+      customPrompt = customPrompt.replace(/\{CATEGORIES_HINT\}/g, sanitizedHints);
+    } else if (sanitizedHints) {
+      customPrompt = `${customPrompt.trim()}\n\n${this.language === 'zh'
+        ? '自定义分类提示：\n' + sanitizedHints
+        : 'Custom category hints:\n' + sanitizedHints}`;
+    }
 
     return customPrompt;
   }
 
-  private createAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[]): string {
+  private createAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string): string {
     const repoInfo = `
 ${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
 ${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(repository.description || (this.language === 'zh' ? '无描述' : 'No description'))}
@@ -869,13 +876,16 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
       const categoriesLine = customCategories && customCategories.length > 0
         ? `\n可用分类（tags 请优先从中选择）：${customCategories.join(', ')}`
         : '';
+      const hintLine = categoryHints && categoryHints.length > 0
+        ? `\n\n自定义分类提示：以下是用户自定义的分类及其关键词。当仓库的名称、描述、Topics 或 README 明显与某个自定义分类的关键词相关时，请务必把该自定义分类名作为 tags 之一（仍保持中文，3-5个）。\n${this.sanitizeForPrompt(categoryHints)}`
+        : '';
       return `
 请分析以下GitHub仓库信息，并只输出合法JSON对象。不要输出思考过程、Markdown、代码块标记、解释或任何额外文本。
 
 要求：
 - summary：中文概述，说明仓库的主要功能和用途，不超过50字。
   禁止出现“我们被要求”“只输出JSON”“根据仓库信息”“summary/tags/platforms”等提示词复述。
-- tags：3-5个中文应用类型标签${customCategories && customCategories.length > 0 ? '，请优先从上方的可用分类中选择' : '，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等'}。${categoriesLine}
+- tags：3-5个中文应用类型标签${customCategories && customCategories.length > 0 ? '，请优先从上方的可用分类中选择' : '，类似应用商店的分类，如：开发工具、Web应用、移动应用、数据库、AI工具等'}。${categoriesLine}${hintLine}
 - platforms：只能从 ["mac","windows","linux","ios","android","docker","web","cli"] 中选择；无法判断则为 []。
 
 输出格式：
@@ -895,13 +905,16 @@ ${repoInfo}
       const categoriesLine = customCategories && customCategories.length > 0
         ? `\nAvailable categories (tags should prioritize these): ${customCategories.join(', ')}`
         : '';
+      const hintLine = categoryHints && categoryHints.length > 0
+        ? `\n\nCustom category hint: The following are user-defined custom categories with their keywords. When the repository keywords, description, Topics, or README clearly relate to these keywords, include the custom category name as-is in tags (3-5 tags total).\n${this.sanitizeForPrompt(categoryHints)}`
+        : '';
       return `
 Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
 Requirements:
 - summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
   Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
-- tags: 3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.${categoriesLine}
+- tags: 3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.${categoriesLine}${hintLine}
 - platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
 
 Output format:
@@ -1433,7 +1446,7 @@ Reply in JSON format:
 
   private performEnhancedSearch(repositories: Repository[], originalQuery: string, aiTerms: string[]): Repository[] {
     const allSearchTerms = [originalQuery, ...aiTerms];
-    
+
     return repositories.filter(repo => {
       const searchableText = [
         repo.name,
@@ -1442,6 +1455,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
@@ -1468,6 +1482,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
@@ -1493,6 +1508,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
