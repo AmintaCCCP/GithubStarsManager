@@ -112,4 +112,19 @@ describe('AIService.searchRepositoriesWithReranking — enhanced basic search fa
     const results = service['performBasicSearch']([repo], '技能');
     expect(results.map((r) => r.id)).toEqual([5]);
   });
+
+  it('finds a repo matching only through custom_tags via enhanced search', async () => {
+    const repo = makeRepo({
+      id: 6,
+      name: 'skill-pack',
+      full_name: 'acme/skill-pack',
+      description: 'A collection of prompts',
+      ai_tags: ['效率工具'],
+      custom_tags: ['技能'],
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const results = service['performEnhancedSearch']([repo], '技能', ['技能']);
+    expect(results.map((r) => r.id)).toEqual([6]);
+  });
 });

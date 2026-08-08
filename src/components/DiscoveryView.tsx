@@ -18,7 +18,7 @@ import {
   X,
   Calendar
 } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
@@ -773,9 +773,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setIsAnalyzing(true);
     setAnalysisState({ paused: false, aborted: false });
     const storeState = useAppStore.getState();
-    const allCategoriesForResolution = [
-      ...storeState.customCategories,
-    ];
+    const allCategoriesForResolution = getAllCategories(
+      storeState.customCategories,
+      storeState.language,
+      storeState.hiddenDefaultCategoryIds,
+      storeState.defaultCategoryOverrides
+    );
     const allCategoryNames = storeState
       .customCategories.map(c => c.name);
     const categoryNames = [

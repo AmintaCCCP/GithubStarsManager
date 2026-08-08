@@ -848,7 +848,14 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
     customPrompt = customPrompt.replace(/\{REPO_INFO\}/g, repoInfo);
     customPrompt = customPrompt.replace(/\{CATEGORIES_INFO\}/g, categoriesInfo);
     customPrompt = customPrompt.replace(/\{LANGUAGE\}/g, this.language);
-    customPrompt = customPrompt.replace(/\{CATEGORIES_HINT\}/g, this.sanitizeForPrompt(categoryHints || ''));
+    const sanitizedHints = this.sanitizeForPrompt(categoryHints || '');
+    if (customPrompt.includes('{CATEGORIES_HINT}')) {
+      customPrompt = customPrompt.replace(/\{CATEGORIES_HINT\}/g, sanitizedHints);
+    } else if (sanitizedHints) {
+      customPrompt = `${customPrompt.trim()}\n\n${this.language === 'zh'
+        ? '自定义分类提示：\n' + sanitizedHints
+        : 'Custom category hints:\n' + sanitizedHints}`;
+    }
 
     return customPrompt;
   }

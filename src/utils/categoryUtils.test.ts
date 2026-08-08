@@ -67,6 +67,36 @@ describe('getEffectiveTags', () => {
     };
     expect(getEffectiveTags(repository)).toEqual(['machine-learning']);
   });
+
+  it('ignores whitespace-only custom tags and falls back to AI tags', () => {
+    const repository = {
+      ...baseRepository,
+      custom_tags: [' ', '  '],
+      ai_tags: ['AI/机器学习'],
+      topics: ['web'],
+    };
+    expect(getEffectiveTags(repository)).toEqual(['AI/机器学习']);
+  });
+
+  it('ignores whitespace-only AI tags and falls back to topics', () => {
+    const repository = {
+      ...baseRepository,
+      custom_tags: [''],
+      ai_tags: [' ', ''],
+      topics: ['machine-learning'],
+    };
+    expect(getEffectiveTags(repository)).toEqual(['machine-learning']);
+  });
+
+  it('returns empty array when all sources contain only whitespace tags', () => {
+    const repository = {
+      ...baseRepository,
+      custom_tags: ['   '],
+      ai_tags: [' '],
+      topics: [' ', ''],
+    };
+    expect(getEffectiveTags(repository)).toEqual([]);
+  });
 });
 
 describe('matchesCategory', () => {
@@ -108,6 +138,28 @@ describe('matchesCategory', () => {
       expect(matchesCategory(baseRepository, aiCategory, mode)).toBe(true);
     }
   );
+
+  it('does not treat whitespace-only AI tags as a match in legacy mode', () => {
+    const repository = {
+      ...baseRepository,
+      custom_category: undefined,
+      custom_tags: undefined,
+      ai_tags: [' ', '  '],
+      topics: [],
+    };
+    expect(matchesCategory(repository, aiCategory, 'legacy')).toBe(false);
+  });
+
+  it('does not match when ai_tags contain only blanks in effective mode', () => {
+    const repository = {
+      ...baseRepository,
+      custom_category: undefined,
+      custom_tags: [],
+      ai_tags: ['   '],
+      topics: [],
+    };
+    expect(matchesCategory(repository, aiCategory, 'effective')).toBe(false);
+  });
 
   it('does not match in legacy mode when execute effective custom tags do not overlap', () => {
     const repository = {
@@ -410,10 +462,8 @@ describe('buildCategoryHints', () => {
     const categories: Category[] = [
       { id: 'c1', name: 'skills', icon: '💡', keywords: [' ', '  ', 'Skill'], isCustom: true },
     ];
-    const hints = buildCategoryHints(categories);
-    expect(hints).toContain('Skill');
-    expect(hints).not.toContain('（ ,');
-    expect(hints).not.toContain('(no keywords');
+    // 仅保留有效关键词，生成精确的提示文本
+    expect(buildCategoryHints(categories)).toBe('skills（Skill）');
   });
 });
 
