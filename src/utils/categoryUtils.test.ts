@@ -122,14 +122,14 @@ describe('matchesCategory', () => {
     expect(matchesCategory(repository, aiCategory)).toBe(false);
   });
 
-  it('honors non-empty custom_category over AI tags', () => {
+  it('re-matches by tags when custom_category is set but not locked (AI-derived value)', () => {
     const repository = {
       ...baseRepository,
       custom_category: 'Web应用',
     };
 
-    expect(matchesCategory(repository, aiCategory)).toBe(false);
-    expect(matchesCategory(repository, webCategory)).toBe(true);
+    expect(matchesCategory(repository, aiCategory)).toBe(true);
+    expect(matchesCategory(repository, webCategory)).toBe(false);
   });
 
   it.each(['legacy', 'effective'] as const)(
@@ -240,11 +240,22 @@ describe('resolveCategoryAssignment', () => {
 
   const categories: Category[] = [aiCategory, webCategory, customCategory];
 
-  it('preserves an existing valid custom_category', () => {
+  it('recomputes an unlocked custom_category from tags (AI-derived value)', () => {
     const repository = {
       ...baseRepository,
       custom_category: '我的项目',
       custom_tags: ['我的项目'],
+    };
+    // 未锁定的 custom_category 视为 AI 分析写入的值，重新计算而非直接保留
+    expect(resolveCategoryAssignment(repository, ['AI/机器学习'], categories)).toBe(undefined);
+  });
+
+  it('preserves a locked valid custom_category', () => {
+    const repository = {
+      ...baseRepository,
+      custom_category: '我的项目',
+      custom_tags: ['我的项目'],
+      category_locked: true,
     };
     expect(resolveCategoryAssignment(repository, ['AI/机器学习'], categories)).toBe('我的项目');
   });
@@ -349,7 +360,21 @@ describe('resolveCategoryAssignment metadata fallback for custom categories', ()
     expect(resolveCategoryAssignment(repository, [], [customSkills, aiCategory])).toBe('skills');
   });
 
-  it('preserves an existing valid custom_category despite metadata fallback', () => {
+  it('preserves a locked custom_category despite metadata fallback', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'phuryn/pm-skills',
+      name: 'pm-skills',
+      description: 'PM Skills Marketplace',
+      language: '',
+      topics: ['agent-skills'],
+      custom_category: 'Web应用',
+      category_locked: true,
+    };
+    expect(resolveCategoryAssignment(repository, ['AI/机器学习'], [customSkills, aiCategory, webCategory])).toBe('Web应用');
+  });
+
+  it('recomputes an unlocked custom_category via metadata fallback', () => {
     const repository = {
       ...baseRepository,
       full_name: 'phuryn/pm-skills',
@@ -360,7 +385,8 @@ describe('resolveCategoryAssignment metadata fallback for custom categories', ()
       custom_category: 'Web应用',
       category_locked: false,
     };
-    expect(resolveCategoryAssignment(repository, ['AI/机器学习'], [customSkills, aiCategory, webCategory])).toBe('Web应用');
+    // 未锁定的旧值视为 AI 写入，重新按元数据兜底计算
+    expect(resolveCategoryAssignment(repository, ['AI/机器学习'], [customSkills, aiCategory, webCategory])).toBe('skills');
   });
 
   it('preserves explicitly cleared custom_category despite metadata fallback', () => {
