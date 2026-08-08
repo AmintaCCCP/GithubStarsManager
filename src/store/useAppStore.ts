@@ -424,6 +424,7 @@ interface AppActions {
   setCategoryOrder: (order: string[]) => void;
   reorderCategories: (oldIndex: number, newIndex: number) => void;
   setCollapsedSidebarCategoryCount: (count: number) => void;
+  setCategoryMatchMode: (mode: 'legacy' | 'effective') => void;
 
   // Asset Filter actions
   addAssetFilter: (filter: AssetFilter) => void;
@@ -555,6 +556,7 @@ type PersistedAppState = Partial<
     | 'defaultCategoryOverrides'
     | 'categoryOrder'
     | 'collapsedSidebarCategoryCount'
+    | 'categoryMatchMode'
     | 'assetFilters'
     | 'theme'
     | 'currentView'
@@ -853,6 +855,7 @@ export const normalizePersistedState = (
     })(),
     categoryOrder: Array.isArray(safePersisted.categoryOrder) ? safePersisted.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') : [],
     collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
+    categoryMatchMode: safePersisted.categoryMatchMode === 'legacy' ? 'legacy' : 'effective',
     assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
     language: safePersisted.language || 'zh',
     isAuthenticated: !!(resolvedUser && resolvedGithubToken),
@@ -1252,6 +1255,7 @@ export const useAppStore = create<AppState & AppActions>()(
       defaultCategoryOverrides: {},
       categoryOrder: [],
       collapsedSidebarCategoryCount: 20,
+      categoryMatchMode: 'effective',
       assetFilters: defaultPresetFilters,
       theme: 'dark',
       hasHydrated: false,
@@ -2077,6 +2081,7 @@ export const useAppStore = create<AppState & AppActions>()(
         return { categoryOrder: newOrder };
       }),
       setCollapsedSidebarCategoryCount: (count) => set({ collapsedSidebarCategoryCount: count }),
+      setCategoryMatchMode: (mode) => set({ categoryMatchMode: mode }),
 
       // Asset Filter actions
       addAssetFilter: (filter) => set((state) => ({
@@ -2333,6 +2338,7 @@ export const useAppStore = create<AppState & AppActions>()(
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
         categoryOrder: state.categoryOrder,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
+        categoryMatchMode: state.categoryMatchMode,
         defaultCategoryOverrides: state.defaultCategoryOverrides,
 
         // 持久化资源过滤器

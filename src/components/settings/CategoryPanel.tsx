@@ -14,6 +14,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const defaultCategoryOverrides = useAppStore(state => state.defaultCategoryOverrides);
   const categoryOrder = useAppStore(state => state.categoryOrder);
   const collapsedSidebarCategoryCount = useAppStore(state => state.collapsedSidebarCategoryCount);
+  const categoryMatchMode = useAppStore(state => state.categoryMatchMode);
   const language = useAppStore(state => state.language);
   const addCustomCategory = useAppStore(state => state.addCustomCategory);
   const deleteCustomCategory = useAppStore(state => state.deleteCustomCategory);
@@ -26,6 +27,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const showDefaultCategory = useAppStore(state => state.showDefaultCategory);
   const setCategoryOrder = useAppStore(state => state.setCategoryOrder);
   const setCollapsedSidebarCategoryCount = useAppStore(state => state.setCollapsedSidebarCategoryCount);
+  const setCategoryMatchMode = useAppStore(state => state.setCategoryMatchMode);
 
   const { toast, confirm } = useDialog();
 
@@ -300,6 +302,64 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               step={1}
             />
           </div>
+        </div>
+      </div>
+
+      {/* 分类匹配模式设置 */}
+      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
+        <div className="flex items-center space-x-3 mb-2">
+          <LayoutGrid className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
+          <h4 className="font-medium text-gray-900 dark:text-text-primary">
+            {t('仓库归类方式', 'Repository Categorization')}
+          </h4>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-text-tertiary mb-3">
+          {t(
+            '选择仓库如何被归入侧边栏的分类中。切换后侧边栏的仓库数量会相应变化。',
+            'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts.'
+          )}
+        </p>
+        <div className="space-y-3">
+          <label className="flex items-start space-x-3 cursor-pointer">
+            <input
+              type="radio"
+              name="categoryMatchMode"
+              checked={categoryMatchMode === 'effective'}
+              onChange={() => setCategoryMatchMode('effective')}
+              className="mt-1 w-4 h-4 text-brand-indigo focus:ring-brand-violet"
+            />
+            <div>
+              <span className="block text-sm font-medium text-gray-900 dark:text-text-primary">
+                {t('按卡片显示的分类标签归类（推荐）', 'Match by tags shown on cards (Recommended)')}
+              </span>
+              <span className="block text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+                {t(
+                  '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先，AI 分析不会覆盖你已经手动分类的仓库。',
+                  'Repositories are grouped by the tags actually shown on their cards; your custom tags take priority, and AI analysis will not override repositories you have categorized manually.'
+                )}
+              </span>
+            </div>
+          </label>
+          <label className="flex items-start space-x-3 cursor-pointer">
+            <input
+              type="radio"
+              name="categoryMatchMode"
+              checked={categoryMatchMode === 'legacy'}
+              onChange={() => setCategoryMatchMode('legacy')}
+              className="mt-1 w-4 h-4 text-brand-indigo focus:ring-brand-violet"
+            />
+            <div>
+              <span className="block text-sm font-medium text-gray-900 dark:text-text-primary">
+                {t('仅按 AI 生成标签归类（旧版）', 'Match by AI-generated tags only (Legacy)')}
+              </span>
+              <span className="block text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+                {t(
+                  '使用早期版本逻辑，仅根据 AI 生成的标签归类，适合习惯旧版分类方式的用户。',
+                  'Uses the legacy logic that categorizes only by AI-generated tags, for users who prefer the old behavior.'
+                )}
+              </span>
+            </div>
+          </label>
         </div>
       </div>
 
