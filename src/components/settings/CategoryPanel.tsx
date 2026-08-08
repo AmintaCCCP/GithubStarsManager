@@ -315,8 +315,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
         </div>
         <p className="text-sm text-gray-500 dark:text-text-tertiary mb-3">
           {t(
-            '选择仓库如何被归入侧边栏的分类中。切换后侧边栏的仓库数量会相应变化。',
-            'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts.'
+            '选择仓库如何被归入侧边栏的分类中。切换后侧边栏的仓库数量会相应变化。你手动设置的分类归属始终保留，不会被 AI 分析覆盖。',
+            'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts. Categories you assign manually are always kept and will not be overridden by AI analysis.'
           )}
         </p>
         <div className="space-y-3">
@@ -334,8 +334,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               </span>
               <span className="block text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
                 {t(
-                  '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先，AI 分析不会覆盖你已经手动分类的仓库。',
-                  'Repositories are grouped by the tags actually shown on their cards; your custom tags take priority, and AI analysis will not override repositories you have categorized manually.'
+                  '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先。',
+                  'Repositories are grouped by the tags actually shown on their cards; your custom tags take priority.'
                 )}
               </span>
             </div>
