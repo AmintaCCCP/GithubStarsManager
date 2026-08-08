@@ -31,6 +31,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     defaultCategoryOverrides,
     categoryOrder,
     collapsedSidebarCategoryCount,
+    categoryMatchMode,
     deleteCustomCategory,
     hideDefaultCategory,
     showDefaultCategory,
@@ -175,11 +176,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     
     for (const category of allCategories) {
       if (category.id === 'all') continue;
-      const count = repositories.filter(repo => matchesCategory(repo, category)).length;
+      const count = repositories.filter(repo => matchesCategory(repo, category, categoryMatchMode)).length;
       counts.set(category.id, count);
     }
     return counts;
-  }, [repositories, allCategories]);
+  }, [repositories, allCategories, categoryMatchMode]);
 
   const getCategoryCount = useCallback((category: Category) => {
     return categoryCounts.get(category.id) ?? 0;
