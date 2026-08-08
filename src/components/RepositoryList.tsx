@@ -11,7 +11,7 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
-import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
+import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory, buildCategoryHints } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
 
@@ -328,6 +328,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const githubApi = new GitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
       const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+      const aiCategoryHints = buildCategoryHints(allCategories);
 
       let successCount = 0;
       let failedCount = 0;
@@ -372,6 +373,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         githubApi,
         aiService,
         categoryNames,
+        aiCategoryHints,
         (completed, total, currentConcurrency) => {
           setAnalysisProgress({ current: completed, total });
           console.log(`AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
@@ -679,6 +681,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             const githubApi = new GitHubApiService(githubToken);
             const aiService = new AIService(activeConfig, language);
             const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
+            const aiCategoryHints = buildCategoryHints(allCategories);
 
             let successCount = 0;
             let failedCount = 0;
@@ -724,6 +727,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               githubApi,
               aiService,
               categoryNames,
+              aiCategoryHints,
               (completed, total, currentConcurrency) => {
                 setAnalysisProgress({ current: completed, total });
                 console.log(`Bulk AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
