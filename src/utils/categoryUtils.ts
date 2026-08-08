@@ -1,18 +1,27 @@
 import { Category, CategoryMatchMode, Repository } from '../types';
 
 /**
+ * 归一化标签数组：去除前后空白并过滤空白项，避免空白标签匹配任意分类
+ */
+const normalizeTags = (tags: string[] | undefined): string[] => {
+  return (tags || []).map(tag => tag.trim()).filter(tag => tag.length > 0);
+};
+
+/**
  * 获取用于分类匹配的有效标签
  * 优先级与卡片展示一致：自定义标签 > AI标签 > Topics。
  * 自定义标签显式清空（空数组）时不视为命中，回落 AI 标签/ Topics。
  */
 export const getEffectiveTags = (repo: Repository): string[] => {
-  if (repo.custom_tags && repo.custom_tags.length > 0) {
-    return repo.custom_tags;
+  const customTags = normalizeTags(repo.custom_tags);
+  if (customTags.length > 0) {
+    return customTags;
   }
-  if (repo.ai_tags && repo.ai_tags.length > 0) {
-    return repo.ai_tags;
+  const aiTags = normalizeTags(repo.ai_tags);
+  if (aiTags.length > 0) {
+    return aiTags;
   }
-  return repo.topics || [];
+  return normalizeTags(repo.topics);
 };
 
 /**
@@ -142,7 +151,7 @@ export const matchesCategory = (
     return repo.custom_category === category.name;
   }
 
-  const tags = mode === 'effective' ? getEffectiveTags(repo) : (repo.ai_tags || []);
+  const tags = mode === 'effective' ? getEffectiveTags(repo) : normalizeTags(repo.ai_tags);
   if (tags.length > 0) {
     return tags.some(tag => tagMatchesCategory(tag, category, mode === 'effective' && !!category.isCustom));
   }
@@ -231,7 +240,7 @@ export const resolveCategoryAssignment = (
     return repository.custom_category;
   }
 
-  const normalizedTags = Array.isArray(aiTags) ? aiTags.filter(Boolean) : [];
+  const normalizedTags = Array.isArray(aiTags) ? normalizeTags(aiTags) : [];
 
   const customCategories = allCategories.filter(category => category.id !== 'all' && category.isCustom);
   const defaultCategories = allCategories.filter(category => category.id !== 'all' && !category.isCustom);
