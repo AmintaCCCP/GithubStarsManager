@@ -505,4 +505,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.2</downloadUrl>
   </version>
+  <version>
+    <number>0.7.3</number>
+    <releaseDate>2026-08-08</releaseDate>
+    <changelog>
+      <item>feat: Category classification now uses the effective tags actually shown on repository cards (custom_tags &gt; ai_tags &gt; topics) instead of only ai_tags, aligning category matching with display and search. A new categoryMatchMode setting (default Effective; Legacy keeps the old ai_tags-only behavior) controls this, manual category assignments (including explicit clears) are preserved and no longer overwritten by AI analysis, and custom categories fall back to repository metadata keywords when a repo has no topics. (PR #264, closes #262)</item>
+      <item>fix: GitHub PAT / API_SECRET is now persisted to IndexedDB (persist v10) with a synchronous localStorage auth mirror fallback, so users are no longer re-prompted for the token after a Docker restart or tab close; logout performs a full credential teardown, and the new POST /api/sync/auth route (Cache-Control: no-store) enables cross-device session restore. (PR #260, closes #259)</item>
+      <item>fix: The full vector-search config (search_threshold, search_top_k, enable_hyde, enable_reranking, embedding_format_version) is now persisted to the backend instead of silently dropping fields (which could force an unwanted full re-index); a canonical fingerprint stops the endless push/pull sync loop, and a bootstrap guard prevents a fresh backend from wiping locally configured vector search on first sync. (PR #261)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.3</downloadUrl>
+  </version>
 </versions>
