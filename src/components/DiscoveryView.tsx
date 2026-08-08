@@ -811,7 +811,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         (result) => {
           if (result.success && result.repo) {
             const resolvedCategory = resolveCategoryAssignment(
-              result.repo,
+              { ...result.repo, ai_summary: result.summary },
               result.tags || [],
               allCategoriesForResolution
             );

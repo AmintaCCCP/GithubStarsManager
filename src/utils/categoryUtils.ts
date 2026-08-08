@@ -96,6 +96,13 @@ export const computeCustomCategory = (
 };
 
 /**
+ * 归一化分类关键词：去除前后空白并过滤空串，避免空白关键词匹配任意仓库
+ */
+const getCategoryKeywords = (category: Category): string[] => {
+  return (category.keywords || []).map(k => k.trim()).filter(k => k.length > 0);
+};
+
+/**
  * 判断某个标签是否命中分类
  * @param matchCategoryName - 是否参与分类名匹配（effective 模式开启，保证自定义标签等于分类名时也能命中）
  */
@@ -105,7 +112,7 @@ const tagMatchesCategory = (
   matchCategoryName: boolean
 ): boolean => {
   const tagLower = tag.toLowerCase();
-  const keywordMatch = category.keywords.some(keyword =>
+  const keywordMatch = getCategoryKeywords(category).some(keyword =>
     tagLower.includes(keyword.toLowerCase()) ||
     keyword.toLowerCase().includes(tagLower)
   );
@@ -148,7 +155,7 @@ export const matchesCategory = (
     repo.ai_summary || ''
   ].join(' ').toLowerCase();
 
-  return category.keywords.some(keyword =>
+  return getCategoryKeywords(category).some(keyword =>
     repoText.includes(keyword.toLowerCase())
   );
 };
@@ -177,7 +184,7 @@ export const buildCategoryHints = (customCategories: Category[]): string => {
   const lines = customCategories
     .filter(category => category.id !== 'all' && category.isCustom)
     .map(category => {
-      const keywords = category.keywords.filter(k => k && k.trim());
+      const keywords = getCategoryKeywords(category);
       const kwText = keywords.length > 0 ? keywords.join(',') : `(no keywords, match by name: ${category.name})`;
       return `${category.name}（${kwText}）`;
     });
@@ -194,10 +201,13 @@ const matchCustomCategoryByMetadata = (
 ): Category | undefined => {
   if (customCategories.length === 0) return undefined;
   const repoText = getRepoText(repository);
-  return customCategories.find(category =>
-    category.keywords.some(keyword => repoText.includes(keyword.toLowerCase())) ||
-    (category.keywords.length === 0 && repoText.includes(category.name.toLowerCase()))
-  );
+  return customCategories.find(category => {
+    const keywords = getCategoryKeywords(category);
+    const keywordMatch = keywords.length > 0 && keywords.some(keyword => repoText.includes(keyword.toLowerCase()));
+    // 无有效关键词时才回退到分类名包含匹配，并保留现有语义
+    const nameFallback = keywordMatch === false && keywords.length === 0 && repoText.includes(category.name.toLowerCase());
+    return keywordMatch || nameFallback;
+  });
 };
 
 export const resolveCategoryAssignment = (
@@ -236,27 +246,29 @@ export const resolveCategoryAssignment = (
       : undefined;
   }
 
-  const matchCustomCategory = (categories: Category[]) => categories.find(category =>
-    normalizedTags.some(tag =>
+  const matchCustomCategory = (categories: Category[]) => categories.find(category => {
+    const keywords = getCategoryKeywords(category);
+    return normalizedTags.some(tag =>
       category.name.toLowerCase() === tag.toLowerCase() ||
       category.name.toLowerCase().includes(tag.toLowerCase()) ||
       tag.toLowerCase().includes(category.name.toLowerCase()) ||
-      category.keywords.some(keyword =>
+      keywords.some(keyword =>
         tag.toLowerCase().includes(keyword.toLowerCase()) ||
         keyword.toLowerCase().includes(tag.toLowerCase())
       )
-    )
-  );
+    );
+  });
 
-  const matchDefaultCategory = (categories: Category[]) => categories.find(category =>
-    normalizedTags.some(tag =>
+  const matchDefaultCategory = (categories: Category[]) => categories.find(category => {
+    const keywords = getCategoryKeywords(category);
+    return normalizedTags.some(tag =>
       category.name.toLowerCase() === tag.toLowerCase() ||
-      category.keywords.some(keyword =>
+      keywords.some(keyword =>
         tag.toLowerCase().includes(keyword.toLowerCase()) ||
         keyword.toLowerCase().includes(tag.toLowerCase())
       )
-    )
-  );
+    );
+  });
 
   const customMatch = matchCustomCategory(customCategories);
   if (customMatch) return customMatch.name;

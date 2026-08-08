@@ -405,4 +405,110 @@ describe('buildCategoryHints', () => {
     ];
     expect(buildCategoryHints(categories)).toContain('我的项目');
   });
+
+  it('normalizes whitespace-only keywords out of hint text', () => {
+    const categories: Category[] = [
+      { id: 'c1', name: 'skills', icon: '💡', keywords: [' ', '  ', 'Skill'], isCustom: true },
+    ];
+    const hints = buildCategoryHints(categories);
+    expect(hints).toContain('Skill');
+    expect(hints).not.toContain('（ ,');
+    expect(hints).not.toContain('(no keywords');
+  });
+});
+
+describe('resolveCategoryAssignment whitespace-keyword regression', () => {
+  const whitespaceCategory: Category = {
+    id: 'custom-whitespace',
+    name: '空关键词',
+    icon: '⚠️',
+    keywords: [' ', '  ', ''],
+    isCustom: true,
+  };
+
+  it('does not match every repository when keywords are whitespace-only', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'foo/demo-app',
+      name: 'demo-app',
+      description: 'A web demo',
+      language: 'JavaScript',
+      topics: ['web'],
+      custom_category: undefined,
+    };
+    // 关键词全部为空白时应回退到分类名匹配，仓库名不含该分类名 → 不命中
+    expect(resolveCategoryAssignment(repository, ['Web应用'], [whitespaceCategory, aiCategory, webCategory])).toBe(undefined);
+  });
+
+  it('matches by name via fallback when keywords are whitespace-only and name is present in repo text', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'acme/empty-category',
+      name: 'empty-category',
+      description: '空关键词 demo app',
+      language: 'JavaScript',
+      topics: [],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, ['Web应用'], [whitespaceCategory, aiCategory, webCategory])).toBe('空关键词');
+  });
+
+  it('matches via a genuine non-whitespace keyword among whitespace keywords', () => {
+    const category: Category = {
+      id: 'custom-mixed',
+      name: '数据分析',
+      icon: '📊',
+      keywords: ['  ', ' pandas ', ''],
+      isCustom: true,
+    };
+    const repository = {
+      ...baseRepository,
+      full_name: 'acme/pandas-playground',
+      name: 'pandas-playground',
+      description: 'Data science repo',
+      language: 'Python',
+      topics: [],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, [], [category, aiCategory])).toBe('数据分析');
+  });
+});
+
+describe('resolveCategoryAssignment summary-only metadata match', () => {
+  const customSkills: Category = {
+    id: 'custom-skills',
+    name: 'skills',
+    icon: '💡',
+    keywords: ['Skills', '技能'],
+    isCustom: true,
+  };
+
+  it('assigns a custom category matched only by the freshly generated ai_summary', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'leon/repo',
+      name: 'repo',
+      description: 'Generic CLI tool',
+      language: 'Go',
+      topics: [],
+      ai_summary: 'A curated collection of reusable agent skills and prompt libraries',
+      custom_category: undefined,
+    };
+    // name/description/topics 均不含 skills，仅 ai_summary 命中
+    expect(resolveCategoryAssignment(repository, ['开发工具'], [customSkills, aiCategory])).toBe('skills');
+  });
+
+  it('does not assign via ai_summary when the summary contains no matching keyword', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'leon/repo',
+      name: 'repo',
+      description: 'Generic CLI tool',
+      language: 'Go',
+      topics: [],
+      ai_summary: 'A minimal HTTP server written in Go',
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, ['开发工具'], [customSkills, aiCategory])).toBe(undefined);
+  });
 });
