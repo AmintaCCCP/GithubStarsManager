@@ -144,10 +144,12 @@ export const matchesCategory = (
 ): boolean => {
   if (category.id === 'all') return true;
 
-  if (repo.custom_category != null) {
-    if (repo.custom_category === '') {
-      return false;
-    }
+  // 仅锁定的手动分类（或显式清空）参与精确匹配；
+  // 未锁定的 custom_category 是 AI 分析写入的结果，应按标签重新匹配
+  if (repo.custom_category === '') {
+    return false;
+  }
+  if (repo.category_locked && repo.custom_category != null) {
     return repo.custom_category === category.name;
   }
 
@@ -235,8 +237,8 @@ export const resolveCategoryAssignment = (
     return repository.custom_category;
   }
 
-  // 保留用户已手动设置的分类归属（含显式清空），不被 AI 分析覆盖
-  if (repository.custom_category === '' || isValidCategory(repository.custom_category)) {
+  // 保留用户显式清空的分类归属（''），不被 AI 分析覆盖
+  if (repository.custom_category === '') {
     return repository.custom_category;
   }
 
