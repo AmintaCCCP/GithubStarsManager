@@ -56,7 +56,7 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   const categoryHints = buildCategoryHints(categories);
   const analysis = await aiService.analyzeRepository(repository, readmeContent, categoryNames, categoryHints, signal);
 
-  const resolvedCategory = resolveCategoryAssignment(repository as Repository, analysis.tags, categories);
+  const resolvedCategory = resolveCategoryAssignment({ ...repository, ai_summary: analysis.summary } as Repository, analysis.tags, categories);
 
   const wasCategoryLocked = !!(repository as Repository).category_locked;
 

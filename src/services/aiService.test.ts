@@ -83,4 +83,33 @@ describe('AIService.searchRepositoriesWithReranking — enhanced basic search fa
     const results = await service.searchRepositoriesWithReranking([repoA], 'mit');
     expect(results.map((r) => r.id)).toEqual([3]);
   });
+
+  it('finds a repo by its custom tag via static fallback search', async () => {
+    const repo = makeRepo({
+      id: 4,
+      name: 'skill-pack',
+      full_name: 'acme/skill-pack',
+      description: 'A collection of prompts',
+      ai_tags: ['效率工具'],
+      custom_tags: ['技能'],
+    });
+
+    const results = await AIService.searchRepositories([repo], '技能');
+    expect(results.map((r) => r.id)).toEqual([4]);
+  });
+
+  it('finds a repo by its custom tag via basic search', async () => {
+    const repo = makeRepo({
+      id: 5,
+      name: 'skill-pack',
+      full_name: 'acme/skill-pack',
+      description: 'A collection of prompts',
+      ai_tags: ['效率工具'],
+      custom_tags: ['技能'],
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const results = service['performBasicSearch']([repo], '技能');
+    expect(results.map((r) => r.id)).toEqual([5]);
+  });
 });

@@ -336,7 +336,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       const handleResult = (result: AnalysisResult) => {
         if (result.success) {
           const resolvedCategory = resolveCategoryAssignment(
-            result.repo,
+            { ...result.repo, ai_summary: result.summary },
             result.tags || [],
             allCategories
           );
@@ -689,7 +689,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             const handleResult = (result: AnalysisResult) => {
               if (result.success) {
                 const resolvedCategory = resolveCategoryAssignment(
-                  result.repo,
+                  { ...result.repo, ai_summary: result.summary },
                   result.tags || [],
                   allCategories
                 );

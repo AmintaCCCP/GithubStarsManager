@@ -1439,7 +1439,7 @@ Reply in JSON format:
 
   private performEnhancedSearch(repositories: Repository[], originalQuery: string, aiTerms: string[]): Repository[] {
     const allSearchTerms = [originalQuery, ...aiTerms];
-    
+
     return repositories.filter(repo => {
       const searchableText = [
         repo.name,
@@ -1448,6 +1448,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
@@ -1474,6 +1475,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
@@ -1499,6 +1501,7 @@ Reply in JSON format:
         repo.language || '',
         ...(repo.topics || []),
         repo.ai_summary || '',
+        ...(repo.custom_tags || []),
         ...(repo.ai_tags || []),
         ...(repo.ai_platforms || []),
         normalizeLicense(repo.license),
