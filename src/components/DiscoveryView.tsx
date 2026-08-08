@@ -22,7 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
 import { AIService } from '../services/aiService';
 import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
-import { resolveCategoryAssignment } from '../utils/categoryUtils';
+import { resolveCategoryAssignment, buildCategoryHints } from '../utils/categoryUtils';
 import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
@@ -784,6 +784,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
         : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
     ];
+    const aiCategoryHints = buildCategoryHints(storeState.customCategories);
 
     const githubApi = new GitHubApiService(githubToken);
     const aiService = new AIService(activeConfig, language);
@@ -803,6 +804,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         readmeCache,
         aiService,
         categoryNames,
+        aiCategoryHints,
         (current: number, total: number) => {
           setAnalysisProgress({ current, total });
         },

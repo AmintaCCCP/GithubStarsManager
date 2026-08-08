@@ -153,6 +153,53 @@ export const matchesCategory = (
   );
 };
 
+/**
+ * 聚合仓库元数据文本，用于自定义分类的 metadata 兜底匹配
+ * 与 matchesCategory 的 repoText 兜底一致，可命中无 AI tags 或 tags 未覆盖的场景
+ */
+const getRepoText = (repo: Pick<Repository, 'name' | 'description' | 'language' | 'topics' | 'ai_summary' | 'full_name'>): string => {
+  return [
+    repo.name,
+    repo.full_name,
+    repo.description || '',
+    repo.language || '',
+    ...(repo.topics || []),
+    repo.ai_summary || '',
+  ].join(' ').toLowerCase();
+};
+
+/**
+ * 构建用于 AI 提示词的自定义分类关键词提示行
+ * 格式形如：`skills（Skills,技能）\n命令行工具（cli,CLI）`
+ * 让模型在仓库无 topics 时也能识别自定义分类
+ */
+export const buildCategoryHints = (customCategories: Category[]): string => {
+  const lines = customCategories
+    .filter(category => category.id !== 'all' && category.isCustom)
+    .map(category => {
+      const keywords = category.keywords.filter(k => k && k.trim());
+      const kwText = keywords.length > 0 ? keywords.join(',') : `(no keywords, match by name: ${category.name})`;
+      return `${category.name}（${kwText}）`;
+    });
+  return lines.join('\n');
+};
+
+/**
+ * 按仓库元数据（名称/描述/语言/topics/AI摘要）匹配自定义分类
+ * 仅针对自定义分类，关键词命中即返回；关键词为空时回退到分类名包含匹配
+ */
+const matchCustomCategoryByMetadata = (
+  customCategories: Category[],
+  repository: Pick<Repository, 'name' | 'description' | 'language' | 'topics' | 'ai_summary' | 'full_name'>
+): Category | undefined => {
+  if (customCategories.length === 0) return undefined;
+  const repoText = getRepoText(repository);
+  return customCategories.find(category =>
+    category.keywords.some(keyword => repoText.includes(keyword.toLowerCase())) ||
+    (category.keywords.length === 0 && repoText.includes(category.name.toLowerCase()))
+  );
+};
+
 export const resolveCategoryAssignment = (
   repository: Repository,
   aiTags: string[] | undefined,
@@ -175,15 +222,19 @@ export const resolveCategoryAssignment = (
   }
 
   const normalizedTags = Array.isArray(aiTags) ? aiTags.filter(Boolean) : [];
+
+  const customCategories = allCategories.filter(category => category.id !== 'all' && category.isCustom);
+  const defaultCategories = allCategories.filter(category => category.id !== 'all' && !category.isCustom);
+
+  // 无 AI 标签时：自定义分类按 metadata 兜底，仍可归类
   if (normalizedTags.length === 0) {
+    const customMetaMatch = matchCustomCategoryByMetadata(customCategories, repository);
+    if (customMetaMatch) return customMetaMatch.name;
     // 如果没有AI标签，但分类被锁定且自定义分类有效，保持当前分类
     return (repository.category_locked && isValidCategory(repository.custom_category))
       ? repository.custom_category
       : undefined;
   }
-
-  const customCategories = allCategories.filter(category => category.id !== 'all' && category.isCustom);
-  const defaultCategories = allCategories.filter(category => category.id !== 'all' && !category.isCustom);
 
   const matchCustomCategory = (categories: Category[]) => categories.find(category =>
     normalizedTags.some(tag =>
@@ -209,6 +260,11 @@ export const resolveCategoryAssignment = (
 
   const customMatch = matchCustomCategory(customCategories);
   if (customMatch) return customMatch.name;
+
+  // metadata 兜底：AI 标签未直接命中自定义分类时，改用仓库元数据匹配自定义分类
+  // （自定义分类优先级高于默认分类）
+  const customMetaMatch = matchCustomCategoryByMetadata(customCategories, repository);
+  if (customMetaMatch) return customMetaMatch.name;
 
   const defaultMatch = matchDefaultCategory(defaultCategories);
   if (defaultMatch) return undefined;

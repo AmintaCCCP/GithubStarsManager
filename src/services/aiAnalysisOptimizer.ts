@@ -200,7 +200,8 @@ export class AIAnalysisOptimizer {
   async analyzeWithRetry(
     task: AnalysisTask,
     aiService: AIService,
-    categoryNames: string[]
+    categoryNames: string[],
+    categoryHints?: string
   ): Promise<AnalysisResult> {
     const startTime = Date.now();
     let lastError: Error | undefined;
@@ -231,7 +232,7 @@ export class AIAnalysisOptimizer {
 
       try {
         const analysisStart = Date.now();
-        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, controller.signal);
+        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, controller.signal);
         const analysisDuration = Date.now() - analysisStart;
 
         this.recordResponseTime(analysisDuration);
@@ -280,6 +281,7 @@ export class AIAnalysisOptimizer {
     readmeCache: Map<number, string>,
     aiService: AIService,
     categoryNames: string[],
+    categoryHints?: string,
     onProgress?: (completed: number, total: number, currentConcurrency: number) => void,
     onResult?: (result: AnalysisResult) => void
   ): Promise<AnalysisResult[]> {
@@ -293,7 +295,7 @@ export class AIAnalysisOptimizer {
     const runTask = async (repo: Repository): Promise<AnalysisResult> => {
       const readmeContent = readmeCache.get(repo.id) || '';
       const task: AnalysisTask = { repo, readmeContent, retries: 0 };
-      return this.analyzeWithRetry(task, aiService, categoryNames);
+      return this.analyzeWithRetry(task, aiService, categoryNames, categoryHints);
     };
 
     const worker = async (workerId: number): Promise<void> => {
@@ -361,6 +363,7 @@ export class AIAnalysisOptimizer {
     githubApi: GitHubApiService,
     aiService: AIService,
     categoryNames: string[],
+    categoryHints?: string,
     onProgress?: (completed: number, total: number, currentConcurrency: number) => void,
     onResult?: (result: AnalysisResult) => void
   ): Promise<AnalysisResult[]> {
@@ -421,7 +424,7 @@ export class AIAnalysisOptimizer {
             }
 
             const task: AnalysisTask = { repo, readmeContent, retries: 0 };
-            const result = await this.analyzeWithRetry(task, aiService, categoryNames);
+            const result = await this.analyzeWithRetry(task, aiService, categoryNames, categoryHints);
 
             completedCount.value++;
             results.push(result);

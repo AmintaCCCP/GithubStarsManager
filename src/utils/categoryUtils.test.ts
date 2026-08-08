@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Repository } from '../types';
-import { getEffectiveTags, matchesCategory, resolveCategoryAssignment } from './categoryUtils';
+import { getEffectiveTags, matchesCategory, resolveCategoryAssignment, buildCategoryHints } from './categoryUtils';
 
 const aiCategory: Category = {
   id: 'ai',
@@ -245,5 +245,164 @@ describe('resolveCategoryAssignment', () => {
     };
     // "应用" 是默认分类 "Web应用" 的子串，但默认分类仅精确匹配名称
     expect(resolveCategoryAssignment(repository, ['应用'], categories)).toBe(undefined);
+  });
+});
+
+describe('resolveCategoryAssignment metadata fallback for custom categories', () => {
+  const customSkills: Category = {
+    id: 'custom-skills',
+    name: 'skills',
+    icon: '💡',
+    keywords: ['Skills', '技能', 'skill'],
+    isCustom: true,
+  };
+
+  it('assigns skills category via metadata when AI tags miss the custom name', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'Leonxlnx/taste-skill',
+      name: 'taste-skill',
+      description: 'Taste-Skill - gives your AI good taste',
+      language: 'JavaScript',
+      topics: ['agent', 'ai', 'skill', 'skills', 'vibecoding'],
+      custom_category: undefined,
+    };
+    // AI 返回通用标签，仅通过 topics 中的 skill/skills 命中自定义分类
+    expect(resolveCategoryAssignment(repository, ['AI/机器学习', '开发工具', '效率工具'], [customSkills, aiCategory])).toBe('skills');
+  });
+
+  it('assigns skills category for pm-skills repo (topics match keywords)', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'phuryn/pm-skills',
+      name: 'pm-skills',
+      description: 'PM Skills Marketplace: 100+ agentic skills',
+      language: '',
+      topics: ['agent-skills', 'agentic-skills', 'claude-code-plugins', 'product-management'],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, ['开发工具'], [customSkills, aiCategory])).toBe('skills');
+  });
+
+  it('assigns custom category via description even without topics', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'acme/skill-pack',
+      name: 'skill-pack',
+      description: '提供 30+ 技能插件库',
+      language: 'TypeScript',
+      topics: [],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, [], [customSkills, aiCategory])).toBe('skills');
+  });
+
+  it('preserves an existing valid custom_category despite metadata fallback', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'phuryn/pm-skills',
+      name: 'pm-skills',
+      description: 'PM Skills Marketplace',
+      language: '',
+      topics: ['agent-skills'],
+      custom_category: 'Web应用',
+      category_locked: false,
+    };
+    expect(resolveCategoryAssignment(repository, ['AI/机器学习'], [customSkills, aiCategory, webCategory])).toBe('Web应用');
+  });
+
+  it('preserves explicitly cleared custom_category despite metadata fallback', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'phuryn/pm-skills',
+      name: 'pm-skills',
+      description: 'PM Skills Marketplace',
+      language: '',
+      topics: ['agent-skills'],
+      custom_category: '',
+    };
+    expect(resolveCategoryAssignment(repository, [], [customSkills, aiCategory])).toBe('');
+  });
+
+  it('keeps default category behavior when no custom metadata matches', () => {
+    const repository = {
+      ...baseRepository,
+      full_name: 'foo/demo-app',
+      name: 'demo-app',
+      description: 'A web demo',
+      language: 'JavaScript',
+      topics: ['web'],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, ['Web应用'], [customSkills, aiCategory, webCategory])).toBe(undefined);
+  });
+});
+
+describe('resolveCategoryAssignment with real repositories and other custom categories', () => {
+  // 真实仓库元数据（来自 GitHub API 抓取，离线固化防 flaky）
+  const customDataAnalysis: Category = {
+    id: 'custom-data',
+    name: '数据分析',
+    icon: '📊',
+    keywords: ['data-analysis', '数据分析', 'pandas'],
+    isCustom: true,
+  };
+  const customCli: Category = {
+    id: 'custom-cli',
+    name: '命令行工具',
+    icon: '🖥',
+    keywords: ['cli', '命令行', 'terminal'],
+    isCustom: true,
+  };
+
+  it('classifies pandas-dev/pandas to custom 数据分析 via topics', () => {
+    const pandas = {
+      ...baseRepository,
+      id: 2,
+      full_name: 'pandas-dev/pandas',
+      name: 'pandas',
+      description: 'Flexible and powerful data analysis / manipulation library for Python',
+      language: 'Python',
+      topics: ['alignment', 'data-analysis', 'data-science', 'flexible', 'pandas', 'python'],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(pandas, ['AI/机器学习'], [customDataAnalysis, customCli, aiCategory])).toBe('数据分析');
+  });
+
+  it('classifies cli/cli to custom 命令行工具 via topics', () => {
+    const repository = {
+      ...baseRepository,
+      id: 3,
+      full_name: 'cli/cli',
+      name: 'cli',
+      description: 'GitHub official command line tool',
+      language: 'Go',
+      topics: ['cli', 'git', 'github-api-v4', 'golang'],
+      custom_category: undefined,
+    };
+    expect(resolveCategoryAssignment(repository, ['开发工具'], [customCli, customDataAnalysis, aiCategory])).toBe('命令行工具');
+  });
+});
+
+describe('buildCategoryHints', () => {
+  it('builds hint text with keywords', () => {
+    const categories: Category[] = [
+      { id: 'c1', name: 'skills', icon: '💡', keywords: ['Skill', '技能'], isCustom: true },
+      { id: 'c2', name: '数据分析', icon: '📊', keywords: ['pandas'], isCustom: true },
+    ];
+    expect(buildCategoryHints(categories)).toContain('skills');
+    expect(buildCategoryHints(categories)).toContain('技能');
+    expect(buildCategoryHints(categories)).toContain('数据分析');
+  });
+
+  it('returns empty string when no custom categories', () => {
+    expect(buildCategoryHints([aiCategory])).toBe('');
+  });
+
+  it('handles categories without keywords', () => {
+    const categories: Category[] = [
+      { id: 'c1', name: '我的项目', icon: '📁', keywords: [], isCustom: true },
+    ];
+    expect(buildCategoryHints(categories)).toContain('我的项目');
   });
 });
