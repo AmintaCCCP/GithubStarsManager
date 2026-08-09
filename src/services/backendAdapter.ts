@@ -229,9 +229,32 @@ class BackendAdapter {
       }
     } catch { /* body not JSON */ }
     const translated = translateBackendError(code, `${fallbackPrefix}: ${res.status}`);
-    const error = new Error(detail ? `${translated} - ${detail}` : translated) as Error & { statusCode?: number; code?: string };
+    const error = new Error(detail ? `${translated} - ${detail}` : translated) as Error & { statusCode?: number; code?: string; retryAfterMs?: number };
     error.statusCode = res.status;
     if (code) error.code = code;
+    // 后端透传上游 Retry-After 头后，这里解析成毫秒供限流器使用（retry-after-ms 为毫秒，retry-after 为秒）
+    if (res.status === 429) {
+      const retryAfterMsHeader = res.headers.get('retry-after-ms');
+      if (retryAfterMsHeader) {
+        const v = Number(retryAfterMsHeader);
+        if (Number.isFinite(v) && v > 0) error.retryAfterMs = Math.round(v);
+      } else {
+        const retryAfter = res.headers.get('retry-after');
+        if (retryAfter) {
+          // Retry-After 可能是「秒数」或「HTTP-date」；数值解析失败时按日期计算剩余时长
+          const numeric = Number(retryAfter);
+          if (Number.isFinite(numeric) && numeric > 0) {
+            error.retryAfterMs = Math.round(numeric * 1000);
+          } else {
+            const parsedDate = Date.parse(retryAfter);
+            if (!Number.isNaN(parsedDate)) {
+              const remaining = parsedDate - Date.now();
+              if (remaining > 0) error.retryAfterMs = Math.round(remaining);
+            }
+          }
+        }
+      }
+    }
     throw error;
   }
 

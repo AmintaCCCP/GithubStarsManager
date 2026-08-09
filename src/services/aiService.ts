@@ -46,6 +46,64 @@ type ParsedAIResponse = RepositoryAnalysisResult & {
   invalidReason?: string;
 };
 
+/**
+ * 统一的 AI 请求错误，携带 HTTP 状态码与（可选）服务端建议的等待时长。
+ * 上层（限流器 / 优化器）依赖 status / retryAfterMs 判断退避策略。
+ */
+export class AIRequestError extends Error {
+  readonly status: number;
+  readonly retryAfterMs?: number;
+  readonly isRateLimit: boolean;
+
+  constructor(message: string, status: number, retryAfterMs?: number) {
+    super(message);
+    this.name = 'AIRequestError';
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+    this.isRateLimit = status === 429;
+  }
+}
+
+/** 支持检查一个错误对象是否是 AI 限流（429 或代理透传的限流错误）。 */
+export function isRateLimitedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { statusCode?: unknown; status?: unknown; isRateLimit?: unknown; message?: unknown };
+  if (e.isRateLimit === true) return true;
+  if (typeof e.statusCode === 'number' && e.statusCode === 429) return true;
+  if (typeof e.status === 'number' && e.status === 429) return true;
+  const msg = typeof e.message === 'string' ? e.message : '';
+  return /429|rate\s*limit|too many requests/i.test(msg);
+}
+
+/** 从限流错误中读取服务端建议的等待毫秒数（Retry-After / retry-after-ms）。 */
+export function getRetryAfterMsFromError(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const e = error as { retryAfterMs?: unknown; retryAfter?: unknown };
+  const ms = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined;
+  if (ms !== undefined && Number.isFinite(ms) && ms > 0) return ms;
+  return undefined;
+}
+
+/** 解析响应头里的 Retry-After（retry-after-ms → retry-after 秒 → HTTP date）。 */
+function parseRetryAfterMs(response: Response): number | undefined {
+  const msHeader = response.headers.get('retry-after-ms');
+  if (msHeader) {
+    const v = Number(msHeader);
+    if (Number.isFinite(v) && v > 0) return Math.round(v);
+  }
+  const secHeader = response.headers.get('retry-after');
+  if (secHeader) {
+    const v = Number(secHeader);
+    if (Number.isFinite(v) && v > 0) return Math.round(v * 1000);
+    const parsed = Date.parse(secHeader);
+    if (!Number.isNaN(parsed)) {
+      const remaining = parsed - Date.now();
+      if (remaining > 0) return remaining;
+    }
+  }
+  return undefined;
+}
+
 function getStatusCodeMeaning(statusCode: number, language: string): string {
   const meanings: Record<number, { zh: string; en: string }> = {
     400: { zh: '请求参数错误', en: 'Bad Request' },
@@ -255,7 +313,11 @@ export class AIService {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
             url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
           });
-          throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
+          throw new AIRequestError(
+            `AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`,
+            response.status,
+            parseRetryAfterMs(response)
+          );
         }
         data = await response.json();
       }
@@ -365,7 +427,11 @@ export class AIService {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
             url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
           });
-          throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
+          throw new AIRequestError(
+            `AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`,
+            response.status,
+            parseRetryAfterMs(response)
+          );
         }
         data = await response.json();
       }
@@ -457,7 +523,11 @@ ${options.user}` : options.user;
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
           url: maskedUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
         });
-        throw new Error(`AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
+        throw new AIRequestError(
+          `AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`,
+          response.status,
+          parseRetryAfterMs(response)
+        );
       }
       data = await response.json();
     }
