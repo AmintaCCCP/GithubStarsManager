@@ -27,7 +27,7 @@ export function createApp(): express.Express {
   app.use(helmet());
   app.use(
     cors({
-      exposedHeaders: ['X-Log-Count', 'Mcp-Session-Id', 'mcp-session-id'],
+      exposedHeaders: ['X-Log-Count', 'Mcp-Session-Id', 'mcp-session-id', 'Retry-After', 'retry-after-ms'],
       allowedHeaders: [
         'Content-Type',
         'Authorization',

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Repository } from '../types';
-import { AIService } from './aiService';
+import { AIService, AIRequestError, isRateLimitedError, getRetryAfterMsFromError } from './aiService';
 
 // Minimal AIConfig that lets AIService construct without a real token.
 const makeConfig = () => ({
@@ -126,5 +126,29 @@ describe('AIService.searchRepositoriesWithReranking — enhanced basic search fa
     const service = new AIService(makeConfig() as never, 'zh');
     const results = service['performEnhancedSearch']([repo], '技能', ['技能']);
     expect(results.map((r) => r.id)).toEqual([6]);
+  });
+});
+
+describe('AIRequestError / 限流辅助函数', () => {
+  it('构造错误并标记 isRateLimit', () => {
+    const err = new AIRequestError('rate limited', 429, 5000);
+    expect(err.status).toBe(429);
+    expect(err.retryAfterMs).toBe(5000);
+    expect(err.isRateLimit).toBe(true);
+    expect(err.name).toBe('AIRequestError');
+  });
+
+  it('isRateLimitedError 识别 429 或限流信息', () => {
+    expect(isRateLimitedError(new AIRequestError('x', 429))).toBe(true);
+    expect(isRateLimitedError({ statusCode: 429 })).toBe(true);
+    expect(isRateLimitedError(new Error('Too Many Requests'))).toBe(true);
+    expect(isRateLimitedError(new Error('network down'))).toBe(false);
+    expect(isRateLimitedError(null)).toBe(false);
+  });
+
+  it('getRetryAfterMsFromError 取有效毫秒数', () => {
+    expect(getRetryAfterMsFromError(new AIRequestError('x', 429, 1234))).toBe(1234);
+    expect(getRetryAfterMsFromError({})).toBeUndefined();
+    expect(getRetryAfterMsFromError(undefined)).toBeUndefined();
   });
 });
