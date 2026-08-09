@@ -236,13 +236,22 @@ class BackendAdapter {
     if (res.status === 429) {
       const retryAfterMsHeader = res.headers.get('retry-after-ms');
       if (retryAfterMsHeader) {
-        const v = parseFloat(retryAfterMsHeader);
+        const v = Number(retryAfterMsHeader);
         if (Number.isFinite(v) && v > 0) error.retryAfterMs = Math.round(v);
       } else {
         const retryAfter = res.headers.get('retry-after');
         if (retryAfter) {
-          const v = parseFloat(retryAfter);
-          if (Number.isFinite(v) && v > 0) error.retryAfterMs = Math.round(v * 1000);
+          // Retry-After 可能是「秒数」或「HTTP-date」；数值解析失败时按日期计算剩余时长
+          const numeric = Number(retryAfter);
+          if (Number.isFinite(numeric) && numeric > 0) {
+            error.retryAfterMs = Math.round(numeric * 1000);
+          } else {
+            const parsedDate = Date.parse(retryAfter);
+            if (!Number.isNaN(parsedDate)) {
+              const remaining = parsedDate - Date.now();
+              if (remaining > 0) error.retryAfterMs = Math.round(remaining);
+            }
+          }
         }
       }
     }

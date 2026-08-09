@@ -98,4 +98,41 @@ describe('AIAnalysisOptimizer 与共享限流器集成', () => {
     expect(analyze).toHaveBeenCalledTimes(2);
     expect(optimizer.limiter.getStatus().consecutiveRateLimits).toBe(0);
   });
+
+  it('abort() 立即停止阻塞在限流等待与重试延迟中的 worker', async () => {
+    const optimizer = new AIAnalysisOptimizer({
+      maxRetries: 3,
+      retryDelayBaseMs: 10000,
+      rateLimiter: {
+        maxConcurrency: 0,
+        requestsPerMinute: 0,
+        cooldownThreshold: 1,
+        backoffBaseMs: 10000,
+        backoffCapMs: 10000,
+        maxRetryAfterMs: 10000,
+      },
+    });
+
+    const analyze = vi.fn().mockRejectedValue(new AIRequestError('too many requests', 429));
+    const fakeAi = { analyzeRepository: analyze } as unknown as AIService;
+
+    // 第一个任务触发 429 后陷入长重试延迟；第二个任务阻塞在限流器 acquire
+    const first = optimizer.analyzeWithRetry(makeTask(4), fakeAi, []);
+    const second = optimizer.analyzeWithRetry(makeTask(5), fakeAi, []);
+
+    // 给两个任务时间进入阻塞状态，然后中止整个批次
+    await new Promise(r => setTimeout(r, 100));
+    const start = Date.now();
+    optimizer.abort();
+
+    const [r1, r2] = await Promise.all([first, second]);
+    const elapsed = Date.now() - start;
+
+    // abort 应立刻穿过冷却等待 / 重试延迟（总时长被设为 10s）
+    expect(elapsed).toBeLessThan(500);
+    expect(r1.success).toBe(false);
+    expect(r1.error?.message).toBe('Analysis aborted');
+    expect(r2.success).toBe(false);
+    expect(r2.error?.message).toBe('Analysis aborted');
+  });
 });
