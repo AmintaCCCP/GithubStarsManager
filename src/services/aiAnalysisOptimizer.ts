@@ -141,10 +141,6 @@ export class AIAnalysisOptimizer {
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   /** 可中止的延迟：abort() 后立即放行，调用方依靠 aborted 标记结束批次。 */
   private abortableDelay(ms: number): Promise<void> {
     return new Promise(resolve => {
@@ -168,7 +164,7 @@ export class AIAnalysisOptimizer {
 
   private async waitWhilePaused(): Promise<void> {
     while (this.paused && !this.aborted) {
-      await this.delay(500);
+      await this.abortableDelay(500);
     }
   }
 
@@ -177,19 +173,20 @@ export class AIAnalysisOptimizer {
     return this.config.retryDelayBaseMs * Math.pow(2, retryCount) + jitter;
   }
 
-  private async fetchReadme(repo: Repository, githubApi: GitHubApiService): Promise<string> {
-    if (this.aborted) return '';
+  private async fetchReadme(repo: Repository, githubApi: GitHubApiService, signal?: AbortSignal): Promise<string> {
+    if (this.aborted || signal?.aborted) return '';
     await this.waitWhilePaused();
-    if (this.aborted) return '';
+    if (this.aborted || signal?.aborted) return '';
 
     try {
       if (backend.isAvailable) {
         const [owner, name] = repo.full_name.split('/');
-        return await backend.getRepositoryReadme(owner, name);
+        return await backend.getRepositoryReadme(owner, name, signal);
       }
       const [owner, name] = repo.full_name.split('/');
-      return await githubApi.getRepositoryReadme(owner, name);
+      return await githubApi.getRepositoryReadme(owner, name, signal);
     } catch (error) {
+      if (this.aborted || signal?.aborted) return '';
       console.warn(`Failed to fetch README for ${repo.full_name}:`, error);
       return '';
     }
@@ -205,12 +202,12 @@ export class AIAnalysisOptimizer {
     const results = new Map<number, { content: string | null; error?: Error }>();
 
     const fetchReadme = async (repo: Repository): Promise<void> => {
-      if (this.aborted) return;
+      if (this.aborted || this.batchAbortController.signal.aborted) return;
       await this.waitWhilePaused();
-      if (this.aborted) return;
+      if (this.aborted || this.batchAbortController.signal.aborted) return;
 
       try {
-        const content = await this.fetchReadme(repo, githubApi);
+        const content = await this.fetchReadme(repo, githubApi, this.batchAbortController.signal);
         results.set(repo.id, { content });
       } catch (error) {
         results.set(repo.id, { content: '', error: error as Error });
@@ -228,7 +225,7 @@ export class AIAnalysisOptimizer {
       }
 
       if (i + concurrency < repos.length && !this.aborted) {
-        await this.delay(100);
+        await this.abortableDelay(100);
       }
     }
 
@@ -389,13 +386,13 @@ export class AIAnalysisOptimizer {
 
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
-        await this.delay(1000);
-        
+        await this.abortableDelay(1000);
+
         if (this.shouldExitWorkers) {
           this.shouldExitWorkers = false;
           continue;
         }
-        
+
         if (this.activeWorkers < this.currentConcurrency) {
           workerPromises.push(worker(totalWorkersStarted++));
         }
@@ -435,7 +432,7 @@ export class AIAnalysisOptimizer {
         return readmeFetching.get(repo.id)!;
       }
 
-      const promise = this.fetchReadme(repo, githubApi).then(content => {
+      const promise = this.fetchReadme(repo, githubApi, this.batchAbortController.signal).then(content => {
         readmeCache.set(repo.id, content);
         readmeFetching.delete(repo.id);
         return content;
@@ -501,13 +498,13 @@ export class AIAnalysisOptimizer {
 
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
-        await this.delay(1000);
-        
+        await this.abortableDelay(1000);
+
         if (this.shouldExitWorkers) {
           this.shouldExitWorkers = false;
           continue;
         }
-        
+
         if (this.activeWorkers < this.currentConcurrency) {
           workerPromises.push(worker(totalWorkersStarted++));
         }

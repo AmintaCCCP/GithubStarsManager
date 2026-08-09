@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AIAnalysisOptimizer, AnalysisTask } from './aiAnalysisOptimizer';
 import type { AIService } from './aiService';
+import type { GitHubApiService } from './githubApi';
 import { AIRequestError } from './aiService';
 import type { Repository } from '../types';
 
@@ -134,5 +135,36 @@ describe('AIAnalysisOptimizer 与共享限流器集成', () => {
     expect(r1.error?.message).toBe('Analysis aborted');
     expect(r2.success).toBe(false);
     expect(r2.error?.message).toBe('Analysis aborted');
+  });
+
+  it('abort() 立即结束流水线，即使 README 请求仍在飞行', async () => {
+    const optimizer = new AIAnalysisOptimizer({
+      maxRetries: 0,
+      rateLimiter: { maxConcurrency: 0, requestsPerMinute: 0 },
+    });
+
+    const analyze = vi.fn().mockResolvedValue({ summary: 'ok', tags: [], platforms: [] });
+    const fakeAi = { analyzeRepository: analyze } as unknown as AIService;
+
+    // README 拉取在收到 batch 信号中止前一直挂起：验证信号确实被传到了请求 API
+    const githubApi = {
+      getRepositoryReadme: vi.fn((_owner: string, _repo: string, signal?: AbortSignal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('Aborted')));
+        })
+      ),
+    } as unknown as GitHubApiService;
+
+    const pending = optimizer.analyzeRepositoriesPipelined(
+      [makeRepo(6), makeRepo(7)], githubApi, fakeAi, []);
+
+    // 让流水线进入 README 拉取后再中止
+    await new Promise(r => setTimeout(r, 100));
+    const start = Date.now();
+    optimizer.abort();
+    await pending;
+
+    expect(Date.now() - start).toBeLessThan(500);
+    expect(githubApi.getRepositoryReadme).toHaveBeenCalled();
   });
 });
