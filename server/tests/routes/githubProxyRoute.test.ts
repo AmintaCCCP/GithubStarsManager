@@ -139,4 +139,34 @@ describe('GitHub proxy routes', () => {
     expect(options.headers['Content-Length']).toBeUndefined();
     expect(options.headers['X-Custom']).toBe('kept');
   });
+
+  it('relays upstream rate-limit headers to the client and skips unrelated ones', async () => {
+    const app = createTestApp();
+    proxyRequestMock.mockResolvedValueOnce({
+      status: 429,
+      data: { error: { message: 'rate limited' } },
+      headers: {
+        'content-type': 'application/json',
+        'retry-after-ms': '2500',
+        'retry-after': '5',
+        'x-ratelimit-remaining-requests': '12',
+        'x-ratelimit-remaining-tokens': '900',
+        'x-debug-id': 'secret-upstream-id',
+        'set-cookie': 'sid=abc',
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/proxy/github/gists/abc123')
+      .send({ method: 'GET' })
+      .expect(429);
+
+    expect(res.headers['retry-after-ms']).toBe('2500');
+    expect(res.headers['retry-after']).toBe('5');
+    expect(res.headers['x-ratelimit-remaining-requests']).toBe('12');
+    expect(res.headers['x-ratelimit-remaining-tokens']).toBe('900');
+    // 非限流相关头不应透传
+    expect(res.headers['x-debug-id']).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
 });

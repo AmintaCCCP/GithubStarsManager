@@ -2,6 +2,8 @@ import { Repository } from '../types';
 import { AIService } from './aiService';
 import { GitHubApiService } from './githubApi';
 import { backend } from './backendAdapter';
+import { AIRateLimiter, AIRateLimitConfig } from './aiRequestLimiter';
+import { isRateLimitedError, getRetryAfterMsFromError } from './aiService';
 
 export interface AnalysisTask {
   repo: Repository;
@@ -30,6 +32,8 @@ export interface OptimizerConfig {
   maxRetries: number;
   retryDelayBaseMs: number;
   enableAdaptiveConcurrency: boolean;
+  /** 共享 AI 请求限流配置；不传则使用默认（熔断开启，RPM/并发不限制） */
+  rateLimiter?: AIRateLimitConfig;
 }
 
 const DEFAULT_CONFIG: OptimizerConfig = {
@@ -41,6 +45,14 @@ const DEFAULT_CONFIG: OptimizerConfig = {
   maxRetries: 3,
   retryDelayBaseMs: 1000,
   enableAdaptiveConcurrency: true,
+  rateLimiter: {
+    maxConcurrency: 0,
+    requestsPerMinute: 0,
+    cooldownThreshold: 3,
+    backoffBaseMs: 1000,
+    backoffCapMs: 60000,
+    maxRetryAfterMs: 60000,
+  },
 };
 
 export class AIAnalysisOptimizer {
@@ -51,18 +63,27 @@ export class AIAnalysisOptimizer {
   private paused = false;
   private activeWorkers = 0;
   private shouldExitWorkers = false;
-  private abortController: AbortController | null = null;
+  // 批次级中止信号：所有 worker 的限流等待、AI 请求与重试延迟共用同一信号，
+  // 保证 abort() 能立即停下所有仍在阻塞的 worker（而非只停最近一次请求）。
+  private readonly batchAbortController = new AbortController();
+  private readonly sharedLimiter: AIRateLimiter;
 
   constructor(config: Partial<OptimizerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.currentConcurrency = this.config.initialConcurrency;
+    this.sharedLimiter = new AIRateLimiter(this.config.rateLimiter);
   }
 
+  /** 限流器实例：供外部（请求层 / 测试）复用同一份冷却与统计。 */
+  get limiter(): AIRateLimiter {
+    return this.sharedLimiter;
+  }
+
+  /** 中止整个批次：所有在飞请求、限流等待与重试延迟立即停止。 */
   abort(): void {
     this.aborted = true;
     this.shouldExitWorkers = true;
-    this.abortController?.abort();
-    this.abortController = null;
+    this.batchAbortController.abort();
   }
 
   pause(): void {
@@ -120,13 +141,30 @@ export class AIAnalysisOptimizer {
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  /** 可中止的延迟：abort() 后立即放行，调用方依靠 aborted 标记结束批次。 */
+  private abortableDelay(ms: number): Promise<void> {
+    return new Promise(resolve => {
+      const signal = this.batchAbortController.signal;
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal.addEventListener('abort', onAbort);
+    });
   }
 
   private async waitWhilePaused(): Promise<void> {
     while (this.paused && !this.aborted) {
-      await this.delay(500);
+      await this.abortableDelay(500);
     }
   }
 
@@ -135,19 +173,20 @@ export class AIAnalysisOptimizer {
     return this.config.retryDelayBaseMs * Math.pow(2, retryCount) + jitter;
   }
 
-  private async fetchReadme(repo: Repository, githubApi: GitHubApiService): Promise<string> {
-    if (this.aborted) return '';
+  private async fetchReadme(repo: Repository, githubApi: GitHubApiService, signal?: AbortSignal): Promise<string> {
+    if (this.aborted || signal?.aborted) return '';
     await this.waitWhilePaused();
-    if (this.aborted) return '';
+    if (this.aborted || signal?.aborted) return '';
 
     try {
       if (backend.isAvailable) {
         const [owner, name] = repo.full_name.split('/');
-        return await backend.getRepositoryReadme(owner, name);
+        return await backend.getRepositoryReadme(owner, name, signal);
       }
       const [owner, name] = repo.full_name.split('/');
-      return await githubApi.getRepositoryReadme(owner, name);
+      return await githubApi.getRepositoryReadme(owner, name, signal);
     } catch (error) {
+      if (this.aborted || signal?.aborted) return '';
       console.warn(`Failed to fetch README for ${repo.full_name}:`, error);
       return '';
     }
@@ -163,12 +202,12 @@ export class AIAnalysisOptimizer {
     const results = new Map<number, { content: string | null; error?: Error }>();
 
     const fetchReadme = async (repo: Repository): Promise<void> => {
-      if (this.aborted) return;
+      if (this.aborted || this.batchAbortController.signal.aborted) return;
       await this.waitWhilePaused();
-      if (this.aborted) return;
+      if (this.aborted || this.batchAbortController.signal.aborted) return;
 
       try {
-        const content = await this.fetchReadme(repo, githubApi);
+        const content = await this.fetchReadme(repo, githubApi, this.batchAbortController.signal);
         results.set(repo.id, { content });
       } catch (error) {
         results.set(repo.id, { content: '', error: error as Error });
@@ -186,7 +225,7 @@ export class AIAnalysisOptimizer {
       }
 
       if (i + concurrency < repos.length && !this.aborted) {
-        await this.delay(100);
+        await this.abortableDelay(100);
       }
     }
 
@@ -227,24 +266,28 @@ export class AIAnalysisOptimizer {
         };
       }
 
-      const controller = new AbortController();
-      this.abortController = controller;
-
       try {
-        const analysisStart = Date.now();
-        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, controller.signal);
-        const analysisDuration = Date.now() - analysisStart;
-
-        this.recordResponseTime(analysisDuration);
-
-        return {
-          repo: task.repo,
-          success: true,
-          summary: analysis.summary,
-          tags: analysis.tags,
-          platforms: analysis.platforms,
-          duration: Date.now() - startTime,
-        };
+        // 通过共享限流器占用一个请求槽：冷却 / RPM 窗口内会自动等待
+        const release = await this.sharedLimiter.acquire(this.batchAbortController.signal);
+        try {
+          // 起算点放在 acquire 之后：限流排队时间不应计入 provider 响应时长，
+          // 否则 429 冷却会把「并发调节」误判为 provider 变慢而持续降并发
+          const analysisStart = Date.now();
+          const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, this.batchAbortController.signal);
+          const analysisDuration = Date.now() - analysisStart;
+          this.sharedLimiter.notifySuccess();
+          this.recordResponseTime(analysisDuration);
+          return {
+            repo: task.repo,
+            success: true,
+            summary: analysis.summary,
+            tags: analysis.tags,
+            platforms: analysis.platforms,
+            duration: Date.now() - startTime,
+          };
+        } finally {
+          release();
+        }
       } catch (error) {
         lastError = error as Error;
 
@@ -257,13 +300,17 @@ export class AIAnalysisOptimizer {
           };
         }
 
-        if (attempt < this.config.maxRetries) {
-          const delayMs = this.calculateRetryDelay(attempt);
-          await this.delay(delayMs);
+        // 429 / 限流：记入共享限流器，触发全局冷却并采纳服务端 Retry-After
+        if (isRateLimitedError(error)) {
+          this.sharedLimiter.notifyRateLimit(getRetryAfterMsFromError(error));
         }
-      } finally {
-        if (this.abortController === controller) {
-          this.abortController = null;
+
+        if (attempt < this.config.maxRetries) {
+          // 限流场景下，最短等待到全局冷却结束（含 Retry-After），避免与冷却窗口竞争
+          const cooldownWait = this.sharedLimiter.getStatus().cooldownRemainingMs;
+          const delayMs = Math.max(this.calculateRetryDelay(attempt), cooldownWait);
+          // 可中止的等待：abort() 后立即结束等待，由下一轮循环的 aborted 检查兜底返回
+          await this.abortableDelay(delayMs);
         }
       }
     }
@@ -339,13 +386,13 @@ export class AIAnalysisOptimizer {
 
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
-        await this.delay(1000);
-        
+        await this.abortableDelay(1000);
+
         if (this.shouldExitWorkers) {
           this.shouldExitWorkers = false;
           continue;
         }
-        
+
         if (this.activeWorkers < this.currentConcurrency) {
           workerPromises.push(worker(totalWorkersStarted++));
         }
@@ -385,7 +432,7 @@ export class AIAnalysisOptimizer {
         return readmeFetching.get(repo.id)!;
       }
 
-      const promise = this.fetchReadme(repo, githubApi).then(content => {
+      const promise = this.fetchReadme(repo, githubApi, this.batchAbortController.signal).then(content => {
         readmeCache.set(repo.id, content);
         readmeFetching.delete(repo.id);
         return content;
@@ -451,13 +498,13 @@ export class AIAnalysisOptimizer {
 
     const concurrencyMonitor = async (): Promise<void> => {
       while (pendingRepos.length > 0 && !this.aborted) {
-        await this.delay(1000);
-        
+        await this.abortableDelay(1000);
+
         if (this.shouldExitWorkers) {
           this.shouldExitWorkers = false;
           continue;
         }
-        
+
         if (this.activeWorkers < this.currentConcurrency) {
           workerPromises.push(worker(totalWorkersStarted++));
         }

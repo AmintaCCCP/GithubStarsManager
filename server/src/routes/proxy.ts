@@ -27,7 +27,43 @@ function getProxyConfig(): ProxyConfig | null {
 
 const router = Router();
 
-// Helper: build API URL handling baseUrl already ending in version prefix
+// 透传上游与限流相关的响应头，供前端（含直连模式）统一识别 Retry-After 与剩余配额。
+const UPSTREAM_RATE_LIMIT_HEADERS = new Set([
+  'retry-after',
+  'retry-after-ms',
+  'x-ratelimit-remaining-requests',
+  'x-ratelimit-remaining-tokens',
+  'x-ratelimit-reset-requests',
+  'x-ratelimit-reset-tokens',
+  'x-ratelimit-limit-requests',
+  'x-ratelimit-limit-tokens',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'x-ratelimit-limit',
+  'ratelimit-remaining',
+  'ratelimit-reset',
+  'ratelimit-limit',
+  'anthropic-ratelimit-requests-remaining',
+  'anthropic-ratelimit-requests-reset',
+  'anthropic-ratelimit-input-tokens-remaining',
+  'anthropic-ratelimit-input-tokens-reset',
+  'anthropic-ratelimit-output-tokens-remaining',
+  'anthropic-ratelimit-output-tokens-reset',
+  'x-should-retry',
+]);
+
+function relayRateLimitHeaders(res: import('express').Response, headers: Record<string, string> | undefined): void {
+  if (!headers) return;
+  for (const [key, value] of Object.entries(headers)) {
+    if (UPSTREAM_RATE_LIMIT_HEADERS.has(key.toLowerCase()) && typeof value === 'string' && value) {
+      try {
+        res.setHeader(key, value);
+      } catch { /* ignore invalid header name */ }
+    }
+  }
+}
+
+// Helper: build API URL handling base already ending in version prefix
 function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
   const baseUrlWithSlash = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   const versionPrefix = pathWithVersion.split('/')[0] || '';
@@ -104,6 +140,7 @@ router.post('/api/proxy/github/*', async (req, res) => {
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method, headers, body: body.body, proxyConfig });
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.github', 'GitHub proxy error', err);
@@ -175,6 +212,7 @@ router.post('/api/proxy/github-raw', async (req, res) => {
 
     // Raw content is text/plain, forward as-is (not JSON-wrapped)
     const contentType = String(result.headers['content-type'] || 'text/plain');
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).type(contentType).send(typeof result.data === 'string' ? result.data : JSON.stringify(result.data));
   } catch (err) {
     logger.errorFromError('proxy.github-raw', 'GitHub raw proxy error', err);
@@ -302,6 +340,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       allowPrivate,
     });
 
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.ai', 'AI proxy error', err);
@@ -366,6 +405,7 @@ router.post('/api/proxy/webdav', async (req, res) => {
       allowPrivate: true,
     });
 
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.webdav', 'WebDAV proxy error', err);
@@ -406,6 +446,7 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.github.search', 'GitHub search repositories proxy error', err);
@@ -446,6 +487,7 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
+    relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
   } catch (err) {
     logger.errorFromError('proxy.github.search', 'GitHub search users proxy error', err);
