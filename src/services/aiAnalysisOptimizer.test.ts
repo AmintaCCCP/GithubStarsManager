@@ -147,24 +147,42 @@ describe('AIAnalysisOptimizer 与共享限流器集成', () => {
     const fakeAi = { analyzeRepository: analyze } as unknown as AIService;
 
     // README 拉取在收到 batch 信号中止前一直挂起：验证信号确实被传到了请求 API
+    let resolveReadmeStarted = () => {};
+    const readmeStarted = new Promise<void>(resolve => {
+      resolveReadmeStarted = resolve;
+    });
+    const readmeAborted = vi.fn();
     const githubApi = {
-      getRepositoryReadme: vi.fn((_owner: string, _repo: string, signal?: AbortSignal) =>
-        new Promise<string>((_resolve, reject) => {
-          signal?.addEventListener('abort', () => reject(new Error('Aborted')));
-        })
-      ),
+      getRepositoryReadme: vi.fn((_owner: string, _repo: string, signal?: AbortSignal) => {
+        resolveReadmeStarted();
+        return new Promise<string>((_resolve, reject) => {
+          const onAbort = () => {
+            readmeAborted();
+            reject(new Error('Aborted'));
+          };
+          if (!signal) {
+            reject(new Error('Missing AbortSignal'));
+          } else if (signal.aborted) {
+            onAbort();
+          } else {
+            signal.addEventListener('abort', onAbort, { once: true });
+          }
+        });
+      }),
     } as unknown as GitHubApiService;
 
     const pending = optimizer.analyzeRepositoriesPipelined(
       [makeRepo(6), makeRepo(7)], githubApi, fakeAi, []);
 
-    // 让流水线进入 README 拉取后再中止
-    await new Promise(r => setTimeout(r, 100));
+    // 等 README 请求真正启动后再中止整个批次，避免固定延时与请求启动竞速
+    await readmeStarted;
     const start = Date.now();
     optimizer.abort();
     await pending;
 
     expect(Date.now() - start).toBeLessThan(500);
     expect(githubApi.getRepositoryReadme).toHaveBeenCalled();
+    // 断言 README 请求确实收到了中止信号，而非流水线提前返回放任其挂起
+    expect(readmeAborted).toHaveBeenCalled();
   });
 });
