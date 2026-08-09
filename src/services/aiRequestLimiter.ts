@@ -68,17 +68,25 @@ export class AIRateLimiter {
 
   /** 请求开始前调用：等待并占用一个并发槽（含冷却 / RPM / 并发上限等待）。 */
   async acquire(signal?: AbortSignal): Promise<() => void> {
-    await this.waitForSlot(signal);
-    await this.waitUntilGreen(signal);
-    this.assertNotAborted(signal);
-    this.active++;
-    if (this.config.requestsPerMinute && this.config.requestsPerMinute > 0) {
-      this.requestTimestamps.push(Date.now());
-      this.pruneTimestamps();
+    for (;;) {
+      this.assertNotAborted(signal);
+      const now = Date.now();
+      const wait = this.computeWaitMs(now);
+      const max = this.config.maxConcurrency ?? 0;
+      // 冷却 / RPM 窗口 / 并发槽全部满足时，同步完成准入：校验与占位之间
+      // 不存在 await，单线程下不会与其它并发 acquire 交错，保证原子性。
+      if (wait <= 0 && (max === 0 || this.active < max)) {
+        this.active++;
+        if ((this.config.requestsPerMinute ?? 0) > 0) {
+          this.requestTimestamps.push(now);
+          this.pruneTimestamps();
+        }
+        return () => {
+          this.active = Math.max(0, this.active - 1);
+        };
+      }
+      await this.sleep(wait > 0 ? wait : WAIT_POLL_MS, signal);
     }
-    return () => {
-      this.active = Math.max(0, this.active - 1);
-    };
   }
 
   /** 请求成功返回后调用：清零连续 429 计数。 */
@@ -105,7 +113,9 @@ export class AIRateLimiter {
       (this.config.backoffBaseMs ?? DEFAULT_CONFIG.backoffBaseMs) * 2 ** Math.min(attempt, 6)
     );
 
-    const waitMs = Math.round(Math.max(retryWait, backoff) * (0.75 + Math.random() * 0.5));
+    // 抖动只作用于本地指数退避；服务端 Retry-After 作为最短等待，绝不被缩短
+    const jitteredBackoff = Math.round(backoff * (0.75 + Math.random() * 0.5));
+    const waitMs = Math.max(retryWait, jitteredBackoff);
     // 最终等待受退避上限约束，避免单次 Retry-After 造成过长停摆
     const cappedWait = Math.min(this.config.backoffCapMs ?? DEFAULT_CONFIG.backoffCapMs, waitMs);
     this.cooldownUntil = Math.max(this.cooldownUntil, now + cappedWait);
@@ -137,24 +147,6 @@ export class AIRateLimiter {
   /** 仅统计用：当前在飞请求数 */
   get activeRequests(): number {
     return this.active;
-  }
-
-  /** 并发上限信号量：active 未达上限前轮询等待。 */
-  private async waitForSlot(signal?: AbortSignal): Promise<void> {
-    const max = this.config.maxConcurrency ?? 0;
-    while (max > 0 && this.active >= max) {
-      this.assertNotAborted(signal);
-      await this.sleep(WAIT_POLL_MS, signal);
-    }
-  }
-
-  private async waitUntilGreen(signal?: AbortSignal): Promise<void> {
-    for (;;) {
-      this.assertNotAborted(signal);
-      const waitMs = this.computeWaitMs(Date.now());
-      if (waitMs <= 0) return;
-      await this.sleep(waitMs, signal);
-    }
   }
 
   /** 需要等待的毫秒数：最大（冷却剩余，RPM 释放时刻）。 */
@@ -190,6 +182,7 @@ export class AIRateLimiter {
     }
   }
 
+  /** 可中止的轮询等待：最多等待 WAIT_POLL_MS，供准入循环按区块重判。 */
   private sleep(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const onAbort = () => {

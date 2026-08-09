@@ -41,6 +41,44 @@ describe('AIRateLimiter', () => {
     });
   });
 
+  describe('并发准入原子性（Promise.all）', () => {
+    it('maxConcurrency 下并发 acquire 不超发', async () => {
+      const limiter = new AIRateLimiter({ maxConcurrency: 2 });
+      let peak = 0;
+      let completed = 0;
+      const tasks = Array.from({ length: 6 }, async () => {
+        const release = await limiter.acquire();
+        peak = Math.max(peak, limiter.activeRequests);
+        // 立即归还槽位，让后续等待者继续；峰值由 active 记录
+        release();
+        completed++;
+      });
+
+      await Promise.all(tasks);
+      expect(completed).toBe(6);
+      // 任意时刻同时占用的槽位不得超过 maxConcurrency
+      expect(peak).toBeLessThanOrEqual(2);
+      expect(limiter.activeRequests).toBe(0);
+    });
+
+    it('requestsPerMinute 下并发 acquire 不超发', async () => {
+      const limiter = new AIRateLimiter({ requestsPerMinute: 2, rpmWindowMs: 500 });
+      let acquired = 0;
+      const pending = Array.from({ length: 4 }, async () => {
+        const release = await limiter.acquire();
+        acquired++;
+        release();
+      });
+
+      // 前两个请求已占满 RPM 窗口，其余请求必须等待出窗，而非并发穿透
+      await new Promise(r => setTimeout(r, 200));
+      expect(acquired).toBe(2);
+
+      await Promise.all(pending);
+      expect(acquired).toBe(4);
+    });
+  });
+
   describe('429 冷却与熔断', () => {
     it('连续 429 达到阈值后打开熔断', () => {
       const limiter = new AIRateLimiter({ cooldownThreshold: 3, backoffBaseMs: 1000 });
@@ -62,11 +100,11 @@ describe('AIRateLimiter', () => {
       expect(limiter.getStatus().consecutiveRateLimits).toBe(0);
     });
 
-    it('尊重 Retry-After（带抖动下不小于 75%）', () => {
+    it('尊重 Retry-After：服务端时长作为最短等待，抖动不缩短', () => {
       const limiter = new AIRateLimiter({ maxRetryAfterMs: 60000 });
       limiter.notifyRateLimit(5000);
-      // 等待 = retryAfter（5000）* (0.75~1.25) >= 3750
-      expect(limiter.getStatus().cooldownRemainingMs).toBeGreaterThanOrEqual(3750);
+      // 等待必须以完整 Retry-After（5000ms）为底，绝不低于它
+      expect(limiter.getStatus().cooldownRemainingMs).toBeGreaterThanOrEqual(4900);
       // 且受 backoffCap 约束
       limiter.notifyRateLimit(999999);
       expect(limiter.getStatus().cooldownRemainingMs).toBeLessThanOrEqual(60000);

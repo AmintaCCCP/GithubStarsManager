@@ -63,7 +63,9 @@ export class AIAnalysisOptimizer {
   private paused = false;
   private activeWorkers = 0;
   private shouldExitWorkers = false;
-  private abortController: AbortController | null = null;
+  // 批次级中止信号：所有 worker 的限流等待、AI 请求与重试延迟共用同一信号，
+  // 保证 abort() 能立即停下所有仍在阻塞的 worker（而非只停最近一次请求）。
+  private readonly batchAbortController = new AbortController();
   private readonly sharedLimiter: AIRateLimiter;
 
   constructor(config: Partial<OptimizerConfig> = {}) {
@@ -77,11 +79,11 @@ export class AIAnalysisOptimizer {
     return this.sharedLimiter;
   }
 
+  /** 中止整个批次：所有在飞请求、限流等待与重试延迟立即停止。 */
   abort(): void {
     this.aborted = true;
     this.shouldExitWorkers = true;
-    this.abortController?.abort();
-    this.abortController = null;
+    this.batchAbortController.abort();
   }
 
   pause(): void {
@@ -141,6 +143,27 @@ export class AIAnalysisOptimizer {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /** 可中止的延迟：abort() 后立即放行，调用方依靠 aborted 标记结束批次。 */
+  private abortableDelay(ms: number): Promise<void> {
+    return new Promise(resolve => {
+      const signal = this.batchAbortController.signal;
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal.addEventListener('abort', onAbort);
+    });
   }
 
   private async waitWhilePaused(): Promise<void> {
@@ -246,17 +269,14 @@ export class AIAnalysisOptimizer {
         };
       }
 
-      const controller = new AbortController();
-      this.abortController = controller;
-
       try {
         // 通过共享限流器占用一个请求槽：冷却 / RPM 窗口内会自动等待
-        const release = await this.sharedLimiter.acquire(controller.signal);
+        const release = await this.sharedLimiter.acquire(this.batchAbortController.signal);
         try {
           // 起算点放在 acquire 之后：限流排队时间不应计入 provider 响应时长，
           // 否则 429 冷却会把「并发调节」误判为 provider 变慢而持续降并发
           const analysisStart = Date.now();
-          const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, controller.signal);
+          const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, this.batchAbortController.signal);
           const analysisDuration = Date.now() - analysisStart;
           this.sharedLimiter.notifySuccess();
           this.recordResponseTime(analysisDuration);
@@ -292,11 +312,8 @@ export class AIAnalysisOptimizer {
           // 限流场景下，最短等待到全局冷却结束（含 Retry-After），避免与冷却窗口竞争
           const cooldownWait = this.sharedLimiter.getStatus().cooldownRemainingMs;
           const delayMs = Math.max(this.calculateRetryDelay(attempt), cooldownWait);
-          await this.delay(delayMs);
-        }
-      } finally {
-        if (this.abortController === controller) {
-          this.abortController = null;
+          // 可中止的等待：abort() 后立即结束等待，由下一轮循环的 aborted 检查兜底返回
+          await this.abortableDelay(delayMs);
         }
       }
     }
