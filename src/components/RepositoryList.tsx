@@ -322,6 +322,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       maxRetries: 3,
       retryDelayBaseMs: 1000,
       enableAdaptiveConcurrency: true,
+      rateLimiter: {
+        maxConcurrency: 0,
+        requestsPerMinute: activeConfig.requestsPerMinute || 0,
+      },
     });
 
     try {
@@ -675,6 +679,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             maxRetries: 3,
             retryDelayBaseMs: 1000,
             enableAdaptiveConcurrency: true,
+            rateLimiter: {
+              maxConcurrency: 0,
+              requestsPerMinute: activeConfig.requestsPerMinute || 0,
+            },
           });
 
           try {

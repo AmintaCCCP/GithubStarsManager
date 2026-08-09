@@ -300,6 +300,7 @@ export interface AIConfig {
   customPrompt?: string; // 自定义提示词
   useCustomPrompt?: boolean; // 是否使用自定义提示词
   concurrency?: number; // AI分析并发数，默认为1
+  requestsPerMinute?: number; // 每分钟 AI 请求数上限（供批量分析的共享限流器使用），0/缺省=不限制
   reasoningEffort?: AIReasoningEffort; // OpenAI GPT-5/Responses 可选 reasoning 强度
   mimoPlan?: MiMoPlan; // MiMo 渠道：api（按量付费）或 token-plan（订阅制）
   apiKeyStatus?: SecretStatus;

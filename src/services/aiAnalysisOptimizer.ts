@@ -2,6 +2,8 @@ import { Repository } from '../types';
 import { AIService } from './aiService';
 import { GitHubApiService } from './githubApi';
 import { backend } from './backendAdapter';
+import { AIRateLimiter, AIRateLimitConfig } from './aiRequestLimiter';
+import { isRateLimitedError, getRetryAfterMsFromError } from './aiService';
 
 export interface AnalysisTask {
   repo: Repository;
@@ -30,6 +32,8 @@ export interface OptimizerConfig {
   maxRetries: number;
   retryDelayBaseMs: number;
   enableAdaptiveConcurrency: boolean;
+  /** 共享 AI 请求限流配置；不传则使用默认（熔断开启，RPM/并发不限制） */
+  rateLimiter?: AIRateLimitConfig;
 }
 
 const DEFAULT_CONFIG: OptimizerConfig = {
@@ -41,6 +45,14 @@ const DEFAULT_CONFIG: OptimizerConfig = {
   maxRetries: 3,
   retryDelayBaseMs: 1000,
   enableAdaptiveConcurrency: true,
+  rateLimiter: {
+    maxConcurrency: 0,
+    requestsPerMinute: 0,
+    cooldownThreshold: 3,
+    backoffBaseMs: 1000,
+    backoffCapMs: 60000,
+    maxRetryAfterMs: 60000,
+  },
 };
 
 export class AIAnalysisOptimizer {
@@ -52,10 +64,17 @@ export class AIAnalysisOptimizer {
   private activeWorkers = 0;
   private shouldExitWorkers = false;
   private abortController: AbortController | null = null;
+  private readonly sharedLimiter: AIRateLimiter;
 
   constructor(config: Partial<OptimizerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.currentConcurrency = this.config.initialConcurrency;
+    this.sharedLimiter = new AIRateLimiter(this.config.rateLimiter);
+  }
+
+  /** 限流器实例：供外部（请求层 / 测试）复用同一份冷却与统计。 */
+  get limiter(): AIRateLimiter {
+    return this.sharedLimiter;
   }
 
   abort(): void {
@@ -231,20 +250,27 @@ export class AIAnalysisOptimizer {
       this.abortController = controller;
 
       try {
-        const analysisStart = Date.now();
-        const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, controller.signal);
-        const analysisDuration = Date.now() - analysisStart;
-
-        this.recordResponseTime(analysisDuration);
-
-        return {
-          repo: task.repo,
-          success: true,
-          summary: analysis.summary,
-          tags: analysis.tags,
-          platforms: analysis.platforms,
-          duration: Date.now() - startTime,
-        };
+        // 通过共享限流器占用一个请求槽：冷却 / RPM 窗口内会自动等待
+        const release = await this.sharedLimiter.acquire(controller.signal);
+        try {
+          // 起算点放在 acquire 之后：限流排队时间不应计入 provider 响应时长，
+          // 否则 429 冷却会把「并发调节」误判为 provider 变慢而持续降并发
+          const analysisStart = Date.now();
+          const analysis = await aiService.analyzeRepository(task.repo, task.readmeContent, categoryNames, categoryHints, controller.signal);
+          const analysisDuration = Date.now() - analysisStart;
+          this.sharedLimiter.notifySuccess();
+          this.recordResponseTime(analysisDuration);
+          return {
+            repo: task.repo,
+            success: true,
+            summary: analysis.summary,
+            tags: analysis.tags,
+            platforms: analysis.platforms,
+            duration: Date.now() - startTime,
+          };
+        } finally {
+          release();
+        }
       } catch (error) {
         lastError = error as Error;
 
@@ -257,8 +283,15 @@ export class AIAnalysisOptimizer {
           };
         }
 
+        // 429 / 限流：记入共享限流器，触发全局冷却并采纳服务端 Retry-After
+        if (isRateLimitedError(error)) {
+          this.sharedLimiter.notifyRateLimit(getRetryAfterMsFromError(error));
+        }
+
         if (attempt < this.config.maxRetries) {
-          const delayMs = this.calculateRetryDelay(attempt);
+          // 限流场景下，最短等待到全局冷却结束（含 Retry-After），避免与冷却窗口竞争
+          const cooldownWait = this.sharedLimiter.getStatus().cooldownRemainingMs;
+          const delayMs = Math.max(this.calculateRetryDelay(attempt), cooldownWait);
           await this.delay(delayMs);
         }
       } finally {

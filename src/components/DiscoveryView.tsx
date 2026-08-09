@@ -793,6 +793,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     const aiService = new AIService(activeConfig, language);
     const optimizer = new AIAnalysisOptimizer({
       initialConcurrency: activeConfig.concurrency || 3,
+      rateLimiter: {
+        maxConcurrency: 0,
+        requestsPerMinute: activeConfig.requestsPerMinute || 0,
+      },
     });
     setAnalysisOptimizer(optimizer);
 
