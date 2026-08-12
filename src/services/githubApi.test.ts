@@ -111,4 +111,27 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
 
     expect(result.latestReleases).toBeUndefined();
   });
+
+  it('skips a prerelease latest when includePreRelease is false and collects the newest stable release instead', async () => {
+    const service = new GitHubApiService('token');
+    const prerelease = makeRelease(1, '2026-01-05T00:00:00.000Z', { prerelease: true });
+    const stable = makeRelease(2, '2026-01-04T00:00:00.000Z');
+
+    // 第一页第一条是新发布（预发布），其下才是最新的正式发行
+    vi.spyOn(service, 'getRepositoryReleases' as never).mockResolvedValueOnce(
+      [prerelease, stable] as never
+    );
+
+    const repo = makeRepository(10, 'owner/repo', { has_fetched_releases: true, last_release_fetch_time: '2026-01-02T00:00:00.000Z' });
+
+    const result = await service.getMultipleRepositoryReleases(
+      [repo],
+      { includePreRelease: false, refreshExistingAssets: true }
+    );
+
+    // 最新 Release 应跳过预发布，收集到第一个正式发行
+    expect(result.latestReleases).toHaveLength(1);
+    expect(result.latestReleases![0].id).toBe(2);
+    expect(result.latestReleases![0].repository.id).toBe(10);
+  });
 });

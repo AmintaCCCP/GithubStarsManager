@@ -875,12 +875,17 @@ export class GitHubApiService {
 
               if (batch.length === 0) break;
 
-              // 开启资产刷新时，收集“每仓最新一条 Release”用于资产指纹比对。
-              // GitHub 按发布时间倒序返回，第一页第一条即最新 Release，不产生额外请求。
-              if (refreshExistingAssets && page === 1 && batch[0]) {
-                const latest = batch[0];
-                latest.repository.id = repo.id;
-                latestReleases.push(latest);
+              // 开启资产刷新时，收集“每仓最新一条、且符合预发布过滤的 Release”用于资产指纹比对。
+              // GitHub 按发布时间倒序返回，第一页内第一个匹配项即为最新可见 Release，不产生额外请求。
+              // 若直接取 batch[0] 再事后过滤，最新为预发布版时整个仓库会被跳过（见 includePreRelease 为 false 的场景）。
+              if (refreshExistingAssets && page === 1 && batch.length > 0) {
+                const latest = includePreRelease
+                  ? batch[0]
+                  : batch.find(r => !r.prerelease);
+                if (latest) {
+                  latest.repository.id = repo.id;
+                  latestReleases.push(latest);
+                }
               }
 
               const fresh = sinceTime

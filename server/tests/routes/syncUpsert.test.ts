@@ -47,11 +47,18 @@ function captureStatements() {
   return { statements, db };
 }
 
-const releaseSqlIndex = (statements: { sql: string }[]) =>
-  statements.findIndex((s) => s.sql.includes('INSERT INTO releases'));
+// 两段式语句中，保留分支用 releases.is_read，覆盖分支用 excluded.is_read
+const releasePreserveIndex = (statements: { sql: string }[]) =>
+  statements.findIndex((s) =>
+    s.sql.includes('INSERT INTO releases') && s.sql.includes('is_read = releases.is_read')
+  );
+const releaseOverwriteIndex = (statements: { sql: string }[]) =>
+  statements.findIndex((s) =>
+    s.sql.includes('INSERT INTO releases') && s.sql.includes('is_read = excluded.is_read')
+  );
 
 describe('POST /api/sync/import release upsert is_read semantics', () => {
-  it('passes NULL for is_read when snapshot does not carry it, so existing read state is preserved', async () => {
+  it('uses preserve-statement and inserts is_read=0 when snapshot does not carry it', async () => {
     const { statements } = captureStatements();
     await request(createTestApp())
       .post('/api/sync/import')
@@ -61,17 +68,20 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
       })
       .expect(200);
 
-    const idx = releaseSqlIndex(statements);
+    const idx = releasePreserveIndex(statements);
     expect(idx).toBeGreaterThan(-1);
     const releaseStmt = statements[idx];
+    // 保留分支：冲突时 is_read = releases.is_read（保留库中已读状态）
+    expect(releaseStmt.sql).toContain('is_read = releases.is_read');
+    expect(releaseStmt.sql).not.toContain('is_read = CASE WHEN');
     // is_read 位于 (id, tag_name, name, body, html_url, published_at, prerelease, draft, is_read, ...) 第 9 位
-    expect(releaseStmt.params[8]).toBeNull();
-    // UPSERT 保留分支必须存在，以保留库中已读状态
-    expect(releaseStmt.sql).toContain('is_read = CASE WHEN excluded.is_read IS NOT NULL');
-    expect(releaseStmt.sql).toContain('ELSE releases.is_read');
+    // 非显式时落 0（与 releases 表 DEFAULT 0 语义一致），避免新导入行落 NULL 导致 unread 过滤漏行
+    expect(releaseStmt.params[8]).toBe(0);
+    // 覆盖分支语句不应被命中
+    expect(releaseOverwriteIndex(statements)).toBe(-1);
   });
 
-  it('passes explicit boolean for is_read when snapshot carries it, overwriting existing state', async () => {
+  it('uses overwrite-statement and passes explicit boolean when snapshot carries is_read', async () => {
     const { statements } = captureStatements();
     await request(createTestApp())
       .post('/api/sync/import')
@@ -81,8 +91,12 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
       })
       .expect(200);
 
-    const idx = releaseSqlIndex(statements);
+    const idx = releaseOverwriteIndex(statements);
     expect(idx).toBeGreaterThan(-1);
+    // 覆盖分支：冲突时 is_read = excluded.is_read（用快照中的已读状态覆盖）
+    expect(statements[idx].sql).toContain('is_read = excluded.is_read');
     expect(statements[idx].params[8]).toBe(1);
+    // 保留分支语句不应被命中
+    expect(releasePreserveIndex(statements)).toBe(-1);
   });
 });

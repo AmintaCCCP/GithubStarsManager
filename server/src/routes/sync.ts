@@ -174,9 +174,12 @@ router.post('/api/sync/import', (req, res) => {
       }
 
       // Releases
+      // 合并 UPSERT：冲突时仅更新数据列，保留库中已有的 is_read 已读状态。
+      // 仅当快照显式携带 is_read 布尔值时才覆盖已读状态（stmtOverwriteIsRead）；
+      // 否则走保留分支，避免导入/回退把已读状态误清空。
       const rels = data.releases as Record<string, unknown>[] | undefined;
       if (Array.isArray(rels) && rels.length > 0) {
-        const relStmt = db.prepare(`
+        const relStmtPreserveIsRead = db.prepare(`
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
             prerelease, draft, is_read, assets,
@@ -190,22 +193,42 @@ router.post('/api/sync/import', (req, res) => {
             published_at = excluded.published_at,
             prerelease = excluded.prerelease,
             draft = excluded.draft,
-            is_read = CASE WHEN excluded.is_read IS NOT NULL THEN excluded.is_read ELSE releases.is_read END,
+            is_read = releases.is_read,
+            assets = excluded.assets,
+            repo_id = excluded.repo_id,
+            repo_full_name = excluded.repo_full_name,
+            repo_name = excluded.repo_name
+        `);
+        const relStmtOverwriteIsRead = db.prepare(`
+          INSERT INTO releases (
+            id, tag_name, name, body, html_url, published_at,
+            prerelease, draft, is_read, assets,
+            repo_id, repo_full_name, repo_name
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            tag_name = excluded.tag_name,
+            name = excluded.name,
+            body = excluded.body,
+            html_url = excluded.html_url,
+            published_at = excluded.published_at,
+            prerelease = excluded.prerelease,
+            draft = excluded.draft,
+            is_read = excluded.is_read,
             assets = excluded.assets,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
             repo_name = excluded.repo_name
         `);
         for (const r of rels) {
-          // 仅当快照显式携带 is_read 布尔值时才覆盖已读状态；否则传 NULL，
-          // 由 UPSERT 的 CASE WHEN excluded.is_read IS NOT NULL 走保留分支，
-          // 避免导入/回退时把库中已有的已读状态误清空。
           const hasExplicitIsRead = typeof r.is_read === 'boolean';
+          const relStmt = hasExplicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
           relStmt.run(
             r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
             r.html_url ?? null, r.published_at ?? null,
             r.prerelease ? 1 : 0, r.draft ? 1 : 0,
-            hasExplicitIsRead ? (r.is_read ? 1 : 0) : null,
+            // 保留分支下仍落 0（非空），与 releases 表 is_read DEFAULT 0 语义一致，
+            // 避免新导入行写入 NULL 导致 unread 过滤（is_read = 0）漏行。
+            hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
             r.repo_id ?? null, r.repo_full_name ?? null, r.repo_name ?? null
           );
