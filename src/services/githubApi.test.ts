@@ -134,4 +134,34 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     expect(result.latestReleases![0].id).toBe(2);
     expect(result.latestReleases![0].repository.id).toBe(10);
   });
+
+  it('continues past page one of only prereleases to collect the newest stable release', async () => {
+    const service = new GitHubApiService('token');
+    // 第一页 10 条全是预发布（且都在水印之后），第二页才出现正式版
+    const page1 = Array.from({ length: 10 }, (_, i) =>
+      makeRelease(100 + i, `2026-01-${String(20 - i).padStart(2, '0')}T00:00:00.000Z`, { prerelease: true })
+    );
+    const stable = makeRelease(50, '2026-01-05T00:00:00.000Z');
+    const older = makeRelease(40, '2025-12-01T00:00:00.000Z');
+
+    vi.spyOn(service, 'getRepositoryReleases' as never)
+      .mockResolvedValueOnce(page1 as never)
+      .mockResolvedValueOnce([stable, older] as never);
+
+    const repo = makeRepository(10, 'owner/repo', {
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-01-02T00:00:00.000Z',
+    });
+
+    const result = await service.getMultipleRepositoryReleases(
+      [repo],
+      { includePreRelease: false, refreshExistingAssets: true }
+    );
+
+    expect(result.latestReleases).toHaveLength(1);
+    expect(result.latestReleases![0].id).toBe(50);
+    expect(result.latestReleases![0].repository.id).toBe(10);
+    // 正式版在水印之后，应进入新列表；预发布被 includePreRelease=false 过滤
+    expect(result.releases.map(r => r.id)).toEqual([50]);
+  });
 });
