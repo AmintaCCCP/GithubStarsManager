@@ -120,14 +120,14 @@ router.post('/api/sync/import', (req, res) => {
         const repoId = r.repo_id ?? repository?.id;
         const repoFullName = r.repo_full_name ?? repository?.full_name;
         const repoName = r.repo_name ?? repository?.name;
-        if (typeof id !== 'number' || !Number.isFinite(id) || id <= 0) {
+        if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
           res.status(400).json({
             error: 'Each release must have a valid positive integer id',
             code: 'RELEASE_ID_REQUIRED',
           });
           return;
         }
-        if (typeof repoId !== 'number' || !Number.isFinite(repoId) || repoId <= 0) {
+        if (typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0) {
           res.status(400).json({
             error: 'Each release must have a valid positive integer repo_id',
             code: 'RELEASE_REPO_ID_REQUIRED',
@@ -224,8 +224,9 @@ router.post('/api/sync/import', (req, res) => {
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
             prerelease, draft, is_read, assets,
-            repo_id, repo_full_name, repo_name
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            repo_id, repo_full_name, repo_name,
+            zipball_url, tarball_url
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             tag_name = excluded.tag_name,
             name = excluded.name,
@@ -238,14 +239,17 @@ router.post('/api/sync/import', (req, res) => {
             assets = excluded.assets,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
-            repo_name = excluded.repo_name
+            repo_name = excluded.repo_name,
+            zipball_url = excluded.zipball_url,
+            tarball_url = excluded.tarball_url
         `);
         const relStmtOverwriteIsRead = db.prepare(`
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
             prerelease, draft, is_read, assets,
-            repo_id, repo_full_name, repo_name
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            repo_id, repo_full_name, repo_name,
+            zipball_url, tarball_url
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             tag_name = excluded.tag_name,
             name = excluded.name,
@@ -258,7 +262,9 @@ router.post('/api/sync/import', (req, res) => {
             assets = excluded.assets,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
-            repo_name = excluded.repo_name
+            repo_name = excluded.repo_name,
+            zipball_url = excluded.zipball_url,
+            tarball_url = excluded.tarball_url
         `);
         for (const r of rels) {
           const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
@@ -274,7 +280,9 @@ router.post('/api/sync/import', (req, res) => {
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
             r.repo_id ?? repository?.id ?? null,
             r.repo_full_name ?? repository?.full_name ?? null,
-            r.repo_name ?? repository?.name ?? null
+            r.repo_name ?? repository?.name ?? null,
+            r.zipball_url ?? null,
+            r.tarball_url ?? null
           );
         }
         counts.releases = rels.length;

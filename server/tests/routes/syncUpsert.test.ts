@@ -145,4 +145,60 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     expect(statements[idx].params[11]).toBe('owner/other');
     expect(statements[idx].params[12]).toBe('other');
   });
+
+  it('rejects decimal release id with 400 (must be integer)', async () => {
+    captureStatements();
+    const res = await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({ id: 1.5 })],
+      })
+      .expect(400);
+
+    expect(res.body.code).toBe('RELEASE_ID_REQUIRED');
+  });
+
+  it('persists zipball_url and tarball_url on import UPSERT', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({
+          zipball_url: 'https://example.com/zip',
+          tarball_url: 'https://example.com/tar',
+        })],
+      })
+      .expect(200);
+
+    const idx = releasePreserveIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].sql).toContain('zipball_url = excluded.zipball_url');
+    expect(statements[idx].sql).toContain('tarball_url = excluded.tarball_url');
+    // zipball/tarball 位于 repo_name(12) 之后
+    expect(statements[idx].params[13]).toBe('https://example.com/zip');
+    expect(statements[idx].params[14]).toBe('https://example.com/tar');
+  });
+
+  it('persists archive URLs on overwrite path as well', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({
+          is_read: false,
+          zipball_url: 'https://example.com/z2',
+          tarball_url: 'https://example.com/t2',
+        })],
+      })
+      .expect(200);
+
+    const idx = releaseOverwriteIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].sql).toContain('zipball_url = excluded.zipball_url');
+    expect(statements[idx].params[13]).toBe('https://example.com/z2');
+    expect(statements[idx].params[14]).toBe('https://example.com/t2');
+  });
 });
