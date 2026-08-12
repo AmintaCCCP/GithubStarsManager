@@ -164,7 +164,12 @@ jobs:
     - name: Install system dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt-get update
+        # Microsoft apt sources on GitHub runners occasionally return 403 and break
+        # apt-get update for unrelated electron deps. Disable them before update.
+        sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+          /etc/apt/sources.list.d/microsoft-prod.list \
+          /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
+        sudo apt-get update -o Acquire::Retries=3
         sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
         
     - name: Install Electron dependencies
@@ -410,8 +415,11 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
-        # Install xvfb for headless testing
-        sudo apt-get update
+        # Install xvfb for headless testing (same MS apt 403 guard as above)
+        sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+          /etc/apt/sources.list.d/microsoft-prod.list \
+          /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
+        sudo apt-get update -o Acquire::Retries=3
         sudo apt-get install -y xvfb
         
         # Test if the app can start (will exit quickly but should not crash)

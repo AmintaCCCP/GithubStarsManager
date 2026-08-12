@@ -390,6 +390,8 @@ interface AppActions {
   // Release actions
   setReleases: (releases: Release[]) => void;
   addReleases: (releases: Release[]) => void;
+  /** 按 id 合并更新已存在 Release 的资产/元数据，保留 is_read 等已读状态 */
+  upsertReleases: (releases: Release[]) => void;
   toggleReleaseSubscription: (repoId: number) => void;
   batchUnsubscribeReleases: (repoIds: number[]) => void;
   removeReleasesByRepoId: (repoId: number) => void;
@@ -1684,6 +1686,19 @@ export const useAppStore = create<AppState & AppActions>()(
         const existingIds = new Set(state.releases.map(r => r.id));
         const uniqueReleases = newReleases.filter(r => !existingIds.has(r.id));
         return { releases: [...state.releases, ...uniqueReleases] };
+      }),
+      upsertReleases: (updates) => set((state) => {
+        const byId = new Map(updates.map(r => [r.id, r]));
+        const merged = state.releases.map(r => {
+          const update = byId.get(r.id);
+          if (!update) return r;
+          // 保留已读状态，仅覆盖资产与元数据字段
+          return {
+            ...update,
+            is_read: r.is_read,
+          };
+        });
+        return { releases: merged };
       }),
       toggleReleaseSubscription: (repoId) => set((state) => {
         const newSubscriptions = new Set(state.releaseSubscriptions);

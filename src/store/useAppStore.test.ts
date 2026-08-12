@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EmbeddingConfig, Repository, VectorSearchConfig, defaultReleaseSourceSettings } from '../types';
+import { EmbeddingConfig, Release, Repository, VectorSearchConfig, defaultReleaseSourceSettings } from '../types';
 import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
@@ -65,6 +65,67 @@ describe('useAppStore release source settings', () => {
     useAppStore.getState().removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, 'OWNER/repo');
 
     expect(useAppStore.getState().releaseSourceSettings.customReleaseRepos).toHaveLength(0);
+  });
+});
+
+describe('useAppStore release add/upsert actions', () => {
+  const makeRelease = (id: number, overrides: Partial<Release> = {}): Release => ({
+    id,
+    tag_name: `v${id}`,
+    name: `Release ${id}`,
+    body: null,
+    published_at: '2026-01-01T00:00:00.000Z',
+    html_url: `https://github.com/owner/repo/releases/tag/v${id}`,
+    assets: [
+      {
+        id: 100 + id,
+        name: 'app.dmg',
+        size: 1000,
+        download_count: 0,
+        browser_download_url: 'https://example.com/app.dmg',
+        content_type: 'application/octet-stream',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    useAppStore.setState({
+      releaseSourceSettings: defaultReleaseSourceSettings,
+      releaseSubscriptions: new Set<number>(),
+      releases: [],
+      readReleases: new Set<number>(),
+    });
+  });
+
+  it('addReleases only appends new ids', () => {
+    useAppStore.getState().addReleases([makeRelease(1), makeRelease(2)]);
+    useAppStore.getState().addReleases([makeRelease(2), makeRelease(3)]);
+    expect(useAppStore.getState().releases.map(r => r.id)).toEqual([1, 2, 3]);
+  });
+
+  it('upsertReleases updates assets/metadata but preserves is_read', () => {
+    useAppStore.getState().addReleases([makeRelease(1, { is_read: true })]);
+
+    const updated = makeRelease(1, {
+      name: 'Updated name',
+      assets: [{ ...makeRelease(1).assets[0], size: 9999 }],
+    });
+    useAppStore.getState().upsertReleases([updated]);
+
+    const result = useAppStore.getState().releases[0];
+    expect(result.name).toBe('Updated name');
+    expect(result.assets[0].size).toBe(9999);
+    expect(result.is_read).toBe(true);
+  });
+
+  it('upsertReleases ignores ids not present in store', () => {
+    useAppStore.getState().addReleases([makeRelease(1)]);
+    useAppStore.getState().upsertReleases([makeRelease(99)]);
+    expect(useAppStore.getState().releases.map(r => r.id)).toEqual([1]);
   });
 });
 

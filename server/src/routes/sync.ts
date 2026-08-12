@@ -110,6 +110,47 @@ router.post('/api/sync/import', (req, res) => {
       return;
     }
 
+    // 导入前校验 releases：id / repo_id / repo_full_name / repo_name 均非空，
+    // 避免 NOT NULL 列绑 null 导致整笔事务 500。
+    const importRels = data.releases as Record<string, unknown>[] | undefined;
+    if (Array.isArray(importRels)) {
+      for (const r of importRels) {
+        const repository = r.repository as { id?: unknown; full_name?: unknown; name?: unknown } | undefined;
+        const id = r.id;
+        const repoId = r.repo_id ?? repository?.id;
+        const repoFullName = r.repo_full_name ?? repository?.full_name;
+        const repoName = r.repo_name ?? repository?.name;
+        if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
+          res.status(400).json({
+            error: 'Each release must have a valid positive integer id',
+            code: 'RELEASE_ID_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0) {
+          res.status(400).json({
+            error: 'Each release must have a valid positive integer repo_id',
+            code: 'RELEASE_REPO_ID_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoFullName !== 'string' || !repoFullName.trim()) {
+          res.status(400).json({
+            error: 'Each release must have a non-empty repo_full_name',
+            code: 'RELEASE_REPO_FULL_NAME_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoName !== 'string' || !repoName.trim()) {
+          res.status(400).json({
+            error: 'Each release must have a non-empty repo_name',
+            code: 'RELEASE_REPO_NAME_REQUIRED',
+          });
+          return;
+        }
+      }
+    }
+
     const importAll = db.transaction(() => {
       // Repositories
       const repos = data.repositories as Record<string, unknown>[] | undefined;
@@ -174,22 +215,74 @@ router.post('/api/sync/import', (req, res) => {
       }
 
       // Releases
+      // 合并 UPSERT：冲突时仅更新数据列，保留库中已有的 is_read 已读状态。
+      // 仅当快照显式携带 is_read 布尔值时才覆盖已读状态（stmtOverwriteIsRead）；
+      // 否则走保留分支，避免导入/回退把已读状态误清空。
       const rels = data.releases as Record<string, unknown>[] | undefined;
       if (Array.isArray(rels) && rels.length > 0) {
-        const relStmt = db.prepare(`
-          INSERT OR REPLACE INTO releases (
+        const relStmtPreserveIsRead = db.prepare(`
+          INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
             prerelease, draft, is_read, assets,
-            repo_id, repo_full_name, repo_name
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            repo_id, repo_full_name, repo_name,
+            zipball_url, tarball_url
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            tag_name = excluded.tag_name,
+            name = excluded.name,
+            body = excluded.body,
+            html_url = excluded.html_url,
+            published_at = excluded.published_at,
+            prerelease = excluded.prerelease,
+            draft = excluded.draft,
+            is_read = releases.is_read,
+            assets = excluded.assets,
+            repo_id = excluded.repo_id,
+            repo_full_name = excluded.repo_full_name,
+            repo_name = excluded.repo_name,
+            zipball_url = excluded.zipball_url,
+            tarball_url = excluded.tarball_url
+        `);
+        const relStmtOverwriteIsRead = db.prepare(`
+          INSERT INTO releases (
+            id, tag_name, name, body, html_url, published_at,
+            prerelease, draft, is_read, assets,
+            repo_id, repo_full_name, repo_name,
+            zipball_url, tarball_url
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            tag_name = excluded.tag_name,
+            name = excluded.name,
+            body = excluded.body,
+            html_url = excluded.html_url,
+            published_at = excluded.published_at,
+            prerelease = excluded.prerelease,
+            draft = excluded.draft,
+            is_read = excluded.is_read,
+            assets = excluded.assets,
+            repo_id = excluded.repo_id,
+            repo_full_name = excluded.repo_full_name,
+            repo_name = excluded.repo_name,
+            zipball_url = excluded.zipball_url,
+            tarball_url = excluded.tarball_url
         `);
         for (const r of rels) {
+          const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
+          const hasExplicitIsRead = typeof r.is_read === 'boolean';
+          const relStmt = hasExplicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
           relStmt.run(
             r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
             r.html_url ?? null, r.published_at ?? null,
-            r.prerelease ? 1 : 0, r.draft ? 1 : 0, r.is_read ? 1 : 0,
+            r.prerelease ? 1 : 0, r.draft ? 1 : 0,
+            // 保留分支下仍落 0（非空），与 releases 表 is_read DEFAULT 0 语义一致，
+            // 避免新导入行写入 NULL 导致 unread 过滤（is_read = 0）漏行。
+            hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
-            r.repo_id ?? null, r.repo_full_name ?? null, r.repo_name ?? null
+            r.repo_id ?? repository?.id ?? null,
+            r.repo_full_name ?? repository?.full_name ?? null,
+            r.repo_name ?? repository?.name ?? null,
+            r.zipball_url ?? null,
+            r.tarball_url ?? null
           );
         }
         counts.releases = rels.length;

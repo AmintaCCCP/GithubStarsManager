@@ -94,19 +94,61 @@ router.put('/api/releases', (req, res) => {
       }
     }
 
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO releases (
+    const stmtPreserveIsRead = db.prepare(`
+      INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
         zipball_url, tarball_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        tag_name = excluded.tag_name,
+        name = excluded.name,
+        body = excluded.body,
+        html_url = excluded.html_url,
+        published_at = excluded.published_at,
+        prerelease = excluded.prerelease,
+        draft = excluded.draft,
+        is_read = releases.is_read,
+        assets = excluded.assets,
+        repo_id = excluded.repo_id,
+        repo_full_name = excluded.repo_full_name,
+        repo_name = excluded.repo_name,
+        zipball_url = excluded.zipball_url,
+        tarball_url = excluded.tarball_url
+    `);
+    const stmtOverwriteIsRead = db.prepare(`
+      INSERT INTO releases (
+        id, tag_name, name, body, html_url, published_at,
+        prerelease, draft, is_read, assets,
+        repo_id, repo_full_name, repo_name,
+        zipball_url, tarball_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        tag_name = excluded.tag_name,
+        name = excluded.name,
+        body = excluded.body,
+        html_url = excluded.html_url,
+        published_at = excluded.published_at,
+        prerelease = excluded.prerelease,
+        draft = excluded.draft,
+        is_read = excluded.is_read,
+        assets = excluded.assets,
+        repo_id = excluded.repo_id,
+        repo_full_name = excluded.repo_full_name,
+        repo_name = excluded.repo_name,
+        zipball_url = excluded.zipball_url,
+        tarball_url = excluded.tarball_url
     `);
 
     const upsert = db.transaction(() => {
       let count = 0;
       for (const release of releases) {
         const repository = release.repository as { id?: number; full_name?: string; name?: string } | undefined;
+        // 合并 UPSERT：仅更新数据列，保留库中已有的 is_read 已读状态，避免整行替换把已读清空。
+        // 仅当请求显式携带 is_read（如导入/同步完整快照）时才覆盖已读状态。
+        const hasExplicitIsRead = typeof release.is_read === 'boolean';
+        const stmt = hasExplicitIsRead ? stmtOverwriteIsRead : stmtPreserveIsRead;
         stmt.run(
           release.id,
           release.tag_name ?? null,
@@ -116,7 +158,7 @@ router.put('/api/releases', (req, res) => {
           release.published_at ?? null,
           release.prerelease ? 1 : 0,
           release.draft ? 1 : 0,
-          release.is_read ? 1 : 0,
+          hasExplicitIsRead ? (release.is_read ? 1 : 0) : 0,
           JSON.stringify(release.assets ?? []),
           repository?.id ?? release.repo_id ?? null,
           repository?.full_name ?? release.repo_full_name ?? null,
