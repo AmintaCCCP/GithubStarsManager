@@ -2,12 +2,14 @@ import type { ReleaseAsset } from '../types';
 
 /**
  * 计算单个资产的指纹。
- * 资产指纹用于判断某条 Release 的资产是否发生变化。
- * 依据：GitHub 资产一旦被替换/重传，`updated_at` 会更新；用 `size` 与 `download_count`
- * 做兜底，覆盖同时间戳内出现大小或下载量变化的极端情况。
+ * 资产指纹用于判断某条 Release 的资产内容是否发生变化。
+ * 依据：GitHub 资产一旦被替换/重传，`updated_at` 会更新；用 `size` 做兜底，
+ * 覆盖同时间戳内出现大小变化的极端情况。
+ * 注意：`download_count` 是易变元数据（每次下载都会 +1），若纳入指纹会导致
+ * 指纹在两次刷新间必然变化，从而让增量刷新的“无变化则短路”失效，故不纳入。
  */
 export function assetFingerprint(asset: ReleaseAsset): string {
-  return [asset.id, asset.updated_at, asset.size, asset.download_count].join(':');
+  return [asset.id, asset.updated_at, asset.size].join(':');
 }
 
 /**

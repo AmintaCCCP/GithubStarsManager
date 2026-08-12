@@ -19,9 +19,9 @@ const makeAsset = (overrides: Partial<ReleaseAsset> = {}): ReleaseAsset => ({
 });
 
 describe('assetFingerprint', () => {
-  it('serializes id, updated_at, size and download_count', () => {
+  it('serializes id, updated_at and size', () => {
     const asset = makeAsset();
-    expect(assetFingerprint(asset)).toBe('1:2026-01-01T00:00:00.000Z:1000:5');
+    expect(assetFingerprint(asset)).toBe('1:2026-01-01T00:00:00.000Z:1000');
   });
 
   it('differs when updated_at changes', () => {
@@ -36,10 +36,10 @@ describe('assetFingerprint', () => {
     expect(assetFingerprint(a)).not.toBe(assetFingerprint(b));
   });
 
-  it('differs when download_count changes', () => {
+  it('does not differ when only download_count changes (volatile metadata)', () => {
     const a = makeAsset({ id: 1, download_count: 5 });
-    const b = makeAsset({ id: 1, download_count: 6 });
-    expect(assetFingerprint(a)).not.toBe(assetFingerprint(b));
+    const b = makeAsset({ id: 1, download_count: 999 });
+    expect(assetFingerprint(a)).toBe(assetFingerprint(b));
   });
 });
 
@@ -81,5 +81,12 @@ describe('hasAssetsChanged', () => {
     const one = [makeAsset({ id: 1 })];
     const two = [makeAsset({ id: 1 }), makeAsset({ id: 2 })];
     expect(hasAssetsChanged(one, two)).toBe(true);
+  });
+
+  it('returns false when only download_count changed across refreshes', () => {
+    // download_count 在每次下载时会 +1；若纳入指纹会导致刷新必然“资产已更新”的噪声。
+    const before = [makeAsset({ id: 1, download_count: 0 })];
+    const after = [makeAsset({ id: 1, download_count: 12345 })];
+    expect(hasAssetsChanged(before, after)).toBe(false);
   });
 });
