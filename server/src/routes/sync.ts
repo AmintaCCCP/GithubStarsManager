@@ -110,6 +110,47 @@ router.post('/api/sync/import', (req, res) => {
       return;
     }
 
+    // 导入前校验 releases：id / repo_id / repo_full_name / repo_name 均非空，
+    // 避免 NOT NULL 列绑 null 导致整笔事务 500。
+    const importRels = data.releases as Record<string, unknown>[] | undefined;
+    if (Array.isArray(importRels)) {
+      for (const r of importRels) {
+        const repository = r.repository as { id?: unknown; full_name?: unknown; name?: unknown } | undefined;
+        const id = r.id;
+        const repoId = r.repo_id ?? repository?.id;
+        const repoFullName = r.repo_full_name ?? repository?.full_name;
+        const repoName = r.repo_name ?? repository?.name;
+        if (typeof id !== 'number' || !Number.isFinite(id) || id <= 0) {
+          res.status(400).json({
+            error: 'Each release must have a valid positive integer id',
+            code: 'RELEASE_ID_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoId !== 'number' || !Number.isFinite(repoId) || repoId <= 0) {
+          res.status(400).json({
+            error: 'Each release must have a valid positive integer repo_id',
+            code: 'RELEASE_REPO_ID_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoFullName !== 'string' || !repoFullName.trim()) {
+          res.status(400).json({
+            error: 'Each release must have a non-empty repo_full_name',
+            code: 'RELEASE_REPO_FULL_NAME_REQUIRED',
+          });
+          return;
+        }
+        if (typeof repoName !== 'string' || !repoName.trim()) {
+          res.status(400).json({
+            error: 'Each release must have a non-empty repo_name',
+            code: 'RELEASE_REPO_NAME_REQUIRED',
+          });
+          return;
+        }
+      }
+    }
+
     const importAll = db.transaction(() => {
       // Repositories
       const repos = data.repositories as Record<string, unknown>[] | undefined;
@@ -220,6 +261,7 @@ router.post('/api/sync/import', (req, res) => {
             repo_name = excluded.repo_name
         `);
         for (const r of rels) {
+          const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
           const hasExplicitIsRead = typeof r.is_read === 'boolean';
           const relStmt = hasExplicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
           relStmt.run(
@@ -230,7 +272,9 @@ router.post('/api/sync/import', (req, res) => {
             // 避免新导入行写入 NULL 导致 unread 过滤（is_read = 0）漏行。
             hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
-            r.repo_id ?? null, r.repo_full_name ?? null, r.repo_name ?? null
+            r.repo_id ?? repository?.id ?? null,
+            r.repo_full_name ?? repository?.full_name ?? null,
+            r.repo_name ?? repository?.name ?? null
           );
         }
         counts.releases = rels.length;

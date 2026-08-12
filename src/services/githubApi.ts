@@ -870,21 +870,23 @@ export class GitHubApiService {
 
             let page = 1;
             releases = [];
+            // 资产刷新：收集“每仓最新一条、且符合预发布过滤的 Release”。
+            // 当 includePreRelease=false 且前几页全是预发布时，需继续翻页找最新正式版，
+            // 不能只看 page=1 就停（否则正式版资产变化会被漏掉）。
+            let collectedLatest = false;
             while (true) {
               const batch = await this.getRepositoryReleases(owner, name, page, 10);
 
               if (batch.length === 0) break;
 
-              // 开启资产刷新时，收集“每仓最新一条、且符合预发布过滤的 Release”用于资产指纹比对。
-              // GitHub 按发布时间倒序返回，第一页内第一个匹配项即为最新可见 Release，不产生额外请求。
-              // 若直接取 batch[0] 再事后过滤，最新为预发布版时整个仓库会被跳过（见 includePreRelease 为 false 的场景）。
-              if (refreshExistingAssets && page === 1 && batch.length > 0) {
+              if (refreshExistingAssets && !collectedLatest && batch.length > 0) {
                 const latest = includePreRelease
                   ? batch[0]
                   : batch.find(r => !r.prerelease);
                 if (latest) {
                   latest.repository.id = repo.id;
                   latestReleases.push(latest);
+                  collectedLatest = true;
                 }
               }
 
@@ -893,6 +895,14 @@ export class GitHubApiService {
                 : batch;
 
               releases.push(...fresh);
+
+              // 未收集到符合过滤条件的最新 Release 时，即使已触达水印也继续翻页，
+              // 直到找到候选或耗尽分页（避免前 10 条全是预发布时漏掉正式版）。
+              const needMoreForLatest = refreshExistingAssets && !collectedLatest && batch.length >= 10;
+              if (needMoreForLatest) {
+                page++;
+                continue;
+              }
 
               // Stop if we hit the watermark or ran out of data
               if (

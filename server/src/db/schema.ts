@@ -55,7 +55,9 @@ export function initializeSchema(db: Database.Database): void {
       repo_name TEXT NOT NULL,
       prerelease INTEGER DEFAULT 0,
       draft INTEGER DEFAULT 0,
-      is_read INTEGER DEFAULT 0
+      is_read INTEGER DEFAULT 0,
+      zipball_url TEXT,
+      tarball_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS categories (

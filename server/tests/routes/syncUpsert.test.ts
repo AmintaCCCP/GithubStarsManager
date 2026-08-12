@@ -57,6 +57,16 @@ const releaseOverwriteIndex = (statements: { sql: string }[]) =>
     s.sql.includes('INSERT INTO releases') && s.sql.includes('is_read = excluded.is_read')
   );
 
+const validRelease = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  tag_name: 'v1',
+  assets: [],
+  repo_id: 10,
+  repo_full_name: 'owner/repo',
+  repo_name: 'repo',
+  ...overrides,
+});
+
 describe('POST /api/sync/import release upsert is_read semantics', () => {
   it('uses preserve-statement and inserts is_read=0 when snapshot does not carry it', async () => {
     const { statements } = captureStatements();
@@ -64,7 +74,7 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
       .post('/api/sync/import')
       .send({
         repositories: [],
-        releases: [{ id: 1, tag_name: 'v1', assets: [] }],
+        releases: [validRelease()],
       })
       .expect(200);
 
@@ -87,7 +97,7 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
       .post('/api/sync/import')
       .send({
         repositories: [],
-        releases: [{ id: 1, tag_name: 'v1', is_read: true, assets: [] }],
+        releases: [validRelease({ is_read: true })],
       })
       .expect(200);
 
@@ -98,5 +108,41 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     expect(statements[idx].params[8]).toBe(1);
     // 保留分支语句不应被命中
     expect(releasePreserveIndex(statements)).toBe(-1);
+  });
+
+  it('rejects release snapshot missing required repository fields with 400', async () => {
+    captureStatements();
+    const res = await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [{ id: 1, tag_name: 'v1', assets: [] }],
+      })
+      .expect(400);
+
+    expect(res.body.code).toBe('RELEASE_REPO_ID_REQUIRED');
+  });
+
+  it('accepts repository nested object for required repo fields', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [{
+          id: 2,
+          tag_name: 'v2',
+          assets: [],
+          repository: { id: 20, full_name: 'owner/other', name: 'other' },
+        }],
+      })
+      .expect(200);
+
+    const idx = releasePreserveIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    // repo_id / full_name / name 位于 is_read(8)、assets(9) 之后
+    expect(statements[idx].params[10]).toBe(20);
+    expect(statements[idx].params[11]).toBe('owner/other');
+    expect(statements[idx].params[12]).toBe('other');
   });
 });
