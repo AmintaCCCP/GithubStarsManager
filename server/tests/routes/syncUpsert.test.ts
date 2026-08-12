@@ -198,6 +198,9 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     const idx = releaseOverwriteIndex(statements);
     expect(idx).toBeGreaterThan(-1);
     expect(statements[idx].sql).toContain('zipball_url = excluded.zipball_url');
+    expect(statements[idx].sql).toContain('tarball_url = excluded.tarball_url');
+    // is_read: false → 覆盖分支绑定 0
+    expect(statements[idx].params[8]).toBe(0);
     expect(statements[idx].params[13]).toBe('https://example.com/z2');
     expect(statements[idx].params[14]).toBe('https://example.com/t2');
   });
