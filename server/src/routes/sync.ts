@@ -177,11 +177,24 @@ router.post('/api/sync/import', (req, res) => {
       const rels = data.releases as Record<string, unknown>[] | undefined;
       if (Array.isArray(rels) && rels.length > 0) {
         const relStmt = db.prepare(`
-          INSERT OR REPLACE INTO releases (
+          INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
             prerelease, draft, is_read, assets,
             repo_id, repo_full_name, repo_name
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            tag_name = excluded.tag_name,
+            name = excluded.name,
+            body = excluded.body,
+            html_url = excluded.html_url,
+            published_at = excluded.published_at,
+            prerelease = excluded.prerelease,
+            draft = excluded.draft,
+            is_read = CASE WHEN excluded.is_read IS NOT NULL THEN excluded.is_read ELSE releases.is_read END,
+            assets = excluded.assets,
+            repo_id = excluded.repo_id,
+            repo_full_name = excluded.repo_full_name,
+            repo_name = excluded.repo_name
         `);
         for (const r of rels) {
           relStmt.run(
