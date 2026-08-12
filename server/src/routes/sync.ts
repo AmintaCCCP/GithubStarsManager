@@ -197,10 +197,15 @@ router.post('/api/sync/import', (req, res) => {
             repo_name = excluded.repo_name
         `);
         for (const r of rels) {
+          // 仅当快照显式携带 is_read 布尔值时才覆盖已读状态；否则传 NULL，
+          // 由 UPSERT 的 CASE WHEN excluded.is_read IS NOT NULL 走保留分支，
+          // 避免导入/回退时把库中已有的已读状态误清空。
+          const hasExplicitIsRead = typeof r.is_read === 'boolean';
           relStmt.run(
             r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
             r.html_url ?? null, r.published_at ?? null,
-            r.prerelease ? 1 : 0, r.draft ? 1 : 0, r.is_read ? 1 : 0,
+            r.prerelease ? 1 : 0, r.draft ? 1 : 0,
+            hasExplicitIsRead ? (r.is_read ? 1 : 0) : null,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
             r.repo_id ?? null, r.repo_full_name ?? null, r.repo_name ?? null
           );
