@@ -90,10 +90,22 @@ export interface GistUpdateInput {
 
 export interface ReleaseFetchOptions {
   includePreRelease?: boolean;
+  /**
+   * 开启后，对已同步仓库额外检测“每仓最新一条 Release”的资产指纹是否变化，
+   * 并把“资产已变化但 id 已存在”的条目放入 updatedReleases，供调用方按 id 合并更新。
+   * 不产生额外网络请求：最新一条 Release 由增量分支第一页（per_page=10）即可获得。
+   */
+  refreshExistingAssets?: boolean;
 }
 
 export interface MultipleReleasesResult {
+  /** 新增（本地不存在的 id）的 Release */
   releases: Release[];
+  /**
+   * 已同步仓库“最新一条”Release（仅当 refreshExistingAssets 开启时收集）。
+   * 用于调用方与本地存储做资产指纹比对，指纹变化则合并更新资产，保留 is_read。
+   */
+  latestReleases?: Release[];
   failedRepos: { repoId: number; full_name: string; error: string }[];
 }
 
@@ -827,8 +839,9 @@ export class GitHubApiService {
     options: ReleaseFetchOptions = {}
   ): Promise<MultipleReleasesResult> {
     const startTime = Date.now();
-    const { includePreRelease = true } = options;
+    const { includePreRelease = true, refreshExistingAssets = false } = options;
     const allReleases: Release[] = [];
+    const latestReleases: Release[] = [];
     const failedRepos: { repoId: number; full_name: string; error: string }[] = [];
 
     // Controlled concurrency: process 3 repos at a time
@@ -862,6 +875,14 @@ export class GitHubApiService {
 
               if (batch.length === 0) break;
 
+              // 开启资产刷新时，收集“每仓最新一条 Release”用于资产指纹比对。
+              // GitHub 按发布时间倒序返回，第一页第一条即最新 Release，不产生额外请求。
+              if (refreshExistingAssets && page === 1 && batch[0]) {
+                const latest = batch[0];
+                latest.repository.id = repo.id;
+                latestReleases.push(latest);
+              }
+
               const fresh = sinceTime
                 ? batch.filter(r => new Date(r.published_at) > sinceTime)
                 : batch;
@@ -891,7 +912,6 @@ export class GitHubApiService {
           }
 
           allReleases.push(...releases);
-
         } catch (error) {
           failedRepos.push({
             repoId: repo.id,
@@ -912,8 +932,14 @@ export class GitHubApiService {
       new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
     );
 
-    logger.info('githubApi', 'Update releases completed', { repoCount: repositories.length, releaseCount: sortedReleases.length, durationMs: Date.now() - startTime });
+    logger.info('githubApi', 'Update releases completed', { repoCount: repositories.length, releaseCount: sortedReleases.length, latestReleaseCount: latestReleases.length, durationMs: Date.now() - startTime });
 
+    if (refreshExistingAssets) {
+      const latest = includePreRelease
+        ? latestReleases
+        : latestReleases.filter(r => !r.prerelease);
+      return { releases: sortedReleases, latestReleases: latest, failedRepos };
+    }
     return { releases: sortedReleases, failedRepos };
   }
 

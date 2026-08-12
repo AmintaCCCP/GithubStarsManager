@@ -22,6 +22,7 @@ import {
   releaseBelongsToResolvedSources,
   resolveReleaseSources,
 } from '../utils/releaseSources';
+import { assetsFingerprint } from '../utils/releaseAssets';
 
 export const ReleaseTimeline: React.FC = () => {
   const {
@@ -34,6 +35,7 @@ export const ReleaseTimeline: React.FC = () => {
     language,
     assetFilters,
     addReleases,
+    upsertReleases,
     markReleaseAsRead,
     markAllReleasesAsRead,
     batchUnsubscribeReleases,
@@ -400,9 +402,9 @@ export const ReleaseTimeline: React.FC = () => {
     try {
       const githubApi = new GitHubApiService(githubToken);
 
-      const { releases: newReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
+      const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
-        { includePreRelease }
+        { includePreRelease, refreshExistingAssets: true }
       );
 
       // Update repository sync metadata only for repos that succeeded
@@ -446,21 +448,39 @@ export const ReleaseTimeline: React.FC = () => {
         addReleases(actuallyNewReleases);
       }
 
+      // 只比每仓最新 1 条资产指纹：对已存在的最新 Release，若资产发生变化则按 id 合并更新，
+      // 保留已读状态（is_read 由 upsertReleases 合并逻辑保证）。
+      const currentReleases = useAppStore.getState().releases;
+      const updatedReleases = (latestReleases || []).filter(latest => {
+        const local = currentReleases.find(r => r.id === latest.id);
+        // 本地不存在（即为新增，已在上方 addReleases 处理）或资产未变化时跳过
+        if (!local) return false;
+        return assetsFingerprint(local.assets) !== assetsFingerprint(latest.assets);
+      });
+      const updatedCount = updatedReleases.length;
+
+      if (updatedReleases.length > 0) {
+        upsertReleases(updatedReleases);
+      }
+
       setLastRefreshTime(now);
 
       // Build success message with failed repos info
       let message: string;
+      const updatedPart = updatedCount > 0
+        ? (language === 'zh' ? `，${updatedCount} 个Release资产已更新` : `, ${updatedCount} release assets updated`)
+        : '';
       if (failedRepos.length > 0) {
         message = language === 'zh'
-          ? `刷新完成！发现 ${actuallyNewCount} 个新Release，${failedRepos.length} 个仓库刷新失败。`
-          : `Refresh completed! Found ${actuallyNewCount} new releases, ${failedRepos.length} repos failed.`;
+          ? `刷新完成！发现 ${actuallyNewCount} 个新Release${updatedPart}，${failedRepos.length} 个仓库刷新失败。`
+          : `Refresh completed! Found ${actuallyNewCount} new releases${updatedPart}, ${failedRepos.length} repos failed.`;
       } else {
         message = language === 'zh'
-          ? `刷新完成！发现 ${actuallyNewCount} 个新Release。`
-          : `Refresh completed! Found ${actuallyNewCount} new releases.`;
+          ? `刷新完成！发现 ${actuallyNewCount} 个新Release${updatedPart}。`
+          : `Refresh completed! Found ${actuallyNewCount} new releases${updatedPart}.`;
       }
 
-      toast(message, actuallyNewCount > 0 ? 'success' : 'info');
+      toast(message, actuallyNewCount > 0 || updatedCount > 0 ? 'success' : 'info');
     } catch (error) {
       console.error('Refresh failed:', error);
       const errorMessage = language === 'zh'
