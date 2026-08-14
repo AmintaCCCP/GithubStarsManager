@@ -402,6 +402,7 @@ export interface AppState {
   isSyncingStars: boolean;
   lastSync: string | null;
   analyzingRepositoryIds: Set<number>;
+  repositoryViewMode: 'grid' | 'list';
 
   // Gists
   gists: Gist[];
