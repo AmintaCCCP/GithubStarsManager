@@ -1163,33 +1163,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             </div>
           )}
 
-          {!isLoading && (
-            <div className="flex items-center gap-1 rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface dark:bg-white/[0.04] p-0.5" role="group" aria-label={t('仓库布局', 'Repository layout')}>
-              <button
-                type="button"
-                onClick={() => setRepositoryViewMode('grid')}
-                aria-pressed={repositoryViewMode === 'grid'}
-                className={`flex items-center justify-center w-8 h-7 rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white dark:bg-white/[0.08] text-brand-violet shadow-sm' : 'text-gray-500 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary'}`}
-                title={t('多列卡片', 'Grid view')}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setRepositoryViewMode('list')}
-                aria-pressed={repositoryViewMode === 'list'}
-                className={`flex items-center justify-center w-8 h-7 rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white dark:bg-white/[0.08] text-brand-violet shadow-sm' : 'text-gray-500 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary'}`}
-                title={t('单列列表', 'List view')}
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Statistics */}
-        <div className={disableCardAnimations ? 'repository-list-syncing' : undefined}>
-          <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+        {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
+        <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
+          <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5 sm:text-right">
             <div className="flex items-center justify-between">
               <div>
                 {t(
@@ -1221,6 +1199,31 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </div>
             </div>
           </div>
+
+          {!isLoading && (
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-black/[0.06] bg-light-surface p-0.5 dark:border-white/[0.04] dark:bg-white/[0.04]" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+              <button
+                type="button"
+                onClick={() => setRepositoryViewMode('grid')}
+                aria-pressed={repositoryViewMode === 'grid'}
+                aria-label={t('多列卡片', 'Grid view')}
+                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                title={t('多列卡片', 'Grid view')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRepositoryViewMode('list')}
+                aria-pressed={repositoryViewMode === 'list'}
+                aria-label={t('单列列表', 'List view')}
+                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                title={t('单列列表', 'List view')}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -882,7 +882,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
     const baseClasses = viewMode === 'list'
-      ? 'repository-card repository-card--list ui-card group relative px-4 py-3 transition-all duration-200 cursor-pointer select-none'
+      ? 'repository-card repository-card--list ui-card group relative px-6 py-5 transition-all duration-200 cursor-pointer select-none'
       : 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
       ? 'linear-card-selected'
@@ -904,14 +904,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className={`flex items-start space-x-3 ${viewMode === 'list' ? 'mb-0' : 'mb-3'}`}>
+      <div className="flex items-start space-x-3 mb-3">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
-          className="w-8 h-8 rounded-full flex-shrink-0"
+          className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-text-primary truncate">
+          <h3 className={`${viewMode === 'list' ? 'text-base' : ''} font-semibold text-gray-900 dark:text-text-primary truncate`}>
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
           <p className="text-sm text-gray-500 dark:text-text-secondary truncate">
@@ -938,13 +938,20 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 {language === 'zh' ? '待分析' : 'Not analyzed'}
               </span>
             )}
-            {isSubscribed && (
-              <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-status-emerald/10 text-status-emerald">
-                <Bell className="w-3 h-3" />
-                Release
-              </span>
+            {!selectionMode && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setEditModalOpen(true);
+                }}
+                className="linear-icon-button flex h-8 w-8 items-center justify-center text-status-amber"
+                title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
+                aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
             )}
-            {displayContent.isCustomized && <Edit3 className="w-3.5 h-3.5 text-status-amber" title={language === 'zh' ? '已自定义' : 'Customized'} />}
           </div>
         )}
 
@@ -993,17 +1000,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 >
                   {isSubscribed ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                   {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsActionsMenuOpen(false);
-                    setEditModalOpen(true);
-                  }}
-                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  {language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
                 </button>
                 <div className="my-1 border-t ui-divider" />
                 <a
@@ -1160,7 +1156,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Description with Tooltip */}
-      <div className={viewMode === 'list' ? 'mt-1.5' : 'mb-4 flex-1'}>
+      <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
         <div
           ref={descTriggerRef}
           className="relative group"
@@ -1173,7 +1169,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         >
           <p
             className={viewMode === 'list'
-              ? 'text-gray-700 dark:text-text-secondary text-[13px] leading-5 line-clamp-1 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary'
+              ? 'text-sm leading-6 text-gray-700 dark:text-text-secondary line-clamp-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary'
               : 'text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded-md px-1 -mx-1 hover:bg-light-surface dark:hover:bg-white/[0.02]'}
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
@@ -1227,7 +1223,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {displayTags.tags.length > 0 && (
-        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1 mt-1.5' : 'gap-2 mb-4'}`}>
+        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1 mb-3' : 'gap-2 mb-4'}`}>
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
@@ -1265,7 +1261,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Stats */}
-      <div className={viewMode === 'list' ? 'mt-1.5' : 'space-y-3 mt-auto'}>
+      <div className={viewMode === 'list' ? 'mb-3' : 'space-y-3 mt-auto'}>
         {/* Language and Stars */}
         <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-gray-700 dark:text-text-secondary`}>
           {repository.language && (
@@ -1282,7 +1278,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <span className="truncate max-w-16">{formatNumber(repository.stargazers_count)}</span>
           </div>
           {viewMode === 'list' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
-            <div className="hidden lg:flex items-center space-x-1 min-w-0">
+            <div className="flex items-center space-x-1 min-w-0">
               <Terminal className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate max-w-40">{repository.ai_platforms.slice(0, 3).map(getPlatformDisplayName).join(' · ')}</span>
             </div>
@@ -1301,7 +1297,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
-        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary pt-2 border-t ui-divider ${viewMode === 'list' ? 'text-xs mt-1.5' : 'text-sm'}`}>
+        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'pt-3 text-sm' : 'pt-2 text-sm'}`}>
           <div className="relative flex items-center space-x-1 min-w-0">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>

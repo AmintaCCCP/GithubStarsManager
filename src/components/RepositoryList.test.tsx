@@ -98,6 +98,10 @@ describe('RepositoryList view mode controls', () => {
     expect(card).toHaveAttribute('data-view-mode', 'grid');
     expect(screen.getByTitle('多列卡片')).toHaveAttribute('aria-pressed', 'true');
 
+    const layoutControls = screen.getByRole('group', { name: '仓库布局' });
+    const toolbar = layoutControls.closest('.ui-toolbar');
+    expect(toolbar?.lastElementChild).toContainElement(layoutControls);
+
     fireEvent.click(screen.getByTitle('单列列表'));
 
     expect(storeState.setRepositoryViewMode).toHaveBeenCalledWith('list');

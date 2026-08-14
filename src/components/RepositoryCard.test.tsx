@@ -104,6 +104,9 @@ describe('RepositoryCard view modes', () => {
     expect(lastPushed).toBeInTheDocument();
     expect(lastPushed).not.toHaveClass('group-hover:opacity-0');
     expect(screen.getByRole('button', { name: '更多操作' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '编辑仓库信息' })).toBeInTheDocument();
+    expect(screen.getByText('test')).toBeInTheDocument();
+    expect(screen.getByText('TypeScript')).toBeInTheDocument();
     expect(screen.queryByTitle('AI分析此仓库')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
@@ -114,7 +117,7 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('link', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
   });
 
-  it('does not let the card keyboard handler intercept list-menu activation', async () => {
+  it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {
     const user = userEvent.setup();
     render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
 
@@ -123,10 +126,15 @@ describe('RepositoryCard view modes', () => {
     await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
+    const releaseAction = screen.getByRole('button', { name: '取消订阅 Release' });
+    releaseAction.focus();
+    await user.keyboard('{Enter}');
+    expect(storeState.toggleReleaseSubscription).toHaveBeenCalledWith(repository.id);
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+
     const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
     editAction.focus();
     await user.keyboard('{Enter}');
-    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 
