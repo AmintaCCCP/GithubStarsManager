@@ -182,12 +182,35 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (viewMode !== 'list' || selectionMode) {
       setIsActionsMenuOpen(false);
     }
   }, [viewMode, selectionMode]);
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!actionsMenuRef.current?.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [isActionsMenuOpen]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -827,6 +850,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     // 如果点击的是交互元素，不处理
     if (isInteractiveElement) return;
 
+    // 菜单展开时，点击卡片空白处仅收起菜单，不触发详情或选择。
+    if (isActionsMenuOpen) {
+      setIsActionsMenuOpen(false);
+      return;
+    }
+
     // 如果选择模式下，点击卡片切换选择状态
     if (selectionMode && onSelect) {
       // 阻止默认行为以防止焦点改变导致页面滚动
@@ -846,7 +875,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     // 打开 README 模态框前隐藏描述悬浮提示，避免遮挡预览层
     hideDescriptionTooltip();
     setReadmeModalOpen(true);
-  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip]);
+  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip, isActionsMenuOpen]);
 
   // 处理鼠标按下事件，阻止焦点变化导致页面滚动
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -882,7 +911,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
     const baseClasses = viewMode === 'list'
-      ? 'repository-card repository-card--list ui-card group relative px-6 py-5 transition-all duration-200 cursor-pointer select-none'
+      ? 'repository-card repository-card--list ui-card group relative px-6 pt-5 pb-0 transition-all duration-200 cursor-pointer select-none'
       : 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
       ? 'linear-card-selected'
@@ -956,7 +985,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         )}
 
         {viewMode === 'list' && !selectionMode && (
-          <div className="relative flex-shrink-0">
+          <div ref={actionsMenuRef} className="relative flex-shrink-0">
             <button
               type="button"
               onClick={(event) => {
@@ -1237,7 +1266,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       </div>
 
       {/* List mode keeps tags and repository metadata on one wrapping information row. */}
-      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2 mb-5' : 'contents'}>
+      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2' : 'contents'}>
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {displayTags.tags.length > 0 && (
         <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2 mb-4'}`}>
@@ -1313,8 +1342,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           })()}
         </div>
 
-        {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
-        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full mt-2 py-1 min-h-8 text-sm leading-5' : 'pt-2 text-sm'}`}>
+        {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
+        <div className={viewMode === 'list' ? 'basis-full flex-none' : 'contents'}>
+        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
@@ -1356,6 +1386,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
             </button>
           )}
+        </div>
         </div>
       </div>
       </div>

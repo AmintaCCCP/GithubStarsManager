@@ -128,6 +128,26 @@ describe('RepositoryCard view modes', () => {
     expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
   });
 
+  it('closes the list action menu from card whitespace, page whitespace, or Escape', () => {
+    const { container } = render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    const moreActions = screen.getByRole('button', { name: '更多操作' });
+    const card = container.firstElementChild as HTMLElement;
+
+    fireEvent.click(moreActions);
+    expect(screen.getByText('仓库操作')).toBeInTheDocument();
+    fireEvent.click(card);
+    expect(screen.queryByText('仓库操作')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(moreActions);
+    fireEvent.click(document.body);
+    expect(screen.queryByText('仓库操作')).not.toBeInTheDocument();
+
+    fireEvent.click(moreActions);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByText('仓库操作')).not.toBeInTheDocument();
+  });
+
   it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {
     const user = userEvent.setup();
     render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
