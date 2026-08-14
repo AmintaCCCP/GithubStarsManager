@@ -17,6 +17,18 @@ vi.mock('./FloatingTooltip', () => ({
   FloatingTooltip: () => null,
 }));
 
+vi.mock('./RepositoryEditModal', () => ({
+  RepositoryEditModal: ({ isOpen }: { isOpen: boolean }) => (
+    isOpen ? <div data-testid="repository-edit-modal" /> : null
+  ),
+}));
+
+vi.mock('./ReadmeModal', () => ({
+  ReadmeModal: ({ isOpen }: { isOpen: boolean }) => (
+    isOpen ? <div data-testid="readme-modal" /> : null
+  ),
+}));
+
 const repository: Repository = {
   id: 1,
   name: 'example-repository',
@@ -99,6 +111,22 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('button', { name: 'AI 分析' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '取消 Star' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
+  });
+
+  it('does not let the card keyboard handler intercept list-menu activation', () => {
+    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+
+    const moreActions = screen.getByRole('button', { name: '更多操作' });
+    expect(fireEvent.keyDown(moreActions, { key: 'Enter' })).toBe(true);
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(moreActions);
+    const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
+    expect(fireEvent.keyDown(editAction, { key: 'Enter' })).toBe(true);
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(editAction);
+    expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 
   it('retains the existing quick action row in grid mode', () => {
