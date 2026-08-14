@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryCard } from './RepositoryCard';
 import { useAppStore } from '../store/useAppStore';
@@ -113,19 +114,19 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('link', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
   });
 
-  it('does not let the card keyboard handler intercept list-menu activation', () => {
+  it('does not let the card keyboard handler intercept list-menu activation', async () => {
+    const user = userEvent.setup();
     render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
 
     const moreActions = screen.getByRole('button', { name: '更多操作' });
-    expect(fireEvent.keyDown(moreActions, { key: 'Enter' })).toBe(true);
+    moreActions.focus();
+    await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
-    fireEvent.click(moreActions);
     const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
-    expect(fireEvent.keyDown(editAction, { key: 'Enter' })).toBe(true);
+    editAction.focus();
+    await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
-
-    fireEvent.click(editAction);
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 
