@@ -461,6 +461,9 @@ interface AppActions {
   // RPC Download actions
   setRpcDownloadConfig: (updates: Partial<RpcDownloadConfig>) => void;
 
+  // Repository list view actions
+  setRepositoryViewMode: (mode: 'grid' | 'list') => void;
+
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
   setReleaseShowMode: (mode: 'all' | 'unread') => void;
@@ -566,6 +569,7 @@ type PersistedAppState = Partial<
     | 'language'
     | 'searchFilters'
     | 'isSidebarCollapsed'
+    | 'repositoryViewMode'
     | 'forks'
     | 'forkViewMode'
     | 'forkSelectedFilters'
@@ -810,6 +814,7 @@ export const normalizePersistedState = (
     releases,
     searchResults: migratedRepositories,
     releaseSubscriptions: normalizeNumberSet(safePersisted.releaseSubscriptions),
+    repositoryViewMode: safePersisted.repositoryViewMode === 'list' ? 'list' : 'grid',
     releaseSourceSettings: normalizeReleaseSourceSettings(safePersisted.releaseSourceSettings),
     readReleases: normalizeNumberSet(safePersisted.readReleases),
     readForks: normalizeNumberSet(safePersisted.readForks),
@@ -1271,6 +1276,7 @@ export const useAppStore = create<AppState & AppActions>()(
       rpcDownloadConfig: { enabled: false, host: '', port: 6800 },
       isSidebarCollapsed: false,
       readmeModalOpen: false,
+      repositoryViewMode: 'grid',
       releaseViewMode: 'timeline',
       releaseShowMode: 'all',
       releaseLatestMode: 'all',
@@ -2138,6 +2144,9 @@ export const useAppStore = create<AppState & AppActions>()(
         rpcDownloadConfig: { ...state.rpcDownloadConfig, ...updates }
       })),
 
+      // Repository list view actions
+      setRepositoryViewMode: (repositoryViewMode) => set({ repositoryViewMode }),
+
       // Release Timeline View actions
       setReleaseViewMode: (releaseViewMode) => set({ releaseViewMode }),
       setReleaseShowMode: (releaseShowMode) => set({ releaseShowMode }),
@@ -2377,6 +2386,8 @@ export const useAppStore = create<AppState & AppActions>()(
           sortOrder: state.searchFilters.sortOrder,
         },
 
+        // 持久化仓库页面视图设置
+        repositoryViewMode: state.repositoryViewMode,
         // 持久化Release页面视图设置
         releaseViewMode: state.releaseViewMode,
         releaseShowMode: state.releaseShowMode,

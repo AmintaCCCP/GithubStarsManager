@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Bot, ChevronDown, Pause, Play } from 'lucide-react';
+import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -44,7 +44,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     batchUnsubscribeReleases,
     releaseSubscriptions,
     similarView,
-    resetSimilarView
+    resetSimilarView,
+    repositoryViewMode,
+    setRepositoryViewMode
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -1160,6 +1162,29 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </div>
             </div>
           )}
+
+          {!isLoading && (
+            <div className="flex items-center gap-1 rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface dark:bg-white/[0.04] p-0.5" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+              <button
+                type="button"
+                onClick={() => setRepositoryViewMode('grid')}
+                aria-pressed={repositoryViewMode === 'grid'}
+                className={`flex items-center justify-center w-8 h-7 rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white dark:bg-white/[0.08] text-brand-violet shadow-sm' : 'text-gray-500 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary'}`}
+                title={t('多列卡片', 'Grid view')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRepositoryViewMode('list')}
+                aria-pressed={repositoryViewMode === 'list'}
+                className={`flex items-center justify-center w-8 h-7 rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white dark:bg-white/[0.08] text-brand-violet shadow-sm' : 'text-gray-500 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary'}`}
+                title={t('单列列表', 'List view')}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Statistics */}
@@ -1201,7 +1226,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
       {/* Repository Grid with consistent card widths */}
       <div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]"
+        className={repositoryViewMode === 'list'
+          ? 'space-y-2 min-h-[200px]'
+          : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]'}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       >
@@ -1216,6 +1243,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             selectionMode={showBulkToolbar}
             isExitingSelection={isExitingSelection}
             allCategories={allCategories}
+            viewMode={repositoryViewMode}
           />
         ))}
       </div>
