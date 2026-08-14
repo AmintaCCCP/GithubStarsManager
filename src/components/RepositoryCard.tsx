@@ -861,6 +861,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const isModalOpen = editModalOpen || readmeModalOpen;
   
   const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    // 仅由卡片自身获得焦点时处理，避免拦截三点菜单等后代控件的原生键盘行为。
+    if (event.target !== event.currentTarget) return;
+
     // 如果任何模态框打开，不处理键盘事件
     if (isModalOpen) return;
     
