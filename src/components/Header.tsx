@@ -43,9 +43,9 @@ export const Header: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <header className="bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04] sticky top-0 z-50 hd-drag lg:hd-drag relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+    <header className="linear-header sticky top-0 z-50 hd-drag lg:hd-drag relative">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="linear-header-inner flex items-center justify-between h-14 sm:h-[60px]">
           {/* Logo and Title */}
           <div className="flex min-w-0 items-center space-x-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
@@ -82,11 +82,9 @@ export const Header: React.FC = () => {
                   onClick={() => setCurrentView(menuItem.id as AppState['currentView'])}
                   title={t(meta.labelZh, meta.labelEn)}
                   aria-label={t(meta.labelZh, meta.labelEn)}
-                  className={`flex items-center whitespace-nowrap rounded-lg font-medium transition-colors ${
-                    isActive
-                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
-                  } xl:px-4 xl:py-2 p-2.5`}
+                  className={`linear-nav-item flex items-center whitespace-nowrap font-medium ${
+                    isActive ? 'is-active' : ''
+                  } xl:px-3 xl:py-1.5 p-2`}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span className="hidden xl:inline ml-2">{t(meta.labelZh, meta.labelEn)}</span>
@@ -110,10 +108,8 @@ export const Header: React.FC = () => {
                         setCurrentView(menuItem.id as AppState['currentView']);
                         setMobileMenuOpen(false);
                       }}
-                      className={`flex items-center px-4 py-3 rounded-lg font-medium transition-colors ${
-                        isActive
-                          ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-text-primary shadow-sm border border-black/[0.06] dark:border-white/[0.04]'
-                          : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/5'
+                      className={`linear-nav-item flex items-center px-4 py-3 font-medium ${
+                        isActive ? 'is-active' : ''
                       }`}
                     >
                       <Icon className="w-5 h-5 mr-3" />
@@ -130,7 +126,7 @@ export const Header: React.FC = () => {
             {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
+              className="linear-icon-button md:hidden p-2"
               aria-label={t('菜单', 'Menu')}
             >
               <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -145,7 +141,7 @@ export const Header: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
+              className="linear-icon-button p-2"
               title={t('切换主题', 'Toggle theme')}
             >
               {theme === 'light' ? (
@@ -181,7 +177,7 @@ export const Header: React.FC = () => {
                       logout();
                     }
                   }}
-                    className="p-2 rounded-lg hover:bg-light-surface dark:hover:bg-white/5 transition-colors"
+                    className="linear-icon-button p-2"
                   title={t('退出登录', 'Logout')}
                 >
                   <LogOut className="w-4 h-4 text-gray-700 dark:text-text-secondary" />

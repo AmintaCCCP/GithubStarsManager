@@ -864,14 +864,14 @@ export const ReleaseTimeline: React.FC = () => {
             <button
               onClick={handleRefresh}
               disabled={releaseIsRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
             </button>
             <button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
-              className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+              className="ui-button flex items-center space-x-2 px-3 py-2"
               title={t('Release 来源设置', 'Release Source Settings')}
             >
               <Settings className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
@@ -881,7 +881,7 @@ export const ReleaseTimeline: React.FC = () => {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 mb-4">
+        <div className="ui-toolbar p-3 sm:p-4 mb-4">
           {/* Search Bar */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
@@ -893,7 +893,7 @@ export const ReleaseTimeline: React.FC = () => {
                 setReleaseSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-10 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
+              className="ui-field w-full pl-10 pr-10 py-2 text-gray-900 dark:text-text-primary"
             />
             {searchQuery && (
               <button
@@ -926,7 +926,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsShowModeDropdownOpen(false);
                   setIsLatestModeDropdownOpen(false);
                 }}
-                className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
               >
                 {viewMode === 'timeline' ? (
@@ -947,7 +947,7 @@ export const ReleaseTimeline: React.FC = () => {
                     className="fixed inset-0 z-40"
                     onClick={() => setIsViewDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-lg shadow-lg border border-black/[0.06] dark:border-white/[0.04] z-50 py-1">
+                  <div className="ui-menu absolute right-0 mt-2 w-48 z-50 py-1">
                     <button
                       onClick={() => {
                         setReleaseViewMode('timeline');
@@ -1038,7 +1038,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsViewDropdownOpen(false);
                   setIsLatestModeDropdownOpen(false);
                 }}
-                className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
               >
                 <Filter className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
@@ -1051,7 +1051,7 @@ export const ReleaseTimeline: React.FC = () => {
               {isShowModeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsShowModeDropdownOpen(false)} />
-                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-lg shadow-lg border border-black/[0.06] dark:border-white/[0.04] z-50 py-1">
+                  <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
                     <button
                       onClick={() => handleShowModeChange('all')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
@@ -1089,7 +1089,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsViewDropdownOpen(false);
                   setIsShowModeDropdownOpen(false);
                 }}
-                className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+                className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
               >
                 <Package className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
@@ -1102,7 +1102,7 @@ export const ReleaseTimeline: React.FC = () => {
               {isLatestModeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsLatestModeDropdownOpen(false)} />
-                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-panel-dark rounded-lg shadow-lg border border-black/[0.06] dark:border-white/[0.04] z-50 py-1">
+                  <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
                     <button
                       onClick={() => handleLatestModeChange('all')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
@@ -1141,7 +1141,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                className="ui-field px-3 py-1 text-sm"
               >
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -1167,7 +1167,7 @@ export const ReleaseTimeline: React.FC = () => {
        {/* Releases List */}
        <div className="space-y-2">
          {paginatedReleases.length === 0 ? (
-           <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06]-alt dark:border-white/[0.04]">
+           <div className="ui-empty-state text-center py-12">
             <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
               {releaseShowMode === 'unread'
@@ -1184,7 +1184,7 @@ export const ReleaseTimeline: React.FC = () => {
             {releaseShowMode === 'unread' && (
               <button
                 onClick={() => handleShowModeChange('all')}
-                className="mt-4 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm"
+                className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('查看全部', 'Show All')}
               </button>
@@ -1192,7 +1192,7 @@ export const ReleaseTimeline: React.FC = () => {
             {selectedFilters.length > 0 && releaseShowMode !== 'unread' && (
               <button
                 onClick={handleClearFilters}
-                className="mt-4 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm"
+                className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('清除过滤器', 'Clear Filters')}
               </button>
@@ -1236,7 +1236,7 @@ export const ReleaseTimeline: React.FC = () => {
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
 
             return (
-              <div key={repository.id} className="bg-light-bg dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+              <div key={repository.id} className="ui-card overflow-hidden">
                 {/* Repository Header */}
                 <button
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
@@ -1286,7 +1286,7 @@ export const ReleaseTimeline: React.FC = () => {
                   style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                 >
                   <div className="overflow-hidden min-h-0">
-                    <div className="border-t border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark/50">
+                    <div className="border-t ui-divider bg-light-bg dark:bg-panel-dark/50">
                       <div className="p-1.5 space-y-1.5">
                       {releases.map(({ release, displayLinks }) => {
                         const isUnread = isReleaseUnread(release.id);

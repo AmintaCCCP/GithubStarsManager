@@ -560,7 +560,7 @@ export const ForkTimeline: React.FC = () => {
                 onChange={(e) => handleForkOwnerChange(e.target.value)}
                 aria-label={t('选择 Fork 拥有者', 'Select fork owner')}
                 disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}
-                className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="ui-field px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {forkOwnerOptions.map(owner => (
                   <option key={owner.id} value={owner.login}>
@@ -588,7 +588,7 @@ export const ForkTimeline: React.FC = () => {
             <button
               onClick={handleRefresh}
               disabled={forkIsRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{forkIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
@@ -597,7 +597,7 @@ export const ForkTimeline: React.FC = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-3 mb-4">
+        <div className="ui-toolbar p-3 sm:p-4 mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
             <input
@@ -608,7 +608,7 @@ export const ForkTimeline: React.FC = () => {
                 setForkSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-10 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary"
+              className="ui-field w-full pl-10 pr-10 py-2 text-gray-900 dark:text-text-primary"
             />
             {searchQuery && (
               <button
@@ -650,7 +650,7 @@ export const ForkTimeline: React.FC = () => {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                className="ui-field px-3 py-1 text-sm"
               >
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -717,7 +717,7 @@ export const ForkTimeline: React.FC = () => {
       {/* Fork List */}
       <div className="space-y-2">
         {paginatedForks.length === 0 ? (
-          <div className="text-center py-12 bg-light-bg dark:bg-panel-dark/50 rounded-xl border-2 border-dashed border-black/[0.06] dark:border-white/[0.04]">
+          <div className="ui-empty-state text-center py-12">
             <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
               {searchQuery ? t('无符合条件的结果', 'No matching results') : t('没有Fork仓库', 'No Forked Repositories')}
@@ -730,7 +730,7 @@ export const ForkTimeline: React.FC = () => {
             {searchQuery && (
               <button
                 onClick={() => setForkSearchQuery('')}
-                className="mt-4 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm"
+                className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('清除搜索', 'Clear Search')}
               </button>
@@ -848,7 +848,7 @@ export const ForkTimeline: React.FC = () => {
               <select
                 value={syncModal.branch}
                 onChange={(e) => setSyncModal(prev => ({ ...prev, branch: e.target.value }))}
-                className="w-full px-3 py-2 bg-white dark:bg-panel-dark border border-gray-300 dark:border-white/[0.08] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-indigo focus:border-transparent dark:text-text-primary"
+                className="ui-field w-full px-3 py-2 dark:text-text-primary"
               >
                 {syncModalBranches.length > 0 ? (
                   syncModalBranches.map(b => (
@@ -864,14 +864,14 @@ export const ForkTimeline: React.FC = () => {
           <div className="flex justify-end space-x-3 pt-4">
             <button
               onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+              className="ui-button px-4 py-2 text-sm font-medium"
             >
               {language === 'zh' ? '取消' : 'Cancel'}
             </button>
             <button
               onClick={confirmSyncUpstream}
               disabled={isFetchingBranches || !syncModal.branch}
-              className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button-primary px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {language === 'zh' ? '确认同步' : 'Sync Branch'}
             </button>

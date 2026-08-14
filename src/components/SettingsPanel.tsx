@@ -424,13 +424,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   if (isModal) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        className="linear-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-modal-title"
       >
-        <div className="w-full max-w-5xl h-[85vh] bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark">
+        <div className="linear-modal w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b ui-divider bg-light-bg dark:bg-panel-dark">
             <div className="flex items-center space-x-3">
               <Settings className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
               <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-text-primary">
@@ -439,7 +439,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
             <button
               onClick={handleClose}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-150"
+              className="linear-icon-button p-2"
               aria-label={t('关闭设置', 'Close settings')}
             >
               <X className="w-5 h-5 text-gray-500 dark:text-text-tertiary" />
@@ -448,7 +448,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
             {/* 侧边栏 - 桌面端 */}
-            <div className="hidden md:block w-64 border-r border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-panel-dark overflow-y-auto">
+            <div className="hidden md:block w-64 border-r ui-divider bg-light-bg dark:bg-panel-dark overflow-y-auto">
               <nav className="p-4 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
                 {tabs.map((tab) => (
                   <button
@@ -458,10 +458,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     id={`settings-tab-${tab.id}`}
                     aria-selected={activeTab === tab.id}
                     aria-controls={`settings-tabpanel-${tab.id}`}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
-                      activeTab === tab.id
-                        ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
-                        : 'text-gray-700 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.04]'
+                    className={`linear-settings-nav-item w-full flex items-center space-x-3 px-4 py-3 text-left ${
+                      activeTab === tab.id ? 'is-active font-medium' : ''
                     }`}
                   >
                     {tab.icon}
@@ -505,7 +503,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+          <div className="ui-panel overflow-hidden">
             <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
                 <button
@@ -515,10 +513,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   id={`settings-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
                   aria-controls={`settings-tabpanel-${tab.id}`}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 text-left ${
-                    activeTab === tab.id
-                      ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
-                      : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/[0.04]'
+                  className={`linear-settings-nav-item w-full flex items-center space-x-3 px-4 py-3 text-left ${
+                    activeTab === tab.id ? 'is-active font-medium' : ''
                   }`}
                 >
                   {tab.icon}
@@ -540,7 +536,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
-          <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6">
+          <div className="ui-panel p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>

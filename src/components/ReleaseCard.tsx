@@ -181,10 +181,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`bg-white dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
-        isAnyExpanded
-          ? 'border-brand-indigo/20 shadow-lg ring-1 ring-brand-indigo/30'
-          : 'border-black/[0.06] dark:border-white/[0.04] hover:shadow-md hover:border-black/10 dark:hover:border-white/10'
+      className={`release-card ui-card transition-all duration-200 ease-in-out cursor-pointer ${
+        isAnyExpanded ? 'is-expanded' : ''
       }`}
     >
       {/* 头部区域 - 仅显示元信息，不可点击展开 */}
@@ -194,7 +192,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             {isUnread && (
               <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse mr-2"></div>
             )}
-            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 dark:bg-white/[0.04] rounded-lg flex-shrink-0 border border-transparent dark:border-white/[0.04]">
+            <div className="linear-platform-icon flex items-center justify-center w-8 h-8 flex-shrink-0">
               <GitBranch className="w-4 h-4 text-gray-500 dark:text-text-tertiary" />
             </div>
             <div className="min-w-0 flex-1 ml-3">
@@ -202,7 +200,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <h4 className="font-semibold text-gray-900 dark:text-text-primary text-sm truncate">
                     {release.repository.name}
                   </h4>
-                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-text-secondary text-xs font-medium rounded-md border border-black/[0.06] dark:border-white/[0.04] shrink-0">
+                  <span className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0">
                     {release.tag_name}
                   </span>
                   {release.name && release.name !== release.tag_name && (

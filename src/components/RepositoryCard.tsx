@@ -869,9 +869,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
-    const baseClasses = 'repository-card group bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-6 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 hover:border-black/10 dark:hover:border-white/10 flex flex-col h-full cursor-pointer select-none';
+    const baseClasses = 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
-      ? 'shadow-[0_0_0_2px_theme(colors.blue.500)] dark:shadow-[0_0_0_2px_theme(colors.brand.violet)] bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10'
+      ? 'linear-card-selected'
       : '';
     const exitingClasses = isExitingSelection && isSelected ? 'animate-selection-exit' : '';
     return `${baseClasses} ${selectedClasses} ${exitingClasses}`.trim();
@@ -928,7 +928,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="flex items-center justify-center w-8 h-8 rounded-lg cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-gray-900 hover:bg-light-surface dark:hover:bg-white/5 transition-all duration-200 touch-manipulation"
+              className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing transition-all duration-200 touch-manipulation"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
               <GripVertical className="w-4 h-4" />
@@ -1032,7 +1032,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           tabIndex={0}
         >
           <p
-            className="text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"
+            className="text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded-md px-1 -mx-1 hover:bg-light-surface dark:hover:bg-white/[0.02]"
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
@@ -1087,7 +1087,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary border border-transparent dark:border-white/[0.04]"
+              className="linear-card-tag px-2 py-1 text-xs font-medium"
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1109,7 +1109,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               return (
                 <div
                   key={index}
-                  className="w-6 h-6 flex items-center justify-center bg-light-surface dark:bg-white/[0.04] rounded text-gray-700 dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 dark:hover:text-gray-700 transition-colors cursor-default"
+                  className="linear-platform-icon w-6 h-6 flex items-center justify-center cursor-default"
                   title={displayName}
                 >
                   <IconComponent className="w-3 h-3" />
@@ -1151,7 +1151,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
-        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
+        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t ui-divider">
           <div className="relative flex items-center space-x-1 min-w-0">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>

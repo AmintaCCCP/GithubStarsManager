@@ -84,7 +84,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50"
+        className="linear-modal-backdrop fixed inset-0"
         onClick={onCancel}
       />
 
@@ -94,7 +94,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-md mx-4 bg-white dark:bg-panel-dark dark:border dark:border-white/[0.04] rounded-xl shadow-xl"
+        className="linear-modal relative w-full max-w-md mx-4"
       >
         <div className="p-6">
           <div className="flex items-start space-x-4">
@@ -116,17 +116,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3 px-6 py-4 bg-light-bg dark:bg-white/[0.02] border-t border-black/[0.06] dark:border-white/[0.04] rounded-b-xl">
+        <div className="flex justify-end space-x-3 px-6 py-4 bg-light-bg dark:bg-white/[0.02] border-t ui-divider rounded-b-xl">
           <button
             ref={cancelButtonRef}
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-primary bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.08] rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
+            className="ui-button px-4 py-2 text-sm font-medium"
           >
             {cancelText}
           </button>
           <button
             onClick={handleConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${buttonClass}`}
+            className={`ui-button-primary px-4 py-2 text-sm font-medium ${buttonClass}`}
           >
             {confirmText}
           </button>

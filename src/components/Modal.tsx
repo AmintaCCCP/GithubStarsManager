@@ -45,7 +45,7 @@ export const Modal: React.FC<ModalProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="linear-modal-backdrop fixed inset-0 transition-opacity"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -55,24 +55,24 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
-          className={`relative w-full ${maxWidth} bg-white dark:bg-panel-dark dark:border dark:border-white/[0.04] rounded-xl shadow-xl transform transition-all`}
+          className={`linear-modal relative w-full ${maxWidth} transform transition-all`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-black/[0.06] dark:border-white/[0.04]">
+          <div className="flex items-center justify-between p-5 sm:p-6 border-b ui-divider">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
               {title}
             </h3>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-900 dark:text-text-primary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+              className="linear-icon-button p-2"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
           
           {/* Content */}
-          <div className="p-6">
+          <div className="p-5 sm:p-6">
             {children}
           </div>
         </div>
