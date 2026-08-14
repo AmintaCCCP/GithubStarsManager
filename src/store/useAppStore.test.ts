@@ -418,3 +418,31 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
     expect(normalized.githubToken).toBe('ghp_persisted');
   });
 });
+
+describe('useAppStore repository view mode', () => {
+  beforeEach(() => {
+    useAppStore.setState({ repositoryViewMode: 'grid' });
+  });
+
+  it('keeps grid as the backwards-compatible default for persisted states without a view preference', () => {
+    const normalized = normalizePersistedState({}, useAppStore.getState());
+
+    expect(normalized.repositoryViewMode).toBe('grid');
+  });
+
+  it('restores the persisted list preference', () => {
+    const normalized = normalizePersistedState({ repositoryViewMode: 'list' }, useAppStore.getState());
+
+    expect(normalized.repositoryViewMode).toBe('list');
+  });
+
+  it('updates the repository view preference without changing repository records', () => {
+    const repositories = [createRepository(1)];
+    useAppStore.setState({ repositories, repositoryViewMode: 'grid' });
+
+    useAppStore.getState().setRepositoryViewMode('list');
+
+    expect(useAppStore.getState().repositoryViewMode).toBe('list');
+    expect(useAppStore.getState().repositories).toBe(repositories);
+  });
+});

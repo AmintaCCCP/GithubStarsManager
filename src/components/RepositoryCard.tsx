@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../services/vectorSearchService';
@@ -71,6 +71,7 @@ interface RepositoryCardProps {
   selectionMode?: boolean;
   isExitingSelection?: boolean;
   allCategories: Category[];
+  viewMode?: 'grid' | 'list';
 }
 
 const MAX_CACHE_SIZE = 500;
@@ -89,7 +90,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   onSelect,
   selectionMode = false,
   isExitingSelection = false,
-  allCategories
+  allCategories,
+  viewMode = 'grid'
 }) => {
   const repoId = repository.id;
 
@@ -179,6 +181,36 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, [embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus]);
 
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (viewMode !== 'list' || selectionMode) {
+      setIsActionsMenuOpen(false);
+    }
+  }, [viewMode, selectionMode]);
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!actionsMenuRef.current?.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [isActionsMenuOpen]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -818,6 +850,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     // 如果点击的是交互元素，不处理
     if (isInteractiveElement) return;
 
+    // 菜单展开时，点击卡片空白处仅收起菜单，不触发详情或选择。
+    if (isActionsMenuOpen) {
+      setIsActionsMenuOpen(false);
+      return;
+    }
+
     // 如果选择模式下，点击卡片切换选择状态
     if (selectionMode && onSelect) {
       // 阻止默认行为以防止焦点改变导致页面滚动
@@ -837,7 +875,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     // 打开 README 模态框前隐藏描述悬浮提示，避免遮挡预览层
     hideDescriptionTooltip();
     setReadmeModalOpen(true);
-  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip]);
+  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip, isActionsMenuOpen]);
 
   // 处理鼠标按下事件，阻止焦点变化导致页面滚动
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -852,6 +890,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const isModalOpen = editModalOpen || readmeModalOpen;
   
   const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    // 仅由卡片自身获得焦点时处理，避免拦截三点菜单等后代控件的原生键盘行为。
+    if (event.target !== event.currentTarget) return;
+
     // 如果任何模态框打开，不处理键盘事件
     if (isModalOpen) return;
     
@@ -869,13 +910,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
-    const baseClasses = 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
+    const baseClasses = viewMode === 'list'
+      ? 'repository-card repository-card--list ui-card group relative px-6 pt-5 pb-0 transition-all duration-200 cursor-pointer select-none'
+      : 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
     const selectedClasses = isSelected
       ? 'linear-card-selected'
       : '';
     const exitingClasses = isExitingSelection && isSelected ? 'animate-selection-exit' : '';
     return `${baseClasses} ${selectedClasses} ${exitingClasses}`.trim();
-  }, [isSelected, isExitingSelection]);
+  }, [isSelected, isExitingSelection, viewMode]);
 
   return (
     <div
@@ -894,10 +937,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
-          className="w-8 h-8 rounded-full flex-shrink-0"
+          className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-text-primary truncate">
+          <h3 className={`${viewMode === 'list' ? 'text-base' : ''} font-semibold text-gray-900 dark:text-text-primary truncate`}>
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
           <p className="text-sm text-gray-500 dark:text-text-secondary truncate">
@@ -906,7 +949,141 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
         
         {/* 拖拽按钮 - 右上角 - 手机和平板端隐藏 */}
-        {!selectionMode && (
+        {viewMode === 'list' && (
+          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+            {displayContent.isAnalysisFailed ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-status-red/10 text-status-red">
+                <Bot className="w-3 h-3" />
+                {language === 'zh' ? '分析失败' : 'Analysis failed'}
+              </span>
+            ) : displayContent.isAnalyzed ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-brand-indigo/10 dark:bg-brand-indigo/20 text-brand-violet">
+                <Sparkles className="w-3 h-3" />
+                {language === 'zh' ? '已分析' : 'Analyzed'}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-text-secondary">
+                <Bot className="w-3 h-3" />
+                {language === 'zh' ? '待分析' : 'Not analyzed'}
+              </span>
+            )}
+            {!selectionMode && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setEditModalOpen(true);
+                }}
+                className="linear-icon-button flex h-8 w-8 items-center justify-center text-status-amber"
+                title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
+                aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {viewMode === 'list' && !selectionMode && (
+          <div ref={actionsMenuRef} className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsActionsMenuOpen((open) => !open);
+              }}
+              className={`linear-icon-button flex items-center justify-center w-8 h-8 ${isActionsMenuOpen ? 'bg-light-surface dark:bg-white/[0.08]' : ''}`}
+              title={language === 'zh' ? '更多操作' : 'More actions'}
+              aria-label={language === 'zh' ? '更多操作' : 'More actions'}
+              aria-expanded={isActionsMenuOpen}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {isActionsMenuOpen && (
+              <div
+                className="ui-menu absolute z-30 right-0 top-9 w-48 p-1.5"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="px-2 py-1.5 text-[11px] text-gray-500 dark:text-text-tertiary">
+                  {language === 'zh' ? '仓库操作' : 'Repository actions'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsMenuOpen(false);
+                    void handleAIAnalyze();
+                  }}
+                  disabled={isAnalyzing}
+                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                >
+                  {isAnalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
+                  {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsMenuOpen(false);
+                    toggleReleaseSubscription(repository.id);
+                  }}
+                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                >
+                  {isSubscribed ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                  {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
+                </button>
+                {vectorSearchAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsActionsMenuOpen(false);
+                      handleFindSimilar();
+                    }}
+                    disabled={isFindingSimilar}
+                    className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                  >
+                    {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                    {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
+                  </button>
+                )}
+                <div className="my-1 border-t ui-divider" />
+                <a
+                  href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsActionsMenuOpen(false)}
+                  className="ui-menu-item flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
+                </a>
+                <a
+                  href={repository.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsActionsMenuOpen(false)}
+                  className="ui-menu-item flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
+                </a>
+                <div className="my-1 border-t ui-divider" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsMenuOpen(false);
+                    void handleUnstar();
+                  }}
+                  disabled={unstarring}
+                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-status-red disabled:opacity-50"
+                >
+                  <StarOff className={`w-3.5 h-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
+                  {language === 'zh' ? '取消 Star' : 'Unstar'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {viewMode === 'grid' && !selectionMode && (
           <div className="hidden lg:block relative flex-shrink-0 mt-[-4px] opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
             <div
               ref={dragHandleRef}
@@ -946,6 +1123,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       </div>
 
       {/* Action Buttons Row - Left and Right Aligned */}
+      {viewMode === 'grid' && (
       <div className="flex items-center justify-between mb-4">
         {/* Left side: AI Analysis, Release Subscription, and Edit */}
         <div className="flex items-center gap-1.5">
@@ -1018,9 +1196,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           </SelectionAwareButton>
         </div>
       </div>
+      )}
 
       {/* Description with Tooltip */}
-      <div className="mb-4 flex-1">
+      <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
         <div
           ref={descTriggerRef}
           className="relative group"
@@ -1032,7 +1211,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           tabIndex={0}
         >
           <p
-            className="text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded-md px-1 -mx-1 hover:bg-light-surface dark:hover:bg-white/[0.02]"
+            className={viewMode === 'list'
+              ? 'text-sm leading-6 text-gray-700 dark:text-text-secondary line-clamp-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary'
+              : 'text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded-md px-1 -mx-1 hover:bg-light-surface dark:hover:bg-white/[0.02]'}
           >
             {highlightSearchTerm(displayContent.content, searchQuery)}
           </p>
@@ -1042,10 +1223,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             triggerRef={descTriggerRef}
             onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); }}
             onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
+            widthRatio={viewMode === 'list' ? 0.5 : 1}
           />
         </div>
 
         {/* 方案一：同时显示多个状态标签 */}
+        {viewMode === 'grid' && (
         <div className="flex items-center space-x-2 flex-wrap gap-y-1">
           {/* 已自定义标签 - 与筛选器逻辑一致 */}
           {displayContent.isCustomized && (
@@ -1079,15 +1262,18 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </div>
           ) : null}
         </div>
+        )}
       </div>
 
+      {/* List mode keeps tags and repository metadata on one wrapping information row. */}
+      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2' : 'contents'}>
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {displayTags.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2 mb-4'}`}>
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className="linear-card-tag px-2 py-1 text-xs font-medium"
+              className={`linear-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'}`}
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1096,7 +1282,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Platform Icons */}
-      {repository.ai_platforms && repository.ai_platforms.length > 0 && (
+      {viewMode === 'grid' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
         <div className="flex items-center space-x-2 mb-4">
           <span className="text-xs text-gray-700 dark:text-text-secondary">
             {language === 'zh' ? '支持平台:' : 'Platforms:'}
@@ -1121,9 +1307,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Stats */}
-      <div className="space-y-3 mt-auto">
+      <div className={viewMode === 'list' ? 'contents' : 'space-y-3 mt-auto'}>
         {/* Language and Stars */}
-        <div className="flex items-center space-x-4 text-xs text-gray-700 dark:text-text-secondary">
+        <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-gray-700 dark:text-text-secondary`}>
           {repository.language && (
             <div className="flex items-center space-x-1 min-w-0">
               <div
@@ -1137,6 +1323,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <Star className="w-3.5 h-3.5" />
             <span className="truncate max-w-16">{formatNumber(repository.stargazers_count)}</span>
           </div>
+          {viewMode === 'list' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
+            <div className="flex items-center space-x-1 min-w-0">
+              <Terminal className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate max-w-40">{repository.ai_platforms.slice(0, 3).map(getPlatformDisplayName).join(' · ')}</span>
+            </div>
+          )}
           {(() => {
             // license：归一化后展示 SPDX id；无 license 不渲染
             const lic = normalizeLicense(repository.license);
@@ -1150,15 +1342,16 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           })()}
         </div>
 
-        {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
-        <div className="flex items-center justify-between text-sm text-gray-700 dark:text-text-secondary pt-2 border-t ui-divider">
-          <div className="relative flex items-center space-x-1 min-w-0">
-            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
-            <span className={`truncate transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
+        {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
+        <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
+        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
+          <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
+            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
+            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
             </span>
 
-            {vectorSearchAvailable && !selectionMode && (
+            {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1174,6 +1367,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             )}
           </div>
 
+
           {/* 选择按钮 */}
           {onSelect && (
             <button
@@ -1182,7 +1376,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+              className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
                 isSelected
                   ? 'bg-gray-200 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary'
                   : 'text-gray-400 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
@@ -1193,6 +1387,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </button>
           )}
         </div>
+        </div>
+      </div>
       </div>
 
       {/* Repository Edit Modal - Using portal to render outside card container */}
@@ -1253,6 +1449,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.selectionMode === nextProps.selectionMode &&
     prevProps.isExitingSelection === nextProps.isExitingSelection &&
+    prevProps.viewMode === nextProps.viewMode &&
     allCategoriesEqual
   );
 });
