@@ -1001,6 +1001,20 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   {isSubscribed ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                   {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
                 </button>
+                {vectorSearchAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsActionsMenuOpen(false);
+                      handleFindSimilar();
+                    }}
+                    disabled={isFindingSimilar}
+                    className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                  >
+                    {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                    {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
+                  </button>
+                )}
                 <div className="my-1 border-t ui-divider" />
                 <a
                   href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
@@ -1180,6 +1194,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             triggerRef={descTriggerRef}
             onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); }}
             onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
+            widthRatio={viewMode === 'list' ? 0.5 : 1}
           />
         </div>
 
@@ -1221,9 +1236,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         )}
       </div>
 
+      {/* List mode keeps tags and repository metadata on one wrapping information row. */}
+      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2 mb-5' : 'contents'}>
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {displayTags.tags.length > 0 && (
-        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1 mb-3' : 'gap-2 mb-4'}`}>
+        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2 mb-4'}`}>
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
@@ -1261,7 +1278,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Stats */}
-      <div className={viewMode === 'list' ? 'mb-3' : 'space-y-3 mt-auto'}>
+      <div className={viewMode === 'list' ? 'contents' : 'space-y-3 mt-auto'}>
         {/* Language and Stars */}
         <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-gray-700 dark:text-text-secondary`}>
           {repository.language && (
@@ -1297,8 +1314,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
-        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'pt-3 text-sm' : 'pt-2 text-sm'}`}>
-          <div className="relative flex items-center space-x-1 min-w-0">
+        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full mt-2 py-1 min-h-8 text-sm leading-5' : 'pt-2 text-sm'}`}>
+          <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
@@ -1320,20 +1337,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             )}
           </div>
 
-          {viewMode === 'list' && vectorSearchAvailable && !selectionMode && (
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                handleFindSimilar();
-              }}
-              disabled={isFindingSimilar}
-              className="flex items-center space-x-1 text-brand-violet dark:text-brand-violet font-medium hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
-              title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
-            >
-              {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-              <span>{language === 'zh' ? '查找同类' : 'Find similar'}</span>
-            </button>
-          )}
 
           {/* 选择按钮 */}
           {onSelect && (
@@ -1343,7 +1346,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+              className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
                 isSelected
                   ? 'bg-gray-200 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary'
                   : 'text-gray-400 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
@@ -1354,6 +1357,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </button>
           )}
         </div>
+      </div>
       </div>
 
       {/* Repository Edit Modal - Using portal to render outside card container */}
