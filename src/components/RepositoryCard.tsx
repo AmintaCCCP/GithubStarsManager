@@ -1300,8 +1300,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         {/* Update Time / 查找相似仓库 - 悬停时时间淡出，显示高亮按钮 */}
         <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary pt-2 border-t ui-divider ${viewMode === 'list' ? 'text-xs mt-1.5' : 'text-sm'}`}>
           <div className="relative flex items-center space-x-1 min-w-0">
-            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
-            <span className={`truncate transition-opacity duration-150 ${vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
+            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
+            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
             </span>
 
