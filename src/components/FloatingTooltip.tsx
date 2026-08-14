@@ -40,11 +40,12 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
     const tooltipEl = tooltipRef.current;
 
     tooltipEl.style.maxHeight = '280px';
-    const tooltipHeight = tooltipEl.offsetHeight;
     const tooltipWidth = Math.min(
       triggerRect.width * widthRatio,
       window.innerWidth - triggerRect.left - 8,
     );
+    tooltipEl.style.width = `${tooltipWidth}px`;
+    const tooltipHeight = tooltipEl.offsetHeight;
 
     const top = triggerRect.top - tooltipHeight - 8;
     const left = triggerRect.left;
@@ -58,7 +59,6 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
     }
 
     tooltipEl.style.left = `${left}px`;
-    tooltipEl.style.width = `${tooltipWidth}px`;
   }, [triggerRef, visible, widthRatio]);
 
   useLayoutEffect(() => {
