@@ -75,20 +75,20 @@ export const LoginScreen: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <div className={`min-h-screen ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-gradient-to-br from-gray-900 to-gray-800'} flex items-center justify-center p-4 transition-colors duration-300`}>
+    <div className="linear-login-shell min-h-screen flex items-center justify-center p-4 transition-colors duration-300">
       {/* Theme and Language Toggle */}
       <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
         {/* Language Toggle */}
-        <div className="flex items-center bg-white dark:bg-panel-dark rounded-lg shadow-md border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+        <div className="linear-login-toggle flex items-center overflow-hidden">
           <button
             onClick={() => setLanguage('zh')}
-            className={`px-3 py-2 w-16 text-center text-sm font-medium transition-colors ${language === 'zh' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
+            className={`linear-login-language px-3 py-2 w-16 text-center text-sm font-medium ${language === 'zh' ? 'is-active' : ''}`}
           >
             中文
           </button>
           <button
             onClick={() => setLanguage('en')}
-            className={`px-3 py-2 w-16 text-center text-sm font-medium transition-colors ${language === 'en' ? 'bg-brand-indigo text-white' : 'text-gray-700 dark:text-text-secondary hover:bg-light-surface dark:hover:bg-white/10'}`}
+            className={`linear-login-language px-3 py-2 w-16 text-center text-sm font-medium ${language === 'en' ? 'is-active' : ''}`}
           >
             EN
           </button>
@@ -97,7 +97,7 @@ export const LoginScreen: React.FC = () => {
         {/* Theme Toggle */}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="p-2 rounded-lg bg-white dark:bg-panel-dark shadow-md border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+          className="linear-icon-button linear-login-theme p-2"
           title={t('切换主题', 'Toggle theme')}
         >
           {theme === 'light' ? (
@@ -110,7 +110,7 @@ export const LoginScreen: React.FC = () => {
 
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center w-16 h-16 bg-white dark:bg-panel-dark rounded-2xl mx-auto mb-4 shadow-lg ring-1 ring-blue-100 dark:ring-gray-700 overflow-hidden">
+          <div className="linear-login-mark flex items-center justify-center w-14 h-14 mx-auto mb-4 overflow-hidden">
             <img
               src="./icon.png"
               alt="GitHub Stars Manager"
@@ -125,7 +125,7 @@ export const LoginScreen: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-panel-dark rounded-2xl shadow-xl border border-black/[0.06] dark:border-white/[0.04] p-8">
+        <div className="linear-login-card p-6 sm:p-7">
           <div className="text-center mb-6">
             <Github className="w-10 h-10 text-gray-900 dark:text-text-secondary mx-auto mb-3" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary mb-2">
@@ -168,7 +168,7 @@ export const LoginScreen: React.FC = () => {
                   }}
                   onKeyDown={handleKeyPress}
                   disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary disabled:bg-light-bg dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
+                  className="ui-field w-full pl-10 pr-4 py-3 text-gray-900 dark:text-text-primary disabled:opacity-60"
                 />
               </div>
             </div>
@@ -183,7 +183,7 @@ export const LoginScreen: React.FC = () => {
             <button 
               onClick={handleConnect}
               disabled={isLoading || !token.trim()}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-brand-indigo hover:bg-gray-100 dark:bg-white/[0.04] disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              className="ui-button-primary w-full flex items-center justify-center space-x-2 px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {isLoading ? (
                 <>
@@ -199,7 +199,7 @@ export const LoginScreen: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-6 p-4 bg-light-bg dark:bg-white/[0.02] rounded-lg">
+          <div className="linear-login-help mt-6 p-4">
             <h3 className="font-medium text-gray-900 dark:text-text-primary mb-2 text-sm">
               {t('如何创建GitHub token:', 'How to create a GitHub token:')}
             </h3>

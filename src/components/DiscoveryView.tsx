@@ -997,7 +997,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
-            <div className="bg-white dark:bg-panel-dark/80 backdrop-blur-xl rounded-2xl border border-black/[0.06] dark:border-white/[0.04] p-3.5 sm:p-4 mb-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20">
+            <div className="ui-toolbar p-3.5 sm:p-4 mb-4">
               {/* 第一行：标题和刷新按钮 */}
               <div className="flex items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1021,7 +1021,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <button
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
-                    className="p-2 rounded-xl bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-brand-indigo/20 dark:hover:bg-gray-100 dark:bg-white/[0.04] hover:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="linear-icon-button p-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('刷新', 'Refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
@@ -1045,7 +1045,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <select
                 value={trendingTimeRange}
                 onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
               >
                 <option value="daily">{t('今日', 'Today')}</option>
                 <option value="weekly">{t('本周', 'This Week')}</option>
@@ -1057,7 +1057,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoverySelectedTopic || ''}
                     onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
                   >
                     <option value="">{t('主题', 'Topic')}</option>
                     <option value="ai">{t('人工智能', 'AI')}</option>
@@ -1136,8 +1136,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
           >
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode
-                ? 'bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 space-y-4'
-                : 'bg-white/80 dark:bg-panel-dark/80 backdrop-blur-xl rounded-2xl border border-black/[0.06] dark:border-white/[0.04] p-5 space-y-4 shadow-sm shadow-gray-200/50 dark:shadow-gray-900/20'}>
+                ? 'ui-toolbar p-4 space-y-4'
+                : 'ui-toolbar p-5 space-y-4'}>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-tertiary" />
@@ -1147,15 +1147,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       placeholder={t('搜索仓库...', 'Search repositories...')}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/[0.06] dark:border-white/[0.04] bg-light-bg dark:bg-white/[0.04] text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500
-                   " />
+                      className="ui-field w-full pl-10 pr-4 py-2.5 text-gray-900 dark:text-text-primary" />
                   </div>
                   <button
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className={isDesktopSafeMode
-                      ? 'px-5 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium'
-                      : 'px-5 py-2.5 rounded-xl bg-brand-indigo text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-indigo/25 hover:shadow-lg hover:shadow-brand-indigo/30 transition-all duration-200 flex items-center gap-2 font-medium'}
+                      ? 'ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium'
+                      : 'ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium'}
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -1166,7 +1165,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <select
                     value={discoveryLanguage}
                     onChange={(e) => setDiscoveryLanguage(e.target.value as ProgrammingLanguage)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-black/[0.06] text-gray-900 shadow-sm bg-white dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent transition-colors"
+                    className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
                   >
                     <option value="All">{t('所有语言', 'All Languages')}</option>
                     <option value="JavaScript">JavaScript</option>

@@ -18,43 +18,44 @@ export default {
         mono: ['Berkeley Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
       },
       colors: {
-        // Linear Base Backgrounds
-        'marketing-black': '#08090a', 
-        'panel-dark': '#0f1011',
-        'surface-3': '#191a1b',
-        'surface-sec': '#28282c',
-        
-        // Linear Text
-        'text-primary': '#f7f8f8',
-        'text-secondary': '#d0d6e0',
-        'text-tertiary': '#8a8f98',
-        'text-quaternary': '#62666d',
-        
-        // Linear Brand & Accent
-      brand: {
-        indigo: '#5e6ad2',
-        violet: '#7170ff',
-        hover: '#828fff',
-      },
-      'security-lavender': '#7a7fad',
-        
-        // Linear Status
-        'status-green': '#27a644',
-        'status-emerald': '#10b981',
-        'status-red': '#ef4444',
-        
-        // Linear Borders (Solid fallbacks, though we mainly use rgba)
-        'border-primary': '#23252a',
-        'border-secondary': '#34343a',
-        'border-tertiary': '#3e3e44',
-        'line-tint': '#141516',
-        'line-tertiary': '#18191a',
-        
-        // Linear Light Mode Neutrals (Fallbacks if needed)
-        'light-bg': '#f7f8f8',
-        'light-surface': '#f3f4f5',
-        'light-border': '#d0d6e0',
-        'light-border-alt': '#e6e6e6',
+        // Linear-inspired application surfaces
+        'marketing-black': '#111113',
+        'panel-dark': '#19191c',
+        'surface-3': '#212124',
+        'surface-sec': '#2a2a2f',
+
+        // Text hierarchy for dark application surfaces
+        'text-primary': '#f7f7f8',
+        'text-secondary': '#c9c9d1',
+        'text-tertiary': '#92929d',
+        'text-quaternary': '#696972',
+
+        // Single-purpose accent: action and focus only
+        brand: {
+          indigo: '#5e6ad2',
+          violet: '#7c7bf6',
+          hover: '#6d6ce6',
+        },
+        'security-lavender': '#8b8abe',
+
+        // Semantic status colors
+        'status-green': '#4cb782',
+        'status-emerald': '#4cb782',
+        'status-amber': '#d89547',
+        'status-red': '#e06c75',
+
+        // Fine application lines; use the lowest contrast that preserves hierarchy
+        'border-primary': '#2b2b30',
+        'border-secondary': '#38383f',
+        'border-tertiary': '#47474f',
+        'line-tint': '#171719',
+        'line-tertiary': '#202024',
+
+        // Light-mode application neutrals
+        'light-bg': '#f7f7f8',
+        'light-surface': '#f1f1f3',
+        'light-border': '#dedee3',
+        'light-border-alt': '#e8e8ec',
 
         // Keeping existing for gradual migration
         primary: {
@@ -112,12 +113,12 @@ export default {
         'tiny': '-0.15px',
       },
       boxShadow: {
-        'subtle': '0px 1.2px 0px rgba(0,0,0,0.03)',
-        'ring': '0px 0px 0px 1px rgba(0,0,0,0.2)',
-        'elevated': '0px 2px 4px rgba(0,0,0,0.4)',
-        'dialog': '0px 8px 2px rgba(0,0,0,0), 0px 5px 2px rgba(0,0,0,0.01), 0px 3px 2px rgba(0,0,0,0.04), 0px 1px 1px rgba(0,0,0,0.07), 0px 0px 1px rgba(0,0,0,0.08)',
-        'focus': '0px 4px 12px rgba(0,0,0,0.1)',
-        'inset-panel': '0px 0px 12px 0px rgba(0,0,0,0.2) inset',
+        'subtle': '0 1px 2px rgba(0,0,0,0.035)',
+        'ring': '0 0 0 1px rgba(0,0,0,0.08)',
+        'elevated': '0 12px 32px rgba(0,0,0,0.12)',
+        'dialog': '0 20px 48px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+        'focus': '0 0 0 3px rgba(94,106,210,0.18)',
+        'inset-panel': '0 1px 0 rgba(255,255,255,0.04) inset',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',

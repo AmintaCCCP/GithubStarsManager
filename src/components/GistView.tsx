@@ -270,7 +270,7 @@ export const GistView: React.FC = () => {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
       <aside className="lg:w-64 lg:flex-shrink-0">
-        <div className="sticky top-24 z-10 rounded-lg border border-black/[0.06] bg-white p-3 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
+        <div className="linear-sidebar sticky top-24 z-10 p-3">
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-1">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-text-primary">Gist</h2>
@@ -301,10 +301,8 @@ export const GistView: React.FC = () => {
                   key={category.id}
                   type="button"
                   onClick={() => setSelectedGistCategory(category.id)}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-                    active
-                      ? 'bg-brand-indigo text-white shadow-sm'
-                      : 'text-gray-700 hover:bg-light-surface dark:text-text-secondary dark:hover:bg-white/[0.08]'
+                  className={`linear-settings-nav-item flex w-full items-center justify-between px-3 py-2 text-sm ${
+                    active ? 'is-active' : ''
                   }`}
                 >
                   <span className="inline-flex items-center gap-2">
@@ -322,7 +320,7 @@ export const GistView: React.FC = () => {
       </aside>
 
       <section className="min-w-0 flex-1 space-y-5">
-        <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm dark:border-white/[0.04] dark:bg-white/[0.03]">
+        <div className="ui-toolbar p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <div className="relative min-w-0 flex-1">
@@ -333,7 +331,7 @@ export const GistView: React.FC = () => {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') basicSearch();
                   }}
-                  className="w-full rounded-lg border border-black/[0.06] bg-light-surface py-2 pl-9 pr-9 text-sm text-gray-900 outline-none focus:border-brand-indigo dark:border-white/[0.04] dark:bg-black/20 dark:text-text-primary"
+                  className="ui-field w-full py-2 pl-9 pr-9 text-sm text-gray-900 dark:text-text-primary"
                   placeholder={t('搜索 gist、文件名、摘要...', 'Search gists, filenames, summaries...')}
                 />
                 {query && (
@@ -353,7 +351,7 @@ export const GistView: React.FC = () => {
                 type="button"
                 onClick={aiSearch}
                 disabled={isSearching || !query.trim()}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-button-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                 {t('AI搜索', 'AI search')}
@@ -365,13 +363,13 @@ export const GistView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSortOpen(open => !open)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary"
+                  className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm"
                 >
                   {t(selectedSort.labelZh, selectedSort.labelEn)}
                   <ChevronDown className="h-4 w-4" />
                 </button>
                 {sortOpen && (
-                  <div className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-lg dark:border-white/[0.04] dark:bg-panel-dark">
+                  <div className="ui-menu absolute right-0 z-30 mt-1 w-40 overflow-hidden">
                     {sortOptions.map(option => (
                       <button
                         key={option.value}
@@ -395,7 +393,7 @@ export const GistView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setGistSearchFilters({ sortOrder: gistSearchFilters.sortOrder === 'desc' ? 'asc' : 'desc' })}
-                className="rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary"
+                className="ui-button px-3 py-2 text-sm"
               >
                 {gistSearchFilters.sortOrder === 'desc' ? t('降序', 'Desc') : t('升序', 'Asc')}
               </button>
@@ -403,7 +401,7 @@ export const GistView: React.FC = () => {
                 type="button"
                 onClick={analyzeVisibleGists}
                 disabled={isAnalyzingAll || gistSearchResults.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface disabled:opacity-50 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+                className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
               >
                 {isAnalyzingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                 {t('AI分析', 'AI analyze')}
@@ -412,7 +410,7 @@ export const GistView: React.FC = () => {
                 type="button"
                 onClick={refreshGists}
                 disabled={isRefreshing}
-                className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface disabled:opacity-50 dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+                className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {t('同步', 'Sync')}
@@ -423,7 +421,7 @@ export const GistView: React.FC = () => {
                   setEditingGist(null);
                   setIsEditorOpen(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90"
+                className="ui-button-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-medium"
               >
                 <Plus className="h-4 w-4" />
                 {t('新建', 'New')}
@@ -460,7 +458,7 @@ export const GistView: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-black/[0.08] bg-white p-12 text-center text-gray-500 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-text-tertiary">
+          <div className="ui-empty-state p-12 text-center">
             {t('暂无 gist。点击同步获取数据，或新建一个 gist。', 'No gists yet. Sync to fetch data, or create a new gist.')}
           </div>
         )}

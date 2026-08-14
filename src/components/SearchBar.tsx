@@ -173,10 +173,10 @@ export const SearchBar: React.FC = () => {
   const skipNextTextSearchRef = useRef(false);
   const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
   const [searchPhase, setSearchPhase] = useState<string | null>(null);
-  const filterChipBaseClass = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm border transition-colors';
-  const filterChipActiveClass = 'bg-brand-indigo text-white border-brand-indigo shadow-sm dark:bg-brand-indigo/80 dark:text-white dark:border-brand-indigo/70 font-medium';
-  const filterChipInactiveClass = 'bg-white border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary';
-  const filterTagBaseClass = 'px-3 py-1.5 rounded-lg text-sm border transition-colors';
+  const filterChipBaseClass = 'linear-filter-chip flex items-center space-x-2 px-3 py-1.5 text-sm';
+  const filterChipActiveClass = 'is-active font-medium';
+  const filterChipInactiveClass = '';
+  const filterTagBaseClass = 'linear-filter-chip px-3 py-1.5 text-sm';
 
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
@@ -830,7 +830,7 @@ export const SearchBar: React.FC = () => {
   });
 
   return (
-    <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4 sm:p-6 mb-6">
+    <div className="ui-toolbar p-4 sm:p-5 mb-5">
       {/* Search Input */}
       <div className="relative mb-4 z-40">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
@@ -848,7 +848,7 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="w-full pl-10 pr-24 sm:pr-40 py-3 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-brand-violet focus:border-transparent bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary placeholder-gray-500 dark:placeholder-gray-400"
+          className="ui-field w-full pl-10 pr-24 sm:pr-40 py-3 text-gray-900 dark:text-text-primary"
         />
 
         {/* Search History Dropdown */}
@@ -919,7 +919,7 @@ export const SearchBar: React.FC = () => {
           <button
             onClick={handleAISearch}
             disabled={isSearching}
-            className="flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors text-sm font-medium disabled:opacity-50"
+            className="ui-button-primary flex items-center space-x-1 px-2.5 sm:px-4 py-1.5 text-sm font-medium disabled:opacity-50"
             title={activeAIConfig
               ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
@@ -982,10 +982,8 @@ export const SearchBar: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-brand-indigo/20 text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 '
-                : 'bg-white border border-black/[0.06] text-gray-700 dark:bg-white/[0.04] dark:border-white/[0.04] dark:text-text-secondary hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+            className={`linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm ${
+              showFilters || activeFiltersCount > 0 ? 'is-active' : ''
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -1020,7 +1018,7 @@ export const SearchBar: React.FC = () => {
             onClick={() => setSearchFilters({
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
-            className="px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm hover:bg-light-bg dark:hover:bg-gray-600 transition-colors"
+            className="ui-button px-3 py-2 text-sm"
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
           </button>
@@ -1030,7 +1028,7 @@ export const SearchBar: React.FC = () => {
             <button
               onClick={handleStarSync}
               disabled={isSyncingStars}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-brand-indigo text-white hover:bg-brand-hover"
+              className="ui-button-primary inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
               title={t('同步星标仓库列表', 'Sync starred repositories')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
@@ -1054,7 +1052,7 @@ export const SearchBar: React.FC = () => {
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="mt-6 pt-6 border-t border-black/[0.06] dark:border-white/[0.04] space-y-6">
+        <div className="mt-5 pt-5 border-t ui-divider space-y-5">
           {/* Status Filters */}
           <div>
             <h4 className="text-sm font-medium text-gray-900 dark:text-text-primary mb-3">

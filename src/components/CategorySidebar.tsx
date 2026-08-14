@@ -323,7 +323,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
             </h3>
             <button
               onClick={handleAddCategory}
-              className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+              className="linear-icon-button p-1.5"
               title={t('添加分类', 'Add Category')}
               aria-label={t('添加分类', 'Add Category')}
             >
@@ -392,7 +392,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start z-10">
           {/* 侧栏容器 */}
           <div
-            className={`relative bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] overflow-visible transition-all duration-250 ease-out ${
+            className={`linear-sidebar relative overflow-visible transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
@@ -408,7 +408,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 展开按钮 - 放在折叠状态的顶部 */}
                 <button
                   onClick={toggleSidebar}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-violet"
+                  className="linear-icon-button w-8 h-8 flex items-center justify-center transition-all duration-200"
                   title={t('展开侧栏 (Ctrl/Cmd+B)', 'Expand Sidebar (Ctrl/Cmd+B)')}
                   aria-label={t('展开侧栏', 'Expand Sidebar')}
                   aria-expanded="false"
@@ -471,7 +471,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 添加分类按钮 */}
                 <button
                   onClick={handleAddCategory}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                  className="linear-icon-button w-8 h-8 flex items-center justify-center"
                   title={t('添加分类', 'Add Category')}
                   aria-label={t('添加分类', 'Add Category')}
                 >
@@ -493,7 +493,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={handleAddCategory}
-                      className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                      className="linear-icon-button p-1.5"
                       title={t('添加分类', 'Add Category')}
                       aria-label={t('添加分类', 'Add Category')}
                     >
