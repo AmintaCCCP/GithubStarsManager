@@ -176,5 +176,8 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();
     expect(screen.getByTitle('编辑仓库信息')).toBeInTheDocument();
+
+    const footer = screen.getByText(/最近提交/).closest('.border-t');
+    expect(footer?.parentElement).toHaveClass('mt-4');
   });
 });

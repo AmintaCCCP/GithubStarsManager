@@ -1343,7 +1343,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
-        <div className={viewMode === 'list' ? 'basis-full flex-none' : 'contents'}>
+        <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
         <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
