@@ -87,7 +87,9 @@ describe('RepositoryCard view modes', () => {
   it('moves single-card actions into an accessible more-actions menu in list mode', () => {
     render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
 
-    expect(screen.getByText(/最近提交/)).toBeInTheDocument();
+    const lastPushed = screen.getByText(/最近提交/);
+    expect(lastPushed).toBeInTheDocument();
+    expect(lastPushed).not.toHaveClass('group-hover:opacity-0');
     expect(screen.getByRole('button', { name: '更多操作' })).toBeInTheDocument();
     expect(screen.queryByTitle('AI分析此仓库')).not.toBeInTheDocument();
 
