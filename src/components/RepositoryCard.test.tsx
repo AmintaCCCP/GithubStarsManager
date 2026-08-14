@@ -91,6 +91,7 @@ const mockUseAppStore = vi.mocked(useAppStore);
 beforeEach(() => {
   vi.clearAllMocks();
   storeState.releaseSubscriptions = new Set<number>([1]);
+  storeState.vectorSearchConfig.enabled = true;
   mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
     selector ? selector(storeState) : storeState
   )) as typeof useAppStore);
@@ -113,8 +114,18 @@ describe('RepositoryCard view modes', () => {
 
     expect(screen.getByText('仓库操作')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'AI 分析' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查找同类仓库' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '取消 Star' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
+  });
+
+  it('only exposes similar-repository search in the menu when vector search is available', () => {
+    storeState.vectorSearchConfig.enabled = false;
+    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
+    expect(screen.queryByRole('button', { name: '查找同类仓库' })).not.toBeInTheDocument();
+    expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
   });
 
   it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {

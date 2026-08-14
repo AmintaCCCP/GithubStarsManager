@@ -7,6 +7,7 @@ interface FloatingTooltipProps {
   triggerRef: React.RefObject<HTMLElement | null>;
   onMouseLeave: () => void;
   onMouseEnter?: () => void;
+  widthRatio?: number;
 }
 
 function isPointerNear(el: HTMLElement | null, x: number, y: number, padding: number): boolean {
@@ -26,6 +27,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
   triggerRef,
   onMouseLeave,
   onMouseEnter,
+  widthRatio = 1,
 }) => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
@@ -39,7 +41,10 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
 
     tooltipEl.style.maxHeight = '280px';
     const tooltipHeight = tooltipEl.offsetHeight;
-    const tooltipWidth = triggerRect.width;
+    const tooltipWidth = Math.min(
+      triggerRect.width * widthRatio,
+      window.innerWidth - triggerRect.left - 8,
+    );
 
     const top = triggerRect.top - tooltipHeight - 8;
     const left = triggerRect.left;
@@ -54,7 +59,7 @@ export const FloatingTooltip: React.FC<FloatingTooltipProps> = ({
 
     tooltipEl.style.left = `${left}px`;
     tooltipEl.style.width = `${tooltipWidth}px`;
-  }, [triggerRef, visible]);
+  }, [triggerRef, visible, widthRatio]);
 
   useLayoutEffect(() => {
     if (visible) {
