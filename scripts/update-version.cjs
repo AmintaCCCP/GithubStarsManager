@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,12 +7,14 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PACKAGE_PATH = path.join(PROJECT_ROOT, 'package.json');
 const LOCKFILE_PATH = path.join(PROJECT_ROOT, 'package-lock.json');
 const VERSION_XML_PATH = path.join(PROJECT_ROOT, 'versions/version-info.xml');
+const RELEASE_LOCK_PATH = path.join(PROJECT_ROOT, '.release-version.lock');
 
 /**
- * 更新版本信息的脚本。
+ * 根 package.json 是应用版本的唯一来源。
  *
  * 用法：
- *   node scripts/update-version.cjs <version> <changelog...> [--url=downloadUrl]
+ *   node scripts/update-version.cjs <changelog...> [--url=downloadUrl]
+ *   node scripts/update-version.cjs --sync-lock
  *   node scripts/update-version.cjs --list
  *   node scripts/update-version.cjs --current
  */
@@ -29,51 +30,58 @@ function updateVersionInfo() {
       showCurrentVersion();
       return;
     }
+    if (args[0] === '--sync-lock') {
+      syncLockfileFromRootVersion();
+      return;
+    }
     if (args[0] === '--help' || args[0] === '-h') {
       showHelp();
       return;
     }
   }
 
-  if (args.length < 2) {
+  if (args.length === 0) {
     console.error('❌ 参数不足');
     showHelp();
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
-  const newVersion = args[0];
-  let releaseArgs;
-  try {
-    releaseArgs = parseReleaseArgs(args.slice(1));
-    validateReleaseVersion(newVersion);
-  } catch (error) {
-    console.error('❌ 版本更新前检查失败:', error.message);
-    process.exit(1);
-  }
-
+  let releaseLock;
+  let stagedLockfilePath;
   let stagedXmlPath;
+
   try {
-    const xmlContext = loadVersionXml(newVersion);
-    stagedXmlPath = stageVersionXml(xmlContext, newVersion, releaseArgs.changelog, releaseArgs.customDownloadUrl);
-    const packageSnapshots = createFileSnapshots([PACKAGE_PATH, LOCKFILE_PATH]);
+    releaseLock = acquireReleaseLock();
+    const releaseArgs = parseReleaseArgs(args);
+    if (releaseArgs.changelog.length === 0) {
+      throw new Error('至少需要提供一条更新日志');
+    }
+
+    const version = readRootPackageVersion();
+    validateVersion(version);
+    const xmlContext = loadVersionXml(version);
+    stagedLockfilePath = stageSyncedPackageLock(version);
+    stagedXmlPath = stageVersionXml(xmlContext, version, releaseArgs.changelog, releaseArgs.customDownloadUrl);
+    const packageLockSnapshot = createFileSnapshot(LOCKFILE_PATH);
 
     try {
-      updateRootPackageVersion(newVersion);
-      verifyRootVersionSync(newVersion);
+      fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
+      stagedLockfilePath = null;
+      verifyRootVersionSync(version);
       fs.renameSync(stagedXmlPath, VERSION_XML_PATH);
       stagedXmlPath = null;
-      console.log('📄 已更新 version-info.xml');
     } catch (error) {
-      restoreFileSnapshots(packageSnapshots);
+      restoreFileSnapshot(packageLockSnapshot);
       throw error;
     }
 
-    console.log(`✅ 版本已更新到 ${newVersion}`);
+    console.log(`✅ 已根据根 package.json 的版本 v${version} 更新发布元数据`);
     console.log('📝 更新内容:');
     releaseArgs.changelog.forEach((item, index) => {
       console.log(`   ${index + 1}. ${item}`);
     });
-    if (releaseArgs.customDownloadUrl) {
+    if (releaseArgs.customDownloadUrl !== null) {
       console.log(`🔗 自定义下载链接: ${releaseArgs.customDownloadUrl}`);
     }
     console.log('\n🔄 请记得提交这些更改到 Git 仓库');
@@ -81,25 +89,80 @@ function updateVersionInfo() {
     console.error('❌ 更新版本失败:', error.message);
     process.exitCode = 1;
   } finally {
-    if (stagedXmlPath && fs.existsSync(stagedXmlPath)) {
-      fs.unlinkSync(stagedXmlPath);
+    cleanupStagedFile(stagedLockfilePath);
+    cleanupStagedFile(stagedXmlPath);
+    releaseReleaseLock(releaseLock);
+  }
+}
+
+function syncLockfileFromRootVersion() {
+  let releaseLock;
+  let stagedLockfilePath;
+
+  try {
+    releaseLock = acquireReleaseLock();
+    const version = readRootPackageVersion();
+    validateVersion(version);
+    stagedLockfilePath = stageSyncedPackageLock(version);
+    fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
+    stagedLockfilePath = null;
+    verifyRootVersionSync(version);
+    console.log(`📦 已将 package-lock.json 同步为根 package.json 的版本 v${version}`);
+  } catch (error) {
+    console.error('❌ 同步 package-lock.json 失败:', error.message);
+    process.exitCode = 1;
+  } finally {
+    cleanupStagedFile(stagedLockfilePath);
+    releaseReleaseLock(releaseLock);
+  }
+}
+
+function acquireReleaseLock() {
+  try {
+    fs.writeFileSync(
+      RELEASE_LOCK_PATH,
+      `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
+      { encoding: 'utf8', flag: 'wx', mode: 0o600 }
+    );
+    return RELEASE_LOCK_PATH;
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      throw new Error(`检测到另一个版本同步任务正在运行（${path.basename(RELEASE_LOCK_PATH)}）。确认其结束后再重试`);
+    }
+    throw error;
+  }
+}
+
+function releaseReleaseLock(lockPath) {
+  if (!lockPath) {
+    return;
+  }
+
+  try {
+    fs.unlinkSync(lockPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error(`❌ 无法移除版本同步锁 ${path.basename(lockPath)}:`, error.message);
+      process.exitCode = 1;
     }
   }
 }
 
 function parseReleaseArgs(args) {
   let customDownloadUrl = null;
+  let hasCustomDownloadUrl = false;
   const changelog = [];
 
   for (const arg of args) {
     if (arg.startsWith('--url=')) {
       customDownloadUrl = arg.substring(6);
+      hasCustomDownloadUrl = true;
     } else {
       changelog.push(arg);
     }
   }
 
-  if (customDownloadUrl) {
+  if (hasCustomDownloadUrl) {
     let url;
     try {
       url = new URL(customDownloadUrl);
@@ -114,35 +177,15 @@ function parseReleaseArgs(args) {
   return { changelog, customDownloadUrl };
 }
 
-function validateReleaseVersion(version) {
-  if (!isValidVersion(version)) {
-    throw new Error('版本号应该是无前导零的 x.y.z 格式');
-  }
-
-  const currentVersion = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf8')).version;
-  if (!isValidVersion(currentVersion)) {
-    throw new Error(`根 package.json 的当前版本无效：${currentVersion}`);
-  }
-
-  if (compareVersions(version, currentVersion) <= 0) {
-    throw new Error(`新版本必须高于当前版本 ${currentVersion}`);
-  }
+function readRootPackageVersion() {
+  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf8'));
+  return packageJson.version;
 }
 
-function isValidVersion(version) {
-  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version);
-}
-
-function compareVersions(left, right) {
-  const leftParts = left.split('.').map(Number);
-  const rightParts = right.split('.').map(Number);
-
-  for (let index = 0; index < leftParts.length; index += 1) {
-    if (leftParts[index] !== rightParts[index]) {
-      return leftParts[index] - rightParts[index];
-    }
+function validateVersion(version) {
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+    throw new Error(`根 package.json 的版本无效：${version}`);
   }
-  return 0;
 }
 
 function loadVersionXml(version) {
@@ -172,10 +215,22 @@ function loadVersionXml(version) {
   return { content: xmlContent, closingTagIndex };
 }
 
-function buildVersionXml(xmlContext, version, changelog, customDownloadUrl) {
+function stageSyncedPackageLock(version) {
+  const packageLock = JSON.parse(fs.readFileSync(LOCKFILE_PATH, 'utf8'));
+  if (!packageLock.packages || !packageLock.packages['']) {
+    throw new Error('package-lock.json 缺少根包条目，无法同步版本');
+  }
+
+  packageLock.version = version;
+  packageLock.packages[''].version = version;
+  return stageFile(LOCKFILE_PATH, `${JSON.stringify(packageLock, null, 2)}\n`);
+}
+
+function stageVersionXml(xmlContext, version, changelog, customDownloadUrl) {
   const currentDate = new Date().toISOString().split('T')[0];
-  const downloadUrl = customDownloadUrl ||
-    `https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v${version}/github-stars-manager-${version}.dmg`;
+  const downloadUrl = customDownloadUrl === null
+    ? `https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v${version}/github-stars-manager-${version}.dmg`
+    : customDownloadUrl;
   const versionEntry = `  <version>
     <number>${version}</number>
     <releaseDate>${currentDate}</releaseDate>
@@ -184,71 +239,64 @@ ${changelog.map((item) => `      <item>${escapeXml(item)}</item>`).join('\n')}
     </changelog>
     <downloadUrl>${escapeXml(downloadUrl)}</downloadUrl>
   </version>\n`;
+  const updatedXml = `${xmlContext.content.slice(0, xmlContext.closingTagIndex)}${versionEntry}${xmlContext.content.slice(xmlContext.closingTagIndex)}`;
 
-  return `${xmlContext.content.slice(0, xmlContext.closingTagIndex)}${versionEntry}${xmlContext.content.slice(xmlContext.closingTagIndex)}`;
+  return stageFile(VERSION_XML_PATH, updatedXml);
 }
 
-function stageVersionXml(xmlContext, version, changelog, customDownloadUrl) {
+function stageFile(targetPath, content) {
   const stagedPath = path.join(
-    path.dirname(VERSION_XML_PATH),
-    `.${path.basename(VERSION_XML_PATH)}.${process.pid}.${Date.now()}.tmp`
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${Date.now()}.tmp`
   );
-
-  fs.writeFileSync(stagedPath, buildVersionXml(xmlContext, version, changelog, customDownloadUrl), { flag: 'wx' });
+  fs.writeFileSync(stagedPath, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
   return stagedPath;
 }
 
-function createFileSnapshots(filePaths) {
-  return filePaths.map((filePath) => ({
+function cleanupStagedFile(stagedPath) {
+  if (!stagedPath || !fs.existsSync(stagedPath)) {
+    return;
+  }
+
+  try {
+    fs.unlinkSync(stagedPath);
+  } catch (error) {
+    console.error(`❌ 无法清理临时文件 ${path.basename(stagedPath)}:`, error.message);
+    process.exitCode = 1;
+  }
+}
+
+function createFileSnapshot(filePath) {
+  return {
     path: filePath,
     exists: fs.existsSync(filePath),
     content: fs.existsSync(filePath) ? fs.readFileSync(filePath) : null
-  }));
+  };
 }
 
-function restoreFileSnapshots(snapshots) {
-  const restorationErrors = [];
-
-  for (const snapshot of [...snapshots].reverse()) {
-    try {
-      if (snapshot.exists) {
-        fs.writeFileSync(snapshot.path, snapshot.content);
-      } else if (fs.existsSync(snapshot.path)) {
-        fs.unlinkSync(snapshot.path);
-      }
-    } catch (error) {
-      restorationErrors.push(`${path.basename(snapshot.path)}: ${error.message}`);
+function restoreFileSnapshot(snapshot) {
+  try {
+    if (snapshot.exists) {
+      fs.writeFileSync(snapshot.path, snapshot.content);
+    } else if (fs.existsSync(snapshot.path)) {
+      fs.unlinkSync(snapshot.path);
     }
+  } catch (error) {
+    throw new Error(`版本同步失败，且 package-lock.json 回滚未完成：${error.message}`);
   }
-
-  if (restorationErrors.length > 0) {
-    throw new Error(`版本更新失败，且回滚未完成：${restorationErrors.join('; ')}`);
-  }
-}
-
-function updateRootPackageVersion(version) {
-  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  execFileSync(
-    npmCommand,
-    ['version', version, '--no-git-tag-version', '--ignore-scripts'],
-    { cwd: PROJECT_ROOT, stdio: 'inherit' }
-  );
 }
 
 function verifyRootVersionSync(version) {
-  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf8'));
   const packageLock = JSON.parse(fs.readFileSync(LOCKFILE_PATH, 'utf8'));
   const lockRootVersion = packageLock.packages?.['']?.version;
 
-  if (packageJson.version !== version) {
-    throw new Error(`package.json 版本未更新为 ${version}`);
+  if (readRootPackageVersion() !== version) {
+    throw new Error(`package.json 版本在同步期间变更，预期为 ${version}`);
   }
 
   if (packageLock.version !== version || lockRootVersion !== version) {
     throw new Error(`package-lock.json 的根包版本未同步为 ${version}`);
   }
-
-  console.log(`📦 已将根 package.json 与 package-lock.json 同步为 ${version}`);
 }
 
 function escapeXml(text) {
@@ -290,8 +338,7 @@ function listVersions() {
 
 function showCurrentVersion() {
   try {
-    const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf8'));
-    console.log(`📦 当前版本: v${packageJson.version}`);
+    console.log(`📦 当前版本: v${readRootPackageVersion()}`);
   } catch (error) {
     console.error('❌ 读取当前版本失败:', error.message);
     process.exitCode = 1;
@@ -300,20 +347,21 @@ function showCurrentVersion() {
 
 function showHelp() {
   console.log('📖 版本管理工具使用说明\n');
+  console.log('根 package.json 的 version 是唯一版本输入。请先修改它，再执行以下命令。\n');
   console.log('用法:');
-  console.log('  node scripts/update-version.cjs <version> <changelog...> [--url=downloadUrl]');
+  console.log('  node scripts/update-version.cjs <changelog...> [--url=downloadUrl]');
+  console.log('  node scripts/update-version.cjs --sync-lock');
   console.log('  node scripts/update-version.cjs --list');
-  console.log('  node scripts/update-version.cjs --current');
-  console.log('  node scripts/update-version.cjs --help\n');
+  console.log('  node scripts/update-version.cjs --current\n');
   console.log('示例:');
-  console.log('  npm run update-version -- 0.1.5 "修复已知问题" "提升用户体验"');
-  console.log('  npm run update-version -- 0.1.6 "优化性能" --url=https://example.com/download\n');
+  console.log('  npm run sync-version');
+  console.log('  npm run update-version -- "修复已知问题" "提升用户体验"');
+  console.log('  npm run update-version -- "优化性能" --url=https://example.com/download\n');
   console.log('注意:');
-  console.log('  • 版本号必须遵循无前导零的 x.y.z 格式。');
-  console.log('  • 新版本必须高于当前版本，且不能与更新记录重复。');
-  console.log('  • 根 package.json 是唯一版本来源；package-lock.json 自动同步。');
-  console.log('  • electron/package.json 不维护独立应用版本号。');
-  console.log('  • 更新元数据会先暂存；前置校验失败时不会改动版本文件。');
+  console.log('  • package-lock.json 必须保留字面版本以保证 npm 锁定安装，但由脚本从根 package.json 自动同步。');
+  console.log('  • electron/package.json 不维护独立应用版本；Electron Builder 使用根 package.json。');
+  console.log('  • 版本同步期间会持有仓库独占锁，防止并发发布互相覆盖。');
+  console.log('  • --url= 会被视为无效参数，避免静默回退到默认下载链接。');
 }
 
 updateVersionInfo();
