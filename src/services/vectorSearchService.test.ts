@@ -13,7 +13,10 @@ import {
 // Signature mirrors EmbeddingClient.embed; helpers only pass the args they use.
 const makeClient = (
   embedImpl: (texts: string[]) => Promise<number[][]>,
-) => ({ embed: vi.fn(embedImpl) }) as unknown as Parameters<typeof embedWithFallback>[1];
+) => {
+  const embed = vi.fn(embedImpl);
+  return { embed } as Parameters<typeof embedWithFallback>[1] & { embed: typeof embed };
+};
 
 const vec = (n: number) => [n, n + 1, n + 2];
 

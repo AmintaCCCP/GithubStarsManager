@@ -199,10 +199,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setWorkerTestResult(null);
     try {
       const service = new VectorSearchService({
-        enabled: true,
         workerUrl: formWorkerUrl,
         authToken: formAuthToken,
-        embeddingConfigId: '',
       });
       const result = await service.testConnection();
       setWorkerTestResult(result);
@@ -252,10 +250,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       dimensions: formDimensions,
     });
     const vectorService = new VectorSearchService({
-      enabled: true,
       workerUrl: formWorkerUrl,
       authToken: formAuthToken,
-      embeddingConfigId: activeEmbeddingConfig || '',
     });
     // 复用单个 GitHubApiService 实例，保留 rate-limit state
     const githubApi = githubToken ? new GitHubApiService(githubToken) : null;
@@ -362,12 +358,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     const controller = new AbortController();
     setAbortController(controller);
     setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
+    let currentEmbeddingFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
 
     try {
       // 每次点击时读取最新的 repositories / vectorSearchConfig，避免闭包捕获过期数据
       const currentState = useAppStore.getState();
       const currentRepos = currentState.repositories;
-      const currentEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
+      currentEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
 
