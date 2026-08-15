@@ -515,4 +515,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.3</downloadUrl>
   </version>
+  <version>
+    <number>0.7.4</number>
+    <releaseDate>2026-08-15</releaseDate>
+    <changelog>
+      <item>feat: Added shared AI request rate limiting for batch analysis, with retry-aware cooldowns, exponential backoff, a circuit breaker, optional concurrency and requests-per-minute controls, and forwarded provider rate-limit signals. (PR #265)</item>
+      <item>fix: Refreshing existing repository releases now detects changed assets and metadata, merges updates safely, preserves read/unread status, and uses the newest non-prerelease release when prereleases are excluded. (PR #266, fixes #263)</item>
+      <item>feat: Added a persisted Grid/List switch for repositories. The new compact list layout keeps essential metadata and actions accessible, while the grid view remains the default. (PR #268, closes #267)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.4</downloadUrl>
+  </version>
 </versions>
