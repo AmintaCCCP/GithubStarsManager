@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run sync-version",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -14,7 +15,9 @@
     "build:desktop": "node scripts/build-desktop.js",
     "electron": "electron electron/main.js",
     "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "predist": "npm run sync-version",
     "dist": "electron-builder",
+    "sync-version": "node scripts/update-version.cjs --sync-lock",
     "update-version": "node scripts/update-version.cjs",
     "dev:server": "cd server && npm run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
