@@ -2,7 +2,6 @@ import type {
   ProxyConfig,
   Repository,
   Category,
-  VectorSearchConfig,
   EmbeddingConfig,
   McpServiceConfig,
 } from '../types';
