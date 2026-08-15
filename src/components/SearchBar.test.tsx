@@ -81,7 +81,7 @@ const createStoreState = (overrides: Partial<ReturnType<typeof baseStoreState>> 
 
 const baseStoreState = () => ({
   searchFilters: { ...defaultSearchFilters },
-  repositories: [],
+  repositories: [] as Repository[],
   releaseSubscriptions: new Set<number>(),
   aiConfigs: [],
   activeAIConfig: null,

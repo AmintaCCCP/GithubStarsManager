@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EmbeddingConfig, Release, Repository, VectorSearchConfig, defaultReleaseSourceSettings } from '../types';
+import { EmbeddingConfig, Release, Repository, VectorSearchConfig, VectorSearchStatus, defaultReleaseSourceSettings } from '../types';
 import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 
@@ -298,6 +298,44 @@ describe('useAppStore vector search config normalization', () => {
 
     expect(indexedIds).toEqual([3]);
     expect(result.indexedRepoIds).toEqual([3]);
+  });
+
+  it('sanitizes corrupt persisted vector search status before hydration', () => {
+    const normalized = normalizePersistedState({
+      vectorSearchStatus: {
+        connected: 'yes',
+        vectorCount: -1,
+        dimensions: Number.NaN,
+        lastSyncAt: 123,
+        error: { message: 'invalid' },
+      } as unknown as VectorSearchStatus,
+    }, useAppStore.getState());
+
+    expect(normalized.vectorSearchStatus).toEqual({
+      connected: false,
+      vectorCount: 0,
+      dimensions: 0,
+    });
+  });
+
+  it('preserves valid persisted vector search status during hydration', () => {
+    const normalized = normalizePersistedState({
+      vectorSearchStatus: {
+        connected: true,
+        vectorCount: 42,
+        dimensions: 1536,
+        lastSyncAt: '2026-08-15T00:00:00.000Z',
+        error: 'stale error',
+      },
+    }, useAppStore.getState());
+
+    expect(normalized.vectorSearchStatus).toEqual({
+      connected: true,
+      vectorCount: 42,
+      dimensions: 1536,
+      lastSyncAt: '2026-08-15T00:00:00.000Z',
+      error: 'stale error',
+    });
   });
 });
 

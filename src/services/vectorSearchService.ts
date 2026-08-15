@@ -214,11 +214,13 @@ export interface VectorizeStatus {
   indexName?: string;
 }
 
+type VectorSearchServiceConfig = Pick<VectorSearchConfig, 'workerUrl' | 'authToken'>;
+
 export class VectorSearchService {
   private workerUrl: string;
   private authToken: string;
 
-  constructor(config: VectorSearchConfig) {
+  constructor(config: VectorSearchServiceConfig) {
     this.workerUrl = config.workerUrl.replace(/\/+$/, '');
     this.authToken = config.authToken;
   }
