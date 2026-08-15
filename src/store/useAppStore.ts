@@ -551,6 +551,10 @@ type PersistedAppState = Partial<
     | 'lastSync'
     | 'aiConfigs'
     | 'activeAIConfig'
+    | 'embeddingConfigs'
+    | 'activeEmbeddingConfig'
+    | 'vectorSearchConfig'
+    | 'vectorSearchStatus'
     | 'webdavConfigs'
     | 'activeWebDAVConfig'
     | 'lastBackup'
@@ -600,6 +604,7 @@ type PersistedAppState = Partial<
     | 'subscriptionIsLoading'
     | 'subscriptionChannels'
     | 'headerMenuConfig'
+    | 'mcpConfig'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -635,6 +640,40 @@ const defaultVectorSearchConfig: VectorSearchConfig = {
   enableHyDE: true,
   enableReranking: true,
   embeddingFormatVersion: EMBEDDING_FORMAT_VERSION,
+};
+
+const defaultVectorSearchStatus: VectorSearchStatus = {
+  connected: false,
+  vectorCount: 0,
+  dimensions: 0,
+};
+
+const normalizeVectorSearchStatus = (raw: unknown): VectorSearchStatus => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...defaultVectorSearchStatus };
+  }
+
+  const status = raw as Record<string, unknown>;
+  const vectorCount = typeof status.vectorCount === 'number'
+    && Number.isInteger(status.vectorCount)
+    && status.vectorCount >= 0
+    ? status.vectorCount
+    : defaultVectorSearchStatus.vectorCount;
+  const dimensions = typeof status.dimensions === 'number'
+    && Number.isInteger(status.dimensions)
+    && status.dimensions >= 0
+    ? status.dimensions
+    : defaultVectorSearchStatus.dimensions;
+
+  return {
+    connected: status.connected === true,
+    vectorCount,
+    dimensions,
+    ...(typeof status.lastSyncAt === 'string' && Number.isFinite(Date.parse(status.lastSyncAt))
+      ? { lastSyncAt: status.lastSyncAt }
+      : {}),
+    ...(typeof status.error === 'string' ? { error: status.error } : {}),
+  };
 };
 
 export const defaultMcpConfig: McpServiceConfig = {
@@ -727,7 +766,7 @@ const mergeVectorSearchConfig = (
 ): VectorSearchConfig => {
   const currentVersion = isKnownEmbeddingFormatVersion(current.embeddingFormatVersion)
     ? current.embeddingFormatVersion
-    : defaultVectorSearchConfig.embeddingFormatVersion;
+    : EMBEDDING_FORMAT_VERSION;
   const patchVersion = patch.embeddingFormatVersion;
   const embeddingFormatVersion = isKnownEmbeddingFormatVersion(patchVersion)
     ? Math.max(currentVersion, patchVersion)
@@ -843,6 +882,9 @@ export const normalizePersistedState = (
     vectorSearchConfig: normalizeVectorSearchConfig(
       safePersisted.vectorSearchConfig,
       safePersisted.embeddingConfigs
+    ),
+    vectorSearchStatus: normalizeVectorSearchStatus(
+      safePersisted.vectorSearchStatus ?? currentState.vectorSearchStatus
     ),
 // Persist full mcpConfig including token so Agent configs stay stable across restarts
     // unless the user explicitly resets the token.
@@ -1244,7 +1286,7 @@ export const useAppStore = create<AppState & AppActions>()(
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
       vectorSearchConfig: { ...defaultVectorSearchConfig },
-      vectorSearchStatus: { connected: false, vectorCount: 0, dimensions: 0 },
+      vectorSearchStatus: { ...defaultVectorSearchStatus },
       vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
       mcpConfig: { ...defaultMcpConfig },
       similarView: null,
@@ -1420,7 +1462,7 @@ export const useAppStore = create<AppState & AppActions>()(
           : applyPatches(state.searchResults);
         const similarResultsResult = state.similarView
           ? applyPatches(state.similarView.similarResults)
-          : { repositories: state.similarView?.similarResults ?? [], changed: false };
+          : { repositories: [], changed: false };
 
         if (!repositoriesResult.changed && !searchResultsResult.changed && !similarResultsResult.changed) {
           return state;
@@ -2468,9 +2510,8 @@ export const useAppStore = create<AppState & AppActions>()(
         }
 
         // 从旧版本升级时，确保 vectorSearchStatus 字段存在（vectorCount 等）
-        if (state && !state.vectorSearchStatus) {
-          console.log('Migrating from old version: initializing vectorSearchStatus');
-          state.vectorSearchStatus = { connected: false, vectorCount: 0, dimensions: 0 };
+        if (state) {
+          state.vectorSearchStatus = normalizeVectorSearchStatus(state.vectorSearchStatus);
         }
 
         // Additive: MCP config defaults when missing (upgrade). Old builds ignore this key on downgrade.

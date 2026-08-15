@@ -318,7 +318,7 @@ export async function vectorSearch(
   if (vs.auth_token_encrypted) {
     try {
       workerToken = decrypt(String(vs.auth_token_encrypted), config.encryptionKey);
-    } catch (err) {
+    } catch {
       logger.warn('mcp.vector', 'Failed to decrypt worker auth token');
       return { available: false, reason: 'worker_token_decrypt_failed' };
     }
