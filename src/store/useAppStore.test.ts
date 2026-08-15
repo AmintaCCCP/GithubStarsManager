@@ -318,6 +318,23 @@ describe('useAppStore vector search config normalization', () => {
     });
   });
 
+  it('omits invalid persisted vector search status timestamps during hydration', () => {
+    const normalized = normalizePersistedState({
+      vectorSearchStatus: {
+        connected: true,
+        vectorCount: 42,
+        dimensions: 1536,
+        lastSyncAt: 'not-a-date',
+      },
+    }, useAppStore.getState());
+
+    expect(normalized.vectorSearchStatus).toEqual({
+      connected: true,
+      vectorCount: 42,
+      dimensions: 1536,
+    });
+  });
+
   it('preserves valid persisted vector search status during hydration', () => {
     const normalized = normalizePersistedState({
       vectorSearchStatus: {

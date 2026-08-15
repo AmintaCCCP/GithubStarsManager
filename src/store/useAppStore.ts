@@ -669,7 +669,9 @@ const normalizeVectorSearchStatus = (raw: unknown): VectorSearchStatus => {
     connected: status.connected === true,
     vectorCount,
     dimensions,
-    ...(typeof status.lastSyncAt === 'string' ? { lastSyncAt: status.lastSyncAt } : {}),
+    ...(typeof status.lastSyncAt === 'string' && Number.isFinite(Date.parse(status.lastSyncAt))
+      ? { lastSyncAt: status.lastSyncAt }
+      : {}),
     ...(typeof status.error === 'string' ? { error: status.error } : {}),
   };
 };
