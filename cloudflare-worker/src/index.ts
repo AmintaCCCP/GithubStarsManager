@@ -24,6 +24,147 @@ interface UpsertRequest {
   vectors: VectorizeVector[];
 }
 
+type CompactMetadata = {
+  full_name: string;
+  description: string;
+  language: string;
+  stars: number;
+  tags: string[];
+  license?: string;
+};
+
+// Keep a margin below Vectorize's 10 KiB per-vector metadata limit so that
+// future small fields or JSON overhead do not turn a valid payload into a 40016.
+export const VECTORIZE_METADATA_LIMIT_BYTES = 10_240;
+const VECTORIZE_METADATA_SAFE_BYTES = 9_500;
+const encoder = new TextEncoder();
+
+function utf8ByteLength(value: string): number {
+  return encoder.encode(value).byteLength;
+}
+
+function jsonByteLength(value: unknown): number {
+  return utf8ByteLength(JSON.stringify(value) ?? '');
+}
+
+/** Truncate on Unicode code-point boundaries, using UTF-8 bytes rather than JS characters. */
+export function truncateUtf8(value: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
+  if (utf8ByteLength(value) <= maxBytes) return value;
+
+  const codePoints = Array.from(value);
+  let low = 0;
+  let high = codePoints.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (utf8ByteLength(codePoints.slice(0, middle).join('')) <= maxBytes) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return codePoints.slice(0, low).join('');
+}
+
+function normalizeMetadata(input: unknown): CompactMetadata {
+  const source = input && typeof input === 'object' && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {};
+  const metadata: CompactMetadata = {
+    full_name: typeof source.full_name === 'string' ? source.full_name : '',
+    description: typeof source.description === 'string' ? source.description : '',
+    language: typeof source.language === 'string' ? source.language : '',
+    stars: typeof source.stars === 'number' && Number.isFinite(source.stars) ? source.stars : 0,
+    tags: Array.isArray(source.tags)
+      ? source.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
+  };
+  if (typeof source.license === 'string') metadata.license = source.license;
+  return metadata;
+}
+
+function truncateTags(tags: string[], maxBytes: number): string[] {
+  if (maxBytes <= 0) return [];
+  const result: string[] = [];
+  for (const tag of tags) {
+    const candidate = [...result, tag];
+    if (jsonByteLength(candidate) <= maxBytes) {
+      result.push(tag);
+      continue;
+    }
+
+    // Keep a prefix of the first tag that does not fit, then stop: later tags
+    // cannot be more useful than the already retained prefix under this budget.
+    const codePoints = Array.from(tag);
+    let low = 0;
+    let high = codePoints.length;
+    let best = '';
+    while (low <= high) {
+      const middle = Math.floor((low + high) / 2);
+      const shortened = codePoints.slice(0, middle).join('');
+      if (jsonByteLength([...result, shortened]) <= maxBytes) {
+        best = shortened;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    if (best) result.push(best);
+    break;
+  }
+  return result;
+}
+
+/**
+ * Compact one vector's metadata independently of the rest of its batch.
+ * The largest variable field is reduced first; once fields reach a similar
+ * size, both are reduced together until the complete JSON fits the budget.
+ */
+export function compactVectorMetadata(input: unknown): CompactMetadata {
+  const metadata = normalizeMetadata(input);
+  if (jsonByteLength(metadata) <= VECTORIZE_METADATA_SAFE_BYTES) return metadata;
+
+  const variableBytes = Math.max(
+    utf8ByteLength(metadata.description),
+    jsonByteLength(metadata.tags),
+  );
+  let low = 0;
+  let high = variableBytes;
+  let best: CompactMetadata = { ...metadata, description: '', tags: [] };
+
+  // A shared cap implements the "largest field first, then both together"
+  // policy: a smaller field is untouched until the larger one reaches it.
+  while (low <= high) {
+    const cap = Math.floor((low + high) / 2);
+    const candidate: CompactMetadata = {
+      ...metadata,
+      description: truncateUtf8(metadata.description, cap),
+      tags: truncateTags(metadata.tags, cap),
+    };
+    if (jsonByteLength(candidate) <= VECTORIZE_METADATA_SAFE_BYTES) {
+      best = candidate;
+      low = cap + 1;
+    } else {
+      high = cap - 1;
+    }
+  }
+
+  if (jsonByteLength(best) <= VECTORIZE_METADATA_SAFE_BYTES) return best;
+
+  // The normal fields above are already small; this final fallback protects
+  // against malformed input such as an enormous license or repository name.
+  const fallback: CompactMetadata = {
+    full_name: truncateUtf8(metadata.full_name, 512),
+    description: '',
+    language: truncateUtf8(metadata.language, 128),
+    stars: metadata.stars,
+    tags: [],
+  };
+  if (metadata.license) fallback.license = truncateUtf8(metadata.license, 256);
+  if (jsonByteLength(fallback) > VECTORIZE_METADATA_SAFE_BYTES) delete fallback.license;
+  return fallback;
+}
+
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -62,7 +203,11 @@ export default {
         if (!Array.isArray(vectors) || vectors.length === 0) {
           return jsonResponse({ success: false, error: 'vectors array required' }, 400);
         }
-        await env.VECTORIZE.upsert(vectors);
+        const compactedVectors = vectors.map((vector) => ({
+          ...vector,
+          metadata: compactVectorMetadata(vector.metadata),
+        }));
+        await env.VECTORIZE.upsert(compactedVectors);
         return jsonResponse({ success: true, upserted: vectors.length });
       }
 
