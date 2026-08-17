@@ -16,6 +16,10 @@ export type CompactMetadata = {
   license?: string;
 };
 
+/** Mirror of Vectorize's metadata value types, kept free of workers-types. */
+export type VectorMetadataValue = string | number | boolean | string[];
+export type VectorMetadata = VectorMetadataValue | Record<string, VectorMetadataValue>;
+
 /** Vectorize's hard per-vector metadata limit (10 KiB). */
 export const VECTORIZE_METADATA_LIMIT_BYTES = 10_240;
 
@@ -118,17 +122,17 @@ function truncateTags(tags: string[], maxBytes: number): string[] {
  *    fields, protecting against malformed input such as an enormous license or
  *    repository name.
  */
-export function compactVectorMetadata(input: unknown): Record<string, unknown> {
+export function compactVectorMetadata(input: unknown): Record<string, VectorMetadata> {
   const source = input && typeof input === 'object' && !Array.isArray(input)
     ? input as Record<string, unknown>
     : null;
   if (source && jsonByteLength(source) <= VECTORIZE_METADATA_SAFE_BYTES) {
-    return { ...source };
+    return { ...source } as Record<string, VectorMetadata>;
   }
 
   const metadata = normalizeMetadata(input);
   if (jsonByteLength(metadata) <= VECTORIZE_METADATA_SAFE_BYTES) {
-    return { ...metadata };
+    return { ...metadata } as Record<string, VectorMetadata>;
   }
 
   const variableBytes = Math.max(
@@ -137,17 +141,17 @@ export function compactVectorMetadata(input: unknown): Record<string, unknown> {
   );
   let low = 0;
   let high = variableBytes;
-  let best: Record<string, unknown> = { ...metadata, description: '', tags: [] };
+  let best = { ...metadata, description: '', tags: [] } as Record<string, VectorMetadata>;
 
   // A shared cap implements the "largest field first, then both together"
   // policy: a smaller field is untouched until the larger one reaches it.
   while (low <= high) {
     const cap = Math.floor((low + high) / 2);
-    const candidate: Record<string, unknown> = {
+    const candidate = {
       ...(source ?? metadata),
       description: truncateUtf8(metadata.description, cap),
       tags: truncateTags(metadata.tags, cap),
-    };
+    } as Record<string, VectorMetadata>;
     if (jsonByteLength(candidate) <= VECTORIZE_METADATA_SAFE_BYTES) {
       best = candidate;
       low = cap + 1;
@@ -169,19 +173,25 @@ export function compactVectorMetadata(input: unknown): Record<string, unknown> {
   };
   if (metadata.license) fallback.license = truncateUtf8(metadata.license, 256);
   if (jsonByteLength(fallback) > VECTORIZE_METADATA_SAFE_BYTES) delete fallback.license;
-  return fallback;
+  return fallback as Record<string, VectorMetadata>;
 }
 
 /**
  * Apply per-vector metadata compaction at the /upsert boundary.
  * Preserves every top-level vector property (id, values, namespace, …) while
- * replacing `metadata` with its compacted form.
+ * replacing `metadata` with its compacted form. Vectors that omit `metadata`
+ * keep it omitted — no empty schema object is fabricated on their behalf.
  */
 export function compactUpsertVectors<T extends { metadata?: unknown }>(
   vectors: readonly T[],
-): Array<T & { metadata: Record<string, unknown> }> {
-  return vectors.map((vector) => ({
-    ...vector,
-    metadata: compactVectorMetadata(vector.metadata),
-  }));
+): Array<T & { metadata?: Record<string, VectorMetadata> }> {
+  return vectors.map((vector) => {
+    if (vector.metadata === undefined) {
+      return { ...vector };
+    }
+    return {
+      ...vector,
+      metadata: compactVectorMetadata(vector.metadata),
+    };
+  }) as Array<T & { metadata?: Record<string, VectorMetadata> }>;
 }
