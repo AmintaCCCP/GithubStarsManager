@@ -147,12 +147,18 @@ export class GitHubListsApiService {
 
   /**
    * 获取当前用户的全部 Lists（含每 list 内仓库的 full_name）。
-   * 分页拉取：lists 每页 100；每个 list 的 items 通过 node(id:) 分页（每页 100）。
+   *
+   * 实现采用"先取摘要、再逐 list 取 items"的两阶段策略：
+   * - 阶段一：分页拉取 lists 摘要（id/name/description/isPrivate），单次请求轻量，稳定不超时；
+   * - 阶段二：对每个 list 通过 node(id:) 分页拉取 items（每页 100）。
+   *
+   * 不能像早期实现那样在列表查询里直接内联 items：当 lists 数量较多（约 15-20 个以上）
+   * 且每个 list 内含大量仓库时，单个 GraphQL 请求响应体过大，GitHub 侧会超时返回 502/504。
    */
   async getUserLists(login: string): Promise<GitHubList[]> {
     logger.info('githubLists', 'Fetching user lists', { login });
 
-    const lists: GitHubList[] = [];
+    const summaries: Array<{ id: string; name: string; description?: string; isPrivate: boolean }> = [];
     let hasNextPage = true;
     let cursor: string | null = null;
 
@@ -161,16 +167,7 @@ export class GitHubListsApiService {
         user: {
           lists: {
             pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: Array<{
-              id: string;
-              name: string;
-              description?: string;
-              isPrivate: boolean;
-              items: {
-                pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
-              };
-            }>;
+            nodes: Array<{ id: string; name: string; description?: string; isPrivate: boolean }>;
           };
         } | null;
       }>(
@@ -178,19 +175,7 @@ export class GitHubListsApiService {
           user(login: $login) {
             lists(first: 100, after: $cursor) {
               pageInfo { hasNextPage endCursor }
-              nodes {
-                id
-                name
-                description
-                isPrivate
-                items(first: 100) {
-                  pageInfo { hasNextPage endCursor }
-                  nodes {
-                    __typename
-                    ... on Repository { id nameWithOwner }
-                  }
-                }
-              }
+              nodes { id name description isPrivate }
             }
           }
         }`,
@@ -202,69 +187,56 @@ export class GitHubListsApiService {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
 
-      const page = data.user.lists;
-      for (const node of page.nodes) {
-        const items = node.items.nodes
-          .map(item => item.nameWithOwner)
-          .filter((name): name is string => !!name);
-        const list: GitHubList = {
-          id: node.id,
-          name: node.name,
-          description: node.description,
-          isPrivate: node.isPrivate,
-          items,
-        };
-        lists.push(list);
+      summaries.push(...data.user.lists.nodes);
+      hasNextPage = data.user.lists.pageInfo.hasNextPage;
+      cursor = data.user.lists.pageInfo.endCursor;
+    }
 
-        // 单个 list 的 items 超过 100 时，通过 node(id:) 逐页补齐。
-        // 若 UserList 不支持 node 查询（返回 null 或抛错），回退为仅首页，不中断整个同步。
-        let itemHasNext = node.items.pageInfo.hasNextPage;
-        let itemCursor: string | null = node.items.pageInfo.endCursor;
-        while (itemHasNext && itemCursor) {
-          try {
-            const itemPage = await this.request<{
-              node: {
-                items: {
-                  pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                  nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
-                };
-              } | null;
-            }>(
-              `query($listId: ID!, $itemCursor: String) {
-                node(id: $listId) {
-                  ... on UserList {
-                    items(first: 100, after: $itemCursor) {
-                      pageInfo { hasNextPage endCursor }
-                      nodes {
-                        __typename
-                        ... on Repository { id nameWithOwner }
-                      }
-                    }
+    // 阶段二：逐 list 分页拉取 items
+    const lists: GitHubList[] = [];
+    for (const summary of summaries) {
+      const items: string[] = [];
+      let itemHasNext = true;
+      let itemCursor: string | null = null;
+      while (itemHasNext) {
+        const itemPage = await this.request<{
+          node: {
+            items: {
+              pageInfo: { hasNextPage: boolean; endCursor: string | null };
+              nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
+            };
+          } | null;
+        }>(
+          `query($listId: ID!, $itemCursor: String) {
+            node(id: $listId) {
+              ... on UserList {
+                items(first: 100, after: $itemCursor) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    __typename
+                    ... on Repository { id nameWithOwner }
                   }
                 }
-              }`,
-              { listId: node.id, itemCursor }
-            );
-            if (!itemPage.node) break;
-            for (const item of itemPage.node.items.nodes) {
-              if (item.nameWithOwner) list.items.push(item.nameWithOwner);
+              }
             }
-            itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
-            itemCursor = itemPage.node.items.pageInfo.endCursor;
-          } catch (err) {
-            // node(id:) 不可用等情形：保留已获取的首页，避免整个拉取失败
-            logger.warn('githubLists', 'Failed to paginate list items, keeping first page', {
-              listId: node.id,
-              listName: node.name,
-              error: err instanceof Error ? err.message : String(err),
-            });
-            break;
-          }
+          }`,
+          { listId: summary.id, itemCursor }
+        );
+        if (!itemPage.node) break;
+        for (const item of itemPage.node.items.nodes) {
+          if (item.nameWithOwner) items.push(item.nameWithOwner);
         }
+        itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
+        itemCursor = itemPage.node.items.pageInfo.endCursor;
       }
 
-      hasNextPage = page.pageInfo.hasNextPage;
-      cursor = page.pageInfo.endCursor;
+      lists.push({
+        id: summary.id,
+        name: summary.name,
+        description: summary.description,
+        isPrivate: summary.isPrivate,
+        items,
+      });
     }
 
     logger.info('githubLists', 'Fetched user lists', { count: lists.length });
