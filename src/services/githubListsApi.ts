@@ -2,6 +2,47 @@ import { logger } from './logger';
 
 const GITHUB_GRAPHQL_ENDPOINT = 'https://api.github.com/graphql';
 
+/**
+ * 阶段二在各 list 之间并发拉取 items 的并发度。
+ * 取值兼顾：远低于 GitHub GraphQL 并发上限避免次级速率限制，又足够大让
+ * 22 个 list 的 items 拉取从串行变并行，显著降低墙钟时间。
+ */
+const LIST_ITEMS_CONCURRENCY = 6;
+
+/**
+ * 受控并发映射：对 items 中每个元素调用 mapper，至多 concurrency 个并发执行，
+ * 保持结果顺序与输入一致。任一 mapper 抛错会向上抛出（整体失败语义，与原串行
+ * 实现一致——单 list 拉取失败即视为本次同步失败）。
+ * 支持 AbortSignal：若 signal 已取消则立即抛出 AbortError，已在途的请求仍会
+ * 完成（fetch 由其自身的 signal 控制中止）。
+ */
+async function mapPool<T, R>(
+  items: readonly T[],
+  mapper: (item: T, index: number) => Promise<R>,
+  concurrency: number,
+  signal?: AbortSignal
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (true) {
+      if (signal?.aborted) {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        throw err;
+      }
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  };
+  const workers: Promise<void>[] = [];
+  const n = Math.max(1, Math.min(concurrency, items.length || 1));
+  for (let i = 0; i < n; i++) workers.push(worker());
+  await Promise.all(workers);
+  return results;
+}
+
 export interface GitHubList {
   id: string;
   name: string;
@@ -170,8 +211,18 @@ export class GitHubListsApiService {
    *
    * 不能像早期实现那样在列表查询里直接内联 items：当 lists 数量较多（约 15-20 个以上）
    * 且每个 list 内含大量仓库时，单个 GraphQL 请求响应体过大，GitHub 侧会超时返回 502/504。
+   *
+   * 阶段二在各 list 间并发（受 LIST_ITEMS_CONCURRENCY 控制），每个 list 内部
+   * 仍串行分页（页间有游标依赖）。实测 22 个 list、2533 个仓库较串行显著降低墙钟时间，
+   * 且并发度远低于 GitHub GraphQL 并发上限，不触发次级速率限制。
+   *
+   * @param options.concurrency 阶段二 list 间并发数（默认 LIST_ITEMS_CONCURRENCY）
    */
-  async getUserLists(login: string, signal?: AbortSignal): Promise<GitHubList[]> {
+  async getUserLists(
+    login: string,
+    signal?: AbortSignal,
+    options: { concurrency?: number } = {}
+  ): Promise<GitHubList[]> {
     logger.info('githubLists', 'Fetching user lists', { login });
 
     const summaries: Array<{ id: string; name: string; description?: string; isPrivate: boolean }> = [];
@@ -215,62 +266,75 @@ export class GitHubListsApiService {
       }
     }
 
-    // 阶段二：逐 list 分页拉取 items
-    const lists: GitHubList[] = [];
-    for (const summary of summaries) {
-      const items: string[] = [];
-      let itemHasNext = true;
-      let itemCursor: string | null = null;
-      while (itemHasNext) {
-        const itemPage = await this.request<{
-          node: {
-            items: {
-              pageInfo: { hasNextPage: boolean; endCursor: string | null };
-              nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
-            };
-          } | null;
-        }>(
-          `query($listId: ID!, $itemCursor: String) {
-            node(id: $listId) {
-              ... on UserList {
-                items(first: 100, after: $itemCursor) {
-                  pageInfo { hasNextPage endCursor }
-                  nodes {
-                    __typename
-                    ... on Repository { id nameWithOwner }
-                  }
+    // 阶段二：各 list 间并发分页拉取 items，每个 list 内部串行分页。
+    const concurrency = Math.max(1, options.concurrency ?? LIST_ITEMS_CONCURRENCY);
+    const results = await mapPool(
+      summaries,
+      async (summary) => {
+        const items = await this.fetchListItems(summary.id, signal);
+        return {
+          id: summary.id,
+          name: summary.name,
+          description: summary.description,
+          isPrivate: summary.isPrivate,
+          items,
+        } satisfies GitHubList;
+      },
+      concurrency,
+      signal
+    );
+
+    logger.info('githubLists', 'Fetched user lists', { count: results.length });
+    return results;
+  }
+
+  /**
+   * 分页拉取单个 list 的 items（每页 100），返回仓库的 nameWithOwner 列表。
+   * 单个 list 内部分页必须串行：后一页的 itemCursor 依赖前一页的 endCursor。
+   */
+  private async fetchListItems(listId: string, signal?: AbortSignal): Promise<string[]> {
+    const items: string[] = [];
+    let itemHasNext = true;
+    let itemCursor: string | null = null;
+    while (itemHasNext) {
+      const itemPage = await this.request<{
+        node: {
+          items: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
+          };
+        } | null;
+      }>(
+        `query($listId: ID!, $itemCursor: String) {
+          node(id: $listId) {
+            ... on UserList {
+              items(first: 100, after: $itemCursor) {
+                pageInfo { hasNextPage endCursor }
+                nodes {
+                  __typename
+                  ... on Repository { id nameWithOwner }
                 }
               }
             }
-          }`,
-          { listId: summary.id, itemCursor },
-          { signal }
-        );
-        if (!itemPage.node) break;
-        for (const item of itemPage.node.items.nodes) {
-          if (item.nameWithOwner) items.push(item.nameWithOwner);
-        }
-        itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
-        const nextItemCursor = itemPage.node.items.pageInfo.endCursor;
-        // 防御：游标为空或未前进时终止分页，避免死循环/重复页
-        if (!nextItemCursor || nextItemCursor === itemCursor) {
-          itemHasNext = false;
-        } else {
-          itemCursor = nextItemCursor;
-        }
+          }
+        }`,
+        { listId, itemCursor },
+        { signal }
+      );
+      if (!itemPage.node) break;
+      for (const item of itemPage.node.items.nodes) {
+        if (item.nameWithOwner) items.push(item.nameWithOwner);
       }
-
-      lists.push({
-        id: summary.id,
-        name: summary.name,
-        description: summary.description,
-        isPrivate: summary.isPrivate,
-        items,
-      });
+      itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
+      const nextItemCursor = itemPage.node.items.pageInfo.endCursor;
+      // 防御：游标为空或未前进时终止分页，避免死循环/重复页
+      if (!nextItemCursor || nextItemCursor === itemCursor) {
+        itemHasNext = false;
+      } else {
+        itemCursor = nextItemCursor;
+      }
     }
-
-    logger.info('githubLists', 'Fetched user lists', { count: lists.length });
-    return lists;
+    return items;
   }
 
   /** 获取当前用户全部 Lists 的 id 与名称（不含成员），用于回写前的同名检测。 */
