@@ -4,10 +4,11 @@ const GITHUB_GRAPHQL_ENDPOINT = 'https://api.github.com/graphql';
 
 /**
  * 阶段二在各 list 之间并发拉取 items 的并发度。
- * 取值兼顾：远低于 GitHub GraphQL 并发上限避免次级速率限制，又足够大让
- * 22 个 list 的 items 拉取从串行变并行，显著降低墙钟时间。
+ * 取值兼顾：远低于 GitHub GraphQL 并发上限避免触发次级速率限制（实测 6
+ * 在部分时段会触发 503），同时保留并行收益。配合 request 内的 5xx/
+ * 限流指数退避重试，进一步吸收 GitHub 临时过载。
  */
-const LIST_ITEMS_CONCURRENCY = 6;
+const LIST_ITEMS_CONCURRENCY = 3;
 
 /**
  * 受控并发映射：对 items 中每个元素调用 mapper，至多 concurrency 个并发执行，
@@ -41,6 +42,19 @@ async function mapPool<T, R>(
   for (let i = 0; i < n; i++) workers.push(worker());
   await Promise.all(workers);
   return results;
+}
+
+/**
+ * 标记"瞬时、可重试"的错误。request 外层退避循环捕获后等待重试。
+ * retryAfterMs 优先（来自 Retry-After 头），否则用指数退避序列。
+ */
+class RetriableError extends Error {
+  readonly retryAfterMs?: number;
+  constructor(message: string, retryAfterMs?: number) {
+    super(message);
+    this.name = 'RetriableError';
+    this.retryAfterMs = retryAfterMs;
+  }
 }
 
 export interface GitHubList {
@@ -100,9 +114,16 @@ export class GitHubListsApiService {
    * 发送 GraphQL 请求。query 支持 $variables 占位。
    * 权限不足/未授权时抛出带可读信息的错误。
    *
+   * 对 GitHub 侧瞬时错误做指数退避重试：
+   * - 5xx（502/503/504，含上游网关超时与负载过载）
+   * - 限流 403（x-ratelimit-remaining=0 或带 Retry-After；次级速率限制也会用 403）
+   * - 网络异常（fetch reject，如瞬时连接重置）
+   * 重试尊重 Retry-After 头，最多 4 次，退避 1→2→4→8s（与 Retry-After 取较大者）。
+   * 鉴权类错误（401/403 scope 不足）、业务错误（GraphQL errors）、4xx 不重试。
+   *
    * @param toleratePartialErrors 为 true 时，若响应为 200 且包含部分 data，
    *   即使 errors 数组非空也不抛错（用于批量解析场景：个别字段失败不应丢弃已成功的结果）。
-   *   鉴权类错误（401/403/scope 不足）无论何种模式都会抛出。
+   *   鉴权类错误（401/403 scope 不足）无论何种模式都会抛出。
    */
   private async request<T>(
     query: string,
@@ -110,39 +131,125 @@ export class GitHubListsApiService {
     options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number } = {}
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
-    const signal = options.signal ?? AbortSignal.timeout(options.timeoutMs ?? 30_000);
+    const parentSignal = options.signal;
+    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 30_000);
+    // 组合用户外部信号与超时信号：任一放弃都中止
+    const signal = parentSignal ?AbortSignal.any([parentSignal, timeoutSignal]) : timeoutSignal;
 
+    const MAX_ATTEMPTS = 4;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (signal.aborted) {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        throw err;
+      }
+      try {
+        return await this.attemptRequest<T>(query, body, signal, options);
+      } catch (e) {
+        if (e instanceof RetriableError) {
+          lastError = e;
+          // 最后一次不再等待，直接抛出
+          if (attempt === MAX_ATTEMPTS - 1) break;
+          const backoffMs = e.retryAfterMs ?? (1000 * Math.pow(2, attempt));
+          await this.sleep(backoffMs, signal);
+          continue;
+        }
+        // 不可重试（鉴权/业务/AbortError 等），直接抛
+        throw e;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('GitHub GraphQL 请求在多次重试后仍失败。');
+  }
+
+  /**
+   * 可退避等待：尊重 signal 中止；中止时立即抛出 AbortError。
+   */
+  private sleep(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        reject(err);
+        return;
+      }
+      const onAbort = () => {
+        clearTimeout(timer);
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        reject(err);
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  /**
+   * 单次 GraphQL 请求尝试。瞬时错误抛 RetriableError 供外层重试，
+   * 永久错误（鉴权/业务/缺 data）直接抛出。
+   */
+  private async attemptRequest<T>(
+    query: string,
+    body: string,
+    signal: AbortSignal,
+    options: { toleratePartialErrors?: boolean }
+  ): Promise<T> {
     let response: Response;
-    if (this.backendUrl) {
-      const proxyUrl = `${this.backendUrl}/proxy/github/graphql`;
-      response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: this.getBackendHeaders(),
-        signal,
-        body: JSON.stringify({
+    try {
+      if (this.backendUrl) {
+        const proxyUrl = `${this.backendUrl}/proxy/github/graphql`;
+        response = await fetch(proxyUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.parse(body),
-        }),
-      });
-    } else {
-      response = await fetch(GITHUB_GRAPHQL_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-        signal,
-        body,
-      });
+          headers: this.getBackendHeaders(),
+          signal,
+          body: JSON.stringify({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.parse(body),
+          }),
+        });
+      } else {
+        response = await fetch(GITHUB_GRAPHQL_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          signal,
+          body,
+        });
+      }
+    } catch (e) {
+      // 网络层异常：AbortError 不重试，其余（连接重置/超时一类）瞬时性重试
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        const abortErr = new Error('Aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
+      throw new RetriableError(
+        `GitHub GraphQL 网络请求失败：${e instanceof Error ? e.message : String(e)}`,
+        undefined
+      );
     }
 
     let payload: GraphQLResponse<T>;
     try {
       payload = await response.json();
     } catch {
+      // 非 JSON 响应：5xx 时网关可能返回 HTML 错误页，按瞬时错误重试
+      if (response.status >= 500 && response.status <= 599) {
+        throw new RetriableError(
+          `GitHub GraphQL 响应解析失败（HTTP ${response.status}）。`,
+          this.parseRetryAfterMs(response)
+        );
+      }
       throw new Error('GitHub GraphQL 响应解析失败（非 JSON）。');
     }
 
@@ -153,9 +260,11 @@ export class GitHubListsApiService {
       (response.headers.get('x-ratelimit-remaining') === '0' ||
         response.headers.get('retry-after') !== null);
     if (isRateLimited) {
-      const retryAfter = response.headers.get('retry-after');
-      throw new Error(
-        `GitHub API 触发速率限制，请稍后重试${retryAfter ? `（约 ${retryAfter} 秒后）` : ''}。`
+      // 次级/主速率限制是瞬时的：尊重 Retry-After 重试而非直接抛错给用户。
+      // 若未提供 Retry-After，凭退避序列退避。
+      throw new RetriableError(
+        `GitHub API 触发速率限制（HTTP 403）。`,
+        this.parseRetryAfterMs(response)
       );
     }
 
@@ -191,6 +300,14 @@ export class GitHubListsApiService {
       );
     }
 
+    // 5xx（502/503/504）：GitHub 过载或网关超时，瞬时性错误，可重试
+    if (response.status >= 500 && response.status <= 599) {
+      throw new RetriableError(
+        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}`,
+        this.parseRetryAfterMs(response)
+      );
+    }
+
     if (!response.ok) {
       throw new Error(`GitHub GraphQL 请求失败：${response.status} ${response.statusText}`);
     }
@@ -200,6 +317,18 @@ export class GitHubListsApiService {
     }
 
     return payload.data;
+  }
+
+  /**
+   * 解析 Retry-After 头（秒）为等待毫秒数；不存在或非法返回 undefined。
+   */
+  private parseRetryAfterMs(response: Response): number | undefined {
+    const raw = response.headers.get('retry-after');
+    if (!raw) return undefined;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return undefined;
+    // 限流 Retry-After 可能较大；封顶 60s 避免单次退避过长拖累整体同步。
+    return Math.min(Math.round(n * 1000), 60_000);
   }
 
   /**
