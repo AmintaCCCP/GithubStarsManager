@@ -21,8 +21,11 @@ import {
   HardDrive,
   RefreshCw,
   Rss,
+  ListChecks,
+  GitBranch,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useDialog } from '../../hooks/useDialog';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
@@ -44,6 +47,9 @@ import {
   mergeReleaseSourceSettings,
   normalizeReleaseSourceSettings,
 } from '../../utils/releaseSources';
+import { createGitHubListsApiService } from '../../services/githubApiFactory';
+import { getAllCategories } from '../../store/useAppStore';
+import { matchesCategory } from '../../utils/categoryUtils';
 
 interface DataManagementPanelProps {
   t: (zh: string, en: string) => string;
@@ -160,10 +166,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     releaseSourceSettings,
     readReleases,
     language,
+    githubToken,
     setRepositories,
     setReleases,
     setBackendApiSecret,
   } = useAppStore();
+
+  const { toast, confirm } = useDialog();
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
     type: null,
@@ -171,6 +180,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     githubUsernameInput: '',
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPushingLists, setIsPushingLists] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
   const [, setSearchHistoryVersion] = useState(0);
@@ -1066,6 +1076,130 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     setConfirmation({ type: null, isOpen: false, githubUsernameInput: '' });
   };
 
+  // 回写：将本地分类同步为 GitHub Lists（同名 list 覆盖，无则新建）
+  const handlePushCategoriesToLists = async () => {
+    if (!githubToken) {
+      toast(t('未登录 GitHub，请先连接', 'Not connected to GitHub yet'), 'error');
+      return;
+    }
+    if (!user) {
+      toast(t('缺少用户信息，请重新连接', 'Missing user info, reconnect'), 'error');
+      return;
+    }
+    if (repositories.length === 0) {
+      toast(t('暂无仓库可回写', 'No repositories to push'), 'warning');
+      return;
+    }
+
+    const confirmed = await confirm(
+      t('同步仓库分类到 GitHub list', 'Push categories to GitHub lists'),
+      t(
+        '将每个本地分类（含默认与自定义分类）写回为同名 GitHub List：\n\n' +
+        '· 同名 list 将直接覆盖其成员\n' +
+        '· 无同名 list 则新建（默认私有）\n' +
+        '· 仓库将按其匹配的分类加入对应 list\n\n确定继续吗？',
+        'Each local category (default & custom) will be written to a GitHub List of the same name:\n\n' +
+        '· Existing same-name lists will be overwritten\n' +
+        '· Missing lists will be created (private by default)\n' +
+        '· Repos are added to the lists matching their category\n\nContinue?'
+      ),
+      { type: 'warning' }
+    );
+    if (!confirmed) return;
+
+    setIsPushingLists(true);
+    setShowSuccessMessage(null);
+    setShowErrorMessage(null);
+
+    try {
+      const allCategories = getAllCategories(
+        customCategories,
+        language,
+        hiddenDefaultCategoryIds,
+        defaultCategoryOverrides
+      ).filter(cat => cat.id !== 'all');
+
+      // 1. 计算每个分类命中的仓库（effective 标签匹配），并统计每仓库命中的 list 名
+      const listNameRepos: Record<string, Set<string>> = {};
+      const repoListNames: Record<string, Set<string>> = {};
+      // 小写 full_name → 原始大小写 full_name（GraphQL 匹配区分大小写，需用原始大小写解析 node id）
+      const lowerToOriginal = new Map<string, string>();
+      for (const repo of repositories) {
+        const matched: string[] = [];
+        for (const cat of allCategories) {
+          if (matchesCategory(repo, cat, 'effective')) {
+            matched.push(cat.name);
+          }
+        }
+        if (matched.length === 0) continue;
+        const original = repo.full_name || `${repo.owner}/${repo.name}`;
+        const lower = original.toLowerCase();
+        lowerToOriginal.set(lower, original);
+        repoListNames[lower] = new Set(matched);
+        for (const name of matched) {
+          if (!listNameRepos[name]) listNameRepos[name] = new Set();
+          listNameRepos[name].add(lower);
+        }
+      }
+
+      if (Object.keys(repoListNames).length === 0) {
+        toast(t('没有仓库命中任何分类', 'No repos matched any category'), 'warning');
+        setIsPushingLists(false);
+        return;
+      }
+
+      const api = createGitHubListsApiService(githubToken);
+
+      // 2. 检查现有同名 list，无则新建
+      const existing = await api.getUserListSummaries(user.login);
+      const listIdByName: Record<string, string> = {};
+      for (const name of Object.keys(listNameRepos)) {
+        const found = existing.find(l => l.name.toLowerCase() === name.toLowerCase());
+        if (found) {
+          listIdByName[name] = found.id;
+        } else {
+          listIdByName[name] = await api.createUserList(name, true);
+        }
+      }
+
+      // 3. 解析仓库 node id（用原始大小写 owner/name 调用 GraphQL，避免大小写不匹配）
+      const ownerNamePairs = Object.entries(repoListNames).map(([lowerFullName]) => {
+        const original = lowerToOriginal.get(lowerFullName) || lowerFullName;
+        const idx = original.indexOf('/');
+        return { owner: original.slice(0, idx), name: original.slice(idx + 1) };
+      });
+      const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
+
+      // 4. 覆盖写入：仓库加入其命中的全部 list（整体替换语义）
+      let updatedCount = 0;
+      for (const [fullName, listNames] of Object.entries(repoListNames)) {
+        const itemId = nodeIdMap.get(fullName);
+        if (!itemId) continue;
+        const listIds = [...listNames].map(name => listIdByName[name]).filter(Boolean);
+        if (listIds.length === 0) continue;
+        await api.updateUserListsForItem(itemId, listIds);
+        updatedCount++;
+      }
+
+      addLog(t('同步分类到 GitHub list', 'Push categories to lists'), true,
+        t(`创建/覆盖 ${Object.keys(listIdByName).length} 个 list，更新 ${updatedCount} 个仓库`, `Created/overwrote ${Object.keys(listIdByName).length} lists, updated ${updatedCount} repos`));
+      setShowSuccessMessage(t(
+        `已同步 ${Object.keys(listIdByName).length} 个 list、更新 ${updatedCount} 个仓库`,
+        `Pushed ${Object.keys(listIdByName).length} lists, updated ${updatedCount} repos`
+      ));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Push categories to lists failed:', error);
+      addLog(t('同步分类到 GitHub list', 'Push categories to lists'), false, message);
+      setShowErrorMessage(t(
+        '同步失败',
+        'Push failed'
+      ) + `: ${message}`);
+    } finally {
+      setIsPushingLists(false);
+    }
+  };
+
   const getDeleteDescription = (type: DeleteOperation): string => {
     switch (type) {
       case 'repositories':
@@ -1435,6 +1569,49 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </label>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 同步仓库分类到 GitHub list */}
+      <section>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
+          <ListChecks className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
+          {t('GitHub Lists 同步', 'GitHub Lists Sync')}
+        </h3>
+        <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
+              <GitBranch className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-text-primary">
+                {t('同步仓库分类到 GitHub list', 'Push categories to GitHub lists')}
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                {t(
+                  '将每个本地分类写回为同名 GitHub List。同名 list 将被覆盖，无同名 list 则新建。',
+                  'Write each local category to a GitHub List of the same name. Same-name lists are overwritten, missing lists are created.'
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handlePushCategoriesToLists}
+            disabled={isPushingLists}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-status-emerald hover:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPushingLists ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{t('同步中...', 'Pushing...')}</span>
+              </>
+            ) : (
+              <>
+                <ListChecks className="w-4 h-4" />
+                <span>{t('同步仓库分类到 GitHub list', 'Push categories to lists')}</span>
+              </>
+            )}
+          </button>
         </div>
       </section>
 

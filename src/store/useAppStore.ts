@@ -41,6 +41,7 @@ import {
   HeaderMenuId,
   HeaderMenuItem,
   defaultHeaderMenuConfig,
+  SyncMode,
 } from '../types';
 import { indexedDBStorage } from '../services/indexedDbStorage';
 import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
@@ -335,6 +336,8 @@ interface AppActions {
   setLoading: (loading: boolean) => void;
   setSyncingStars: (syncing: boolean) => void;
   setLastSync: (timestamp: string) => void;
+  setSyncMode: (mode: SyncMode) => void;
+  setSyncModeConfigured: (configured: boolean) => void;
   deleteRepository: (repoId: number) => void;
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
 
@@ -605,6 +608,8 @@ type PersistedAppState = Partial<
     | 'subscriptionChannels'
     | 'headerMenuConfig'
     | 'mcpConfig'
+    | 'syncMode'
+    | 'syncModeConfigured'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -864,6 +869,8 @@ export const normalizePersistedState = (
     forkExpandedRepositories: normalizeNumberSet(safePersisted.forkExpandedRepositories),
     releaseExpandedRepositories: normalizeNumberSet(safePersisted.releaseExpandedRepositories),
     includePreRelease,
+    syncMode: safePersisted.syncMode === 'stars-and-lists' ? 'stars-and-lists' : 'stars',
+    syncModeConfigured: safePersisted.syncModeConfigured === true,
     searchFilters: {
       ...initialSearchFilters,
       ...safePersisted.searchFilters,
@@ -1280,6 +1287,8 @@ export const useAppStore = create<AppState & AppActions>()(
       isLoading: false,
       isSyncingStars: false,
       lastSync: null,
+      syncMode: 'stars',
+      syncModeConfigured: false,
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
@@ -1515,6 +1524,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setLoading: (isLoading) => set({ isLoading }),
       setSyncingStars: (isSyncingStars) => set({ isSyncingStars }),
       setLastSync: (lastSync) => set({ lastSync }),
+      setSyncMode: (syncMode) => set({ syncMode }),
+      setSyncModeConfigured: (syncModeConfigured) => set({ syncModeConfigured }),
       deleteRepository: (repoId) => set((state) => {
         const nextReleaseSubscriptions = new Set(state.releaseSubscriptions);
         nextReleaseSubscriptions.delete(repoId);

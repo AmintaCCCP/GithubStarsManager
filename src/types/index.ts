@@ -528,7 +528,15 @@ export interface AppState {
   subscriptionLastRefresh: Record<string, string | null>;
   subscriptionIsLoading: Record<string, boolean>;
   subscriptionChannels: SubscriptionChannel[];
+
+  // GitHub Lists 同步模式：仅星标 / 星标及 list
+  syncMode: SyncMode;
+  /** 用户是否已明确选择过同步模式（首次登录弹窗后置为 true） */
+  syncModeConfigured: boolean;
 }
+
+/** GitHub 同步范围：'stars' = 仅星标仓库（现状）；'stars-and-lists' = 星标仓库及 Lists */
+export type SyncMode = 'stars' | 'stars-and-lists';
 
 export interface UpdateNotification {
   version: string;

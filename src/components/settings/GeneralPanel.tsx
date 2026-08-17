@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Package, Mail, ExternalLink, Github, Twitter } from 'lucide-react';
+import { Globe, Package, Mail, ExternalLink, Github, Twitter, Star, ListChecks } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { version } from '../../../package.json';
@@ -10,7 +10,7 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { language, setLanguage } = useAppStore();
+  const { language, setLanguage, syncMode, setSyncMode, setSyncModeConfigured } = useAppStore();
 
   return (
     <div className="space-y-6">
@@ -63,6 +63,57 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
               </span>
               <p className="text-xs text-gray-500 dark:text-text-tertiary">
                 US English
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
+        <div className="flex items-center space-x-3 mb-4">
+          <Star className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
+          <h4 className="font-medium text-gray-900 dark:text-text-primary">
+            {t('同步范围', 'Sync Scope')}
+          </h4>
+        </div>
+        <p className="text-sm text-gray-700 dark:text-text-tertiary mb-4">
+          {t('选择同步按钮默认拉取的数据范围：仅星标仓库，或星标仓库及 GitHub Lists。', 'Choose what the sync button pulls by default: starred repos only, or starred repos plus GitHub Lists.')}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
+            <input
+              type="radio"
+              name="syncMode"
+              value="stars"
+              checked={syncMode === 'stars'}
+              onChange={() => { setSyncMode('stars'); setSyncModeConfigured(true); }}
+              className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+            />
+            <div>
+              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
+                {t('仅同步星标仓库', 'Starred repos only')}
+              </span>
+              <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                {t('与以前行为一致', 'Same as before')}
+              </p>
+            </div>
+          </label>
+          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
+            <input
+              type="radio"
+              name="syncMode"
+              value="stars-and-lists"
+              checked={syncMode === 'stars-and-lists'}
+              onChange={() => { setSyncMode('stars-and-lists'); setSyncModeConfigured(true); }}
+              className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+            />
+            <div>
+              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
+                {t('同步星标仓库及 list', 'Starred repos & lists')}
+              </span>
+              <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                <ListChecks className="w-3 h-3 inline mr-1" />
+                {t('拉取 GitHub Lists 并按标签归类', 'Also pull GitHub Lists & categorize by tags')}
               </p>
             </div>
           </label>
