@@ -22,7 +22,11 @@ import {
   releaseBelongsToResolvedSources,
   resolveReleaseSources,
 } from '../utils/releaseSources';
-import { assetsFingerprint, effectiveReleaseTime } from '../utils/releaseAssets';
+import {
+  assetsFingerprint,
+  effectiveReleaseTime,
+  shouldShowAssetsUpdatedIndicator,
+} from '../utils/releaseAssets';
 
 export const ReleaseTimeline: React.FC = () => {
   const {
@@ -1235,7 +1239,9 @@ export const ReleaseTimeline: React.FC = () => {
             const isExpanded = expandedRepositories.has(repository.id);
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
             const latestEffectiveTime = latestRelease ? effectiveReleaseTime(latestRelease) : null;
-            const latestAssetsUpdated = latestEffectiveTime !== null && latestEffectiveTime > latestRelease.published_at;
+            const latestAssetsUpdated = latestRelease !== null
+              && latestEffectiveTime !== null
+              && shouldShowAssetsUpdatedIndicator(latestRelease, isReleaseUnread(latestRelease.id));
 
             return (
               <div key={repository.id} className="ui-card overflow-hidden">
