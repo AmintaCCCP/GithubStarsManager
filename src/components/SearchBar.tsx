@@ -4,6 +4,7 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { AIService } from '../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../services/vectorSearchService';
 import { GitHubApiService } from '../services/githubApi';
+import { createGitHubListsApiService } from '../services/githubApiFactory';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useDialog } from '../hooks/useDialog';
@@ -11,6 +12,7 @@ import { isRepoCustomized } from '../utils/repoUtils';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
+import type { Repository } from '../types';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
 
@@ -98,11 +100,15 @@ export const SearchBar: React.FC = () => {
     setLastSync,
     isSyncingStars,
     setSyncingStars,
+    syncMode,
+    user,
   } = useAppStore();
 
-  const { toast } = useDialog();
+  const { toast, confirm } = useDialog();
   
   const [showFilters, setShowFilters] = useState(false);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
+  const syncMenuRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState(searchFilters.query);
   const [isSearching, setIsSearching] = useState(false);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -736,7 +742,7 @@ export const SearchBar: React.FC = () => {
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const handleStarSync = async () => {
+  const handleStarSync = async (mode: 'auto' | 'stars-only' | 'stars-and-lists' = 'auto') => {
     if (!githubToken) {
       toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
@@ -774,10 +780,97 @@ export const SearchBar: React.FC = () => {
         return newRepo;
       });
 
+      // 解析本次同步范围：
+      // - 'auto'：跟随持久化配置 syncMode
+      // - 'stars-only'：强制仅星标（忽略 syncMode，供下拉菜单显式选择）
+      // - 'stars-and-lists'：强制星标及 list（供下拉菜单显式选择）
+      const syncLists = mode === 'stars-and-lists' || (mode === 'auto' && syncMode === 'stars-and-lists');
+      let finalRepositories = mergedRepositories;
+
+      if (syncLists) {
+        const listRepoMap = new Map(finalRepositories.map(repo => [repo.full_name.toLowerCase(), repo]));
+        const appliedTagsCount: Record<string, number> = {};
+        try {
+          const listsApi = createGitHubListsApiService(githubToken);
+          const login = user?.login;
+          if (!login) {
+            throw new Error(t('无法获取 GitHub 用户名，请重新登录。', 'Failed to get GitHub username. Please login again.'));
+          }
+          const lists = await listsApi.getUserLists(login);
+
+          // 构造"list 名 → 本地分类是否存在"的映射，避免每次循环重复查询
+          const categoryNames = new Set(
+            allCategories
+              .filter(c => c.id !== 'all')
+              .map(c => c.name.toLowerCase())
+          );
+
+          for (const list of lists) {
+            let appliedCount = 0;
+            for (const fullName of list.items) {
+              const repo = listRepoMap.get(fullName.toLowerCase());
+              if (!repo) continue;
+
+              // DEC-4：只判定锁定状态。锁定的仓库不改分类（也不改标签）。
+              if (repo.category_locked) continue;
+
+              const customTags = repo.custom_tags ? [...repo.custom_tags] : [];
+              if (!customTags.includes(list.name)) {
+                customTags.push(list.name);
+              }
+
+              // 若 list 名对应某个本地分类：设置分类并加锁；否则仅加标签（多分类靠标签匹配）
+              const listMatchesCategory = categoryNames.has(list.name.toLowerCase());
+              const updatedRepo: Repository = listMatchesCategory
+                ? {
+                    ...repo,
+                    custom_tags: customTags,
+                    custom_category: list.name,
+                    category_locked: true,
+                    last_edited: new Date().toISOString(),
+                  }
+                : {
+                    ...repo,
+                    custom_tags: customTags,
+                  };
+
+              listRepoMap.set(fullName.toLowerCase(), updatedRepo);
+              appliedCount++;
+            }
+            if (appliedCount > 0) {
+              appliedTagsCount[list.name] = appliedCount;
+            }
+          }
+
+          finalRepositories = finalRepositories.map(repo =>
+            listRepoMap.get(repo.full_name.toLowerCase()) || repo
+          );
+
+          if (Object.keys(appliedTagsCount).length > 0) {
+            const listSummary = Object.entries(appliedTagsCount)
+              .map(([name, count]) => `${name}(${count})`)
+              .join('、');
+            toast(t(
+              `已同步 ${lists.length} 个 list，并应用到 ${Object.values(appliedTagsCount).reduce((a, b) => a + b, 0)} 个未锁定仓库：${listSummary}`,
+              `Synced ${lists.length} lists, applied to ${Object.values(appliedTagsCount).reduce((a, b) => a + b, 0)} unlocked repositories: ${listSummary}`
+            ), 'info');
+          }
+        } catch (listError) {
+          console.error('List sync failed:', listError);
+          toast(
+            listError instanceof Error && listError.message
+              ? listError.message
+              : t('List 同步失败，星标仓库已同步。', 'List sync failed, starred repositories were synced.'),
+            'error'
+          );
+          // 不中断：星标同步结果仍然生效
+        }
+      }
+
       const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
       const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
 
-      setRepositories(mergedRepositories);
+      setRepositories(finalRepositories);
       await forceSyncToBackend();
       
       setLastSync(new Date().toISOString());
@@ -810,6 +903,38 @@ export const SearchBar: React.FC = () => {
     if (diffHours < 1) return t('刚刚', 'Just now');
     if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
     return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
+  };
+
+  // 同步下拉菜单点击外部关闭
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (syncMenuRef.current && !syncMenuRef.current.contains(event.target as Node)) {
+        setShowSyncMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行
+  const handleStarAndListSync = async () => {
+    const confirmed = await confirm(
+      t('同步星标仓库及 list', 'Sync starred repos & lists'),
+      t(
+        '将拉取你的 GitHub Lists（星标列表）并应用到本地仓库：\n\n' +
+        '· 每个 list 名会作为标签添加到对应仓库（一个仓库可属于多个 list/分类）\n' +
+        '· 未锁定分类的仓库将应用 list 对应的分类并默认锁定\n' +
+        '· 已锁定分类的仓库保持不变\n\n确定继续吗？',
+        'This will fetch your GitHub Lists and apply them to local repositories:\n\n' +
+        '· Each list name is added as a tag (a repo can belong to multiple lists/categories)\n' +
+        '· Unlocked repos get the list category applied and locked\n' +
+        '· Locked repos are left unchanged\n\nContinue?'
+      ),
+      { type: 'warning' }
+    );
+    if (!confirmed) return;
+    setShowSyncMenu(false);
+    await handleStarSync('stars-and-lists');
   };
 
   // 全局快捷键支持（Ctrl/Cmd+K、Ctrl/Cmd+Shift+F、/、Escape）
@@ -1025,15 +1150,46 @@ export const SearchBar: React.FC = () => {
 
           {/* Sync Button */}
           <div className="flex items-center gap-2 ml-1">
-            <button
-              onClick={handleStarSync}
-              disabled={isSyncingStars}
-              className="ui-button-primary inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
-              title={t('同步星标仓库列表', 'Sync starred repositories')}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
-            </button>
+            <div className="relative" ref={syncMenuRef}>
+              <div className="flex items-center">
+                <button
+                  onClick={() => { setShowSyncMenu(false); handleStarSync(); }}
+                  disabled={isSyncingStars}
+                  className="ui-button-primary inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50 rounded-r-none"
+                  title={t('同步星标仓库列表', 'Sync starred repositories')}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
+                  <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+                </button>
+                <button
+                  onClick={() => setShowSyncMenu(!showSyncMenu)}
+                  disabled={isSyncingStars}
+                  className="ui-button-primary inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 rounded-l-none border-l border-black/10 dark:border-white/10"
+                  title={t('更多同步选项', 'More sync options')}
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSyncMenu ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {showSyncMenu && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-[9999] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => { setShowSyncMenu(false); handleStarSync('stars-only'); }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors"
+                  >
+                    <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStarAndListSync}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors"
+                  >
+                    <span className="whitespace-nowrap">{t('同步星标仓库及 list', 'Sync starred repos & lists')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="group relative">
               <Clock className="w-4 h-4 text-gray-400 dark:text-text-quaternary cursor-help" />
               <div className="absolute right-0 top-full mt-2 w-max p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
