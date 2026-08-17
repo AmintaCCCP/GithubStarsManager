@@ -16,13 +16,14 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
     githubToken,
     listsPush,
     pushCategoriesToLists,
+    setListsPushError,
   } = useAppStore();
 
   const { confirm } = useDialog();
 
   const handlePushCategoriesToLists = async () => {
     if (!githubToken) {
-      useAppStore.setState({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('未登录 GitHub，请先连接', 'Not connected to GitHub yet') } });
+      setListsPushError(t('未登录 GitHub，请先连接', 'Not connected to GitHub yet'));
       return;
     }
     const confirmed = await confirm(

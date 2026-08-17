@@ -798,11 +798,14 @@ export const SearchBar: React.FC = () => {
           }
           const lists = await listsApi.getUserLists(login);
 
-          // 构造"list 名 → 本地分类是否存在"的映射，避免每次循环重复查询
-          const categoryNames = new Set(
+          // 构造"list 名(小写) → 本地分类"的映射，避免每次循环重复查询。
+          // 值使用本地分类的原始名称（保留其大小写），而非 list 名：
+          // 锁定分类的筛选用精确相等比较，若直接存 GitHub 侧的大小写，
+          // 仓库会从分类结果中消失（如 list 名为 "web apps" 而分类为 "Web Apps"）。
+          const categoryByLowerName = new Map(
             allCategories
               .filter(c => c.id !== 'all')
-              .map(c => c.name.toLowerCase())
+              .map(c => [c.name.toLowerCase(), c.name])
           );
 
           // DEC-4：只判定锁定状态。
@@ -838,12 +841,12 @@ export const SearchBar: React.FC = () => {
               }
 
               // 若 list 名对应某个本地分类：设置分类并加锁；否则仅加标签（多分类靠标签匹配）
-              const listMatchesCategory = categoryNames.has(list.name.toLowerCase());
+              const listMatchesCategory = categoryByLowerName.has(list.name.toLowerCase());
               const updatedRepo: Repository = listMatchesCategory
                 ? {
                     ...repo,
                     custom_tags: customTags,
-                    custom_category: list.name,
+                    custom_category: categoryByLowerName.get(list.name.toLowerCase()),
                     category_locked: true,
                     last_edited: new Date().toISOString(),
                   }
@@ -865,22 +868,21 @@ export const SearchBar: React.FC = () => {
           );
 
           if (Object.keys(appliedTagsCount).length > 0) {
+            const appliedTotal = Object.values(appliedTagsCount).reduce((a, b) => a + b, 0);
             const listSummary = Object.entries(appliedTagsCount)
               .map(([name, count]) => `${name}(${count})`)
               .join('、');
             toast(t(
-              `已同步 ${lists.length} 个 list，并应用到 ${Object.values(appliedTagsCount).reduce((a, b) => a + b, 0)} 个未锁定仓库：${listSummary}`,
-              `Synced ${lists.length} lists, applied to ${Object.values(appliedTagsCount).reduce((a, b) => a + b, 0)} unlocked repositories: ${listSummary}`
+              `已同步 ${lists.length} 个 list，并应用到 ${appliedTotal} 个未锁定仓库：${listSummary}`,
+              `Synced ${lists.length} lists, applied to ${appliedTotal} unlocked repositories: ${listSummary}`
             ), 'info');
           }
         } catch (listError) {
           console.error('List sync failed:', listError);
-          toast(
-            listError instanceof Error && listError.message
-              ? listError.message
-              : t('List 同步失败，星标仓库已同步。', 'List sync failed, starred repositories were synced.'),
-            'error'
-          );
+          toast(t(
+            'List 同步失败，星标仓库已同步。请稍后重试，或检查 GitHub Token 权限（需 user scope）。',
+            'List sync failed, starred repositories were synced. Retry later, or check the GitHub Token has the user scope.'
+          ), 'error');
           // 不中断：星标同步结果仍然生效
         }
       }

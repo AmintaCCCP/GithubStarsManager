@@ -342,6 +342,8 @@ interface AppActions {
   setSyncModeConfigured: (configured: boolean) => void;
   pushCategoriesToLists: (api: GitHubListsApiService) => Promise<void>;
   resetListsPush: () => void;
+  setListsPushError: (error: string | null) => void;
+  setCategoryListIdMap: (categoryId: string, listId: string) => void;
   deleteRepository: (repoId: number) => void;
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
 
@@ -614,6 +616,7 @@ type PersistedAppState = Partial<
     | 'mcpConfig'
     | 'syncMode'
     | 'syncModeConfigured'
+    | 'categoryListIdMap'
   >
 > & {
   releaseSubscriptions?: unknown;
@@ -875,6 +878,15 @@ export const normalizePersistedState = (
     includePreRelease,
     syncMode: safePersisted.syncMode === 'stars-and-lists' ? 'stars-and-lists' : 'stars',
     syncModeConfigured: safePersisted.syncModeConfigured === true,
+    // 分类 id → GitHub List id 映射：仅保留字符串键值对，防止损坏数据污染状态
+    categoryListIdMap: safePersisted.categoryListIdMap
+      && typeof safePersisted.categoryListIdMap === 'object'
+      ? Object.fromEntries(
+          Object.entries(safePersisted.categoryListIdMap).filter(
+            ([key, value]) => typeof key === 'string' && typeof value === 'string'
+          )
+        )
+      : {},
     searchFilters: {
       ...initialSearchFilters,
       ...safePersisted.searchFilters,
@@ -1294,6 +1306,7 @@ export const useAppStore = create<AppState & AppActions>()(
       syncMode: 'stars',
       syncModeConfigured: false,
       listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null },
+      categoryListIdMap: {},
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
@@ -1532,6 +1545,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setSyncMode: (syncMode) => set({ syncMode }),
       setSyncModeConfigured: (syncModeConfigured) => set({ syncModeConfigured }),
       resetListsPush: () => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null } }),
+      setListsPushError: (error) => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error } }),
+      setCategoryListIdMap: (categoryId, listId) => set((state) => ({ categoryListIdMap: { ...state.categoryListIdMap, [categoryId]: listId } })),
       pushCategoriesToLists: async (api) => {
         const state = get();
         const t = (zh: string, en: string) => (state.language === 'zh' ? zh : en);
@@ -1551,7 +1566,7 @@ export const useAppStore = create<AppState & AppActions>()(
         set({ listsPush: { isRunning: true, total: 0, done: 0, currentLabel: null, message: null, error: null } });
 
         try {
-          const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides } = get();
+          const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryListIdMap } = get();
 
           const allCategories = getAllCategories(
             customCategories,
@@ -1563,13 +1578,39 @@ export const useAppStore = create<AppState & AppActions>()(
           // 1. 获取当前全部 list（含成员）
           const currentLists = await api.getUserLists(user!.login);
 
-          // 2. 构建"托管 list"映射：每个本地分类 → list id（同名复用，无则新建）
-          const listIdByName = new Map<string, string>();
+          // 2. 构建"托管 list"映射：每个本地分类 → list id。
+          //    使用分类的稳定身份（规范名 + 持久化 id 映射），而不是翻译后的 cat.name：
+          //    否则在中文/英文间来回推送会创建并行 list（如 "Web应用" 与 "Web Apps"）。
+          //    - 优先复用已持久化的 categoryListIdMap[cat.id]（跨语言稳定）
+          //    - 否则按规范名及其本地化变体在既有 list 中查找（迁移历史 list，避免重复创建）
+          //    - 仍找不到才新建，并用规范名命名，随后记录到映射
+          const listIdByCategoryId = new Map<string, string>();
           const managedListIds = new Set<string>();
+          const nextCategoryListIdMap = { ...categoryListIdMap };
           for (const cat of allCategories) {
-            const found = currentLists.find(l => l.name.toLowerCase() === cat.name.toLowerCase());
-            const id = found ? found.id : await api.createUserList(cat.name, true);
-            listIdByName.set(cat.name, id);
+            const persistedId = categoryListIdMap[cat.id];
+            if (persistedId && currentLists.some(l => l.id === persistedId)) {
+              listIdByCategoryId.set(cat.id, persistedId);
+              managedListIds.add(persistedId);
+              continue;
+            }
+            // 规范名：默认分类用其稳定中文名（除非被用户覆盖），自定义分类用其自身名称
+            const defaultCat = defaultCategories.find(d => d.id === cat.id);
+            const canonicalName = defaultCat ? defaultCat.name : cat.name;
+            const overrideName = defaultCategoryOverrides[cat.id]?.name;
+            const nameVariants = getCategoryNameVariants(canonicalName, overrideName);
+            const matchedList = currentLists.find(l =>
+              nameVariants.some(v => v.toLowerCase() === l.name.toLowerCase())
+            );
+            if (matchedList) {
+              listIdByCategoryId.set(cat.id, matchedList.id);
+              nextCategoryListIdMap[cat.id] = matchedList.id;
+              managedListIds.add(matchedList.id);
+              continue;
+            }
+            const id = await api.createUserList(canonicalName, true);
+            listIdByCategoryId.set(cat.id, id);
+            nextCategoryListIdMap[cat.id] = id;
             managedListIds.add(id);
           }
 
@@ -1594,7 +1635,7 @@ export const useAppStore = create<AppState & AppActions>()(
             const matched: string[] = [];
             for (const cat of allCategories) {
               if (matchesCategory(repo, cat, 'effective')) {
-                const id = listIdByName.get(cat.name);
+                const id = listIdByCategoryId.get(cat.id);
                 if (id) matched.push(id);
               }
             }
@@ -1648,9 +1689,9 @@ export const useAppStore = create<AppState & AppActions>()(
           }
 
           set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t(
-            `已同步 ${listIdByName.size} 个 list、更新 ${updatedCount} 个仓库`,
-            `Pushed ${listIdByName.size} lists, updated ${updatedCount} repos`
-          ), error: null } });
+            `已同步 ${listIdByCategoryId.size} 个 list、更新 ${updatedCount} 个仓库`,
+            `Pushed ${listIdByCategoryId.size} lists, updated ${updatedCount} repos`
+          ), error: null }, categoryListIdMap: nextCategoryListIdMap });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error('Push categories to lists failed:', error);
@@ -2572,6 +2613,8 @@ export const useAppStore = create<AppState & AppActions>()(
         // 持久化同步范围配置（GitHub Lists 同步）
         syncMode: state.syncMode,
         syncModeConfigured: state.syncModeConfigured,
+        // 持久化分类 → GitHub List 映射（跨语言稳定身份）
+        categoryListIdMap: state.categoryListIdMap,
 
         // 持久化搜索排序设置
         searchFilters: {
