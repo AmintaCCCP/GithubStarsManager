@@ -805,18 +805,36 @@ export const SearchBar: React.FC = () => {
               .map(c => c.name.toLowerCase())
           );
 
+          // DEC-4：只判定锁定状态。
+          // 区分"本次同步开始前已存在"的锁定与"本次运行中新产生"的锁定：
+          // - 预存在的锁定：跳过（不改分类也不改标签）
+          // - 本次运行中被前面的 list 刚锁定：保留已分配的分类/锁定，但继续追加后续 list 的标签
+          const preExistingLocked = new Set(
+            finalRepositories
+              .filter(r => r.category_locked)
+              .map(r => r.full_name.toLowerCase())
+          );
+
           for (const list of lists) {
             let appliedCount = 0;
             for (const fullName of list.items) {
-              const repo = listRepoMap.get(fullName.toLowerCase());
+              const key = fullName.toLowerCase();
+              const repo = listRepoMap.get(key);
               if (!repo) continue;
 
-              // DEC-4：只判定锁定状态。锁定的仓库不改分类（也不改标签）。
-              if (repo.category_locked) continue;
+              // 预存在锁定：跳过（不改分类也不改标签）
+              if (preExistingLocked.has(key)) continue;
 
               const customTags = repo.custom_tags ? [...repo.custom_tags] : [];
               if (!customTags.includes(list.name)) {
                 customTags.push(list.name);
+              }
+
+              // 本次运行中刚被锁定的仓库：保留已分配的分类与锁定，仅追加标签
+              if (repo.category_locked) {
+                listRepoMap.set(key, { ...repo, custom_tags: customTags });
+                appliedCount++;
+                continue;
               }
 
               // 若 list 名对应某个本地分类：设置分类并加锁；否则仅加标签（多分类靠标签匹配）
@@ -834,7 +852,7 @@ export const SearchBar: React.FC = () => {
                     custom_tags: customTags,
                   };
 
-              listRepoMap.set(fullName.toLowerCase(), updatedRepo);
+              listRepoMap.set(key, updatedRepo);
               appliedCount++;
             }
             if (appliedCount > 0) {
