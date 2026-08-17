@@ -1,3 +1,5 @@
+import { compactUpsertVectors } from './metadata';
+
 /**
  * GitHub Stars Vectorize — 极简代理 Worker
  *
@@ -23,6 +25,11 @@ interface DeleteRequest {
 interface UpsertRequest {
   vectors: VectorizeVector[];
 }
+
+// returnMetadata:'all' caps topK at 50 on Vectorize V2 indexes; clamp requests
+// to avoid passing an out-of-range topK and being silently truncated.
+const QUERY_TOPK_LIMIT = 50;
+const QUERY_DEFAULT_TOPK = 20;
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -62,18 +69,23 @@ export default {
         if (!Array.isArray(vectors) || vectors.length === 0) {
           return jsonResponse({ success: false, error: 'vectors array required' }, 400);
         }
-        await env.VECTORIZE.upsert(vectors);
+        const compactedVectors = compactUpsertVectors(vectors);
+        await env.VECTORIZE.upsert(compactedVectors);
         return jsonResponse({ success: true, upserted: vectors.length });
       }
 
       // POST /query — 向量相似度查询
       if (request.method === 'POST' && url.pathname === '/query') {
-        const { vector, topK = 20, threshold = 0.35 } = (await request.json()) as QueryRequest;
+        const { vector, topK = QUERY_DEFAULT_TOPK, threshold = 0.35 } = (await request.json()) as QueryRequest;
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }
-        // returnMetadata:'all' caps topK at 50; clamp to avoid silent truncation
-        const clampedTopK = Math.min(topK, 50);
+        // returnMetadata:'all' caps topK at 50 (Vectorize V2 limits); clamp so
+        // an oversized/negative/NaN topK degrades gracefully instead of erroring.
+        const requestedTopK = typeof topK === 'number' && Number.isFinite(topK)
+          ? Math.floor(topK)
+          : QUERY_DEFAULT_TOPK;
+        const clampedTopK = Math.min(Math.max(requestedTopK, 1), QUERY_TOPK_LIMIT);
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
           returnMetadata: 'all' as const,
