@@ -54,3 +54,29 @@ export function effectiveReleaseTime(release: Pick<Release, 'published_at' | 'as
   }
   return new Date(latest).toISOString();
 }
+
+/**
+ * 判断是否存在发布时间之后更新过的资产。
+ * 使用时间值比较，而不是比较不同格式的时间字符串，避免时区或毫秒精度差异造成误判。
+ */
+export function hasAssetsUpdatedAfterPublish(
+  release: Pick<Release, 'published_at' | 'assets'>
+): boolean {
+  const publishedTime = new Date(release.published_at).getTime();
+  if (Number.isNaN(publishedTime) || !Array.isArray(release.assets)) return false;
+
+  return release.assets.some((asset) => {
+    const assetTime = new Date(asset.updated_at).getTime();
+    return !Number.isNaN(assetTime) && assetTime > publishedTime;
+  });
+}
+
+/**
+ * “资产已更新”是未读更新提示的一部分；Release 被标记为已读后应立即隐藏该提示。
+ */
+export function shouldShowAssetsUpdatedIndicator(
+  release: Pick<Release, 'published_at' | 'assets'>,
+  isUnread: boolean
+): boolean {
+  return isUnread && hasAssetsUpdatedAfterPublish(release);
+}

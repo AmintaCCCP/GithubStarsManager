@@ -5,6 +5,8 @@ import {
   assetsFingerprint,
   effectiveReleaseTime,
   hasAssetsChanged,
+  hasAssetsUpdatedAfterPublish,
+  shouldShowAssetsUpdatedIndicator,
 } from './releaseAssets';
 
 const makeAsset = (overrides: Partial<ReleaseAsset> = {}): ReleaseAsset => ({
@@ -130,5 +132,58 @@ describe('effectiveReleaseTime', () => {
       ],
     });
     expect(effectiveReleaseTime(release)).toBe('2026-01-10T00:00:00.000Z');
+  });
+});
+
+describe('hasAssetsUpdatedAfterPublish', () => {
+  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name: 'v1',
+    name: 'Release 1',
+    body: null,
+    published_at: '2026-01-01T00:00:00Z',
+    html_url: 'https://github.com/owner/repo/releases/tag/v1',
+    assets: [],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  it('returns true when an asset is updated after publication', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.001Z' })],
+    }))).toBe(true);
+  });
+
+  it('compares timestamps by time value across equivalent formats', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: '2026-01-01T08:00:00+08:00',
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }))).toBe(false);
+  });
+
+  it('returns false when assets are unchanged or updated at publication time', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }))).toBe(false);
+    expect(hasAssetsUpdatedAfterPublish(makeRelease())).toBe(false);
+  });
+});
+
+describe('shouldShowAssetsUpdatedIndicator', () => {
+  const release: Pick<Release, 'published_at' | 'assets'> = {
+    published_at: '2026-01-01T00:00:00Z',
+    assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+  };
+
+  it('shows the indicator only while the release is unread', () => {
+    expect(shouldShowAssetsUpdatedIndicator(release, true)).toBe(true);
+    expect(shouldShowAssetsUpdatedIndicator(release, false)).toBe(false);
+  });
+
+  it('does not show the indicator when no asset was updated after publication', () => {
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }, true)).toBe(false);
   });
 });
