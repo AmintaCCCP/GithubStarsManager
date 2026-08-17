@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compactUpsertVectors,
   compactVectorMetadata,
   VECTORIZE_METADATA_LIMIT_BYTES,
-} from '../../cloudflare-worker/src/index';
+} from '../../cloudflare-worker/src/metadata';
 
 const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
@@ -15,13 +16,25 @@ const baseMetadata = {
   license: 'MIT',
 };
 
+type TestMetadata = {
+  full_name: string;
+  description: string;
+  language: string;
+  stars: number;
+  tags: string[];
+  license?: string;
+  [key: string]: unknown;
+};
+
+const compact = (input: unknown): TestMetadata => compactVectorMetadata(input) as TestMetadata;
+
 describe('Cloudflare Worker Vectorize metadata compaction', () => {
   it('leaves metadata unchanged when it is within the budget', () => {
-    expect(compactVectorMetadata(baseMetadata)).toEqual(baseMetadata);
+    expect(compact(baseMetadata)).toEqual(baseMetadata);
   });
 
   it('truncates a long UTF-8 description while retaining small tags', () => {
-    const metadata = compactVectorMetadata({
+    const metadata = compact({
       ...baseMetadata,
       description: '中文描述'.repeat(7_000),
       tags: ['semantic-search'],
@@ -37,7 +50,7 @@ describe('Cloudflare Worker Vectorize metadata compaction', () => {
   it('compresses both description and tags when both fields are oversized', () => {
     const description = 'd'.repeat(20_000);
     const tag = '标签'.repeat(8_000);
-    const metadata = compactVectorMetadata({
+    const metadata = compact({
       ...baseMetadata,
       description,
       tags: [tag],
@@ -52,7 +65,7 @@ describe('Cloudflare Worker Vectorize metadata compaction', () => {
   });
 
   it('protects the limit from a malformed oversized license field', () => {
-    const metadata = compactVectorMetadata({
+    const metadata = compact({
       ...baseMetadata,
       description: '',
       tags: [],
@@ -63,5 +76,71 @@ describe('Cloudflare Worker Vectorize metadata compaction', () => {
     expect(metadata.full_name).toBe(baseMetadata.full_name);
     expect(metadata.language).toBe(baseMetadata.language);
     expect(metadata.stars).toBe(baseMetadata.stars);
+  });
+
+  it('preserves unknown metadata fields when the payload is within budget', () => {
+    const input = {
+      ...baseMetadata,
+      url: 'https://github.com/owner/repository',
+      source_id: 'abc-123',
+      custom: 123,
+    };
+
+    expect(compact(input)).toEqual(input);
+  });
+
+  it('reduces oversized description first while keeping unknown fields', () => {
+    const metadata = compact({
+      ...baseMetadata,
+      description: 'x'.repeat(20_000),
+      url: 'https://github.com/owner/repository',
+    });
+
+    expect(jsonBytes(metadata)).toBeLessThanOrEqual(VECTORIZE_METADATA_LIMIT_BYTES);
+    expect(metadata.description.length).toBeLessThan(20_000);
+    expect(metadata.url).toBe('https://github.com/owner/repository');
+  });
+
+  it('drops unknown fields only in the final fallback when they cannot fit', () => {
+    const metadata = compact({
+      full_name: baseMetadata.full_name,
+      description: '',
+      language: baseMetadata.language,
+      stars: baseMetadata.stars,
+      tags: [],
+      license: baseMetadata.license,
+      url: 'u'.repeat(100_000),
+    });
+
+    expect(jsonBytes(metadata)).toBeLessThanOrEqual(VECTORIZE_METADATA_LIMIT_BYTES);
+    expect(metadata.full_name).toBe(baseMetadata.full_name);
+    expect(metadata).not.toHaveProperty('url');
+  });
+
+  it('applies compaction to each vector at the upsert boundary', () => {
+    const vectors = [
+      { id: '1', values: [0.1, 0.2], namespace: 'a', metadata: baseMetadata },
+      {
+        id: '2',
+        values: [0.3],
+        namespace: 'b',
+        metadata: { ...baseMetadata, description: 'x'.repeat(20_000), url: 'https://example.com' },
+      },
+    ];
+
+    const compacted = compactUpsertVectors(vectors);
+
+    // vector identity / top-level fields are preserved untouched
+    expect(compacted[0].id).toBe('1');
+    expect(compacted[0].values).toEqual([0.1, 0.2]);
+    expect(compacted[0].namespace).toBe('a');
+    // within-budget metadata is passed through byte-for-byte
+    expect(compacted[0].metadata).toEqual(baseMetadata);
+
+    // oversized metadata is compacted but keeps unknown fields
+    expect(jsonBytes(compacted[1].metadata)).toBeLessThanOrEqual(VECTORIZE_METADATA_LIMIT_BYTES);
+    expect(compacted[1].metadata.url).toBe('https://example.com');
+    expect((compacted[1].metadata.description as string).length).toBeLessThan(20_000);
+    expect(compacted[1].namespace).toBe('b');
   });
 });
