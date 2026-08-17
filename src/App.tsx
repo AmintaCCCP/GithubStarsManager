@@ -17,6 +17,7 @@ import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync, tryRestoreAuthFromBackend } from './services/autoSync';
 import {
@@ -254,6 +255,7 @@ function App() {
       <BackToTop />
       <DebugModeIndicator />
       <SyncModeChoiceModal />
+      <ListsPushIndicator />
     </div>
   );
 }

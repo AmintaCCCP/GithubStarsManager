@@ -53,6 +53,8 @@ import {
 } from '../utils/releaseSources';
 import { logger } from '../services/logger';
 import { PRESET_FILTERS } from '../constants/presetFilters';
+import type { GitHubListsApiService } from '../services/githubListsApi';
+import { matchesCategory } from '../utils/categoryUtils';
 
 const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
 const AUTH_MIRROR_KEY = 'github-stars-manager-auth';
@@ -338,6 +340,8 @@ interface AppActions {
   setLastSync: (timestamp: string) => void;
   setSyncMode: (mode: SyncMode) => void;
   setSyncModeConfigured: (configured: boolean) => void;
+  pushCategoriesToLists: (api: GitHubListsApiService) => Promise<void>;
+  resetListsPush: () => void;
   deleteRepository: (repoId: number) => void;
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
 
@@ -1272,7 +1276,7 @@ const defaultDiscoveryChannels: DiscoveryChannel[] = [
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       user: null,
       githubToken: null,
@@ -1289,6 +1293,7 @@ export const useAppStore = create<AppState & AppActions>()(
       lastSync: null,
       syncMode: 'stars',
       syncModeConfigured: false,
+      listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null },
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
@@ -1526,6 +1531,132 @@ export const useAppStore = create<AppState & AppActions>()(
       setLastSync: (lastSync) => set({ lastSync }),
       setSyncMode: (syncMode) => set({ syncMode }),
       setSyncModeConfigured: (syncModeConfigured) => set({ syncModeConfigured }),
+      resetListsPush: () => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null } }),
+      pushCategoriesToLists: async (api) => {
+        const state = get();
+        const t = (zh: string, en: string) => (state.language === 'zh' ? zh : en);
+        if (!state.githubToken) {
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('未登录 GitHub，请先连接', 'Not connected to GitHub yet') } });
+          return;
+        }
+        if (!state.user) {
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('缺少用户信息，请重新连接', 'Missing user info, reconnect') } });
+          return;
+        }
+        if (state.repositories.length === 0) {
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('暂无仓库可回写', 'No repositories to push') } });
+          return;
+        }
+
+        set({ listsPush: { isRunning: true, total: 0, done: 0, currentLabel: null, message: null, error: null } });
+
+        try {
+          const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides } = get();
+
+          const allCategories = getAllCategories(
+            customCategories,
+            language,
+            hiddenDefaultCategoryIds,
+            defaultCategoryOverrides
+          ).filter(cat => cat.id !== 'all');
+
+          // 1. 获取当前全部 list（含成员）
+          const currentLists = await api.getUserLists(user!.login);
+
+          // 2. 构建"托管 list"映射：每个本地分类 → list id（同名复用，无则新建）
+          const listIdByName = new Map<string, string>();
+          const managedListIds = new Set<string>();
+          for (const cat of allCategories) {
+            const found = currentLists.find(l => l.name.toLowerCase() === cat.name.toLowerCase());
+            const id = found ? found.id : await api.createUserList(cat.name, true);
+            listIdByName.set(cat.name, id);
+            managedListIds.add(id);
+          }
+
+          // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）
+          const repoCurrentListIds = new Map<string, Set<string>>();
+          const lowerToOriginal = new Map<string, string>();
+          for (const list of currentLists) {
+            for (const fullName of list.items) {
+              const key = fullName.toLowerCase();
+              lowerToOriginal.set(key, fullName);
+              if (!repoCurrentListIds.has(key)) repoCurrentListIds.set(key, new Set());
+              repoCurrentListIds.get(key)!.add(list.id);
+            }
+          }
+
+          // 4. 每仓库命中的托管 list（effective 标签匹配）
+          const repoTargetListIds = new Map<string, Set<string>>();
+          for (const repo of repositories) {
+            const original = repo.full_name || `${repo.owner}/${repo.name}`;
+            const key = original.toLowerCase();
+            lowerToOriginal.set(key, original);
+            const matched: string[] = [];
+            for (const cat of allCategories) {
+              if (matchesCategory(repo, cat, 'effective')) {
+                const id = listIdByName.get(cat.name);
+                if (id) matched.push(id);
+              }
+            }
+            if (matched.length > 0) {
+              repoTargetListIds.set(key, new Set(matched));
+            }
+          }
+
+          // 5. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）
+          const reposToUpdate = new Map<string, Set<string>>();
+          for (const [key, targetIds] of repoTargetListIds) {
+            reposToUpdate.set(key, targetIds);
+          }
+          for (const [key, currentIds] of repoCurrentListIds) {
+            const hasManagedCurrent = [...currentIds].some(id => managedListIds.has(id));
+            if (hasManagedCurrent && !reposToUpdate.has(key)) {
+              reposToUpdate.set(key, new Set());
+            }
+          }
+
+          if (reposToUpdate.size === 0) {
+            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: t('没有仓库命中任何分类', 'No repos matched any category'), error: null } });
+            return;
+          }
+
+          // 6. 解析仓库 node id
+          const ownerNamePairs = [...reposToUpdate.keys()].map(key => {
+            const original = lowerToOriginal.get(key) || key;
+            const idx = original.indexOf('/');
+            return { owner: original.slice(0, idx), name: original.slice(idx + 1) };
+          });
+          const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
+
+          // 7. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
+          let updatedCount = 0;
+          let done = 0;
+          const total = reposToUpdate.size;
+          for (const [key, targetIds] of reposToUpdate) {
+            done++;
+            set({ listsPush: { isRunning: true, total, done, currentLabel: key, message: null, error: null } });
+            const itemId = nodeIdMap.get(key);
+            if (!itemId) continue;
+            const currentIds = repoCurrentListIds.get(key) || new Set<string>();
+            const preservedIds = [...currentIds].filter(id => !managedListIds.has(id));
+            const finalListIds = [...new Set([...preservedIds, ...targetIds])];
+            if (finalListIds.length === currentIds.size && finalListIds.every(id => currentIds.has(id))) {
+              continue;
+            }
+            await api.updateUserListsForItem(itemId, finalListIds);
+            updatedCount++;
+          }
+
+          set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t(
+            `已同步 ${listIdByName.size} 个 list、更新 ${updatedCount} 个仓库`,
+            `Pushed ${listIdByName.size} lists, updated ${updatedCount} repos`
+          ), error: null } });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error('Push categories to lists failed:', error);
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('同步失败', 'Push failed') + `: ${message}` } });
+        }
+      },
       deleteRepository: (repoId) => set((state) => {
         const nextReleaseSubscriptions = new Set(state.releaseSubscriptions);
         nextReleaseSubscriptions.delete(repoId);
