@@ -14,6 +14,7 @@ import {
   Layout,
   Search,
   Cable,
+  Star,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { isElectron } from '../services/electronProxy';
@@ -29,11 +30,12 @@ import {
   NetworkPanel,
   DiagnosticLogsPanel,
   MenuManagementPanel,
+  StarSyncPanel,
   VectorSearchSettings,
   McpSettingsPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp';
+type SettingsTab = 'general' | 'starSync' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -260,7 +262,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp']),
+    () => new Set(['general', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp']),
     []
   );
 
@@ -312,6 +314,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       id: 'general',
       label: t('通用', 'General'),
       icon: <Globe className="w-5 h-5" />,
+    },
+    {
+      id: 'starSync',
+      label: t('星标同步', 'Star Sync'),
+      icon: <Star className="w-5 h-5" />,
     },
     {
       id: 'ai',
@@ -376,6 +383,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       switch (displayTab) {
         case 'general':
           return <GeneralPanel t={t} />;
+        case 'starSync':
+          return <StarSyncPanel t={t} />;
         case 'ai':
           return <AIConfigPanel t={t} />;
         case 'webdav':

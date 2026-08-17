@@ -533,6 +533,18 @@ export interface AppState {
   syncMode: SyncMode;
   /** 用户是否已明确选择过同步模式（首次登录弹窗后置为 true） */
   syncModeConfigured: boolean;
+
+  // GitHub Lists 回写进度（会话级，不持久化）
+  listsPush: ListsPushState;
+}
+
+export interface ListsPushState {
+  isRunning: boolean;
+  total: number;
+  done: number;
+  currentLabel: string | null;
+  message: string | null;
+  error: string | null;
 }
 
 /** GitHub 同步范围：'stars' = 仅星标仓库（现状）；'stars-and-lists' = 星标仓库及 Lists */

@@ -1170,23 +1170,25 @@ export const SearchBar: React.FC = () => {
           <div className="flex items-center gap-2 ml-1">
             <div className="relative" ref={syncMenuRef}>
               <div className="flex items-center">
-                <button
-                  onClick={() => { setShowSyncMenu(false); handleStarSync(); }}
-                  disabled={isSyncingStars}
-                  className="ui-button-primary inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50 rounded-r-none"
-                  title={t('同步星标仓库列表', 'Sync starred repositories')}
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
-                  <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
-                </button>
-                <button
-                  onClick={() => setShowSyncMenu(!showSyncMenu)}
-                  disabled={isSyncingStars}
-                  className="ui-button-primary inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 rounded-l-none border-l border-black/10 dark:border-white/10"
-                  title={t('更多同步选项', 'More sync options')}
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSyncMenu ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="ui-button-primary inline-flex items-stretch overflow-hidden">
+                  <button
+                    onClick={() => { setShowSyncMenu(false); handleStarSync(); }}
+                    disabled={isSyncingStars}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    title={t('同步星标仓库列表', 'Sync starred repositories')}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
+                    <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowSyncMenu(!showSyncMenu)}
+                    disabled={isSyncingStars}
+                    className="inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-white/20"
+                    title={t('更多同步选项', 'More sync options')}
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSyncMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
               </div>
 
               {showSyncMenu && (
