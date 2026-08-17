@@ -40,7 +40,7 @@ Push: 本地分类 → 计算每个分类的成员仓库 → GitHub Lists (Graph
 新建 `src/services/githubListsApi.ts`：
 
 - 底层 HTTP 走 REST 同样的模式：有后端时 `backend.postProxy` / 无后端时 `fetch('https://api.github.com/graphql')`，带 `Authorization: Bearer <token>`。复用 `githubApi.ts` 现有请求封装思路。
-- 查询：`getUserLists()` → `user(login){ lists(first:100){ nodes { id name description isPrivate items(first:100, cursor) { nodes { repository { id nameWithOwner } } } } } }`（分页拉全）。
+- 查询：`getUserLists()` 分两阶段分页：先读取 `user(login).lists` 摘要（`first:100` 分页拉全），再通过 `node(id:)` 分页读取每个 `UserList.items`（每页 `first:100`）。两阶段均带 `after` 游标与 `pageInfo`，避免单次内联 items 的巨型响应导致 GitHub 侧超时（502/504）。
 - 覆盖写入：先查现有 lists → 同名 list 存在则 `updateUserListsForItem` 或删除重建；不存在则 `createUserList` + `updateUserListsForItem`。
 - 权限校验：GraphQL 需要 `user` scope（经典 PAT）或含 star lists 权限的 fine-grained token；权限不足时返回友好错误，提示 `gh auth refresh -h github.com -s user`。
 

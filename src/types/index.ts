@@ -536,6 +536,8 @@ export interface AppState {
 
   // GitHub Lists 回写进度（会话级，不持久化）
   listsPush: ListsPushState;
+  /** 分类 id → GitHub List id 的稳定映射（跨语言持久化，避免切换语言时重复建 list） */
+  categoryListIdMap: Record<string, string>;
 }
 
 export interface ListsPushState {

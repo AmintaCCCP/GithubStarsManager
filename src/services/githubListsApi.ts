@@ -66,9 +66,10 @@ export class GitHubListsApiService {
   private async request<T>(
     query: string,
     variables: Record<string, unknown> = {},
-    options: { toleratePartialErrors?: boolean } = {}
+    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number } = {}
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
+    const signal = options.signal ?? AbortSignal.timeout(options.timeoutMs ?? 30_000);
 
     let response: Response;
     if (this.backendUrl) {
@@ -76,6 +77,7 @@ export class GitHubListsApiService {
       response = await fetch(proxyUrl, {
         method: 'POST',
         headers: this.getBackendHeaders(),
+        signal,
         body: JSON.stringify({
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -91,6 +93,7 @@ export class GitHubListsApiService {
           'Accept': 'application/json',
           'X-GitHub-Api-Version': '2022-11-28',
         },
+        signal,
         body,
       });
     }
@@ -100,6 +103,19 @@ export class GitHubListsApiService {
       payload = await response.json();
     } catch {
       throw new Error('GitHub GraphQL 响应解析失败（非 JSON）。');
+    }
+
+    // 速率限制：403 既可能是 scope 不足，也可能是主/次速率限制。
+    // 需在鉴权分类之前判断，避免把限流误报为"缺少权限"。
+    const isRateLimited =
+      response.status === 403 &&
+      (response.headers.get('x-ratelimit-remaining') === '0' ||
+        response.headers.get('retry-after') !== null);
+    if (isRateLimited) {
+      const retryAfter = response.headers.get('retry-after');
+      throw new Error(
+        `GitHub API 触发速率限制，请稍后重试${retryAfter ? `（约 ${retryAfter} 秒后）` : ''}。`
+      );
     }
 
     if (payload.errors && payload.errors.length > 0) {
@@ -155,7 +171,7 @@ export class GitHubListsApiService {
    * 不能像早期实现那样在列表查询里直接内联 items：当 lists 数量较多（约 15-20 个以上）
    * 且每个 list 内含大量仓库时，单个 GraphQL 请求响应体过大，GitHub 侧会超时返回 502/504。
    */
-  async getUserLists(login: string): Promise<GitHubList[]> {
+  async getUserLists(login: string, signal?: AbortSignal): Promise<GitHubList[]> {
     logger.info('githubLists', 'Fetching user lists', { login });
 
     const summaries: Array<{ id: string; name: string; description?: string; isPrivate: boolean }> = [];
@@ -179,7 +195,8 @@ export class GitHubListsApiService {
             }
           }
         }`,
-        { login, cursor }
+        { login, cursor },
+        { signal }
       );
 
       // user 为 null 表示该 login 不存在或当前 token 无权访问
@@ -189,7 +206,13 @@ export class GitHubListsApiService {
 
       summaries.push(...data.user.lists.nodes);
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
-      cursor = data.user.lists.pageInfo.endCursor;
+      const nextCursor = data.user.lists.pageInfo.endCursor;
+      // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页
+      if (!nextCursor || nextCursor === cursor) {
+        hasNextPage = false;
+      } else {
+        cursor = nextCursor;
+      }
     }
 
     // 阶段二：逐 list 分页拉取 items
@@ -220,14 +243,21 @@ export class GitHubListsApiService {
               }
             }
           }`,
-          { listId: summary.id, itemCursor }
+          { listId: summary.id, itemCursor },
+          { signal }
         );
         if (!itemPage.node) break;
         for (const item of itemPage.node.items.nodes) {
           if (item.nameWithOwner) items.push(item.nameWithOwner);
         }
         itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
-        itemCursor = itemPage.node.items.pageInfo.endCursor;
+        const nextItemCursor = itemPage.node.items.pageInfo.endCursor;
+        // 防御：游标为空或未前进时终止分页，避免死循环/重复页
+        if (!nextItemCursor || nextItemCursor === itemCursor) {
+          itemHasNext = false;
+        } else {
+          itemCursor = nextItemCursor;
+        }
       }
 
       lists.push({
@@ -244,7 +274,7 @@ export class GitHubListsApiService {
   }
 
   /** 获取当前用户全部 Lists 的 id 与名称（不含成员），用于回写前的同名检测。 */
-  async getUserListSummaries(login: string): Promise<GitHubListSummary[]> {
+  async getUserListSummaries(login: string, signal?: AbortSignal): Promise<GitHubListSummary[]> {
     const summaries: GitHubListSummary[] = [];
     let hasNextPage = true;
     let cursor: string | null = null;
@@ -266,14 +296,21 @@ export class GitHubListsApiService {
             }
           }
         }`,
-        { login, cursor }
+        { login, cursor },
+        { signal }
       );
       if (!data.user) {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
       summaries.push(...data.user.lists.nodes);
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
-      cursor = data.user.lists.pageInfo.endCursor;
+      const nextCursor = data.user.lists.pageInfo.endCursor;
+      // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页
+      if (!nextCursor || nextCursor === cursor) {
+        hasNextPage = false;
+      } else {
+        cursor = nextCursor;
+      }
     }
 
     return summaries;
@@ -327,7 +364,7 @@ export class GitHubListsApiService {
    * @param ownerNamePairs 仓库的 owner/name（保持 GitHub 原始大小写传入，GraphQL 匹配区分大小写）
    * @returns Map<full_name 小写, node_id> —— 以小写为键便于调用方统一查找
    */
-  async resolveRepositoryNodeIds(ownerNamePairs: Array<{ owner: string; name: string }>): Promise<Map<string, string>> {
+  async resolveRepositoryNodeIds(ownerNamePairs: Array<{ owner: string; name: string }>, signal?: AbortSignal): Promise<Map<string, string>> {
     const result = new Map<string, string>();
     const BATCH = 50;
 
@@ -352,7 +389,7 @@ export class GitHubListsApiService {
         variables,
         // 容忍部分失败：个别仓库解析失败（如已被删除/改名）不应丢弃整批已成功的结果。
         // 鉴权类错误仍会抛出。
-        { toleratePartialErrors: true }
+        { toleratePartialErrors: true, signal }
       );
 
       for (const key of Object.keys(data)) {
