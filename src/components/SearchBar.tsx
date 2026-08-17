@@ -102,6 +102,7 @@ export const SearchBar: React.FC = () => {
     setSyncingStars,
     syncMode,
     user,
+    addCustomCategory,
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
@@ -808,6 +809,27 @@ export const SearchBar: React.FC = () => {
               .map(c => [c.name.toLowerCase(), c.name])
           );
 
+          // 为云端存在、但本地无同名分类的 list 自动创建自定义分类。
+          // 修复"GitHub list 有很多新分类但本地从没拉到过"——原逻辑只贴 custom_tags
+          // 标签，不建分类，导致左侧分类树永远只有历史分类。
+          // 用每 list 递增的下标做 id 后缀，避免同一毫秒内多个 list 撞 id。
+          let createdCategoriesCount = 0;
+          lists.forEach((list, idx) => {
+            const lower = list.name.toLowerCase();
+            if (categoryByLowerName.has(lower)) return;
+            const newCategory = {
+              id: `custom-sync-${Date.now()}-${idx}`,
+              name: list.name,
+              icon: ' 📋',
+              isCustom: true,
+              keywords: [],
+            };
+            addCustomCategory(newCategory);
+            // 纳入本次运行使用的映射，使后续 listMatchesCategory 命中、可设分类并加锁
+            categoryByLowerName.set(lower, list.name);
+            createdCategoriesCount++;
+          });
+
           // DEC-4：只判定锁定状态。
           // 区分"本次同步开始前已存在"的锁定与"本次运行中新产生"的锁定：
           // - 预存在的锁定：不覆盖其分类与锁定，但仍追加本次命中的 list 名为
@@ -882,9 +904,21 @@ export const SearchBar: React.FC = () => {
             const listSummary = Object.entries(appliedTagsCount)
               .map(([name, count]) => `${name}(${count})`)
               .join('、');
+            const createdHint = createdCategoriesCount > 0
+              ? t(
+                  `（新建 ${createdCategoriesCount} 个分类）`,
+                  ` (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created)`
+                )
+              : '';
             toast(t(
-              `已同步 ${lists.length} 个 list，并应用到 ${appliedTotal} 个未锁定仓库：${listSummary}`,
-              `Synced ${lists.length} lists, applied to ${appliedTotal} unlocked repositories: ${listSummary}`
+              `已同步 ${lists.length} 个 list，并应用到 ${appliedTotal} 个未锁定仓库：${listSummary}${createdHint}`,
+              `Synced ${lists.length} lists, applied to ${appliedTotal} unlocked repositories: ${listSummary}${createdHint}`
+            ), 'info');
+          } else if (createdCategoriesCount > 0) {
+            // 命中数为 0，但本次新建了分类（云端 list 与本地无交集但仍有其名分类）
+            toast(t(
+              `已同步 ${lists.length} 个 list（新建 ${createdCategoriesCount} 个分类）。`,
+              `Synced ${lists.length} lists (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created).`
             ), 'info');
           }
         } catch (listError) {
