@@ -1095,13 +1095,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       t('同步仓库分类到 GitHub list', 'Push categories to GitHub lists'),
       t(
         '将每个本地分类（含默认与自定义分类）写回为同名 GitHub List：\n\n' +
-        '· 同名 list 将直接覆盖其成员\n' +
+        '· 同名 list 将覆盖其成员（未匹配分类的仓库会从该 list 移除）\n' +
         '· 无同名 list 则新建（默认私有）\n' +
-        '· 仓库将按其匹配的分类加入对应 list\n\n确定继续吗？',
+        '· 仓库将按其匹配的分类加入对应 list\n' +
+        '· 不属于本地分类的其他 list 成员关系会被保留\n\n确定继续吗？',
         'Each local category (default & custom) will be written to a GitHub List of the same name:\n\n' +
-        '· Existing same-name lists will be overwritten\n' +
+        '· Existing same-name lists will be overwritten (repos no longer matching are removed)\n' +
         '· Missing lists will be created (private by default)\n' +
-        '· Repos are added to the lists matching their category\n\nContinue?'
+        '· Repos are added to the lists matching their category\n' +
+        '· Memberships in lists not managed locally are preserved\n\nContinue?'
       ),
       { type: 'warning' }
     );
@@ -1119,73 +1121,103 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         defaultCategoryOverrides
       ).filter(cat => cat.id !== 'all');
 
-      // 1. 计算每个分类命中的仓库（effective 标签匹配），并统计每仓库命中的 list 名
-      const listNameRepos: Record<string, Set<string>> = {};
-      const repoListNames: Record<string, Set<string>> = {};
-      // 小写 full_name → 原始大小写 full_name（GraphQL 匹配区分大小写，需用原始大小写解析 node id）
-      const lowerToOriginal = new Map<string, string>();
-      for (const repo of repositories) {
-        const matched: string[] = [];
-        for (const cat of allCategories) {
-          if (matchesCategory(repo, cat, 'effective')) {
-            matched.push(cat.name);
-          }
-        }
-        if (matched.length === 0) continue;
-        const original = repo.full_name || `${repo.owner}/${repo.name}`;
-        const lower = original.toLowerCase();
-        lowerToOriginal.set(lower, original);
-        repoListNames[lower] = new Set(matched);
-        for (const name of matched) {
-          if (!listNameRepos[name]) listNameRepos[name] = new Set();
-          listNameRepos[name].add(lower);
+      const api = createGitHubListsApiService(githubToken);
+
+      // 1. 获取当前全部 list（含成员），用于：
+      //    - 复用/创建托管 list（覆盖每个本地分类，包括零命中的分类，以便清理过期成员）
+      //    - 记录每仓库当前 list 成员关系，保留非托管 list 的成员不被覆盖
+      const currentLists = await api.getUserLists(user.login);
+
+      // 2. 构建"托管 list"映射：每个本地分类 → list id（同名复用，无则新建）
+      const listIdByName = new Map<string, string>();
+      const managedListIds = new Set<string>();
+      for (const cat of allCategories) {
+        const found = currentLists.find(l => l.name.toLowerCase() === cat.name.toLowerCase());
+        const id = found ? found.id : await api.createUserList(cat.name, true);
+        listIdByName.set(cat.name, id);
+        managedListIds.add(id);
+      }
+
+      // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）
+      const repoCurrentListIds = new Map<string, Set<string>>();
+      for (const list of currentLists) {
+        for (const fullName of list.items) {
+          const key = fullName.toLowerCase();
+          if (!repoCurrentListIds.has(key)) repoCurrentListIds.set(key, new Set());
+          repoCurrentListIds.get(key)!.add(list.id);
         }
       }
 
-      if (Object.keys(repoListNames).length === 0) {
+      // 4. 每仓库命中的托管 list（effective 标签匹配），并记录原始大小写 full_name
+      //    （GraphQL 匹配区分大小写，需用原始大小写解析 node id）
+      const repoTargetListIds = new Map<string, Set<string>>();
+      const lowerToOriginal = new Map<string, string>();
+      for (const repo of repositories) {
+        const original = repo.full_name || `${repo.owner}/${repo.name}`;
+        const key = original.toLowerCase();
+        lowerToOriginal.set(key, original);
+        const matched: string[] = [];
+        for (const cat of allCategories) {
+          if (matchesCategory(repo, cat, 'effective')) {
+            const id = listIdByName.get(cat.name);
+            if (id) matched.push(id);
+          }
+        }
+        if (matched.length > 0) {
+          repoTargetListIds.set(key, new Set(matched));
+        }
+      }
+
+      // 5. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）
+      const reposToUpdate = new Map<string, Set<string>>();
+      for (const [key, targetIds] of repoTargetListIds) {
+        reposToUpdate.set(key, targetIds);
+      }
+      for (const [key, currentIds] of repoCurrentListIds) {
+        const hasManagedCurrent = [...currentIds].some(id => managedListIds.has(id));
+        if (hasManagedCurrent && !reposToUpdate.has(key) && lowerToOriginal.has(key)) {
+          reposToUpdate.set(key, new Set());
+        }
+      }
+
+      if (reposToUpdate.size === 0) {
         toast(t('没有仓库命中任何分类', 'No repos matched any category'), 'warning');
         setIsPushingLists(false);
         return;
       }
 
-      const api = createGitHubListsApiService(githubToken);
-
-      // 2. 检查现有同名 list，无则新建
-      const existing = await api.getUserListSummaries(user.login);
-      const listIdByName: Record<string, string> = {};
-      for (const name of Object.keys(listNameRepos)) {
-        const found = existing.find(l => l.name.toLowerCase() === name.toLowerCase());
-        if (found) {
-          listIdByName[name] = found.id;
-        } else {
-          listIdByName[name] = await api.createUserList(name, true);
-        }
-      }
-
-      // 3. 解析仓库 node id（用原始大小写 owner/name 调用 GraphQL，避免大小写不匹配）
-      const ownerNamePairs = Object.entries(repoListNames).map(([lowerFullName]) => {
-        const original = lowerToOriginal.get(lowerFullName) || lowerFullName;
+      // 6. 解析仓库 node id（用原始大小写 owner/name 调用 GraphQL，避免大小写不匹配）
+      const ownerNamePairs = [...reposToUpdate.keys()].map(key => {
+        const original = lowerToOriginal.get(key) || key;
         const idx = original.indexOf('/');
         return { owner: original.slice(0, idx), name: original.slice(idx + 1) };
       });
       const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
 
-      // 4. 覆盖写入：仓库加入其命中的全部 list（整体替换语义）
+      // 7. 覆盖写入：只替换"托管 list"的成员（保留非托管 list 的现有成员）；
+      //    之前同步过但现在不再命中的分类，会从仓库的 list 集合中移除（清理过期成员）
       let updatedCount = 0;
-      for (const [fullName, listNames] of Object.entries(repoListNames)) {
-        const itemId = nodeIdMap.get(fullName);
+      for (const [key, targetIds] of reposToUpdate) {
+        const itemId = nodeIdMap.get(key);
         if (!itemId) continue;
-        const listIds = [...listNames].map(name => listIdByName[name]).filter(Boolean);
-        if (listIds.length === 0) continue;
-        await api.updateUserListsForItem(itemId, listIds);
+        const currentIds = repoCurrentListIds.get(key) || new Set<string>();
+        // 保留非托管 list 的成员关系
+        const preservedIds = [...currentIds].filter(id => !managedListIds.has(id));
+        // 最终集合 = 保留的非托管成员 + 命中的托管 list
+        const finalListIds = [...new Set([...preservedIds, ...targetIds])];
+        // 与当前一致则跳过，避免无意义的写请求
+        if (finalListIds.length === currentIds.size && finalListIds.every(id => currentIds.has(id))) {
+          continue;
+        }
+        await api.updateUserListsForItem(itemId, finalListIds);
         updatedCount++;
       }
 
       addLog(t('同步分类到 GitHub list', 'Push categories to lists'), true,
-        t(`创建/覆盖 ${Object.keys(listIdByName).length} 个 list，更新 ${updatedCount} 个仓库`, `Created/overwrote ${Object.keys(listIdByName).length} lists, updated ${updatedCount} repos`));
+        t(`创建/覆盖 ${listIdByName.size} 个 list，更新 ${updatedCount} 个仓库`, `Created/overwrote ${listIdByName.size} lists, updated ${updatedCount} repos`));
       setShowSuccessMessage(t(
-        `已同步 ${Object.keys(listIdByName).length} 个 list、更新 ${updatedCount} 个仓库`,
-        `Pushed ${Object.keys(listIdByName).length} lists, updated ${updatedCount} repos`
+        `已同步 ${listIdByName.size} 个 list、更新 ${updatedCount} 个仓库`,
+        `Pushed ${listIdByName.size} lists, updated ${updatedCount} repos`
       ));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

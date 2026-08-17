@@ -12,6 +12,7 @@ import { DiscoveryView } from './components/DiscoveryView';
 import { GistView } from './components/GistView';
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
@@ -252,6 +253,7 @@ function App() {
       </main>
       <BackToTop />
       <DebugModeIndicator />
+      <SyncModeChoiceModal />
     </div>
   );
 }

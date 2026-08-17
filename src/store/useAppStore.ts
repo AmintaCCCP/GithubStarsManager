@@ -2438,6 +2438,10 @@ export const useAppStore = create<AppState & AppActions>()(
         // localStorage 镜像（AUTH_MIRROR_KEY）作为异步 IndexedDB 写入失败时的兜底。
         backendApiSecret: state.backendApiSecret,
 
+        // 持久化同步范围配置（GitHub Lists 同步）
+        syncMode: state.syncMode,
+        syncModeConfigured: state.syncModeConfigured,
+
         // 持久化搜索排序设置
         searchFilters: {
           sortBy: state.searchFilters.sortBy,
