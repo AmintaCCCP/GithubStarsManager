@@ -179,6 +179,10 @@ export class EmbeddingClient {
 // VectorSearchService — 与 Cloudflare Worker 通信
 // ============================================================
 
+// Vectorize V2 限制：returnMetadata 返回 metadata 时 topK 上限为 50。
+// Worker /query 同样以 50 为 clamp 上限，此处保持一致，避免请求被静默截断。
+export const VECTORIZE_QUERY_TOPK_LIMIT = 50;
+
 export interface VectorizeVector {
   id: string;
   values: number[];
@@ -700,9 +704,10 @@ export async function findSimilarRepositories(
   const queryVector = vectors[0];
 
   // 2. 向量检索（多取 1 个以容纳源仓库自身，随后过滤）
+  //    请求的 topK 需要带上源仓库的 +1 余量，但不超过 Vectorize 的 50 上限。
   const matches = await vectorService.query(
     queryVector,
-    { topK: topK + 1, threshold },
+    { topK: Math.min(topK + 1, VECTORIZE_QUERY_TOPK_LIMIT), threshold },
     signal
   );
 
