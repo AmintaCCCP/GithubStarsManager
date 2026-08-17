@@ -143,4 +143,17 @@ describe('Cloudflare Worker Vectorize metadata compaction', () => {
     expect((compacted[1].metadata.description as string).length).toBeLessThan(20_000);
     expect(compacted[1].namespace).toBe('b');
   });
+
+  it('keeps metadata omitted when a vector has no metadata property', () => {
+    const compacted = compactUpsertVectors([
+      { id: '3', values: [0.9], namespace: 'c' },
+      { id: '4', values: [0.8], namespace: 'd', metadata: undefined },
+    ]);
+
+    expect(compacted[0]).not.toHaveProperty('metadata');
+    expect(compacted[0].id).toBe('3');
+    expect(compacted[0].namespace).toBe('c');
+    expect(compacted[1].metadata).toBeUndefined();
+    expect(compacted[1].id).toBe('4');
+  });
 });
