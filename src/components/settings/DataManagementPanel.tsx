@@ -1138,11 +1138,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         managedListIds.add(id);
       }
 
-      // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）
+      // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）。
+      //    同时记录来自 currentLists 的原始大小写 full_name：即使仓库已不在本地
+      //    repositories 中，仍需要其原始大小写来解析 node id 以清理过期成员。
       const repoCurrentListIds = new Map<string, Set<string>>();
+      const lowerToOriginal = new Map<string, string>();
       for (const list of currentLists) {
         for (const fullName of list.items) {
           const key = fullName.toLowerCase();
+          lowerToOriginal.set(key, fullName);
           if (!repoCurrentListIds.has(key)) repoCurrentListIds.set(key, new Set());
           repoCurrentListIds.get(key)!.add(list.id);
         }
@@ -1151,7 +1155,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // 4. 每仓库命中的托管 list（effective 标签匹配），并记录原始大小写 full_name
       //    （GraphQL 匹配区分大小写，需用原始大小写解析 node id）
       const repoTargetListIds = new Map<string, Set<string>>();
-      const lowerToOriginal = new Map<string, string>();
       for (const repo of repositories) {
         const original = repo.full_name || `${repo.owner}/${repo.name}`;
         const key = original.toLowerCase();
@@ -1168,14 +1171,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
       }
 
-      // 5. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）
+      // 5. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）。
+      //    已不在本地 repositories 中的仓库也要加入（空目标集合 = 从托管 list 中移除）。
       const reposToUpdate = new Map<string, Set<string>>();
       for (const [key, targetIds] of repoTargetListIds) {
         reposToUpdate.set(key, targetIds);
       }
       for (const [key, currentIds] of repoCurrentListIds) {
         const hasManagedCurrent = [...currentIds].some(id => managedListIds.has(id));
-        if (hasManagedCurrent && !reposToUpdate.has(key) && lowerToOriginal.has(key)) {
+        if (hasManagedCurrent && !reposToUpdate.has(key)) {
           reposToUpdate.set(key, new Set());
         }
       }
