@@ -810,8 +810,10 @@ export const SearchBar: React.FC = () => {
 
           // DEC-4：只判定锁定状态。
           // 区分"本次同步开始前已存在"的锁定与"本次运行中新产生"的锁定：
-          // - 预存在的锁定：跳过（不改分类也不改标签）
-          // - 本次运行中被前面的 list 刚锁定：保留已分配的分类/锁定，但继续追加后续 list 的标签
+          // - 预存在的锁定：不覆盖其分类与锁定，但仍追加本次命中的 list 名为
+          //   custom_tags（修复 #273：否则一旦仓库被锁过，之后云端 list 的任何
+          //   变化都被跳过，导致"无法将云端 list 拉取到本地"）。
+          // - 本次运行中被前面的 list 刚锁定：保留已分配的分类/锁定，继续追加后续 list 的标签
           const preExistingLocked = new Set(
             finalRepositories
               .filter(r => r.category_locked)
@@ -825,12 +827,20 @@ export const SearchBar: React.FC = () => {
               const repo = listRepoMap.get(key);
               if (!repo) continue;
 
-              // 预存在锁定：跳过（不改分类也不改标签）
-              if (preExistingLocked.has(key)) continue;
-
               const customTags = repo.custom_tags ? [...repo.custom_tags] : [];
               if (!customTags.includes(list.name)) {
                 customTags.push(list.name);
+              }
+
+              // 预存在锁定：不覆盖其分类与锁定，仅追加 list 名为标签，让云端
+              // list 关系仍能反映到本地（修复 #273）。
+              if (preExistingLocked.has(key)) {
+                // 仅当标签确有变化才写回，避免无谓的 last_edited 抖动
+                if (customTags.length !== (repo.custom_tags?.length ?? 0)) {
+                  listRepoMap.set(key, { ...repo, custom_tags: customTags });
+                }
+                appliedCount++;
+                continue;
               }
 
               // 本次运行中刚被锁定的仓库：保留已分配的分类与锁定，仅追加标签
