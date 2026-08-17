@@ -107,8 +107,9 @@ describe('useAppStore release add/upsert actions', () => {
     expect(useAppStore.getState().releases.map(r => r.id)).toEqual([1, 2, 3]);
   });
 
-  it('upsertReleases updates assets/metadata but preserves is_read', () => {
+  it('upsertReleases updates assets/metadata and resets read state', () => {
     useAppStore.getState().addReleases([makeRelease(1, { is_read: true })]);
+    useAppStore.getState().markReleaseAsRead(1);
 
     const updated = makeRelease(1, {
       name: 'Updated name',
@@ -119,7 +120,20 @@ describe('useAppStore release add/upsert actions', () => {
     const result = useAppStore.getState().releases[0];
     expect(result.name).toBe('Updated name');
     expect(result.assets[0].size).toBe(9999);
-    expect(result.is_read).toBe(true);
+    expect(result.is_read).toBe(false);
+    expect(useAppStore.getState().readReleases.has(1)).toBe(false);
+  });
+
+  it('upsertReleases keeps read state of unaffected releases', () => {
+    useAppStore.getState().addReleases([makeRelease(1), makeRelease(2)]);
+    useAppStore.getState().markReleaseAsRead(2);
+
+    useAppStore.getState().upsertReleases([makeRelease(1, {
+      assets: [{ ...makeRelease(1).assets[0], size: 8888 }],
+    })]);
+
+    expect(useAppStore.getState().readReleases.has(1)).toBe(false);
+    expect(useAppStore.getState().readReleases.has(2)).toBe(true);
   });
 
   it('upsertReleases ignores ids not present in store', () => {

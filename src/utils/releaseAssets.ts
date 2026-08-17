@@ -1,4 +1,4 @@
-import type { ReleaseAsset } from '../types';
+import type { Release, ReleaseAsset } from '../types';
 
 /**
  * 计算单个资产的指纹。
@@ -33,4 +33,24 @@ export function hasAssetsChanged(
   incoming: ReleaseAsset[] | undefined
 ): boolean {
   return assetsFingerprint(current) !== assetsFingerprint(incoming);
+}
+
+/**
+ * 计算 Release 的有效展示时间。
+ * GitHub 的 Release 对象没有 updated_at，资产变更时 published_at 不会变化；
+ * 资产更新时间已包含在 assets[].updated_at 中（每次替换/重传都会更新）。
+ * 取 published_at 与所有资产 updated_at 中的较新者，作为用户可见的更新时间。
+ * 返回标准化 ISO 字符串（toISOString），保证不同时间戳格式（含/不含毫秒）可稳定比较。
+ */
+export function effectiveReleaseTime(release: Pick<Release, 'published_at' | 'assets'>): string {
+  let latest = new Date(release.published_at).getTime();
+  if (Array.isArray(release.assets)) {
+    for (const asset of release.assets) {
+      const assetTime = new Date(asset.updated_at).getTime();
+      if (!Number.isNaN(assetTime) && assetTime > latest) {
+        latest = assetTime;
+      }
+    }
+  }
+  return new Date(latest).toISOString();
 }

@@ -103,7 +103,7 @@ export interface MultipleReleasesResult {
   releases: Release[];
   /**
    * 已同步仓库“最新一条”Release（仅当 refreshExistingAssets 开启时收集）。
-   * 用于调用方与本地存储做资产指纹比对，指纹变化则合并更新资产，保留 is_read。
+   * 用于调用方与本地存储做资产指纹比对，指纹变化则合并更新资产并重置为未读。
    */
   latestReleases?: Release[];
   failedRepos: { repoId: number; full_name: string; error: string }[];

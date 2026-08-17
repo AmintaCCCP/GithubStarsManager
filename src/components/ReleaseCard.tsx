@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import { sendToRpcDownload } from '../services/rpcDownloadService';
 import { AIService } from '../services/aiService';
+import { effectiveReleaseTime } from '../utils/releaseAssets';
 
 type SummaryState = {
   status: 'idle' | 'loading' | 'done' | 'error';
@@ -60,6 +61,9 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   formatFileSize,
 }) => {
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+
+  const effectiveTime = effectiveReleaseTime(release);
+  const assetsUpdatedAfterPublish = effectiveTime > release.published_at;
 
   // RPC download support — use refs to avoid stale closure in async handler
   const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore();
@@ -219,7 +223,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-gray-500 dark:text-text-tertiary">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}</span>
+                <span>{formatDistanceToNow(new Date(effectiveTime), { addSuffix: true })}</span>
+                {assetsUpdatedAfterPublish && (
+                  <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
+                    {t('资产已更新', 'Assets updated')}
+                  </span>
+                )}
               </div>
               {downloadLinks.length > 0 && (
                 <div className="flex items-center gap-1.5">
