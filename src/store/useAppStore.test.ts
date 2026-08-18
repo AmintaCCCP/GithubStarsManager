@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmbeddingConfig, Release, Repository, VectorSearchConfig, VectorSearchStatus, defaultReleaseSourceSettings } from '../types';
 import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
+import { findReleasesWithChangedAssets, shouldShowAssetsUpdatedIndicator } from '../utils/releaseAssets';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
 let normalizePersistedState: typeof import('./useAppStore').normalizePersistedState;
@@ -140,6 +141,41 @@ describe('useAppStore release add/upsert actions', () => {
     useAppStore.getState().addReleases([makeRelease(1)]);
     useAppStore.getState().upsertReleases([makeRelease(99)]);
     expect(useAppStore.getState().releases.map(r => r.id)).toEqual([1]);
+  });
+
+  it('regression: asset update resets read state and gates the "Assets updated" indicator until marked read', () => {
+    const publishedAt = '2026-01-01T00:00:00.000Z';
+    const assetAtPublish = { ...makeRelease(1).assets[0], updated_at: publishedAt };
+
+    // 初始：已同步的 release，用户已标记为已读
+    useAppStore.getState().addReleases([makeRelease(1, {
+      published_at: publishedAt,
+      assets: [assetAtPublish],
+    })]);
+    useAppStore.getState().markReleaseAsRead(1);
+    const isUnread = () => !useAppStore.getState().readReleases.has(1);
+
+    // 刷新：GitHub 返回同 id 但资产已被替换（updated_at 晚于 published_at）
+    const latest = makeRelease(1, {
+      published_at: publishedAt,
+      assets: [{ ...assetAtPublish, updated_at: '2026-01-05T00:00:00.000Z' }],
+    });
+
+    // 复用 handleRefresh 的共享筛选逻辑（findReleasesWithChangedAssets），不依赖已读状态
+    const updatedReleases = findReleasesWithChangedAssets([latest], useAppStore.getState().releases);
+    expect(updatedReleases).toHaveLength(1);
+    useAppStore.getState().upsertReleases(updatedReleases);
+
+    // 资产更新后：无论之前是否已读，都重置为未读并展示"资产已更新"
+    const merged = useAppStore.getState().releases.find(r => r.id === 1)!;
+    expect(merged.is_read).toBe(false);
+    expect(isUnread()).toBe(true);
+    expect(shouldShowAssetsUpdatedIndicator(merged, isUnread())).toBe(true);
+
+    // 用户再次点击该条 release → 已读，"资产已更新"消失
+    useAppStore.getState().markReleaseAsRead(1);
+    expect(isUnread()).toBe(false);
+    expect(shouldShowAssetsUpdatedIndicator(merged, isUnread())).toBe(false);
   });
 });
 
