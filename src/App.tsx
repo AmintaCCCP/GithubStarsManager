@@ -12,10 +12,12 @@ import { DiscoveryView } from './components/DiscoveryView';
 import { GistView } from './components/GistView';
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore } from './store/useAppStore';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { backend } from './services/backendAdapter';
 import { syncFromBackend, startAutoSync, stopAutoSync, tryRestoreAuthFromBackend } from './services/autoSync';
 import {
@@ -252,6 +254,8 @@ function App() {
       </main>
       <BackToTop />
       <DebugModeIndicator />
+      <SyncModeChoiceModal />
+      <ListsPushIndicator />
     </div>
   );
 }
