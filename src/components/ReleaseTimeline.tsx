@@ -1240,7 +1240,6 @@ export const ReleaseTimeline: React.FC = () => {
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
             const latestEffectiveTime = latestRelease ? effectiveReleaseTime(latestRelease) : null;
             const latestAssetsUpdated = latestRelease !== null
-              && latestEffectiveTime !== null
               && shouldShowAssetsUpdatedIndicator(latestRelease, isReleaseUnread(latestRelease.id));
 
             return (
