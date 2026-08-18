@@ -21,6 +21,9 @@ vi.mock('../../src/services/logger.js', () => ({
 
 const { default: configsRouter } = await import('../../src/routes/configs.js');
 
+/**
+ * Create an in-memory settings database stub for the route test.
+ */
 function createSettingsDb() {
   const values = new Map<string, string | null>();
   const statement = {
@@ -37,6 +40,9 @@ function createSettingsDb() {
   return values;
 }
 
+/**
+ * Build an Express app containing the settings route under test.
+ */
 const createTestApp = () => {
   const app = express();
   app.use(express.json());
