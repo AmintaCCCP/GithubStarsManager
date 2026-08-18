@@ -689,13 +689,14 @@ class BackendAdapter {
 
   // === Settings (active selections) ===
 
-  async syncSettings(settings: Record<string, unknown>): Promise<void> {
+  async syncSettings(settings: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
     if (!this._backendUrl) return;
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify(settings)
+      body: JSON.stringify(settings),
+      signal,
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
   }
