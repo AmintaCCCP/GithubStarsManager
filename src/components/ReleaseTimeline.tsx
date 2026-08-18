@@ -1272,7 +1272,7 @@ export const ReleaseTimeline: React.FC = () => {
                           <p className="text-xs text-gray-400 dark:text-text-tertiary truncate">
                             {t('最新:', 'Latest:')} {latestRelease.tag_name}
                           </p>
-                          <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap flex items-center gap-1">
+                          <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap flex items-center justify-end gap-1">
                             {formatDistanceToNow(new Date(latestEffectiveTime!), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                             {latestAssetsUpdated && (
                               <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
