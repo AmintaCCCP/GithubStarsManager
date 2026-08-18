@@ -8,5 +8,6 @@ export { DataManagementPanel } from './DataManagementPanel';
 export { NetworkPanel } from './NetworkPanel';
 export { DiagnosticLogsPanel } from './DiagnosticLogsPanel';
 export { MenuManagementPanel } from './MenuManagementPanel';
+export { StarSyncPanel } from './StarSyncPanel';
 export { VectorSearchSettings } from './VectorSearchSettings';
 export { McpSettingsPanel } from './McpSettingsPanel';

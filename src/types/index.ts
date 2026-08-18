@@ -528,7 +528,29 @@ export interface AppState {
   subscriptionLastRefresh: Record<string, string | null>;
   subscriptionIsLoading: Record<string, boolean>;
   subscriptionChannels: SubscriptionChannel[];
+
+  // GitHub Lists 同步模式：仅星标 / 星标及 list
+  syncMode: SyncMode;
+  /** 用户是否已明确选择过同步模式（首次登录弹窗后置为 true） */
+  syncModeConfigured: boolean;
+
+  // GitHub Lists 回写进度（会话级，不持久化）
+  listsPush: ListsPushState;
+  /** 分类 id → GitHub List id 的稳定映射（跨语言持久化，避免切换语言时重复建 list） */
+  categoryListIdMap: Record<string, string>;
 }
+
+export interface ListsPushState {
+  isRunning: boolean;
+  total: number;
+  done: number;
+  currentLabel: string | null;
+  message: string | null;
+  error: string | null;
+}
+
+/** GitHub 同步范围：'stars' = 仅星标仓库（现状）；'stars-and-lists' = 星标仓库及 Lists */
+export type SyncMode = 'stars' | 'stars-and-lists';
 
 export interface UpdateNotification {
   version: string;
