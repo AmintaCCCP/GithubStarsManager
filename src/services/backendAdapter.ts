@@ -689,6 +689,12 @@ class BackendAdapter {
 
   // === Settings (active selections) ===
 
+  /**
+   * Upsert frontend settings in the backend.
+   *
+   * An optional signal lets startup-only synchronization stop without delaying
+   * the rest of application initialization when the backend is unreachable.
+   */
   async syncSettings(settings: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
     if (!this._backendUrl) return;
 
