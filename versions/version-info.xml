@@ -525,4 +525,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.4</downloadUrl>
   </version>
+  <version>
+    <number>0.7.5</number>
+    <releaseDate>2026-08-18</releaseDate>
+    <changelog>
+      <item>fix: Centralized application versioning around the root package.json, synchronized package-lock metadata automatically, removed the duplicate Electron version field, and strengthened release validation against duplicate or downgraded versions. (PR #270)</item>
+      <item>fix: Cloudflare Worker Vectorize upserts now compact oversized metadata using UTF-8 JSON byte limits while preserving structured fields, with safer handling for long descriptions, tags, malformed license metadata, and excessive similarity-search limits. Cloudflare Worker users must redeploy the Worker to receive this fix. (PR #271)</item>
+      <item>fix: Refreshing releases now marks entries as unread when assets or metadata change, uses the newest asset update as the effective display time, and shows an Assets updated indicator without changing unaffected releases. (PR #272)</item>
+      <item>feat: Added experimental two-way synchronization with GitHub native Lists, including optional sync modes, list-to-tag/category mapping, protected categories, and push-back from local categories. Back up data before trying this feature; existing users and users who do not use GitHub native Lists should continue using the legacy synchronization mode. (PR #273)</item>
+      <item>fix: The Assets updated indicator now follows the release read state and disappears after the release is marked as read, with consistent behavior in release cards and repository group headers. (PR #274)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.5</downloadUrl>
+  </version>
 </versions>
