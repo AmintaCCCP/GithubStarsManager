@@ -45,6 +45,27 @@ async function mapPool<T, R>(
 }
 
 /**
+ * 组合外部信号与超时，返回单个 AbortController。
+ * 不依赖 AbortSignal.timeout / AbortSignal.any（Chrome<124 / Safari<16 不支持），
+ * 用原生 AbortController 实现等价语义：任一来源中止即中止。
+ * controller 中止后清理定时器与监听，避免泄漏。
+ */
+function createCombinedAbortController(parentSignal: AbortSignal | undefined, timeoutMs: number): AbortController {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (timeoutMs > 0) {
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  }
+  const onParentAbort = () => controller.abort();
+  parentSignal?.addEventListener('abort', onParentAbort, { once: true });
+  controller.signal.addEventListener('abort', () => {
+    if (timer) clearTimeout(timer);
+    parentSignal?.removeEventListener('abort', onParentAbort);
+  }, { once: true });
+  return controller;
+}
+
+/**
  * 标记"瞬时、可重试"的错误。request 外层退避循环捕获后等待重试。
  * retryAfterMs 优先（来自 Retry-After 头），否则用指数退避序列。
  */
@@ -132,27 +153,27 @@ export class GitHubListsApiService {
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
     const parentSignal = options.signal;
-    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 30_000);
-    // 组合用户外部信号与超时信号：任一放弃都中止
-    const signal = parentSignal ?AbortSignal.any([parentSignal, timeoutSignal]) : timeoutSignal;
 
     const MAX_ATTEMPTS = 4;
     let lastError: unknown;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      if (signal.aborted) {
+      if (parentSignal?.aborted) {
         const err = new Error('Aborted');
         err.name = 'AbortError';
         throw err;
       }
+      // 每次尝试独立超时：超时上限不被重试+退避消耗，也不会中止退避等待
+      //（否则 sleep 抛出 AbortError，掩盖最终的 RetriableError）。退避只受 parentSignal 控制。
+      const controller = createCombinedAbortController(parentSignal, options.timeoutMs ?? 30_000);
       try {
-        return await this.attemptRequest<T>(query, body, signal, options);
+        return await this.attemptRequest<T>(query, body, controller.signal, options);
       } catch (e) {
         if (e instanceof RetriableError) {
           lastError = e;
           // 最后一次不再等待，直接抛出
           if (attempt === MAX_ATTEMPTS - 1) break;
           const backoffMs = e.retryAfterMs ?? (1000 * Math.pow(2, attempt));
-          await this.sleep(backoffMs, signal);
+          await this.sleep(backoffMs, parentSignal);
           continue;
         }
         // 不可重试（鉴权/业务/AbortError 等），直接抛
@@ -167,9 +188,9 @@ export class GitHubListsApiService {
   /**
    * 可退避等待：尊重 signal 中止；中止时立即抛出 AbortError。
    */
-  private sleep(ms: number, signal: AbortSignal): Promise<void> {
+  private sleep(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (signal.aborted) {
+      if (signal?.aborted) {
         const err = new Error('Aborted');
         err.name = 'AbortError';
         reject(err);
@@ -182,10 +203,10 @@ export class GitHubListsApiService {
         reject(err);
       };
       const timer = setTimeout(() => {
-        signal.removeEventListener('abort', onAbort);
+        signal?.removeEventListener('abort', onAbort);
         resolve();
       }, ms);
-      signal.addEventListener('abort', onAbort, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   }
 

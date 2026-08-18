@@ -1550,6 +1550,8 @@ export const useAppStore = create<AppState & AppActions>()(
       pushCategoriesToLists: async (api) => {
         const state = get();
         const t = (zh: string, en: string) => (state.language === 'zh' ? zh : en);
+        // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员
+        if (state.listsPush.isRunning) return;
         if (!state.githubToken) {
           set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('未登录 GitHub，请先连接', 'Not connected to GitHub yet') } });
           return;
@@ -1629,7 +1631,10 @@ export const useAppStore = create<AppState & AppActions>()(
           // 4. 每仓库命中的托管 list（effective 标签匹配）
           const repoTargetListIds = new Map<string, Set<string>>();
           for (const repo of repositories) {
-            const original = repo.full_name || `${repo.owner}/${repo.name}`;
+            const ownerLogin = repo.owner?.login;
+            const original = repo.full_name || (ownerLogin && repo.name ? `${ownerLogin}/${repo.name}` : '');
+            // 跳过缺少有效 owner/name（含空 full_name）的仓库，避免生成无法解析的 key
+            if (!original.includes('/')) continue;
             const key = original.toLowerCase();
             lowerToOriginal.set(key, original);
             const matched: string[] = [];

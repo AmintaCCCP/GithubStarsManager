@@ -1229,6 +1229,8 @@ export const SearchBar: React.FC = () => {
                   <button
                     onClick={() => setShowSyncMenu(!showSyncMenu)}
                     disabled={isSyncingStars}
+                    aria-haspopup="menu"
+                    aria-expanded={showSyncMenu}
                     className="inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-white/20"
                     title={t('更多同步选项', 'More sync options')}
                   >
@@ -1238,9 +1240,14 @@ export const SearchBar: React.FC = () => {
               </div>
 
               {showSyncMenu && (
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-[9999] overflow-hidden">
+                <div
+                  role="menu"
+                  onKeyDown={(e) => { if (e.key === 'Escape') setShowSyncMenu(false); }}
+                  className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-[9999] overflow-hidden"
+                >
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => { setShowSyncMenu(false); handleStarSync('stars-only'); }}
                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors"
                   >
@@ -1248,6 +1255,7 @@ export const SearchBar: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={handleStarAndListSync}
                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10 transition-colors"
                   >
