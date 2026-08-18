@@ -162,6 +162,12 @@ function App() {
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
 
+    /**
+     * Initialize backend-backed features after persisted local state is ready.
+     *
+     * Token repair is intentionally bounded so an unavailable backend cannot
+     * block the initial data sync and background synchronization indefinitely.
+     */
     const initBackend = async () => {
       try {
         await backend.init();
