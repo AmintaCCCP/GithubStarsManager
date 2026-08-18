@@ -25,6 +25,7 @@
 | 功能 | 描述 |
 |------|------|
 | **自动同步星标** | 连接 GitHub Token 自动拉取所有星标仓库 |
+| **GitHub Lists 双向同步** | 与 GitHub 原生 Lists（星标列表）双向同步：拉取 Lists 归类为标签/分类并自动锁定，将本地分类回写为 GitHub Lists |
 | **AI 摘要与分类** | 使用 AI 生成标签、主题和简短 README 概览 |
 | **语义搜索** | 按意图而非精确名称查找仓库 |
 | **向量语义搜索** | 将仓库描述/README 嵌入 Cloudflare Vectorize 向量库，自然语言查询实现高精度语义匹配 |
@@ -168,6 +169,7 @@
 | **Category** | 分类管理、分类排序、默认分类覆盖规则 |
 | **Data Management** | 数据导入/导出、清除本地数据、重置所有数据 |
 | **向量搜索** | 配置 Cloudflare Vectorize Worker、Embedding 模型、索引模式（描述/README）、索引重建管理 |
+| **MCP 服务** | 开启 MCP 供 Claude Code、Cursor 等 Agent 通过 Streamable HTTP / SSE 检索 AI 加工后的星标，Bearer Token 鉴权 |
 
 **截图：**
 ![Settings Panel Interface](upload/settings.png)
@@ -295,6 +297,43 @@ npm run build
 5. 使用 **AI 搜索** 按钮 — 启用后自动走向量搜索
 
 > ⚠️ 更换 Embedding 模型后必须重建索引 — 不同模型生成的向量维度不兼容。
+
+## 🛰️ MCP 服务（Agent 访问）
+
+让 Agent（Claude Code、Cursor 等）通过 [Model Context Protocol](https://modelcontextprotocol.io/) 读取并检索 AI 加工后的星标仓库（摘要、标签、分类）。
+
+- **Streamable HTTP**（推荐）：应用同源 `POST /mcp`（后端/Docker 模式）或 `http://127.0.0.1:3927/mcp`（客户端本地模式）
+- **旧版 SSE**：`/mcp/sse` + `/mcp/sse/messages`（后端），`/sse` + `/messages`（客户端）— 供旧客户端使用
+- **Bearer Token 鉴权**，Token（`gsm_mcp_...`）稳定不变：开启时生成一次、重启后保持不变、仅在重置时更换
+
+**开启方式：** 设置 → MCP 服务 → 打开开关。面板会显示端点地址、Token 以及一键复制（JSON）的 Agent 配置，同时提供 Streamable HTTP 与 SSE 两套配置，无需额外安装。
+
+> 💡 MCP Token 与后端 `API_SECRET` 相互独立。纯前端（无后端）模式不显示 MCP 设置页；需要桌面（Electron）客户端或已连接后端时可用。
+
+**暴露的工具（全部只读）：**
+
+| 工具 | 说明 |
+|------|------|
+| `gsm_status` | 服务状态：仓库数、向量可用性、版本 |
+| `gsm_search_repos` | 对星标做关键词搜索，支持筛选（语言 / 标签 / 平台 / 许可证 / 分类 / 星标数）与分页 |
+| `gsm_get_repo` | 按数字 id 或 `owner/repo` 获取单个仓库，含 AI 加工字段 |
+| `gsm_list_categories` | 列出自定义分类 |
+| `gsm_list_repos_by_category` | 分页列出某分类下的仓库 |
+| `gsm_stats` | 聚合统计（语言、分析、标签） |
+| `gsm_vector_search` | 语义向量搜索 — 仅当已配置并启用向量搜索时列出 |
+
+**桌面（Electron）说明：** 仅绑定回环地址（`127.0.0.1`），只能本机 Agent 访问；可在设置中调整主机/端口（默认端口 `3927`）。
+
+![MCP](upload/mcp.png)
+
+## 🔄 GitHub Lists 双向同步
+
+在经典 REST 星标同步之外，原生 [GitHub Lists](https://github.com/features/lists)（星标列表）支持双向同步：
+
+- **拉取（GitHub → 应用）** — 在 **设置 → 星标同步** 选择 **同步星标仓库及 list**（或首次登录时选择）。通过 GraphQL 拉取 Lists；每个 list 名作为自定义标签写入，未锁定的仓库归入匹配分类并**自动锁定**，AI 分析不会重置。
+- **回写（应用 → GitHub）** — 在 **设置 → 星标同步** 点击 **同步仓库分类到 GitHub list**。每个本地分类写回为同名 GitHub List（同名覆盖、不存在则默认私有新建）；仓库按分类加入对应 list，本地未管理的其他 list 成员关系会被保留。
+
+> 同步范围持久化保存：可在 **设置 → 星标同步** 中随时在「仅星标仓库」与「星标仓库及 list」之间切换。
 
 ## 💾 WebDAV备份配置
 
