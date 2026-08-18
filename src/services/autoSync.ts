@@ -158,6 +158,34 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
 }
 
 /**
+ * Repair the backend copy of an already authenticated local GitHub token.
+ *
+ * Lists GraphQL requests use the backend proxy, which reads the encrypted token
+ * from backend settings instead of receiving the frontend token. Existing local
+ * sessions can therefore have a working token while the backend copy is absent
+ * (for example, when the backend was enabled after login or a previous settings
+ * sync failed). Keep this repair separate from session restoration so it never
+ * overwrites the local account with backend auth data.
+ */
+export async function syncLocalGitHubTokenToBackend(): Promise<boolean> {
+  if (!backend.isAvailable) return false;
+
+  const { githubToken } = useAppStore.getState();
+  if (!githubToken) return false;
+
+  try {
+    await backend.syncSettings({ github_token: githubToken });
+    logger.info('sync.githubToken', 'Synchronized local GitHub token to backend');
+    return true;
+  } catch (err) {
+    logger.warn('sync.githubToken', 'Failed to synchronize local GitHub token to backend', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
+}
+
+/**
  * Pull all data from backend and update local store.
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
