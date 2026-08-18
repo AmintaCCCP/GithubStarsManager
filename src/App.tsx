@@ -19,7 +19,13 @@ import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { backend } from './services/backendAdapter';
-import { syncFromBackend, startAutoSync, stopAutoSync, tryRestoreAuthFromBackend } from './services/autoSync';
+import {
+  syncFromBackend,
+  startAutoSync,
+  stopAutoSync,
+  tryRestoreAuthFromBackend,
+  syncLocalGitHubTokenToBackend,
+} from './services/autoSync';
 import {
   startMcpElectronBridge,
   stopMcpElectronBridge,
@@ -151,6 +157,8 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
+
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
 
@@ -163,6 +171,9 @@ function App() {
           // Run before the backend data pull so auth can complete before the
           // app decides whether to render LoginScreen.
           await tryRestoreAuthFromBackend();
+          if (!cancelled) {
+            await syncLocalGitHubTokenToBackend();
+          }
           if (!cancelled) {
             await syncFromBackend();
           }
@@ -189,7 +200,7 @@ function App() {
         stopAutoSync(unsubscribe);
       }
     };
-  }, []);
+  }, [hasHydrated]);
 
   const handleCategorySelect = useCallback((category: string) => {
     // 相似仓库视图下点击分类 = 离开相似视图并切换到该分类，避免交互歧义
