@@ -36,6 +36,24 @@ export function hasAssetsChanged(
 }
 
 /**
+ * 从最新拉取的 Release 中筛出“资产相对本地已变化”的条目。
+ * 只比对本地已存在 id 的 Release（新增条目由调用方 addReleases 处理）；
+ * 资产指纹未变化则跳过，保证幂等，避免重复触发 store/后端写入。
+ * 供刷新入口（ReleaseTimeline.handleRefresh）与测试复用。
+ */
+export function findReleasesWithChangedAssets(
+  latestReleases: Release[] | undefined,
+  currentReleases: Release[]
+): Release[] {
+  const byId = new Map(currentReleases.map(r => [r.id, r]));
+  return (latestReleases || []).filter((latest) => {
+    const local = byId.get(latest.id);
+    if (!local) return false;
+    return assetsFingerprint(local.assets) !== assetsFingerprint(latest.assets);
+  });
+}
+
+/**
  * 计算 Release 的有效展示时间。
  * GitHub 的 Release 对象没有 updated_at，资产变更时 published_at 不会变化；
  * 资产更新时间已包含在 assets[].updated_at 中（每次替换/重传都会更新）。
@@ -53,4 +71,30 @@ export function effectiveReleaseTime(release: Pick<Release, 'published_at' | 'as
     }
   }
   return new Date(latest).toISOString();
+}
+
+/**
+ * 判断是否存在发布时间之后更新过的资产。
+ * 使用时间值比较，而不是比较不同格式的时间字符串，避免时区或毫秒精度差异造成误判。
+ */
+export function hasAssetsUpdatedAfterPublish(
+  release: Pick<Release, 'published_at' | 'assets'>
+): boolean {
+  const publishedTime = new Date(release.published_at).getTime();
+  if (Number.isNaN(publishedTime) || !Array.isArray(release.assets)) return false;
+
+  return release.assets.some((asset) => {
+    const assetTime = new Date(asset.updated_at).getTime();
+    return !Number.isNaN(assetTime) && assetTime > publishedTime;
+  });
+}
+
+/**
+ * “资产已更新”是未读更新提示的一部分；Release 被标记为已读后应立即隐藏该提示。
+ */
+export function shouldShowAssetsUpdatedIndicator(
+  release: Pick<Release, 'published_at' | 'assets'>,
+  isUnread: boolean
+): boolean {
+  return isUnread && hasAssetsUpdatedAfterPublish(release);
 }

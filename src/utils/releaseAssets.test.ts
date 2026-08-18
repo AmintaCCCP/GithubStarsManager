@@ -4,7 +4,10 @@ import {
   assetFingerprint,
   assetsFingerprint,
   effectiveReleaseTime,
+  findReleasesWithChangedAssets,
   hasAssetsChanged,
+  hasAssetsUpdatedAfterPublish,
+  shouldShowAssetsUpdatedIndicator,
 } from './releaseAssets';
 
 const makeAsset = (overrides: Partial<ReleaseAsset> = {}): ReleaseAsset => ({
@@ -92,6 +95,44 @@ describe('hasAssetsChanged', () => {
   });
 });
 
+describe('findReleasesWithChangedAssets', () => {
+  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name: 'v1',
+    name: 'Release 1',
+    body: null,
+    published_at: '2026-01-01T00:00:00.000Z',
+    html_url: 'https://github.com/owner/repo/releases/tag/v1',
+    assets: [makeAsset()],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  it('returns releases whose assets fingerprint changed against local', () => {
+    const local = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.000Z' })] })];
+    const incoming = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
+
+  it('skips releases with unchanged assets', () => {
+    const local = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    const incoming = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('skips releases not present locally (new releases handled by addReleases)', () => {
+    const local = [makeRelease({ id: 1 })];
+    const incoming = [makeRelease({ id: 2 })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('returns empty when no latest releases are provided', () => {
+    const local = [makeRelease({ id: 1 })];
+    expect(findReleasesWithChangedAssets(undefined, local)).toHaveLength(0);
+    expect(findReleasesWithChangedAssets([], local)).toHaveLength(0);
+  });
+});
+
 describe('effectiveReleaseTime', () => {
   const makeRelease = (overrides: Partial<Release> = {}): Release => ({
     id: 1,
@@ -130,5 +171,84 @@ describe('effectiveReleaseTime', () => {
       ],
     });
     expect(effectiveReleaseTime(release)).toBe('2026-01-10T00:00:00.000Z');
+  });
+});
+
+describe('hasAssetsUpdatedAfterPublish', () => {
+  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name: 'v1',
+    name: 'Release 1',
+    body: null,
+    published_at: '2026-01-01T00:00:00Z',
+    html_url: 'https://github.com/owner/repo/releases/tag/v1',
+    assets: [],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  it('returns true when an asset is updated after publication', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.001Z' })],
+    }))).toBe(true);
+  });
+
+  it('compares timestamps by time value across equivalent formats', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: '2026-01-01T08:00:00+08:00',
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }))).toBe(false);
+  });
+
+  it('returns false when assets are unchanged or updated at publication time', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }))).toBe(false);
+    expect(hasAssetsUpdatedAfterPublish(makeRelease())).toBe(false);
+  });
+
+  it('treats missing or invalid timestamps as unchanged', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: 'not-a-date',
+      assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+    }))).toBe(false);
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: 'not-a-date' })],
+    }))).toBe(false);
+  });
+
+  it('returns false when assets are missing', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({ assets: undefined }))).toBe(false);
+  });
+});
+
+describe('shouldShowAssetsUpdatedIndicator', () => {
+  const release: Pick<Release, 'published_at' | 'assets'> = {
+    published_at: '2026-01-01T00:00:00Z',
+    assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+  };
+
+  it('shows the indicator only while the release is unread', () => {
+    expect(shouldShowAssetsUpdatedIndicator(release, true)).toBe(true);
+    expect(shouldShowAssetsUpdatedIndicator(release, false)).toBe(false);
+  });
+
+  it('does not show the indicator when no asset was updated after publication', () => {
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }, true)).toBe(false);
+  });
+
+  it('does not show the indicator when timestamps are invalid', () => {
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: 'not-a-date',
+      assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+    }, true)).toBe(false);
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: 'not-a-date' })],
+    }, true)).toBe(false);
   });
 });
