@@ -4,6 +4,7 @@ import {
   assetFingerprint,
   assetsFingerprint,
   effectiveReleaseTime,
+  findReleasesWithChangedAssets,
   hasAssetsChanged,
   hasAssetsUpdatedAfterPublish,
   shouldShowAssetsUpdatedIndicator,
@@ -91,6 +92,44 @@ describe('hasAssetsChanged', () => {
     const before = [makeAsset({ id: 1, download_count: 0 })];
     const after = [makeAsset({ id: 1, download_count: 12345 })];
     expect(hasAssetsChanged(before, after)).toBe(false);
+  });
+});
+
+describe('findReleasesWithChangedAssets', () => {
+  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name: 'v1',
+    name: 'Release 1',
+    body: null,
+    published_at: '2026-01-01T00:00:00.000Z',
+    html_url: 'https://github.com/owner/repo/releases/tag/v1',
+    assets: [makeAsset()],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  it('returns releases whose assets fingerprint changed against local', () => {
+    const local = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.000Z' })] })];
+    const incoming = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
+
+  it('skips releases with unchanged assets', () => {
+    const local = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    const incoming = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('skips releases not present locally (new releases handled by addReleases)', () => {
+    const local = [makeRelease({ id: 1 })];
+    const incoming = [makeRelease({ id: 2 })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('returns empty when no latest releases are provided', () => {
+    const local = [makeRelease({ id: 1 })];
+    expect(findReleasesWithChangedAssets(undefined, local)).toHaveLength(0);
+    expect(findReleasesWithChangedAssets([], local)).toHaveLength(0);
   });
 });
 

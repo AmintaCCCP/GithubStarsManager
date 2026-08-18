@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmbeddingConfig, Release, Repository, VectorSearchConfig, VectorSearchStatus, defaultReleaseSourceSettings } from '../types';
 import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
-import { assetsFingerprint, shouldShowAssetsUpdatedIndicator } from '../utils/releaseAssets';
+import { findReleasesWithChangedAssets, shouldShowAssetsUpdatedIndicator } from '../utils/releaseAssets';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
 let normalizePersistedState: typeof import('./useAppStore').normalizePersistedState;
@@ -161,11 +161,8 @@ describe('useAppStore release add/upsert actions', () => {
       assets: [{ ...assetAtPublish, updated_at: '2026-01-05T00:00:00.000Z' }],
     });
 
-    // 复刻 handleRefresh 的指纹比对与合并逻辑（不依赖已读状态）
-    const updatedReleases = [latest].filter(incoming => {
-      const local = useAppStore.getState().releases.find(r => r.id === incoming.id);
-      return !!local && assetsFingerprint(local.assets) !== assetsFingerprint(incoming.assets);
-    });
+    // 复用 handleRefresh 的共享筛选逻辑（findReleasesWithChangedAssets），不依赖已读状态
+    const updatedReleases = findReleasesWithChangedAssets([latest], useAppStore.getState().releases);
     expect(updatedReleases).toHaveLength(1);
     useAppStore.getState().upsertReleases(updatedReleases);
 
