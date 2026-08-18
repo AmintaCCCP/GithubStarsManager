@@ -24,7 +24,7 @@
 
 ### 数据流
 
-```
+```text
 Pull: GitHub Lists (GraphQL) → 仓库 + list 名标签 → 合并进 store → forceSyncToBackend
 Push: 本地分类 → 计算每个分类的成员仓库 → GitHub Lists (GraphQL) 覆盖写入
 ```
@@ -53,15 +53,15 @@ Push: 本地分类 → 计算每个分类的成员仓库 → GitHub Lists (Graph
   - 若 list 名没有对应分类，仅加标签（标签本身即可让仓库出现在匹配的分类）。
 - 合并仍遵循只增不删：`existingRepoMap` 合并，保留本地已有字段。
 
-### Push 回写逻辑（DataManagementPanel）
+### Push 回写逻辑（StarSyncPanel）
 
-- 新增按钮「同步仓库分类到 GitHub list」+ 确认对话框（警告：同名 list 将被覆盖）。
+- 设置 → 星标同步中新增「同步仓库分类到 GitHub list」按钮 + 确认对话框（警告：同名 list 将被覆盖）。
 - 实现：对每个分类（默认分类或自定义分类）计算 `matchesCategory` 命中的仓库 → 映射为 GitHub list 名（分类名）→ 同名 list 覆盖成员，无则创建。
 - 前置校验 token 存在；GraphQL 失败给出可操作错误提示。
 
-### 首次登录（LoginScreen）
+### 首次登录（SyncModeChoiceModal）
 
-- `handleConnect` 成功后，若 `syncMode` 从未设置（undefined），弹选择框：「仅同步星标仓库」/「同步星标仓库及 list」。选择后写 `syncMode`。
+- `SyncModeChoiceModal` 由 `App.tsx` 挂载：登录完成后，若 `syncModeConfigured === false`，弹选择框：「仅同步星标仓库」/「同步星标仓库及 list」。选择后写 `syncMode` 与 `syncModeConfigured`。
 - 之后进入主界面，同步按钮行为按 `syncMode` 执行。
 
 ### 同步按钮（SearchBar）
