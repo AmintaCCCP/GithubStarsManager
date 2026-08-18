@@ -28,6 +28,7 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | Feature | Description |
 |---------|-------------|
 | **Auto-sync Stars** | Connect your GitHub token to automatically pull all starred repositories |
+| **GitHub Lists Sync** | Bidirectional sync with native GitHub Lists: pull Lists into tags/categories with auto-lock, push local categories back as GitHub Lists |
 | **AI Summaries & Categories** | Generate tags, topics, and short README overviews using AI |
 | **Semantic Search** | Find repos by intent, not exact names |
 | **Vector Semantic Search** | Embed repo descriptions/READMEs into a Cloudflare Vectorize index; query with natural language for high-precision semantic matching |
@@ -172,6 +173,7 @@ Deploy an Express + SQLite backend for:
 | **Category** | Category management, category sorting, default category override rules |
 | **Data Management** | Data import/export, clear local data, reset all data |
 | **Vector Search** | Configure Cloudflare Vectorize worker, embedding model, index mode (description / README), and manage index rebuild |
+| **MCP Server** | Enable MCP so agents (Claude Code, Cursor, etc.) can search your AI-enriched stars via Streamable HTTP / SSE with Bearer-token auth |
 
 **Screenshot:**
 ![Settings Panel Interface](upload/settings.png)
@@ -351,6 +353,43 @@ Vector Semantic Search uses [Cloudflare Vectorize](https://developers.cloudflare
 5. Use the **AI Search** button — it will automatically use vector search when enabled
 
 > ⚠️ After changing the embedding model, you must rebuild the index — different models produce incompatible vector dimensions.
+
+## 🛰️ MCP Server (Agent access)
+
+Let agents (Claude Code, Cursor, etc.) read your AI-enriched starred repositories — summaries, tags, categories — and search them via the [Model Context Protocol](https://modelcontextprotocol.io/).
+
+- **Streamable HTTP** (preferred): `POST /mcp` on the app origin (backend/Docker mode) or `http://127.0.0.1:3927/mcp` (desktop local mode)
+- **Legacy SSE**: `/mcp/sse` + `/mcp/sse/messages` (backend), `/sse` + `/messages` (desktop) — for older clients
+- **Bearer-token auth** with a stable token (`gsm_mcp_...`): generated once when enabled, kept across restarts, only changes when you reset it
+
+**Enable:** Settings → MCP Server → toggle on. The panel shows the endpoint URLs, the token, and a one-click copyable agent config (JSON) for both Streamable HTTP and SSE. No extra install needed.
+
+> 💡 The MCP token is **separate** from the backend `API_SECRET`. Pure frontend (no backend) hides the MCP settings page; it works with the desktop (Electron) client or a connected backend.
+
+**Exposed tools (read-only):**
+
+| Tool | Description |
+|------|-------------|
+| `gsm_status` | Server status: repo count, vector availability, version |
+| `gsm_search_repos` | Keyword search over stars with filters (languages / tags / platforms / licenses / category / stars) and pagination |
+| `gsm_get_repo` | Fetch one repo by numeric id or `owner/repo`, with AI-processed fields |
+| `gsm_list_categories` | List custom categories |
+| `gsm_list_repos_by_category` | List repos in a category with pagination |
+| `gsm_stats` | Aggregate stats (languages, analysis, tags) |
+| `gsm_vector_search` | Semantic vector search — listed only when Vector Search is configured and enabled |
+
+**Desktop (Electron) notes:** binds loopback (`127.0.0.1`) only — local agents only; host/port adjustable in Settings (default port `3927`).
+
+![MCP](upload/mcp.png)
+
+## 🔄 GitHub Lists Bidirectional Sync
+
+Native [GitHub Lists](https://github.com/features/lists) (starred lists) sync both ways, in addition to the classic REST star sync:
+
+- **Pull (GitHub → app)** — choose **Starred repos & lists** in **Settings → Star Sync** (or on first login). Lists are fetched via GraphQL; each list name is applied as a custom tag, and unlocked repos are categorized to the matching category and **auto-locked** so AI analysis won't reset them.
+- **Push (app → GitHub)** — click **Push categories to GitHub lists** in **Settings → Star Sync**. Each local category is written back as a same-named GitHub List (existing lists overwritten, missing lists created private by default); repos join the lists matching their category, and memberships in lists not managed locally are preserved.
+
+> Scope is persistent: switch anytime between **Starred repos only** and **Starred repos & lists** in Settings → Star Sync.
 
 ## 💾 WebDAV Backup Configuration
 
