@@ -36,6 +36,24 @@ export function hasAssetsChanged(
 }
 
 /**
+ * 从最新拉取的 Release 中筛出“资产相对本地已变化”的条目。
+ * 只比对本地已存在 id 的 Release（新增条目由调用方 addReleases 处理）；
+ * 资产指纹未变化则跳过，保证幂等，避免重复触发 store/后端写入。
+ * 供刷新入口（ReleaseTimeline.handleRefresh）与测试复用。
+ */
+export function findReleasesWithChangedAssets(
+  latestReleases: Release[] | undefined,
+  currentReleases: Release[]
+): Release[] {
+  const byId = new Map(currentReleases.map(r => [r.id, r]));
+  return (latestReleases || []).filter((latest) => {
+    const local = byId.get(latest.id);
+    if (!local) return false;
+    return assetsFingerprint(local.assets) !== assetsFingerprint(latest.assets);
+  });
+}
+
+/**
  * 计算 Release 的有效展示时间。
  * GitHub 的 Release 对象没有 updated_at，资产变更时 published_at 不会变化；
  * 资产更新时间已包含在 assets[].updated_at 中（每次替换/重传都会更新）。

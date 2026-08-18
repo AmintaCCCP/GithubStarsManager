@@ -23,8 +23,8 @@ import {
   resolveReleaseSources,
 } from '../utils/releaseSources';
 import {
-  assetsFingerprint,
   effectiveReleaseTime,
+  findReleasesWithChangedAssets,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 
@@ -454,13 +454,10 @@ export const ReleaseTimeline: React.FC = () => {
 
       // 只比每仓最新 1 条资产指纹：对已存在的最新 Release，若资产发生变化则按 id 合并更新，
       // 内容变化后由 upsertReleases 自动重置为未读（is_read=false 并从 readReleases 移除）。
-      const currentReleases = useAppStore.getState().releases;
-      const updatedReleases = (latestReleases || []).filter(latest => {
-        const local = currentReleases.find(r => r.id === latest.id);
-        // 本地不存在（即为新增，已在上方 addReleases 处理）或资产未变化时跳过
-        if (!local) return false;
-        return assetsFingerprint(local.assets) !== assetsFingerprint(latest.assets);
-      });
+      const updatedReleases = findReleasesWithChangedAssets(
+        latestReleases,
+        useAppStore.getState().releases
+      );
       const updatedCount = updatedReleases.length;
 
       if (updatedReleases.length > 0) {
