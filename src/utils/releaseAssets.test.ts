@@ -167,6 +167,21 @@ describe('hasAssetsUpdatedAfterPublish', () => {
     }))).toBe(false);
     expect(hasAssetsUpdatedAfterPublish(makeRelease())).toBe(false);
   });
+
+  it('treats missing or invalid timestamps as unchanged', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: 'not-a-date',
+      assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+    }))).toBe(false);
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: 'not-a-date' })],
+    }))).toBe(false);
+  });
+
+  it('returns false when assets are missing', () => {
+    expect(hasAssetsUpdatedAfterPublish(makeRelease({ assets: undefined }))).toBe(false);
+  });
 });
 
 describe('shouldShowAssetsUpdatedIndicator', () => {
@@ -184,6 +199,17 @@ describe('shouldShowAssetsUpdatedIndicator', () => {
     expect(shouldShowAssetsUpdatedIndicator({
       published_at: '2026-01-01T00:00:00Z',
       assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
+    }, true)).toBe(false);
+  });
+
+  it('does not show the indicator when timestamps are invalid', () => {
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: 'not-a-date',
+      assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
+    }, true)).toBe(false);
+    expect(shouldShowAssetsUpdatedIndicator({
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [makeAsset({ updated_at: 'not-a-date' })],
     }, true)).toBe(false);
   });
 });
