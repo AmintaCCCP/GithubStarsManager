@@ -41,7 +41,10 @@ describe('syncLocalGitHubTokenToBackend', () => {
     await expect(syncLocalGitHubTokenToBackend()).resolves.toBe(true);
 
     expect(mockBackend.syncSettings).toHaveBeenCalledOnce();
-    expect(mockBackend.syncSettings).toHaveBeenCalledWith({ github_token: 'ghp-local-token' });
+    expect(mockBackend.syncSettings).toHaveBeenCalledWith(
+      { github_token: 'ghp-local-token' },
+      expect.any(AbortSignal),
+    );
   });
 
   it('does not write settings when there is no local token', async () => {
@@ -66,5 +69,18 @@ describe('syncLocalGitHubTokenToBackend', () => {
     mockBackend.syncSettings.mockRejectedValue(new Error('backend unavailable'));
 
     await expect(syncLocalGitHubTokenToBackend()).resolves.toBe(false);
+  });
+
+  it('aborts a pending backend token sync after the startup deadline', async () => {
+    mockStore.getState.mockReturnValue({ githubToken: 'ghp-local-token' });
+    mockBackend.syncSettings.mockImplementation(
+      (_settings: Record<string, unknown>, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        }),
+    );
+
+    await expect(syncLocalGitHubTokenToBackend(10)).resolves.toBe(false);
+    expect(mockBackend.syncSettings).toHaveBeenCalledOnce();
   });
 });

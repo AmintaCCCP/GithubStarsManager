@@ -167,14 +167,21 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
  * sync failed). Keep this repair separate from session restoration so it never
  * overwrites the local account with backend auth data.
  */
-export async function syncLocalGitHubTokenToBackend(): Promise<boolean> {
+const LOCAL_TOKEN_SYNC_TIMEOUT_MS = 5000;
+
+export async function syncLocalGitHubTokenToBackend(
+  timeoutMs = LOCAL_TOKEN_SYNC_TIMEOUT_MS,
+): Promise<boolean> {
   if (!backend.isAvailable) return false;
 
   const { githubToken } = useAppStore.getState();
   if (!githubToken) return false;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    await backend.syncSettings({ github_token: githubToken });
+    await backend.syncSettings({ github_token: githubToken }, controller.signal);
     logger.info('sync.githubToken', 'Synchronized local GitHub token to backend');
     return true;
   } catch (err) {
@@ -182,6 +189,8 @@ export async function syncLocalGitHubTokenToBackend(): Promise<boolean> {
       error: err instanceof Error ? err.message : String(err),
     });
     return false;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
