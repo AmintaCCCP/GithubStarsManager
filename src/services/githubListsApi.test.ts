@@ -1,0 +1,137 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GitHubListsApiService } from './githubListsApi';
+
+function makeJsonResponse(status: number, body: unknown, statusText = ''): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText,
+    json: async () => body,
+    headers: { get: () => null },
+  } as unknown as Response;
+}
+
+const DIRECT_URL = 'https://api.github.com/graphql';
+const PROXY_URL = 'http://backend.test/api/proxy/github/graphql';
+const BACKEND_URL = 'http://backend.test/api';
+
+const SUCCESS_DATA = {
+  data: { createUserList: { list: { id: 'L_1', name: 't' } } },
+};
+
+function makeService(backendUrl: string | null = null): GitHubListsApiService {
+  const api = new GitHubListsApiService('gh_token');
+  if (backendUrl) {
+    api.setBackendUrl(backendUrl);
+    api.setBackendAuthToken('backend_secret');
+  }
+  return api;
+}
+
+describe('GitHubListsApiService 后端代理回退直连', () => {
+  beforeEach(() => {
+    // 退避等待直接完成，避免测试被 1→2→4s 背压拖慢
+    vi.spyOn(GitHubListsApiService.prototype, 'sleep' as never).mockResolvedValue(undefined as never);
+  });
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it('代理 502 后回退直连并成功', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: 'getaddrinfo ENOTFOUND api.github.com' }, 'Bad Gateway'))
+      .mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(DIRECT_URL);
+  });
+
+  it('代理 400 GITHUB_TOKEN_NOT_CONFIGURED 后回退直连并成功（无需退避）', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(400, { error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' }))
+      .mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(DIRECT_URL);
+  });
+
+  it('代理成功时保持代理，不发起直连', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+  });
+
+  it('回退后同实例后续请求直接直连，不再撞击代理', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { error: 'Bad Gateway', code: 'BAD_GATEWAY' }, 'Bad Gateway'))
+      .mockResolvedValue(makeJsonResponse(200, SUCCESS_DATA));
+
+    await api.createUserList('first');
+    await api.createUserList('second');
+
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(3);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(DIRECT_URL);
+    expect(String(calls[2][0])).toBe(DIRECT_URL);
+  });
+
+  it('代理返回 401 时抛权限错误，不触发回退直连', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch).mockResolvedValueOnce(
+      makeJsonResponse(401, { data: null, errors: [{ message: '401 Unauthorized' }] })
+    );
+
+    await expect(api.createUserList('t')).rejects.toThrow(/缺少操作星标列表/);
+    expect(vi.mocked(window.fetch).mock.calls).toHaveLength(1);
+  });
+
+  it('未配置后端时直接直连', async () => {
+    const api = makeService(null);
+    vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    expect(String(vi.mocked(window.fetch).mock.calls[0][0])).toBe(DIRECT_URL);
+  });
+
+  it('代理与直连都持续 5xx 时，重试耗尽后抛出', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { error: 'Bad Gateway', code: 'BAD_GATEWAY' }, 'Bad Gateway'))
+      .mockResolvedValue(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong' }] }, 'Bad Gateway'));
+
+    await expect(api.createUserList('t')).rejects.toThrow(/Something went wrong/);
+  });
+
+  it('透传后端代理错误 code/details 到错误信息', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: 'getaddrinfo ENOTFOUND api.github.com' }, 'Bad Gateway'))
+      .mockResolvedValue(makeJsonResponse(502, { error: 'Bad Gateway', code: 'BAD_GATEWAY', details: 'getaddrinfo ENOTFOUND api.github.com' }, 'Bad Gateway'));
+
+    await expect(api.createUserList('t')).rejects.toThrow(/后端代理：BAD_GATEWAY：getaddrinfo ENOTFOUND/);
+  });
+});

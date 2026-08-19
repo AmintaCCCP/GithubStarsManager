@@ -78,6 +78,17 @@ class RetriableError extends Error {
   }
 }
 
+/**
+ * 后端代理返回"未配置 GitHub token"（400 GITHUB_TOKEN_NOT_CONFIGURED）。
+ * 前端始终持有 token，此时应切换到直连模式重试，无需退避等待。
+ */
+class BackendTokenMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BackendTokenMissingError';
+  }
+}
+
 export interface GitHubList {
   id: string;
   name: string;
@@ -97,6 +108,13 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message?: string; type?: string; extensions?: { code?: string } }>;
 }
 
+/** 后端代理 /api/proxy/github/* 失败时的响应体（proxyService 兜底与上游错误透传）。 */
+interface BackendProxyErrorBody {
+  error?: string;
+  code?: string;
+  details?: string;
+}
+
 /**
  * GitHub Lists（星标列表）GraphQL 客户端。
  *
@@ -104,12 +122,17 @@ interface GraphQLResponse<T> {
  * - 有后端代理：POST {backendUrl}/proxy/github/graphql，由服务端读取加密的 token 并转发；
  * - 直连模式：POST https://api.github.com/graphql，携带传入的 token。
  *
+ * 后端代理路径一旦失败（网络/5xx/token 缺失），自动切换到直连模式并保持到本次同步结束，
+ * 避免同一批次的每个查询都先撞击一次失败的代理。直连要求浏览器能直接访问 GitHub。
+ *
  * GraphQL 操作星标列表需要经典 PAT 的 `user` scope（或含 star lists 权限的 token）。
  */
 export class GitHubListsApiService {
   private token: string;
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
+  /** 后端代理路径失败后置位，本实例剩余请求走直连（幂等切换，不重复尝试代理）。 */
+  private proxyFailed = false;
 
   constructor(token: string) {
     this.token = token;
@@ -142,6 +165,9 @@ export class GitHubListsApiService {
    * 重试尊重 Retry-After 头，最多 4 次，退避 1→2→4→8s（与 Retry-After 取较大者）。
    * 鉴权类错误（401/403 scope 不足）、业务错误（GraphQL errors）、4xx 不重试。
    *
+   * 后端代理模式下，代理路径一旦失败（网络/5xx/token 缺失）即切换到直连重试并保持到
+   * 本次同步结束；直连模式失败则按正常退避序列重试。
+   *
    * @param toleratePartialErrors 为 true 时，若响应为 200 且包含部分 data，
    *   即使 errors 数组非空也不抛错（用于批量解析场景：个别字段失败不应丢弃已成功的结果）。
    *   鉴权类错误（401/403 scope 不足）无论何种模式都会抛出。
@@ -166,14 +192,30 @@ export class GitHubListsApiService {
       //（否则 sleep 抛出 AbortError，掩盖最终的 RetriableError）。退避只受 parentSignal 控制。
       const controller = createCombinedAbortController(parentSignal, options.timeoutMs ?? 30_000);
       try {
-        return await this.attemptRequest<T>(query, body, controller.signal, options);
+        // 后端代理路径一旦失败（网络/5xx/token 缺失）即切直连，并保持到本次同步结束：
+        // 避免同一批次的每个查询都先撞击一次失败的代理。
+        const useProxy = this.backendUrl !== null && !this.proxyFailed;
+        return await this.attemptRequest<T>(query, body, controller.signal, options, useProxy);
       } catch (e) {
         if (e instanceof RetriableError) {
           lastError = e;
+          // 后端代理瞬时失败（5xx/网络/限流）：切直连后继续按原退避重试同一查询；
+          // 直连模式失败则按正常退避序列重试（不再改模式）。
+          if (this.backendUrl && !this.proxyFailed) {
+            this.proxyFailed = true;
+            logger.warn('githubLists', 'Backend proxy failed, falling back to direct connection', { error: e.message });
+          }
           // 最后一次不再等待，直接抛出
           if (attempt === MAX_ATTEMPTS - 1) break;
           const backoffMs = e.retryAfterMs ?? (1000 * Math.pow(2, attempt));
           await this.sleep(backoffMs, parentSignal);
+          continue;
+        }
+        if (e instanceof BackendTokenMissingError) {
+          // 后端未配置 token（如首次同步前尚未同步成功），前端持有 token，直连即可，无需退避。
+          lastError = e;
+          this.proxyFailed = true;
+          logger.warn('githubLists', 'Backend token missing, falling back to direct connection');
           continue;
         }
         // 不可重试（鉴权/业务/AbortError 等），直接抛
@@ -213,16 +255,18 @@ export class GitHubListsApiService {
   /**
    * 单次 GraphQL 请求尝试。瞬时错误抛 RetriableError 供外层重试，
    * 永久错误（鉴权/业务/缺 data）直接抛出。
+   * @param useProxy true 走后端代理；false 走直连（浏览器 token 直连 GitHub）。
    */
   private async attemptRequest<T>(
     query: string,
     body: string,
     signal: AbortSignal,
-    options: { toleratePartialErrors?: boolean }
+    options: { toleratePartialErrors?: boolean },
+    useProxy: boolean
   ): Promise<T> {
     let response: Response;
     try {
-      if (this.backendUrl) {
+      if (useProxy && this.backendUrl) {
         const proxyUrl = `${this.backendUrl}/proxy/github/graphql`;
         response = await fetch(proxyUrl, {
           method: 'POST',
@@ -274,6 +318,12 @@ export class GitHubListsApiService {
       throw new Error('GitHub GraphQL 响应解析失败（非 JSON）。');
     }
 
+    // 后端未配置 token（400 GITHUB_TOKEN_NOT_CONFIGURED）：前端持有 token，直连即可。
+    // 抛专用错误由 request 切到直连模式重试（无需退避）。
+    if (useProxy && response.status === 400 && (payload as unknown as BackendProxyErrorBody).code === 'GITHUB_TOKEN_NOT_CONFIGURED') {
+      throw new BackendTokenMissingError('后端未配置 GitHub token，切换到直连模式重试。');
+    }
+
     // 速率限制：403 既可能是 scope 不足，也可能是主/次速率限制。
     // 需在鉴权分类之前判断，避免把限流误报为"缺少权限"。
     const isRateLimited =
@@ -304,9 +354,12 @@ export class GitHubListsApiService {
         );
       }
       // 非鉴权错误：若允许部分失败且响应 200 且存在部分 data，则保留部分结果继续；
-      // 否则抛出。
+      // 否则抛出。上游 5xx（如 GitHub GraphQL 502 + errors 体）属瞬时错误，可重试/切直连。
       if (options.toleratePartialErrors && response.status === 200 && payload.data) {
         return payload.data;
+      }
+      if (response.status >= 500 && response.status <= 599) {
+        throw new RetriableError(message, this.parseRetryAfterMs(response));
       }
       throw new Error(message);
     }
@@ -321,10 +374,14 @@ export class GitHubListsApiService {
       );
     }
 
-    // 5xx（502/503/504）：GitHub 过载或网关超时，瞬时性错误，可重试
+    // 5xx（502/503/504）：GitHub 过载/网关超时，或后端代理自身不可达，瞬时性错误，可重试。
+    // 后端代理失败时透传其 code/details，便于区分"后端容器连不上 GitHub"与"GitHub 本身 5xx"。
     if (response.status >= 500 && response.status <= 599) {
+      const proxyErr = payload as unknown as Partial<BackendProxyErrorBody>;
+      const details = typeof proxyErr.details === 'string' && proxyErr.details ? `：${proxyErr.details}` : '';
+      const diagnostics = proxyErr.code ? `（后端代理：${proxyErr.code}${details}）` : '';
       throw new RetriableError(
-        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}`,
+        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${diagnostics}`,
         this.parseRetryAfterMs(response)
       );
     }
