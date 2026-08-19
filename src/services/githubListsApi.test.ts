@@ -107,6 +107,21 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
     expect(vi.mocked(window.fetch).mock.calls).toHaveLength(1);
   });
 
+  it('5xx 错误文本含鉴权关键词时仍走重试回退，而非误判权限不足', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong while processing a permission-authorized request' }] }, 'Bad Gateway'))
+      .mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(DIRECT_URL);
+  });
+
   it('未配置后端时直接直连', async () => {
     const api = makeService(null);
     vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
