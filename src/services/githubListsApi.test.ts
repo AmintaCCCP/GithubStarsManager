@@ -122,6 +122,34 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
     expect(String(calls[1][0])).toBe(DIRECT_URL);
   });
 
+  it('代理请求内部超时（AbortError）后回退直连并成功', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockRejectedValueOnce(new DOMException('The operation was aborted.', 'AbortError'))
+      .mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));
+
+    const id = await api.createUserList('t');
+
+    expect(id).toBe('L_1');
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(DIRECT_URL);
+  });
+
+  it('调用方取消（父信号中止）时传播 AbortError，不重试不回退', async () => {
+    const api = makeService(BACKEND_URL);
+    const controller = new AbortController();
+    // 模拟请求进行中调用方取消：先中止父信号，fetch 随即以 AbortError 失败
+    vi.mocked(window.fetch).mockImplementationOnce(() => {
+      controller.abort();
+      return Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
+    });
+
+    await expect(api.getUserListSummaries('cgy141514', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(vi.mocked(window.fetch).mock.calls).toHaveLength(1);
+  });
+
   it('未配置后端时直接直连', async () => {
     const api = makeService(null);
     vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, SUCCESS_DATA));

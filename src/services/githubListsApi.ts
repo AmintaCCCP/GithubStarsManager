@@ -227,6 +227,20 @@ export class GitHubListsApiService {
           logger.warn('githubLists', 'Backend token missing, falling back to direct connection');
           continue;
         }
+        // 单次尝试的内部超时（如代理请求停滞）会中止组合 controller，fetch 以 AbortError 失败。
+        // 调用方取消（parentSignal 已中止）应原样传播；内部超时属瞬时错误，
+        // 切直连后按退避重试，而不是直接抛给用户。
+        if (e instanceof Error && e.name === 'AbortError' && !parentSignal?.aborted) {
+          lastError = new RetriableError('GitHub GraphQL 请求超时。');
+          if (this.backendUrl && !this.proxyFailed) {
+            this.proxyFailed = true;
+            logger.warn('githubLists', 'Request timeout, falling back to direct connection');
+          }
+          if (attempt === MAX_ATTEMPTS - 1) break;
+          const backoffMs = 1000 * Math.pow(2, attempt);
+          await this.sleep(backoffMs, parentSignal);
+          continue;
+        }
         // 不可重试（鉴权/业务/AbortError 等），直接抛
         throw e;
       }
