@@ -158,7 +158,14 @@ describe('useAppStore release add/upsert actions', () => {
     // 刷新：GitHub 返回同 id 但资产已被替换（updated_at 晚于 published_at）
     const latest = makeRelease(1, {
       published_at: publishedAt,
-      assets: [{ ...assetAtPublish, updated_at: '2026-01-05T00:00:00.000Z' }],
+      assets: [
+        { ...assetAtPublish, updated_at: '2026-01-05T00:00:00.000Z' },
+        {
+          ...assetAtPublish,
+          id: 999,
+          name: 'new-app.zip',
+        },
+      ],
     });
 
     // 复用 handleRefresh 的共享筛选逻辑（findReleasesWithChangedAssets），不依赖已读状态
@@ -169,6 +176,7 @@ describe('useAppStore release add/upsert actions', () => {
     // 资产更新后：无论之前是否已读，都重置为未读并展示"资产已更新"
     const merged = useAppStore.getState().releases.find(r => r.id === 1)!;
     expect(merged.is_read).toBe(false);
+    expect(merged.updated_asset_ids).toEqual([101, 999]);
     expect(isUnread()).toBe(true);
     expect(shouldShowAssetsUpdatedIndicator(merged, isUnread())).toBe(true);
 

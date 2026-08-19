@@ -24,6 +24,7 @@ interface DownloadLink {
   size: number;
   downloadCount: number;
   isSourceCode?: boolean;
+  assetId?: number;
 }
 
 interface ReleaseCardProps {
@@ -364,6 +365,9 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
                   const isDownloaded = downloadedRef.current[link.url];
+                  const isAssetUpdated = isUnread
+                    && link.assetId !== undefined
+                    && release.updated_asset_ids?.includes(link.assetId) === true;
 
                   if (isRpcEnabled) {
                     return (
@@ -393,6 +397,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           </span>
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                          {isAssetUpdated && (
+                            <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium whitespace-nowrap">
+                              {t('资产已更新', 'Asset updated')}
+                            </span>
+                          )}
                           {link.size > 0 && (
                             <span>{formatFileSize(link.size)}</span>
                           )}
@@ -426,6 +435,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                        {isAssetUpdated && (
+                          <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium whitespace-nowrap">
+                            {t('资产已更新', 'Asset updated')}
+                          </span>
+                        )}
                         {link.size > 0 && (
                           <span>{formatFileSize(link.size)}</span>
                         )}

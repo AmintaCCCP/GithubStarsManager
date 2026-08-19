@@ -36,6 +36,24 @@ export function hasAssetsChanged(
 }
 
 /**
+ * 返回相对本地资产集合新增或发生变化的资产 ID。
+ * 资产被删除时没有可展示的资产行，因此不会出现在返回值中；删除仍由
+ * hasAssetsChanged 识别并触发 Release 整体更新。
+ */
+export function changedAssetIds(
+  current: ReleaseAsset[] | undefined,
+  incoming: ReleaseAsset[] | undefined,
+): number[] {
+  const currentById = new Map((current || []).map(asset => [asset.id, asset]));
+  return (incoming || [])
+    .filter(asset => {
+      const previous = currentById.get(asset.id);
+      return !previous || assetFingerprint(previous) !== assetFingerprint(asset);
+    })
+    .map(asset => asset.id);
+}
+
+/**
  * 从最新拉取的 Release 中筛出“资产相对本地已变化”的条目。
  * 只比对本地已存在 id 的 Release（新增条目由调用方 addReleases 处理）；
  * 资产指纹未变化则跳过，保证幂等，避免重复触发 store/后端写入。
@@ -46,10 +64,14 @@ export function findReleasesWithChangedAssets(
   currentReleases: Release[]
 ): Release[] {
   const byId = new Map(currentReleases.map(r => [r.id, r]));
-  return (latestReleases || []).filter((latest) => {
+  return (latestReleases || []).flatMap((latest) => {
     const local = byId.get(latest.id);
-    if (!local) return false;
-    return assetsFingerprint(local.assets) !== assetsFingerprint(latest.assets);
+    if (!local || !hasAssetsChanged(local.assets, latest.assets)) return [];
+
+    return [{
+      ...latest,
+      updated_asset_ids: changedAssetIds(local.assets, latest.assets),
+    }];
   });
 }
 
@@ -71,6 +93,34 @@ export function effectiveReleaseTime(release: Pick<Release, 'published_at' | 'as
     }
   }
   return new Date(latest).toISOString();
+}
+
+/**
+ * 在一组 Release 中找到有效更新时间最新的条目。
+ *
+ * 仓库分类视图展示的是多个 Release，但仓库容器的更新时间应反映
+ * 所有可见条目中的最新发布时间或资产更新时间，而不是只看最新发布的版本。
+ * 对发布时间无效的条目跳过，避免单条损坏数据阻断整个仓库分组的渲染。
+ */
+export function latestEffectiveRelease<T extends Pick<Release, 'published_at' | 'assets'>>(
+  releases: readonly T[],
+): T | null {
+  let latestRelease: T | null = null;
+  let latestTime = -Infinity;
+
+  for (const release of releases) {
+    if (Number.isNaN(new Date(release.published_at).getTime())) {
+      continue;
+    }
+
+    const effectiveTime = new Date(effectiveReleaseTime(release)).getTime();
+    if (!Number.isNaN(effectiveTime) && effectiveTime > latestTime) {
+      latestRelease = release;
+      latestTime = effectiveTime;
+    }
+  }
+
+  return latestRelease;
 }
 
 /**

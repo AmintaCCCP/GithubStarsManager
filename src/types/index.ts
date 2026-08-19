@@ -65,6 +65,8 @@ export interface Release {
     full_name: string;
     name: string;
   };
+  /** IDs of assets added or changed during the latest refresh. */
+  updated_asset_ids?: number[];
   is_read?: boolean;
 }
 

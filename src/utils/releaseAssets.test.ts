@@ -3,9 +3,11 @@ import type { Release, ReleaseAsset } from '../types';
 import {
   assetFingerprint,
   assetsFingerprint,
+  changedAssetIds,
   effectiveReleaseTime,
   findReleasesWithChangedAssets,
   hasAssetsChanged,
+  latestEffectiveRelease,
   hasAssetsUpdatedAfterPublish,
   shouldShowAssetsUpdatedIndicator,
 } from './releaseAssets';
@@ -95,6 +97,29 @@ describe('hasAssetsChanged', () => {
   });
 });
 
+describe('changedAssetIds', () => {
+  it('returns added and fingerprint-changed asset IDs only', () => {
+    const current = [
+      makeAsset({ id: 1, updated_at: '2026-01-01T00:00:00.000Z' }),
+      makeAsset({ id: 2, updated_at: '2026-01-01T00:00:00.000Z' }),
+    ];
+    const incoming = [
+      makeAsset({ id: 1, updated_at: '2026-01-02T00:00:00.000Z' }),
+      makeAsset({ id: 2, updated_at: '2026-01-01T00:00:00.000Z' }),
+      makeAsset({ id: 3, updated_at: '2026-01-01T00:00:00.000Z' }),
+    ];
+
+    expect(changedAssetIds(current, incoming)).toEqual([1, 3]);
+  });
+
+  it('does not mark removed assets because they have no visible asset row', () => {
+    const current = [makeAsset({ id: 1 }), makeAsset({ id: 2 })];
+    const incoming = [makeAsset({ id: 1 })];
+
+    expect(changedAssetIds(current, incoming)).toEqual([]);
+  });
+});
+
 describe('findReleasesWithChangedAssets', () => {
   const makeRelease = (overrides: Partial<Release> = {}): Release => ({
     id: 1,
@@ -111,7 +136,9 @@ describe('findReleasesWithChangedAssets', () => {
   it('returns releases whose assets fingerprint changed against local', () => {
     const local = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.000Z' })] })];
     const incoming = [makeRelease({ id: 1, assets: [makeAsset({ updated_at: '2026-01-05T00:00:00.000Z' })] })];
-    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+    const updated = findReleasesWithChangedAssets(incoming, local);
+    expect(updated.map(r => r.id)).toEqual([1]);
+    expect(updated[0].updated_asset_ids).toEqual([1]);
   });
 
   it('skips releases with unchanged assets', () => {
@@ -171,6 +198,46 @@ describe('effectiveReleaseTime', () => {
       ],
     });
     expect(effectiveReleaseTime(release)).toBe('2026-01-10T00:00:00.000Z');
+  });
+});
+
+describe('latestEffectiveRelease', () => {
+  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name: 'v1',
+    name: 'Release 1',
+    body: null,
+    published_at: '2026-01-01T00:00:00.000Z',
+    html_url: 'https://github.com/owner/repo/releases/tag/v1',
+    assets: [],
+    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+    ...overrides,
+  });
+
+  it('selects an older release when its asset was updated most recently', () => {
+    const latestPublished = makeRelease({
+      id: 1,
+      published_at: '2026-02-01T00:00:00.000Z',
+    });
+    const olderReleaseWithUpdatedAsset = makeRelease({
+      id: 2,
+      published_at: '2026-01-01T00:00:00.000Z',
+      assets: [makeAsset({ updated_at: '2026-03-01T00:00:00.000Z' })],
+    });
+
+    expect(latestEffectiveRelease([latestPublished, olderReleaseWithUpdatedAsset])).toBe(olderReleaseWithUpdatedAsset);
+  });
+
+  it('uses the newest published release when no asset is newer', () => {
+    const olderRelease = makeRelease({ id: 1, published_at: '2026-01-01T00:00:00.000Z' });
+    const latestRelease = makeRelease({ id: 2, published_at: '2026-02-01T00:00:00.000Z' });
+
+    expect(latestEffectiveRelease([olderRelease, latestRelease])).toBe(latestRelease);
+  });
+
+  it('returns null for empty or invalid releases', () => {
+    expect(latestEffectiveRelease([])).toBeNull();
+    expect(latestEffectiveRelease([makeRelease({ published_at: 'not-a-date' })])).toBeNull();
   });
 });
 
