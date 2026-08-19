@@ -71,10 +71,15 @@ function createCombinedAbortController(parentSignal: AbortSignal | undefined, ti
  */
 class RetriableError extends Error {
   readonly retryAfterMs?: number;
-  constructor(message: string, retryAfterMs?: number) {
+  /** 是否为代理层自身失败（代理网络异常/非 JSON 5xx/带后端 code/details 的 5xx），
+   *  而非 GitHub 侧转发的瞬时错误（限流、上游 5xx）。仅代理层失败才应切 sticky 直连：
+   *  健康代理转发的 GitHub 瞬时错误，直连同样会命中，不应因此永久绕过代理。 */
+  readonly proxyLayerFailure: boolean;
+  constructor(message: string, retryAfterMs?: number, proxyLayerFailure = false) {
     super(message);
     this.name = 'RetriableError';
     this.retryAfterMs = retryAfterMs;
+    this.proxyLayerFailure = proxyLayerFailure;
   }
 }
 
@@ -206,10 +211,10 @@ export class GitHubListsApiService {
       // 每次尝试独立超时：超时上限不被重试+退避消耗，也不会中止退避等待
       //（否则 sleep 抛出 AbortError，掩盖最终的 RetriableError）。退避只受 parentSignal 控制。
       const controller = createCombinedAbortController(parentSignal, options.timeoutMs ?? 30_000);
+      // 后端代理路径一旦失败（网络/5xx/token 缺失）即切直连，并保持到本次同步结束：
+      // 避免同一批次的每个查询都先撞击一次失败的代理。
+      const useProxy = this.backendUrl !== null && !this.proxyFailed;
       try {
-        // 后端代理路径一旦失败（网络/5xx/token 缺失）即切直连，并保持到本次同步结束：
-        // 避免同一批次的每个查询都先撞击一次失败的代理。
-        const useProxy = this.backendUrl !== null && !this.proxyFailed;
         return await this.attemptRequest<T>(query, body, controller.signal, options, useProxy);
       } catch (e) {
         if (e instanceof RetriableError) {
@@ -217,15 +222,15 @@ export class GitHubListsApiService {
           // mutation 未知结果（代理可能已提交成功但响应丢失）：不自动重放，
           // 交由上层核对目标状态，避免重复执行（如重复创建 list）。
           if (!mayReplay) {
-            if (this.backendUrl && !this.proxyFailed) {
+            if (e.proxyLayerFailure && this.backendUrl && !this.proxyFailed) {
               this.proxyFailed = true;
               logger.warn('githubLists', 'Mutation outcome unknown, not auto-replaying', { error: e.message });
             }
             break;
           }
-          // 后端代理瞬时失败（5xx/网络/限流）：切直连后继续按原退避重试同一查询；
-          // 直连模式失败则按正常退避序列重试（不再改模式）。
-          if (this.backendUrl && !this.proxyFailed) {
+          // 仅代理层自身失败才切 sticky 直连（网络/非 JSON 5xx/带后端 code/details 的 5xx）；
+          // 健康代理转发的 GitHub 瞬时错误（限流、上游 5xx）保持走代理按退避重试。
+          if (e.proxyLayerFailure && this.backendUrl && !this.proxyFailed) {
             this.proxyFailed = true;
             logger.warn('githubLists', 'Backend proxy failed, falling back to direct connection', { error: e.message });
           }
@@ -249,13 +254,14 @@ export class GitHubListsApiService {
         if (e instanceof Error && e.name === 'AbortError' && !parentSignal?.aborted) {
           lastError = new RetriableError('GitHub GraphQL 请求超时。');
           if (!mayReplay) {
-            if (this.backendUrl && !this.proxyFailed) {
+            if (useProxy && this.backendUrl && !this.proxyFailed) {
               this.proxyFailed = true;
               logger.warn('githubLists', 'Mutation timeout, not auto-replaying');
             }
             break;
           }
-          if (this.backendUrl && !this.proxyFailed) {
+          // 仅当超时发生在这步的代理请求上才切直连（直连超时无可切对象）。
+          if (useProxy && this.backendUrl && !this.proxyFailed) {
             this.proxyFailed = true;
             logger.warn('githubLists', 'Request timeout, falling back to direct connection');
           }
@@ -346,7 +352,8 @@ export class GitHubListsApiService {
       }
       throw new RetriableError(
         `GitHub GraphQL 网络请求失败：${e instanceof Error ? e.message : String(e)}`,
-        undefined
+        undefined,
+        useProxy
       );
     }
 
@@ -358,7 +365,8 @@ export class GitHubListsApiService {
       if (response.status >= 500 && response.status <= 599) {
         throw new RetriableError(
           `GitHub GraphQL 响应解析失败（HTTP ${response.status}）。`,
-          this.parseRetryAfterMs(response)
+          this.parseRetryAfterMs(response),
+          useProxy
         );
       }
       throw new Error('GitHub GraphQL 响应解析失败（非 JSON）。');
@@ -390,9 +398,14 @@ export class GitHubListsApiService {
       const message = error.message || 'GitHub GraphQL 请求失败';
       // 上游 5xx 无条件视为瞬时错误：即使错误文本疑似鉴权（如 502 网关错误里出现
       // "authorized"/"permission"），也应走重试/切直连，而非误判为权限不足。
-      // 若载荷同时携带后端 code/details 诊断，一并透传。
+      // 若载荷同时携带后端 code/details 诊断（proxyLayerFailure=true），一并透传并视为代理层失败。
       if (response.status >= 500 && response.status <= 599) {
-        throw new RetriableError(`${message}${buildProxyDiagnostics(payload)}`, this.parseRetryAfterMs(response));
+        const diagnostics = buildProxyDiagnostics(payload);
+        throw new RetriableError(
+          `${message}${diagnostics}`,
+          this.parseRetryAfterMs(response),
+          useProxy && diagnostics !== ''
+        );
       }
       // 鉴权类错误：GraphQL 通常返回 "401 Unauthorized" 或错误信息包含 scope/权限相关字眼。
       // 无论是否容忍部分失败，鉴权错误都必须抛出，不能静默吞掉。
@@ -423,11 +436,14 @@ export class GitHubListsApiService {
     }
 
     // 5xx（502/503/504）：GitHub 过载/网关超时，或后端代理自身不可达，瞬时性错误，可重试。
-    // 后端代理失败时透传其 code/details，便于区分"后端容器连不上 GitHub"与"GitHub 本身 5xx"。
+    // 后端代理失败时透传其 code/details，便于区分"后端容器连不上 GitHub"（proxyLayerFailure）
+    // 与"GitHub 本身 5xx"（健康代理透明转发，不应切 sticky 直连）。
     if (response.status >= 500 && response.status <= 599) {
+      const diagnostics = buildProxyDiagnostics(payload);
       throw new RetriableError(
-        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${buildProxyDiagnostics(payload)}`,
-        this.parseRetryAfterMs(response)
+        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${diagnostics}`,
+        this.parseRetryAfterMs(response),
+        useProxy && diagnostics !== ''
       );
     }
 
@@ -718,7 +734,9 @@ export class GitHubListsApiService {
           clientMutationId
         }
       }`,
-      { listId }
+      { listId },
+      // 按 node id 删除具备幂等语义：重放至多命中"已删除"，不会造成额外副作用。
+      { replayableMutation: true }
     );
   }
 
