@@ -342,6 +342,11 @@ export class GitHubListsApiService {
     if (payload.errors && payload.errors.length > 0) {
       const error = payload.errors[0];
       const message = error.message || 'GitHub GraphQL 请求失败';
+      // 上游 5xx 无条件视为瞬时错误：即使错误文本疑似鉴权（如 502 网关错误里出现
+      // "authorized"/"permission"），也应走重试/切直连，而非误判为权限不足。
+      if (response.status >= 500 && response.status <= 599) {
+        throw new RetriableError(message, this.parseRetryAfterMs(response));
+      }
       // 鉴权类错误：GraphQL 通常返回 "401 Unauthorized" 或错误信息包含 scope/权限相关字眼。
       // 无论是否容忍部分失败，鉴权错误都必须抛出，不能静默吞掉。
       if (response.status === 401 || response.status === 403 || /scope|permission|authorized|not granted/i.test(message)) {
@@ -353,13 +358,9 @@ export class GitHubListsApiService {
           '· 或改用含 star lists 权限的 token 重新登录。'
         );
       }
-      // 非鉴权错误：若允许部分失败且响应 200 且存在部分 data，则保留部分结果继续；
-      // 否则抛出。上游 5xx（如 GitHub GraphQL 502 + errors 体）属瞬时错误，可重试/切直连。
+      // 非鉴权错误：若允许部分失败且响应 200 且存在部分 data，则保留部分结果继续；否则抛出。
       if (options.toleratePartialErrors && response.status === 200 && payload.data) {
         return payload.data;
-      }
-      if (response.status >= 500 && response.status <= 599) {
-        throw new RetriableError(message, this.parseRetryAfterMs(response));
       }
       throw new Error(message);
     }
