@@ -152,7 +152,13 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
 
     await expect(api.createUserList('t')).rejects.toThrow(/后端代理：BAD_GATEWAY/);
     expect(String(vi.mocked(window.fetch).mock.calls[0][0])).toBe(PROXY_URL);
-    expect(vi.mocked(window.fetch).mock.calls.some(c => String(c[0]) === DIRECT_URL && String(c[1]).includes('createUserList'))).toBe(false);
+    // 检测直连路径是否重放了 createUserList mutation（读 body 而非 String(c[1])）
+    expect(
+      vi.mocked(window.fetch).mock.calls.some(
+        c => String(c[0]) === DIRECT_URL &&
+          String((c[1] as RequestInit)?.body ?? '').includes('createUserList')
+      )
+    ).toBe(false);
   });
 
   it('mutation（createUserList）代理网络失败后按名核对复用已有 list，不重复创建', async () => {
