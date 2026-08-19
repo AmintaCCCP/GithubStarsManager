@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitHubListsApiService } from './githubListsApi';
 
-function makeJsonResponse(status: number, body: unknown, statusText = ''): Response {
+function makeJsonResponse(status: number, body: unknown, statusText = '', headers: Record<string, string> = {}): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
     statusText,
     json: async () => body,
-    headers: { get: () => null },
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
   } as unknown as Response;
 }
 
@@ -128,7 +128,7 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
     expect(vi.mocked(window.fetch).mock.calls).toHaveLength(1);
   });
 
-  it('5xx 错误文本含鉴权关键词时仍走重试回退，而非误判权限不足', async () => {
+  it('5xx 错误文本含鉴权关键词时仍按瞬时错误走代理重试，而非误判权限不足', async () => {
     const api = makeService(BACKEND_URL);
     vi.mocked(window.fetch)
       .mockResolvedValueOnce(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong while processing a permission-authorized request' }] }, 'Bad Gateway'))
@@ -139,8 +139,39 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
     expect(summaries).toHaveLength(1);
     const calls = vi.mocked(window.fetch).mock.calls;
     expect(calls).toHaveLength(2);
+    // 该 502 无后端 code/details（健康代理透明转发），不切直连，重试仍走代理
     expect(String(calls[0][0])).toBe(PROXY_URL);
-    expect(String(calls[1][0])).toBe(DIRECT_URL);
+    expect(String(calls[1][0])).toBe(PROXY_URL);
+  });
+
+  it('代理透传上游 GitHub 5xx（无 code/details）时不切直连，走代理重试', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong' }] }, 'Bad Gateway'))
+      .mockResolvedValueOnce(makeJsonResponse(200, LIST_SUMMARIES_DATA));
+
+    const summaries = await api.getUserListSummaries('cgy141514');
+
+    expect(summaries).toHaveLength(1);
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(PROXY_URL);
+  });
+
+  it('代理透传 GitHub 限流（403 x-ratelimit-remaining=0）时不切直连，走代理重试', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(403, { data: null, errors: [{ message: 'rate limit' }] }, 'Forbidden', { 'x-ratelimit-remaining': '0' }))
+      .mockResolvedValueOnce(makeJsonResponse(200, LIST_SUMMARIES_DATA));
+
+    const summaries = await api.getUserListSummaries('cgy141514');
+
+    expect(summaries).toHaveLength(1);
+    const calls = vi.mocked(window.fetch).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(String(calls[0][0])).toBe(PROXY_URL);
+    expect(String(calls[1][0])).toBe(PROXY_URL);
   });
 
   it('mutation（createUserList）代理 502 未知结果时抛错，不自动重放直连', async () => {
