@@ -149,4 +149,22 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
 
     await expect(api.createUserList('t')).rejects.toThrow(/后端代理：BAD_GATEWAY：getaddrinfo ENOTFOUND/);
   });
+
+  it('5xx 的 errors 分支也透传 code/details 诊断', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong' }], code: 'BAD_GATEWAY', details: 'getaddrinfo ENOTFOUND' }, 'Bad Gateway'))
+      .mockResolvedValue(makeJsonResponse(502, { data: null, errors: [{ message: 'Something went wrong' }], code: 'BAD_GATEWAY', details: 'getaddrinfo ENOTFOUND' }, 'Bad Gateway'));
+
+    await expect(api.createUserList('t')).rejects.toThrow(/Something went wrong.*后端代理：BAD_GATEWAY：getaddrinfo ENOTFOUND/);
+  });
+
+  it('5xx 仅有 details 无 code 时也透传诊断', async () => {
+    const api = makeService(BACKEND_URL);
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(makeJsonResponse(502, { error: 'Bad Gateway', details: 'ECONNREFUSED' }, 'Bad Gateway'))
+      .mockResolvedValue(makeJsonResponse(502, { error: 'Bad Gateway', details: 'ECONNREFUSED' }, 'Bad Gateway'));
+
+    await expect(api.createUserList('t')).rejects.toThrow(/后端代理：ECONNREFUSED/);
+  });
 });
