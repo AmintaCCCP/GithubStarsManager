@@ -115,6 +115,15 @@ interface BackendProxyErrorBody {
   details?: string;
 }
 
+/** 从响应体提取后端代理诊断信息（code/details 任一存在即输出；无则空串）。 */
+function buildProxyDiagnostics(payload: unknown): string {
+  const proxyErr = payload as Partial<BackendProxyErrorBody>;
+  const parts: string[] = [];
+  if (proxyErr.code) parts.push(proxyErr.code);
+  if (typeof proxyErr.details === 'string' && proxyErr.details) parts.push(proxyErr.details);
+  return parts.length > 0 ? `（后端代理：${parts.join('：')}）` : '';
+}
+
 /**
  * GitHub Lists（星标列表）GraphQL 客户端。
  *
@@ -344,8 +353,9 @@ export class GitHubListsApiService {
       const message = error.message || 'GitHub GraphQL 请求失败';
       // 上游 5xx 无条件视为瞬时错误：即使错误文本疑似鉴权（如 502 网关错误里出现
       // "authorized"/"permission"），也应走重试/切直连，而非误判为权限不足。
+      // 若载荷同时携带后端 code/details 诊断，一并透传。
       if (response.status >= 500 && response.status <= 599) {
-        throw new RetriableError(message, this.parseRetryAfterMs(response));
+        throw new RetriableError(`${message}${buildProxyDiagnostics(payload)}`, this.parseRetryAfterMs(response));
       }
       // 鉴权类错误：GraphQL 通常返回 "401 Unauthorized" 或错误信息包含 scope/权限相关字眼。
       // 无论是否容忍部分失败，鉴权错误都必须抛出，不能静默吞掉。
@@ -378,11 +388,8 @@ export class GitHubListsApiService {
     // 5xx（502/503/504）：GitHub 过载/网关超时，或后端代理自身不可达，瞬时性错误，可重试。
     // 后端代理失败时透传其 code/details，便于区分"后端容器连不上 GitHub"与"GitHub 本身 5xx"。
     if (response.status >= 500 && response.status <= 599) {
-      const proxyErr = payload as unknown as Partial<BackendProxyErrorBody>;
-      const details = typeof proxyErr.details === 'string' && proxyErr.details ? `：${proxyErr.details}` : '';
-      const diagnostics = proxyErr.code ? `（后端代理：${proxyErr.code}${details}）` : '';
       throw new RetriableError(
-        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${diagnostics}`,
+        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${buildProxyDiagnostics(payload)}`,
         this.parseRetryAfterMs(response)
       );
     }
