@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { backend } from '../../services/backendAdapter';
-import { tryRestoreAuthFromBackend } from '../../services/autoSync';
+import { tryRestoreAuthFromBackend, syncLocalGitHubTokenToBackend } from '../../services/autoSync';
 import { useDialog } from '../../hooks/useDialog';
 
 interface BackendPanelProps {
@@ -49,6 +49,9 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         if (healthData) {
           setStatus('connected');
           setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+          // Issue #276: backend became reachable after app startup, so push the
+          // local GitHub token now instead of waiting for the next app launch.
+          void syncLocalGitHubTokenToBackend();
         } else {
           setStatus('disconnected');
           setHealth(null);
@@ -75,6 +78,9 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         // Issue #259: after the one-time secret bootstrap succeeds on a fresh
         // browser/device, try to recover the stored GitHub session.
         void tryRestoreAuthFromBackend();
+        // Issue #276: sync the local GitHub token so proxy features (e.g. GitHub
+        // Lists) work when the backend was enabled after the local session.
+        void syncLocalGitHubTokenToBackend();
       } else {
         setStatus('disconnected');
         setHealth(null);
