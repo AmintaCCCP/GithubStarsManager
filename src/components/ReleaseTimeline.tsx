@@ -25,6 +25,7 @@ import {
 import {
   effectiveReleaseTime,
   findReleasesWithChangedAssets,
+  latestEffectiveRelease,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 
@@ -169,7 +170,7 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const getDownloadLinks = useCallback((release: Release) => {
-    const links: Array<{ name: string; url: string; size: number; downloadCount: number; isSourceCode?: boolean }> = [];
+    const links: Array<{ name: string; url: string; size: number; downloadCount: number; isSourceCode?: boolean; assetId?: number }> = [];
     
     if (release.assets && release.assets.length > 0) {
       release.assets.forEach(asset => {
@@ -177,7 +178,8 @@ export const ReleaseTimeline: React.FC = () => {
           name: asset.name,
           url: asset.browser_download_url,
           size: asset.size,
-          downloadCount: asset.download_count
+          downloadCount: asset.download_count,
+          assetId: asset.id,
         });
       });
     }
@@ -346,10 +348,24 @@ export const ReleaseTimeline: React.FC = () => {
       }
     });
 
-    // 按最新发布时间排序仓库组
-    return Array.from(groups.values()).sort((a, b) =>
-      new Date(b.latestRelease.published_at).getTime() - new Date(a.latestRelease.published_at).getTime()
-    );
+    // 仓库容器的更新时间应覆盖所有可见 Release 的发布时间和资产更新时间。
+    // latestRelease 仍用于展示“最新版本”标签，避免改变版本标签的语义。
+    return Array.from(groups.values())
+      .map(group => ({
+        ...group,
+        latestUpdatedRelease: latestEffectiveRelease(
+          group.releases.map(({ release }) => release),
+        ),
+      }))
+      .sort((a, b) => {
+        const aTime = a.latestUpdatedRelease
+          ? new Date(effectiveReleaseTime(a.latestUpdatedRelease)).getTime()
+          : -Infinity;
+        const bTime = b.latestUpdatedRelease
+          ? new Date(effectiveReleaseTime(b.latestUpdatedRelease)).getTime()
+          : -Infinity;
+        return bTime - aTime;
+      });
   }, [filteredReleases]);
 
   // 根据视图模式计算分页
@@ -1232,12 +1248,14 @@ export const ReleaseTimeline: React.FC = () => {
           })
         ) : (
           // 仓库分类视图
-          paginatedRepositoryGroups.map(({ repository, releases, latestRelease }) => {
+          paginatedRepositoryGroups.map(({ repository, releases, latestRelease, latestUpdatedRelease }) => {
             const isExpanded = expandedRepositories.has(repository.id);
             const hasUnread = releases.some(({ release }) => isReleaseUnread(release.id));
-            const latestEffectiveTime = latestRelease ? effectiveReleaseTime(latestRelease) : null;
-            const latestAssetsUpdated = latestRelease !== null
-              && shouldShowAssetsUpdatedIndicator(latestRelease, isReleaseUnread(latestRelease.id));
+            const latestEffectiveTime = latestUpdatedRelease
+              ? effectiveReleaseTime(latestUpdatedRelease)
+              : null;
+            const latestAssetsUpdated = latestUpdatedRelease !== null
+              && shouldShowAssetsUpdatedIndicator(latestUpdatedRelease, isReleaseUnread(latestUpdatedRelease.id));
 
             return (
               <div key={repository.id} className="ui-card overflow-hidden">
@@ -1272,14 +1290,16 @@ export const ReleaseTimeline: React.FC = () => {
                           <p className="text-xs text-gray-400 dark:text-text-tertiary truncate">
                             {t('最新:', 'Latest:')} {latestRelease.tag_name}
                           </p>
-                          <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap flex items-center justify-end gap-1">
-                            {formatDistanceToNow(new Date(latestEffectiveTime!), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
-                            {latestAssetsUpdated && (
-                              <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
-                                {t('资产已更新', 'Assets updated')}
-                              </span>
-                            )}
-                          </p>
+                          {latestEffectiveTime && (
+                            <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap flex items-center justify-end gap-1">
+                              {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                              {latestAssetsUpdated && (
+                                <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
+                                  {t('资产已更新', 'Assets updated')}
+                                </span>
+                              )}
+                            </p>
+                          )}
                         </>
                       )}
                     </div>
