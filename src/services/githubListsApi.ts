@@ -71,10 +71,26 @@ function createCombinedAbortController(parentSignal: AbortSignal | undefined, ti
  */
 class RetriableError extends Error {
   readonly retryAfterMs?: number;
-  constructor(message: string, retryAfterMs?: number) {
+  /** 是否为代理层自身失败（代理网络异常/非 JSON 5xx/带后端 code/details 的 5xx），
+   *  而非 GitHub 侧转发的瞬时错误（限流、上游 5xx）。仅代理层失败才应切 sticky 直连：
+   *  健康代理转发的 GitHub 瞬时错误，直连同样会命中，不应因此永久绕过代理。 */
+  readonly proxyLayerFailure: boolean;
+  constructor(message: string, retryAfterMs?: number, proxyLayerFailure = false) {
     super(message);
     this.name = 'RetriableError';
     this.retryAfterMs = retryAfterMs;
+    this.proxyLayerFailure = proxyLayerFailure;
+  }
+}
+
+/**
+ * 后端代理返回"未配置 GitHub token"（400 GITHUB_TOKEN_NOT_CONFIGURED）。
+ * 前端始终持有 token，此时应切换到直连模式重试，无需退避等待。
+ */
+class BackendTokenMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BackendTokenMissingError';
   }
 }
 
@@ -97,6 +113,22 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message?: string; type?: string; extensions?: { code?: string } }>;
 }
 
+/** 后端代理 /api/proxy/github/* 失败时的响应体（proxyService 兜底与上游错误透传）。 */
+interface BackendProxyErrorBody {
+  error?: string;
+  code?: string;
+  details?: string;
+}
+
+/** 从响应体提取后端代理诊断信息（code/details 任一存在即输出；无则空串）。 */
+function buildProxyDiagnostics(payload: unknown): string {
+  const proxyErr = payload as Partial<BackendProxyErrorBody>;
+  const parts: string[] = [];
+  if (proxyErr.code) parts.push(proxyErr.code);
+  if (typeof proxyErr.details === 'string' && proxyErr.details) parts.push(proxyErr.details);
+  return parts.length > 0 ? `（后端代理：${parts.join('：')}）` : '';
+}
+
 /**
  * GitHub Lists（星标列表）GraphQL 客户端。
  *
@@ -104,12 +136,17 @@ interface GraphQLResponse<T> {
  * - 有后端代理：POST {backendUrl}/proxy/github/graphql，由服务端读取加密的 token 并转发；
  * - 直连模式：POST https://api.github.com/graphql，携带传入的 token。
  *
+ * 后端代理路径一旦失败（网络/5xx/token 缺失），自动切换到直连模式并保持到本次同步结束，
+ * 避免同一批次的每个查询都先撞击一次失败的代理。直连要求浏览器能直接访问 GitHub。
+ *
  * GraphQL 操作星标列表需要经典 PAT 的 `user` scope（或含 star lists 权限的 token）。
  */
 export class GitHubListsApiService {
   private token: string;
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
+  /** 后端代理路径失败后置位，本实例剩余请求走直连（幂等切换，不重复尝试代理）。 */
+  private proxyFailed = false;
 
   constructor(token: string) {
     this.token = token;
@@ -142,17 +179,26 @@ export class GitHubListsApiService {
    * 重试尊重 Retry-After 头，最多 4 次，退避 1→2→4→8s（与 Retry-After 取较大者）。
    * 鉴权类错误（401/403 scope 不足）、业务错误（GraphQL errors）、4xx 不重试。
    *
+   * 后端代理模式下，代理路径一旦失败（网络/5xx/token 缺失）即切换到直连重试并保持到
+   * 本次同步结束；直连模式失败则按正常退避序列重试。
+   *
    * @param toleratePartialErrors 为 true 时，若响应为 200 且包含部分 data，
    *   即使 errors 数组非空也不抛错（用于批量解析场景：个别字段失败不应丢弃已成功的结果）。
    *   鉴权类错误（401/403 scope 不足）无论何种模式都会抛出。
+   * @param replayableMutation 仅对 mutation 生效。未知结果（网络/5xx/超时）下默认不自动重放，
+   *   因为代理可能已提交成功但响应丢失，重放会重复执行（如重复创建 list）。
+   *   仅当该 mutation 具备服务端幂等语义（如整集替换）时才可设为 true。
    */
   private async request<T>(
     query: string,
     variables: Record<string, unknown> = {},
-    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number } = {}
+    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number; replayableMutation?: boolean } = {}
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
     const parentSignal = options.signal;
+    // mutation 的未知结果不允许自动重放；query 永远可安全重放。
+    const isMutation = query.trim().startsWith('mutation');
+    const mayReplay = !isMutation || options.replayableMutation === true;
 
     const MAX_ATTEMPTS = 4;
     let lastError: unknown;
@@ -165,14 +211,62 @@ export class GitHubListsApiService {
       // 每次尝试独立超时：超时上限不被重试+退避消耗，也不会中止退避等待
       //（否则 sleep 抛出 AbortError，掩盖最终的 RetriableError）。退避只受 parentSignal 控制。
       const controller = createCombinedAbortController(parentSignal, options.timeoutMs ?? 30_000);
+      // 后端代理路径一旦失败（网络/5xx/token 缺失）即切直连，并保持到本次同步结束：
+      // 避免同一批次的每个查询都先撞击一次失败的代理。
+      const useProxy = this.backendUrl !== null && !this.proxyFailed;
       try {
-        return await this.attemptRequest<T>(query, body, controller.signal, options);
+        return await this.attemptRequest<T>(query, body, controller.signal, options, useProxy);
       } catch (e) {
         if (e instanceof RetriableError) {
           lastError = e;
+          // mutation 未知结果（代理可能已提交成功但响应丢失）：不自动重放，
+          // 交由上层核对目标状态，避免重复执行（如重复创建 list）。
+          if (!mayReplay) {
+            if (e.proxyLayerFailure && this.backendUrl && !this.proxyFailed) {
+              this.proxyFailed = true;
+              logger.warn('githubLists', 'Mutation outcome unknown, not auto-replaying', { error: e.message });
+            }
+            break;
+          }
+          // 仅代理层自身失败才切 sticky 直连（网络/非 JSON 5xx/带后端 code/details 的 5xx）；
+          // 健康代理转发的 GitHub 瞬时错误（限流、上游 5xx）保持走代理按退避重试。
+          if (e.proxyLayerFailure && this.backendUrl && !this.proxyFailed) {
+            this.proxyFailed = true;
+            logger.warn('githubLists', 'Backend proxy failed, falling back to direct connection', { error: e.message });
+          }
           // 最后一次不再等待，直接抛出
           if (attempt === MAX_ATTEMPTS - 1) break;
           const backoffMs = e.retryAfterMs ?? (1000 * Math.pow(2, attempt));
+          await this.sleep(backoffMs, parentSignal);
+          continue;
+        }
+        if (e instanceof BackendTokenMissingError) {
+          // 后端未配置 token（如首次同步前尚未同步成功），前端持有 token，直连即可，无需退避。
+          // 400 在转发到 GitHub 前返回，mutation 确定未执行，可安全重放。
+          lastError = e;
+          this.proxyFailed = true;
+          logger.warn('githubLists', 'Backend token missing, falling back to direct connection');
+          continue;
+        }
+        // 单次尝试的内部超时（如代理请求停滞）会中止组合 controller，fetch 以 AbortError 失败。
+        // 调用方取消（parentSignal 已中止）应原样传播；内部超时属瞬时错误，
+        // query 切直连后按退避重试；mutation 未知结果不自动重放。
+        if (e instanceof Error && e.name === 'AbortError' && !parentSignal?.aborted) {
+          lastError = new RetriableError('GitHub GraphQL 请求超时。');
+          if (!mayReplay) {
+            if (useProxy && this.backendUrl && !this.proxyFailed) {
+              this.proxyFailed = true;
+              logger.warn('githubLists', 'Mutation timeout, not auto-replaying');
+            }
+            break;
+          }
+          // 仅当超时发生在这步的代理请求上才切直连（直连超时无可切对象）。
+          if (useProxy && this.backendUrl && !this.proxyFailed) {
+            this.proxyFailed = true;
+            logger.warn('githubLists', 'Request timeout, falling back to direct connection');
+          }
+          if (attempt === MAX_ATTEMPTS - 1) break;
+          const backoffMs = 1000 * Math.pow(2, attempt);
           await this.sleep(backoffMs, parentSignal);
           continue;
         }
@@ -213,16 +307,18 @@ export class GitHubListsApiService {
   /**
    * 单次 GraphQL 请求尝试。瞬时错误抛 RetriableError 供外层重试，
    * 永久错误（鉴权/业务/缺 data）直接抛出。
+   * @param useProxy true 走后端代理；false 走直连（浏览器 token 直连 GitHub）。
    */
   private async attemptRequest<T>(
     query: string,
     body: string,
     signal: AbortSignal,
-    options: { toleratePartialErrors?: boolean }
+    options: { toleratePartialErrors?: boolean },
+    useProxy: boolean
   ): Promise<T> {
     let response: Response;
     try {
-      if (this.backendUrl) {
+      if (useProxy && this.backendUrl) {
         const proxyUrl = `${this.backendUrl}/proxy/github/graphql`;
         response = await fetch(proxyUrl, {
           method: 'POST',
@@ -256,7 +352,8 @@ export class GitHubListsApiService {
       }
       throw new RetriableError(
         `GitHub GraphQL 网络请求失败：${e instanceof Error ? e.message : String(e)}`,
-        undefined
+        undefined,
+        useProxy
       );
     }
 
@@ -268,10 +365,17 @@ export class GitHubListsApiService {
       if (response.status >= 500 && response.status <= 599) {
         throw new RetriableError(
           `GitHub GraphQL 响应解析失败（HTTP ${response.status}）。`,
-          this.parseRetryAfterMs(response)
+          this.parseRetryAfterMs(response),
+          useProxy
         );
       }
       throw new Error('GitHub GraphQL 响应解析失败（非 JSON）。');
+    }
+
+    // 后端未配置 token（400 GITHUB_TOKEN_NOT_CONFIGURED）：前端持有 token，直连即可。
+    // 抛专用错误由 request 切到直连模式重试（无需退避）。
+    if (useProxy && response.status === 400 && (payload as unknown as BackendProxyErrorBody).code === 'GITHUB_TOKEN_NOT_CONFIGURED') {
+      throw new BackendTokenMissingError('后端未配置 GitHub token，切换到直连模式重试。');
     }
 
     // 速率限制：403 既可能是 scope 不足，也可能是主/次速率限制。
@@ -292,6 +396,17 @@ export class GitHubListsApiService {
     if (payload.errors && payload.errors.length > 0) {
       const error = payload.errors[0];
       const message = error.message || 'GitHub GraphQL 请求失败';
+      // 上游 5xx 无条件视为瞬时错误：即使错误文本疑似鉴权（如 502 网关错误里出现
+      // "authorized"/"permission"），也应走重试/切直连，而非误判为权限不足。
+      // 若载荷同时携带后端 code/details 诊断（proxyLayerFailure=true），一并透传并视为代理层失败。
+      if (response.status >= 500 && response.status <= 599) {
+        const diagnostics = buildProxyDiagnostics(payload);
+        throw new RetriableError(
+          `${message}${diagnostics}`,
+          this.parseRetryAfterMs(response),
+          useProxy && diagnostics !== ''
+        );
+      }
       // 鉴权类错误：GraphQL 通常返回 "401 Unauthorized" 或错误信息包含 scope/权限相关字眼。
       // 无论是否容忍部分失败，鉴权错误都必须抛出，不能静默吞掉。
       if (response.status === 401 || response.status === 403 || /scope|permission|authorized|not granted/i.test(message)) {
@@ -303,8 +418,7 @@ export class GitHubListsApiService {
           '· 或改用含 star lists 权限的 token 重新登录。'
         );
       }
-      // 非鉴权错误：若允许部分失败且响应 200 且存在部分 data，则保留部分结果继续；
-      // 否则抛出。
+      // 非鉴权错误：若允许部分失败且响应 200 且存在部分 data，则保留部分结果继续；否则抛出。
       if (options.toleratePartialErrors && response.status === 200 && payload.data) {
         return payload.data;
       }
@@ -321,11 +435,15 @@ export class GitHubListsApiService {
       );
     }
 
-    // 5xx（502/503/504）：GitHub 过载或网关超时，瞬时性错误，可重试
+    // 5xx（502/503/504）：GitHub 过载/网关超时，或后端代理自身不可达，瞬时性错误，可重试。
+    // 后端代理失败时透传其 code/details，便于区分"后端容器连不上 GitHub"（proxyLayerFailure）
+    // 与"GitHub 本身 5xx"（健康代理透明转发，不应切 sticky 直连）。
     if (response.status >= 500 && response.status <= 599) {
+      const diagnostics = buildProxyDiagnostics(payload);
       throw new RetriableError(
-        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}`,
-        this.parseRetryAfterMs(response)
+        `GitHub GraphQL 请求失败：${response.status} ${response.statusText}${diagnostics}`,
+        this.parseRetryAfterMs(response),
+        useProxy && diagnostics !== ''
       );
     }
 
@@ -530,19 +648,82 @@ export class GitHubListsApiService {
     return summaries;
   }
 
-  /** 创建新 List，返回其 id。 */
+  /**
+   * 创建新 List，返回其 id。
+   * 创建属非幂等 mutation：未知结果（网络/5xx/超时）下 request 不会自动重放，
+   * 而是先按名称核对当前用户的 lists —— 若已存在同名 list，说明首次请求已生效但响应
+   * 丢失，直接复用其 id，避免重复创建。
+   */
   async createUserList(name: string, isPrivate = true, description?: string): Promise<string> {
-    const data = await this.request<{
-      createUserList: { list: { id: string; name: string } };
-    }>(
-      `mutation($name: String!, $isPrivate: Boolean!, $description: String) {
+    try {
+      const data = await this.request<{
+        createUserList: { list: { id: string; name: string } };
+      }>(
+        `mutation($name: String!, $isPrivate: Boolean!, $description: String) {
         createUserList(input: { name: $name, isPrivate: $isPrivate, description: $description }) {
           list { id name }
         }
       }`,
-      { name, isPrivate, description: description ?? null }
-    );
-    return data.createUserList.list.id;
+        { name, isPrivate, description: description ?? null }
+      );
+      return data.createUserList.list.id;
+    } catch (error) {
+      // 仅在未知结果（RetriableError）时核对；核对失败时保留原始错误，避免掩盖根因。
+      if (error instanceof RetriableError) {
+        try {
+          const existingId = await this.findListIdByName(name);
+          if (existingId !== null) return existingId;
+        } catch {
+          // 忽略核对查询自身失败，保留原始错误。
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 按名称在当前用户的 lists 中查找 id（用于非幂等 mutation 未知结果后的状态核对）。
+   * 通过 viewer 分页拉取，返回首个同名（不区分大小写）list 的 id，未找到返回 null。
+   */
+  private async findListIdByName(name: string): Promise<string | null> {
+    const target = name.toLowerCase();
+    let cursor: string | null = null;
+    // 分页防御：lists 数量通常很少，10 页（1000 个）足以覆盖极端情况并防止死循环。
+    for (let i = 0; i < 10; i++) {
+      // 显式注解避免隐式 any 的环形推断（该文件既有 TS7022 模式）
+      const data: {
+        viewer: {
+          lists: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: Array<{ id: string; name: string }>;
+          };
+        } | null;
+      } = await this.request(
+        `query($cursor: String) {
+          viewer {
+            lists(first: 100, after: $cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes { id name }
+            }
+          }
+        }`,
+        { cursor }
+      );
+      const lists: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{ id: string; name: string }>;
+      } | undefined = data.viewer?.lists;
+      if (!lists) return null;
+      for (const list of lists.nodes) {
+        if (list.name.toLowerCase() === target) return list.id;
+      }
+      if (!lists.pageInfo.hasNextPage) return null;
+      const nextCursor: string | null = lists.pageInfo.endCursor;
+      // 防御：hasNextPage 为 true 但游标为空或未前进，终止避免死循环
+      if (!nextCursor || nextCursor === cursor) return null;
+      cursor = nextCursor;
+    }
+    return null;
   }
 
   /** 删除 List。 */
@@ -553,7 +734,9 @@ export class GitHubListsApiService {
           clientMutationId
         }
       }`,
-      { listId }
+      { listId },
+      // 按 node id 删除具备幂等语义：重放至多命中"已删除"，不会造成额外副作用。
+      { replayableMutation: true }
     );
   }
 
@@ -569,7 +752,10 @@ export class GitHubListsApiService {
           clientMutationId
         }
       }`,
-      { itemId, listIds }
+      { itemId, listIds },
+      // 整集替换语义（服务端按集合去重）：无论重放多少次，最终成员集合相同，
+      // 因此未知结果后可安全重放，与 query 一致。
+      { replayableMutation: true }
     );
   }
 
