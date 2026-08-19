@@ -180,14 +180,20 @@ export class GitHubListsApiService {
    * @param toleratePartialErrors 为 true 时，若响应为 200 且包含部分 data，
    *   即使 errors 数组非空也不抛错（用于批量解析场景：个别字段失败不应丢弃已成功的结果）。
    *   鉴权类错误（401/403 scope 不足）无论何种模式都会抛出。
+   * @param replayableMutation 仅对 mutation 生效。未知结果（网络/5xx/超时）下默认不自动重放，
+   *   因为代理可能已提交成功但响应丢失，重放会重复执行（如重复创建 list）。
+   *   仅当该 mutation 具备服务端幂等语义（如整集替换）时才可设为 true。
    */
   private async request<T>(
     query: string,
     variables: Record<string, unknown> = {},
-    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number } = {}
+    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number; replayableMutation?: boolean } = {}
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
     const parentSignal = options.signal;
+    // mutation 的未知结果不允许自动重放；query 永远可安全重放。
+    const isMutation = query.trim().startsWith('mutation');
+    const mayReplay = !isMutation || options.replayableMutation === true;
 
     const MAX_ATTEMPTS = 4;
     let lastError: unknown;
@@ -208,6 +214,15 @@ export class GitHubListsApiService {
       } catch (e) {
         if (e instanceof RetriableError) {
           lastError = e;
+          // mutation 未知结果（代理可能已提交成功但响应丢失）：不自动重放，
+          // 交由上层核对目标状态，避免重复执行（如重复创建 list）。
+          if (!mayReplay) {
+            if (this.backendUrl && !this.proxyFailed) {
+              this.proxyFailed = true;
+              logger.warn('githubLists', 'Mutation outcome unknown, not auto-replaying', { error: e.message });
+            }
+            break;
+          }
           // 后端代理瞬时失败（5xx/网络/限流）：切直连后继续按原退避重试同一查询；
           // 直连模式失败则按正常退避序列重试（不再改模式）。
           if (this.backendUrl && !this.proxyFailed) {
@@ -222,6 +237,7 @@ export class GitHubListsApiService {
         }
         if (e instanceof BackendTokenMissingError) {
           // 后端未配置 token（如首次同步前尚未同步成功），前端持有 token，直连即可，无需退避。
+          // 400 在转发到 GitHub 前返回，mutation 确定未执行，可安全重放。
           lastError = e;
           this.proxyFailed = true;
           logger.warn('githubLists', 'Backend token missing, falling back to direct connection');
@@ -229,9 +245,16 @@ export class GitHubListsApiService {
         }
         // 单次尝试的内部超时（如代理请求停滞）会中止组合 controller，fetch 以 AbortError 失败。
         // 调用方取消（parentSignal 已中止）应原样传播；内部超时属瞬时错误，
-        // 切直连后按退避重试，而不是直接抛给用户。
+        // query 切直连后按退避重试；mutation 未知结果不自动重放。
         if (e instanceof Error && e.name === 'AbortError' && !parentSignal?.aborted) {
           lastError = new RetriableError('GitHub GraphQL 请求超时。');
+          if (!mayReplay) {
+            if (this.backendUrl && !this.proxyFailed) {
+              this.proxyFailed = true;
+              logger.warn('githubLists', 'Mutation timeout, not auto-replaying');
+            }
+            break;
+          }
           if (this.backendUrl && !this.proxyFailed) {
             this.proxyFailed = true;
             logger.warn('githubLists', 'Request timeout, falling back to direct connection');
@@ -609,19 +632,82 @@ export class GitHubListsApiService {
     return summaries;
   }
 
-  /** 创建新 List，返回其 id。 */
+  /**
+   * 创建新 List，返回其 id。
+   * 创建属非幂等 mutation：未知结果（网络/5xx/超时）下 request 不会自动重放，
+   * 而是先按名称核对当前用户的 lists —— 若已存在同名 list，说明首次请求已生效但响应
+   * 丢失，直接复用其 id，避免重复创建。
+   */
   async createUserList(name: string, isPrivate = true, description?: string): Promise<string> {
-    const data = await this.request<{
-      createUserList: { list: { id: string; name: string } };
-    }>(
-      `mutation($name: String!, $isPrivate: Boolean!, $description: String) {
+    try {
+      const data = await this.request<{
+        createUserList: { list: { id: string; name: string } };
+      }>(
+        `mutation($name: String!, $isPrivate: Boolean!, $description: String) {
         createUserList(input: { name: $name, isPrivate: $isPrivate, description: $description }) {
           list { id name }
         }
       }`,
-      { name, isPrivate, description: description ?? null }
-    );
-    return data.createUserList.list.id;
+        { name, isPrivate, description: description ?? null }
+      );
+      return data.createUserList.list.id;
+    } catch (error) {
+      // 仅在未知结果（RetriableError）时核对；核对失败时保留原始错误，避免掩盖根因。
+      if (error instanceof RetriableError) {
+        try {
+          const existingId = await this.findListIdByName(name);
+          if (existingId !== null) return existingId;
+        } catch {
+          // 忽略核对查询自身失败，保留原始错误。
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 按名称在当前用户的 lists 中查找 id（用于非幂等 mutation 未知结果后的状态核对）。
+   * 通过 viewer 分页拉取，返回首个同名（不区分大小写）list 的 id，未找到返回 null。
+   */
+  private async findListIdByName(name: string): Promise<string | null> {
+    const target = name.toLowerCase();
+    let cursor: string | null = null;
+    // 分页防御：lists 数量通常很少，10 页（1000 个）足以覆盖极端情况并防止死循环。
+    for (let i = 0; i < 10; i++) {
+      // 显式注解避免隐式 any 的环形推断（该文件既有 TS7022 模式）
+      const data: {
+        viewer: {
+          lists: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: Array<{ id: string; name: string }>;
+          };
+        } | null;
+      } = await this.request(
+        `query($cursor: String) {
+          viewer {
+            lists(first: 100, after: $cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes { id name }
+            }
+          }
+        }`,
+        { cursor }
+      );
+      const lists: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{ id: string; name: string }>;
+      } | undefined = data.viewer?.lists;
+      if (!lists) return null;
+      for (const list of lists.nodes) {
+        if (list.name.toLowerCase() === target) return list.id;
+      }
+      if (!lists.pageInfo.hasNextPage) return null;
+      const nextCursor: string | null = lists.pageInfo.endCursor;
+      // 防御：hasNextPage 为 true 但游标为空或未前进，终止避免死循环
+      if (!nextCursor || nextCursor === cursor) return null;
+      cursor = nextCursor;
+    }
+    return null;
   }
 
   /** 删除 List。 */
@@ -648,7 +734,10 @@ export class GitHubListsApiService {
           clientMutationId
         }
       }`,
-      { itemId, listIds }
+      { itemId, listIds },
+      // 整集替换语义（服务端按集合去重）：无论重放多少次，最终成员集合相同，
+      // 因此未知结果后可安全重放，与 query 一致。
+      { replayableMutation: true }
     );
   }
 
