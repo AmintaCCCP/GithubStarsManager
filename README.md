@@ -293,6 +293,7 @@ The app supports multiple AI providers. Configure yours in the Settings panel:
 - **OpenAI**: GPT-3.5 / GPT-4
 - **Anthropic**: Claude
 - **Ollama**: local models with no API key needed
+- **[OrcaRouter](https://www.orcarouter.ai)**: unified OpenAI-compatible gateway with 100+ models and gateway-level security
 - **Any OpenAI-compatible API**: custom endpoint + key
 
 Steps: open Settings, add an AI config, enter your endpoint and key, pick a model, then test the connection.

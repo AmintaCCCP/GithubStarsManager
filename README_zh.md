@@ -233,6 +233,7 @@ npm run build
 - **OpenAI**: GPT-3.5/GPT-4
 - **Anthropic**: Claude
 - **本地部署**: Ollama等本地AI服务
+- **[OrcaRouter](https://www.orcarouter.ai)**: 统一 OpenAI 兼容网关，100+ 模型，网关级安全防护
 - **其他**: 任何兼容OpenAI API的服务
 
 在设置页面中配置您的AI服务：
