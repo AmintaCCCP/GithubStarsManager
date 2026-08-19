@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal, RotateCcw } from 'lucide-react';
+import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
-import { PRESET_FILTERS } from '../constants/presetFilters';
 import { useDialog } from '../hooks/useDialog';
 
 // 图标映射
@@ -24,13 +23,6 @@ const PRESET_ICON_MAP: Record<string, string> = {
   'preset-source': 'Package',
 };
 
-// 默认预设筛选器（用于重置）
-const DEFAULT_PRESET_FILTERS: AssetFilter[] = PRESET_FILTERS.map(pf => ({
-  ...pf,
-  isPreset: true,
-  icon: PRESET_ICON_MAP[pf.id],
-}));
-
 interface AssetFilterManagerProps {
   selectedFilters: string[];
   onFilterToggle: (filterId: string) => void;
@@ -44,7 +36,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 }) => {
   const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore();
 
-  const { toast, confirm } = useDialog();
+  const { confirm } = useDialog();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<AssetFilter | undefined>();
@@ -98,66 +90,6 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
   const handlePresetToggle = (presetId: string) => {
     onFilterToggle(presetId);
-  };
-
-  const handleResetPresets = async () => {
-    const confirmed = await confirm(
-      t('重置预设', 'Reset Presets'),
-      language === 'zh' ? '确定要重置所有预设筛选器吗？这将恢复默认设置。' : 'Are you sure you want to reset all preset filters? This will restore default settings.',
-      { type: 'warning' }
-    );
-
-    if (!confirmed) return;
-
-    const previousFilters = assetFilters.map(f => ({ ...f }));
-    const previousSelected = [...selectedFilters];
-    const addedFilterIds: string[] = [];
-
-    try {
-      const store = useAppStore.getState();
-      presetFilters.forEach(filter => {
-        if (store.assetFilters.find(f => f.id === filter.id)) {
-          deleteAssetFilter(filter.id);
-        }
-        if (selectedFilters.includes(filter.id)) {
-          onFilterToggle(filter.id);
-        }
-      });
-      DEFAULT_PRESET_FILTERS.forEach(filter => {
-        if (!store.assetFilters.find(f => f.id === filter.id)) {
-          addAssetFilter(filter);
-          addedFilterIds.push(filter.id);
-        }
-      });
-      // Restore previously active preset selections that still map to a known preset id.
-      previousSelected.forEach(id => {
-        if (DEFAULT_PRESET_FILTERS.some(f => f.id === id) && !selectedFilters.includes(id)) {
-          onFilterToggle(id);
-        }
-      });
-    } catch (error) {
-      console.error('Failed to reset presets:', error);
-      const store = useAppStore.getState();
-
-      addedFilterIds.forEach(id => {
-        if (store.assetFilters.find(f => f.id === id)) {
-          deleteAssetFilter(id);
-        }
-      });
-
-      previousFilters.forEach(filter => {
-        if (!store.assetFilters.find(f => f.id === filter.id)) {
-          addAssetFilter(filter);
-        }
-      });
-
-      // 清除当前所有选择
-      selectedFilters.forEach(id => onFilterToggle(id));
-      // 恢复之前的选择
-      previousSelected.forEach(id => onFilterToggle(id));
-
-      toast(language === 'zh' ? '重置预设筛选器失败，已恢复之前的状态。' : 'Failed to reset preset filters. Previous state has been restored.', 'error');
-    }
   };
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
@@ -228,21 +160,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           {/* Preset Filters */}
           {presetFilters.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-gray-500 dark:text-text-tertiary">
-                  {t('预设筛选器', 'Preset Filters')}
-                </p>
-                <button
-                  onClick={handleResetPresets}
-                  className="flex items-center space-x-1 text-xs text-gray-500 dark:text-text-tertiary hover:text-brand-violet dark:hover:text-gray-700 dark:text-text-secondary transition-colors"
-                  title={t('重置预设筛选器', 'Reset preset filters')}
-                  type="button"
-                  aria-label={t('重置预设筛选器', 'Reset preset filters')}
-                >
-                  <RotateCcw className="w-3 h-3" aria-hidden="true" />
-                  <span>{t('重置', 'Reset')}</span>
-                </button>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-text-tertiary mb-2">
+                {t('预设筛选器', 'Preset Filters')}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {presetFilters.map(preset => {
                   const Icon = preset.icon ? ICON_MAP[preset.icon] : Filter;
@@ -349,21 +269,6 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             </div>
           )}
 
-          {selectedFilters.length > 0 && (
-            <div className="flex items-center justify-between pt-2 border-t border-black/[0.06] dark:border-white/[0.04]">
-              <span className="text-xs text-gray-700 dark:text-text-tertiary">
-                {t(`已选择 ${selectedFilters.length} 个过滤器`, `${selectedFilters.length} filters selected`)}
-              </span>
-              <button
-                onClick={onClearFilters}
-                className="text-xs text-gray-700 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-                type="button"
-                aria-label={t('清除所有筛选', 'Clear all filters')}
-              >
-                {t('清除所有筛选', 'Clear all filters')}
-              </button>
-            </div>
-          )}
           </div>
         </div>
       </div>
