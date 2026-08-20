@@ -406,6 +406,7 @@ interface AppActions {
   removeReleasesByRepoId: (repoId: number) => void;
   removeReleasesByRepoFullName: (fullName: string) => void;
   markReleaseAsRead: (releaseId: number) => void;
+  markReleaseAssetAsRead: (releaseId: number, assetId: number) => void;
   markAllReleasesAsRead: () => void;
   setReleaseSourceSettings: (settings: ReleaseSourceSettings) => void;
   setReleaseEnabledSources: (sourceIds: ReleaseSourceId[]) => void;
@@ -2082,6 +2083,24 @@ export const useAppStore = create<AppState & AppActions>()(
         }
 
         return { readReleases: newReadReleases };
+      }),
+      markReleaseAssetAsRead: (releaseId, assetId) => set((state) => {
+        const targetRelease = state.releases.find(release => release.id === releaseId);
+        if (!targetRelease?.updated_asset_ids?.includes(assetId)) {
+          return state;
+        }
+
+        const updatedAssetIds = targetRelease.updated_asset_ids.filter(id => id !== assetId);
+        return {
+          releases: state.releases.map(release =>
+            release.id === releaseId
+              ? {
+                  ...release,
+                  updated_asset_ids: updatedAssetIds,
+                }
+              : release
+          ),
+        };
       }),
       markAllReleasesAsRead: () => set((state) => {
         const allReleaseIds = new Set(state.releases.map(r => r.id));

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { serializeUpdatedAssetIds } from '../services/releaseAssets.js';
 
 const router = Router();
 
@@ -223,10 +224,10 @@ router.post('/api/sync/import', (req, res) => {
         const relStmtPreserveIsRead = db.prepare(`
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
-            prerelease, draft, is_read, assets,
+            prerelease, draft, is_read, assets, updated_asset_ids,
             repo_id, repo_full_name, repo_name,
             zipball_url, tarball_url
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             tag_name = excluded.tag_name,
             name = excluded.name,
@@ -237,6 +238,7 @@ router.post('/api/sync/import', (req, res) => {
             draft = excluded.draft,
             is_read = releases.is_read,
             assets = excluded.assets,
+            updated_asset_ids = excluded.updated_asset_ids,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
             repo_name = excluded.repo_name,
@@ -246,10 +248,10 @@ router.post('/api/sync/import', (req, res) => {
         const relStmtOverwriteIsRead = db.prepare(`
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
-            prerelease, draft, is_read, assets,
+            prerelease, draft, is_read, assets, updated_asset_ids,
             repo_id, repo_full_name, repo_name,
             zipball_url, tarball_url
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             tag_name = excluded.tag_name,
             name = excluded.name,
@@ -260,6 +262,7 @@ router.post('/api/sync/import', (req, res) => {
             draft = excluded.draft,
             is_read = excluded.is_read,
             assets = excluded.assets,
+            updated_asset_ids = excluded.updated_asset_ids,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
             repo_name = excluded.repo_name,
@@ -278,6 +281,7 @@ router.post('/api/sync/import', (req, res) => {
             // 避免新导入行写入 NULL 导致 unread 过滤（is_read = 0）漏行。
             hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
+            serializeUpdatedAssetIds(r.updated_asset_ids),
             r.repo_id ?? repository?.id ?? null,
             r.repo_full_name ?? repository?.full_name ?? null,
             r.repo_name ?? repository?.name ?? null,

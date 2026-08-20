@@ -83,6 +83,18 @@ describe('PUT /api/releases merge upsert', () => {
     expect(statements[0].params[8]).toBe(1);
   });
 
+  it('persists updated_asset_ids with release data', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .put('/api/releases')
+      .send({ releases: [sampleRelease({ updated_asset_ids: [100, 101] })] })
+      .expect(200);
+
+    const sql = statements[0].sql;
+    expect(sql).toContain('updated_asset_ids = excluded.updated_asset_ids');
+    expect(statements[0].params[10]).toBe('[100,101]');
+  });
+
   it('updates data columns while preserving is_read on conflict', async () => {
     const { statements } = captureStatements();
     await request(createTestApp())

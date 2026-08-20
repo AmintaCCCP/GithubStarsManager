@@ -42,6 +42,7 @@ export const ReleaseTimeline: React.FC = () => {
     addReleases,
     upsertReleases,
     markReleaseAsRead,
+    markReleaseAssetAsRead,
     markAllReleasesAsRead,
     batchUnsubscribeReleases,
     removeReleasesByRepoFullName,
@@ -133,8 +134,6 @@ export const ReleaseTimeline: React.FC = () => {
         newSet.delete(releaseId);
       } else {
         newSet.add(releaseId);
-        // Mark as read when expanding assets
-        markReleaseAsRead(releaseId);
       }
       return newSet;
     });
@@ -1241,6 +1240,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                 onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                 onMarkAsRead={() => markReleaseAsRead(release.id)}
+                onMarkAssetAsRead={(assetId) => markReleaseAssetAsRead(release.id, assetId)}
                 language={language}
                 formatFileSize={formatFileSize}
               />
@@ -1341,6 +1341,7 @@ export const ReleaseTimeline: React.FC = () => {
                             onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                             onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                             onMarkAsRead={() => markReleaseAsRead(release.id)}
+                            onMarkAssetAsRead={(assetId) => markReleaseAssetAsRead(release.id, assetId)}
                             language={language}
                             formatFileSize={formatFileSize}
                           />

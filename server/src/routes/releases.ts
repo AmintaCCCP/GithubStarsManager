@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
+import { parseUpdatedAssetIds, serializeUpdatedAssetIds } from '../services/releaseAssets.js';
 
 const router = Router();
 
@@ -20,6 +21,7 @@ function transformRelease(row: Record<string, unknown>) {
     draft: !!row.draft,
     is_read: !!row.is_read,
     assets: parseJsonColumn(row.assets),
+    updated_asset_ids: parseUpdatedAssetIds(row.updated_asset_ids),
     zipball_url: row.zipball_url ?? undefined,
     tarball_url: row.tarball_url ?? undefined,
     repository: {
@@ -97,10 +99,10 @@ router.put('/api/releases', (req, res) => {
     const stmtPreserveIsRead = db.prepare(`
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
-        prerelease, draft, is_read, assets,
+        prerelease, draft, is_read, assets, updated_asset_ids,
         repo_id, repo_full_name, repo_name,
         zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
@@ -111,6 +113,7 @@ router.put('/api/releases', (req, res) => {
         draft = excluded.draft,
         is_read = releases.is_read,
         assets = excluded.assets,
+        updated_asset_ids = excluded.updated_asset_ids,
         repo_id = excluded.repo_id,
         repo_full_name = excluded.repo_full_name,
         repo_name = excluded.repo_name,
@@ -120,10 +123,10 @@ router.put('/api/releases', (req, res) => {
     const stmtOverwriteIsRead = db.prepare(`
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
-        prerelease, draft, is_read, assets,
+        prerelease, draft, is_read, assets, updated_asset_ids,
         repo_id, repo_full_name, repo_name,
         zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
@@ -134,6 +137,7 @@ router.put('/api/releases', (req, res) => {
         draft = excluded.draft,
         is_read = excluded.is_read,
         assets = excluded.assets,
+        updated_asset_ids = excluded.updated_asset_ids,
         repo_id = excluded.repo_id,
         repo_full_name = excluded.repo_full_name,
         repo_name = excluded.repo_name,
@@ -160,6 +164,7 @@ router.put('/api/releases', (req, res) => {
           release.draft ? 1 : 0,
           hasExplicitIsRead ? (release.is_read ? 1 : 0) : 0,
           JSON.stringify(release.assets ?? []),
+          serializeUpdatedAssetIds(release.updated_asset_ids),
           repository?.id ?? release.repo_id ?? null,
           repository?.full_name ?? release.repo_full_name ?? null,
           repository?.name ?? release.repo_name ?? null,

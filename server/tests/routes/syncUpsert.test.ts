@@ -140,10 +140,10 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
 
     const idx = releasePreserveIndex(statements);
     expect(idx).toBeGreaterThan(-1);
-    // repo_id / full_name / name 位于 is_read(8)、assets(9) 之后
-    expect(statements[idx].params[10]).toBe(20);
-    expect(statements[idx].params[11]).toBe('owner/other');
-    expect(statements[idx].params[12]).toBe('other');
+    // repo_id / full_name / name 位于 is_read(8)、assets(9)、updated_asset_ids(10) 之后
+    expect(statements[idx].params[11]).toBe(20);
+    expect(statements[idx].params[12]).toBe('owner/other');
+    expect(statements[idx].params[13]).toBe('other');
   });
 
   it('rejects decimal release id with 400 (must be integer)', async () => {
@@ -157,6 +157,37 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
       .expect(400);
 
     expect(res.body.code).toBe('RELEASE_ID_REQUIRED');
+  });
+
+  it('persists updated_asset_ids on import UPSERT', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({ updated_asset_ids: [100, 101] })],
+      })
+      .expect(200);
+
+    const idx = releasePreserveIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].sql).toContain('updated_asset_ids = excluded.updated_asset_ids');
+    expect(statements[idx].params[10]).toBe('[100,101]');
+  });
+
+  it('preserves exported JSON string form of updated_asset_ids', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({ updated_asset_ids: '[100,101]' })],
+      })
+      .expect(200);
+
+    const idx = releasePreserveIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].params[10]).toBe('[100,101]');
   });
 
   it('persists zipball_url and tarball_url on import UPSERT', async () => {
@@ -176,9 +207,9 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     expect(idx).toBeGreaterThan(-1);
     expect(statements[idx].sql).toContain('zipball_url = excluded.zipball_url');
     expect(statements[idx].sql).toContain('tarball_url = excluded.tarball_url');
-    // zipball/tarball 位于 repo_name(12) 之后
-    expect(statements[idx].params[13]).toBe('https://example.com/zip');
-    expect(statements[idx].params[14]).toBe('https://example.com/tar');
+    // zipball/tarball 位于 repo_name(13) 之后
+    expect(statements[idx].params[14]).toBe('https://example.com/zip');
+    expect(statements[idx].params[15]).toBe('https://example.com/tar');
   });
 
   it('persists archive URLs on overwrite path as well', async () => {
@@ -201,7 +232,7 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     expect(statements[idx].sql).toContain('tarball_url = excluded.tarball_url');
     // is_read: false → 覆盖分支绑定 0
     expect(statements[idx].params[8]).toBe(0);
-    expect(statements[idx].params[13]).toBe('https://example.com/z2');
-    expect(statements[idx].params[14]).toBe('https://example.com/t2');
+    expect(statements[idx].params[14]).toBe('https://example.com/z2');
+    expect(statements[idx].params[15]).toBe('https://example.com/t2');
   });
 });

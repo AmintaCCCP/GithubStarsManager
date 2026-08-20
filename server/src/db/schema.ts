@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+export function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((col) => col.name === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
@@ -56,6 +56,7 @@ export function initializeSchema(db: Database.Database): void {
       prerelease INTEGER DEFAULT 0,
       draft INTEGER DEFAULT 0,
       is_read INTEGER DEFAULT 0,
+      updated_asset_ids TEXT NOT NULL DEFAULT '[]',
       zipball_url TEXT,
       tarball_url TEXT
     );
@@ -146,6 +147,7 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
   addColumnIfMissing(db, 'ai_configs', 'mimo_plan', 'TEXT');
   addColumnIfMissing(db, 'repositories', 'category_locked', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'releases', 'updated_asset_ids', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'releases', 'zipball_url', 'TEXT');
   addColumnIfMissing(db, 'releases', 'tarball_url', 'TEXT');
   addColumnIfMissing(db, 'categories', 'description', 'TEXT');

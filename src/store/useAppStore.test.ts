@@ -143,6 +143,21 @@ describe('useAppStore release add/upsert actions', () => {
     expect(useAppStore.getState().releases.map(r => r.id)).toEqual([1]);
   });
 
+  it('markReleaseAssetAsRead clears only the clicked asset marker', () => {
+    useAppStore.getState().addReleases([makeRelease(1, { updated_asset_ids: [101, 999] })]);
+
+    useAppStore.getState().markReleaseAssetAsRead(1, 101);
+
+    const afterFirstClick = useAppStore.getState().releases[0];
+    expect(afterFirstClick.updated_asset_ids).toEqual([999]);
+    expect(useAppStore.getState().readReleases.has(1)).toBe(false);
+
+    useAppStore.getState().markReleaseAssetAsRead(1, 999);
+
+    expect(useAppStore.getState().releases[0].updated_asset_ids).toEqual([]);
+    expect(useAppStore.getState().readReleases.has(1)).toBe(false);
+  });
+
   it('regression: asset update resets read state and gates the "Assets updated" indicator until marked read', () => {
     const publishedAt = '2026-01-01T00:00:00.000Z';
     const assetAtPublish = { ...makeRelease(1).assets[0], updated_at: publishedAt };

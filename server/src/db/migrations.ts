@@ -1,10 +1,13 @@
 import type Database from 'better-sqlite3';
-import { initializeSchema } from './schema.js';
+import { addColumnIfMissing, initializeSchema } from './schema.js';
 import { logger } from '../services/logger.js';
 
 const migrations: Record<number, (db: Database.Database) => void> = {
   1: (db) => {
     initializeSchema(db);
+  },
+  2: (db) => {
+    addColumnIfMissing(db, 'releases', 'updated_asset_ids', "TEXT NOT NULL DEFAULT '[]'");
   },
 };
 

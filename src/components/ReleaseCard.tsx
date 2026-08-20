@@ -42,6 +42,7 @@ interface ReleaseCardProps {
   onToggleFullContent: (e: React.MouseEvent) => void;
   onUnsubscribe: () => void;
   onMarkAsRead: () => void;
+  onMarkAssetAsRead: (assetId: number) => void;
   language: 'zh' | 'en';
   formatFileSize: (bytes: number) => string;
 }
@@ -61,6 +62,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   onToggleFullContent,
   onUnsubscribe,
   onMarkAsRead,
+  onMarkAssetAsRead,
   language,
   formatFileSize,
 }) => {
@@ -361,7 +363,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               </div>
 
               <div className="bg-gray-50 dark:bg-[#121314] rounded border border-black/[0.06] dark:border-white/[0.04] max-h-72 overflow-y-auto">
-                {downloadLinks.map((link, index) => {
+                {downloadLinks.map((link) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
                   const isDownloaded = downloadedRef.current[link.url];
@@ -372,9 +374,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   if (isRpcEnabled) {
                     return (
                       <button
-                        key={index}
+                        key={link.assetId ?? link.url}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (link.assetId !== undefined) {
+                            onMarkAssetAsRead(link.assetId);
+                          }
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
@@ -415,14 +420,19 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
 
                   return (
                     <a
-                      key={index}
+                      key={link.assetId ?? link.url}
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
                         link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
                       }`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (link.assetId !== undefined) {
+                          onMarkAssetAsRead(link.assetId);
+                        }
+                      }}
                     >
                       <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                         {link.isSourceCode ? (

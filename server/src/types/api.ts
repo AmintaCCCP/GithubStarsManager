@@ -40,6 +40,7 @@ export interface ReleaseRow {
   prerelease: number;
   draft: number;
   is_read: number;
+  updated_asset_ids: string;
   zipball_url: string | null;
   tarball_url: string | null;
 }
