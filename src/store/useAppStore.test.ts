@@ -69,30 +69,30 @@ describe('useAppStore release source settings', () => {
   });
 });
 
-describe('useAppStore release add/upsert actions', () => {
-  const makeRelease = (id: number, overrides: Partial<Release> = {}): Release => ({
-    id,
-    tag_name: `v${id}`,
-    name: `Release ${id}`,
-    body: null,
-    published_at: '2026-01-01T00:00:00.000Z',
-    html_url: `https://github.com/owner/repo/releases/tag/v${id}`,
-    assets: [
-      {
-        id: 100 + id,
-        name: 'app.dmg',
-        size: 1000,
-        download_count: 0,
-        browser_download_url: 'https://example.com/app.dmg',
-        content_type: 'application/octet-stream',
-        created_at: '2026-01-01T00:00:00.000Z',
-        updated_at: '2026-01-01T00:00:00.000Z',
-      },
-    ],
-    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
-    ...overrides,
-  });
+const makeRelease = (id: number, overrides: Partial<Release> = {}): Release => ({
+  id,
+  tag_name: `v${id}`,
+  name: `Release ${id}`,
+  body: null,
+  published_at: '2026-01-01T00:00:00.000Z',
+  html_url: `https://github.com/owner/repo/releases/tag/v${id}`,
+  assets: [
+    {
+      id: 100 + id,
+      name: 'app.dmg',
+      size: 1000,
+      download_count: 0,
+      browser_download_url: 'https://example.com/app.dmg',
+      content_type: 'application/octet-stream',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+  repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
+  ...overrides,
+});
 
+describe('useAppStore release add/upsert actions', () => {
   beforeEach(() => {
     useAppStore.setState({
       releaseSourceSettings: defaultReleaseSourceSettings,
@@ -178,12 +178,102 @@ describe('useAppStore release add/upsert actions', () => {
     expect(merged.is_read).toBe(false);
     expect(merged.updated_asset_ids).toEqual([101, 999]);
     expect(isUnread()).toBe(true);
-    expect(shouldShowAssetsUpdatedIndicator(merged, isUnread())).toBe(true);
+    expect(shouldShowAssetsUpdatedIndicator(merged)).toBe(true);
 
-    // 用户再次点击该条 release → 已读，"资产已更新"消失
+    // 用户再次点击该条 release → 已读，"资产已更新"随 updated_asset_ids 清空而消失
     useAppStore.getState().markReleaseAsRead(1);
     expect(isUnread()).toBe(false);
-    expect(shouldShowAssetsUpdatedIndicator(merged, isUnread())).toBe(false);
+    const afterRead = useAppStore.getState().releases.find(r => r.id === 1)!;
+    expect(afterRead.updated_asset_ids).toEqual([]);
+    expect(shouldShowAssetsUpdatedIndicator(afterRead)).toBe(false);
+  });
+
+  it('regression: asset updated_at newer than published_at alone does not show the indicator', () => {
+    // GitHub 上资产几乎都在 Release 创建后上传（updated_at > published_at 常态），
+    // 只有"相对上次拉取发生了变化"（updated_asset_ids 非空）才允许展示标识。
+    const publishedAt = '2026-01-01T00:00:00.000Z';
+    useAppStore.getState().addReleases([makeRelease(1, {
+      published_at: publishedAt,
+      assets: [{ ...makeRelease(1).assets[0], updated_at: '2026-01-02T00:00:00.000Z' }],
+    })]);
+
+    const fresh = useAppStore.getState().releases.find(r => r.id === 1)!;
+    expect(fresh.updated_asset_ids).toBeUndefined();
+    expect(shouldShowAssetsUpdatedIndicator(fresh)).toBe(false);
+  });
+});
+
+describe('useAppStore release asset read actions', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      releaseSourceSettings: defaultReleaseSourceSettings,
+      releaseSubscriptions: new Set<number>(),
+      releases: [],
+      readReleases: new Set<number>(),
+    });
+  });
+
+  it('markAssetAsRead removes only the clicked asset id from updated_asset_ids', () => {
+    useAppStore.getState().addReleases([
+      makeRelease(1, { updated_asset_ids: [101, 202, 303] }),
+      makeRelease(2, { updated_asset_ids: [404] }),
+    ]);
+
+    useAppStore.getState().markAssetAsRead(202);
+
+    const first = useAppStore.getState().releases.find(r => r.id === 1)!;
+    const second = useAppStore.getState().releases.find(r => r.id === 2)!;
+    expect(first.updated_asset_ids).toEqual([101, 303]);
+    expect(second.updated_asset_ids).toEqual([404]);
+  });
+
+  it('markAssetAsRead does not touch the release read state', () => {
+    useAppStore.getState().addReleases([makeRelease(1, { updated_asset_ids: [101] })]);
+    useAppStore.getState().markAssetAsRead(101);
+
+    expect(useAppStore.getState().readReleases.has(1)).toBe(false);
+    expect(useAppStore.getState().releases[0].is_read).toBeUndefined();
+  });
+
+  it('markAssetAsRead is a no-op for unknown asset ids', () => {
+    useAppStore.getState().addReleases([makeRelease(1, { updated_asset_ids: [101] })]);
+    useAppStore.getState().markAssetAsRead(999);
+    expect(useAppStore.getState().releases[0].updated_asset_ids).toEqual([101]);
+  });
+
+  it('markReleaseAsRead clears updated_asset_ids only on the clicked release', () => {
+    useAppStore.getState().addReleases([
+      makeRelease(1, { updated_asset_ids: [101] }),
+      makeRelease(2, { updated_asset_ids: [202] }),
+    ]);
+
+    useAppStore.getState().markReleaseAsRead(1);
+
+    expect(useAppStore.getState().releases[0].updated_asset_ids).toEqual([]);
+    expect(useAppStore.getState().releases[1].updated_asset_ids).toEqual([202]);
+  });
+
+  it('markAllReleasesAsRead clears updated_asset_ids and sets is_read across releases', () => {
+    useAppStore.getState().addReleases([
+      makeRelease(1, { updated_asset_ids: [101, 202] }),
+      makeRelease(2, { updated_asset_ids: [404] }),
+    ]);
+
+    useAppStore.getState().markAllReleasesAsRead();
+
+    expect(useAppStore.getState().readReleases.has(1)).toBe(true);
+    expect(useAppStore.getState().readReleases.has(2)).toBe(true);
+    expect(useAppStore.getState().releases[0].updated_asset_ids).toEqual([]);
+    expect(useAppStore.getState().releases[1].updated_asset_ids).toEqual([]);
+    expect(useAppStore.getState().releases[0].is_read).toBe(true);
+    expect(useAppStore.getState().releases[1].is_read).toBe(true);
+  });
+
+  it('markAllReleasesAsRead leaves releases without updated_asset_ids untouched', () => {
+    useAppStore.getState().addReleases([makeRelease(1)]);
+    useAppStore.getState().markAllReleasesAsRead();
+    expect(useAppStore.getState().releases[0].updated_asset_ids).toBeUndefined();
+    expect(useAppStore.getState().releases[0].is_read).toBe(true);
   });
 });
 

@@ -42,6 +42,7 @@ export const ReleaseTimeline: React.FC = () => {
     addReleases,
     upsertReleases,
     markReleaseAsRead,
+    markAssetAsRead,
     markAllReleasesAsRead,
     batchUnsubscribeReleases,
     removeReleasesByRepoFullName,
@@ -1241,6 +1242,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                 onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                 onMarkAsRead={() => markReleaseAsRead(release.id)}
+                onMarkAssetAsRead={markAssetAsRead}
                 language={language}
                 formatFileSize={formatFileSize}
               />
@@ -1254,8 +1256,12 @@ export const ReleaseTimeline: React.FC = () => {
             const latestEffectiveTime = latestUpdatedRelease
               ? effectiveReleaseTime(latestUpdatedRelease)
               : null;
-            const latestAssetsUpdated = latestUpdatedRelease !== null
-              && shouldShowAssetsUpdatedIndicator(latestUpdatedRelease, isReleaseUnread(latestUpdatedRelease.id));
+            // 仓库分组头部的“资产已更新”与资产行共用同一事实来源（updated_asset_ids），
+            // 只要组内任一 Release 存在未清除的资产级标识就展示，避免“头部有标识、
+            // 展开后无任何资产行带标识”的不一致。
+            const latestAssetsUpdated = releases.some(
+              ({ release }) => shouldShowAssetsUpdatedIndicator(release)
+            );
 
             return (
               <div key={repository.id} className="ui-card overflow-hidden">
@@ -1341,6 +1347,7 @@ export const ReleaseTimeline: React.FC = () => {
                             onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                             onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                             onMarkAsRead={() => markReleaseAsRead(release.id)}
+                            onMarkAssetAsRead={markAssetAsRead}
                             language={language}
                             formatFileSize={formatFileSize}
                           />

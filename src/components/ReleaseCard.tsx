@@ -42,6 +42,7 @@ interface ReleaseCardProps {
   onToggleFullContent: (e: React.MouseEvent) => void;
   onUnsubscribe: () => void;
   onMarkAsRead: () => void;
+  onMarkAssetAsRead: (assetId: number) => void;
   language: 'zh' | 'en';
   formatFileSize: (bytes: number) => string;
 }
@@ -61,13 +62,14 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   onToggleFullContent,
   onUnsubscribe,
   onMarkAsRead,
+  onMarkAssetAsRead,
   language,
   formatFileSize,
 }) => {
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const effectiveTime = effectiveReleaseTime(release);
-  const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release, isUnread);
+  const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release);
 
   // RPC download support — use refs to avoid stale closure in async handler
   const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore();
@@ -365,8 +367,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
                   const isDownloaded = downloadedRef.current[link.url];
-                  const isAssetUpdated = isUnread
-                    && link.assetId !== undefined
+                  const isAssetUpdated = link.assetId !== undefined
                     && release.updated_asset_ids?.includes(link.assetId) === true;
 
                   if (isRpcEnabled) {
@@ -375,6 +376,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         key={index}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (link.assetId !== undefined) onMarkAssetAsRead(link.assetId);
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
@@ -422,7 +424,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
                         link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
                       }`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (link.assetId !== undefined) onMarkAssetAsRead(link.assetId);
+                      }}
                     >
                       <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                         {link.isSourceCode ? (
