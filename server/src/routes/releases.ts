@@ -113,7 +113,7 @@ router.put('/api/releases', (req, res) => {
         draft = excluded.draft,
         is_read = releases.is_read,
         assets = excluded.assets,
-        updated_asset_ids = excluded.updated_asset_ids,
+        updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END,
         repo_id = excluded.repo_id,
         repo_full_name = excluded.repo_full_name,
         repo_name = excluded.repo_name,
@@ -137,7 +137,7 @@ router.put('/api/releases', (req, res) => {
         draft = excluded.draft,
         is_read = excluded.is_read,
         assets = excluded.assets,
-        updated_asset_ids = excluded.updated_asset_ids,
+        updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END,
         repo_id = excluded.repo_id,
         repo_full_name = excluded.repo_full_name,
         repo_name = excluded.repo_name,
@@ -152,6 +152,7 @@ router.put('/api/releases', (req, res) => {
         // 合并 UPSERT：仅更新数据列，保留库中已有的 is_read 已读状态，避免整行替换把已读清空。
         // 仅当请求显式携带 is_read（如导入/同步完整快照）时才覆盖已读状态。
         const hasExplicitIsRead = typeof release.is_read === 'boolean';
+        const hasExplicitUpdatedAssetIds = Object.hasOwn(release, 'updated_asset_ids');
         const stmt = hasExplicitIsRead ? stmtOverwriteIsRead : stmtPreserveIsRead;
         stmt.run(
           release.id,
@@ -169,7 +170,8 @@ router.put('/api/releases', (req, res) => {
           repository?.full_name ?? release.repo_full_name ?? null,
           repository?.name ?? release.repo_name ?? null,
           release.zipball_url ?? null,
-          release.tarball_url ?? null
+          release.tarball_url ?? null,
+          hasExplicitUpdatedAssetIds ? 1 : 0
         );
         count++;
       }

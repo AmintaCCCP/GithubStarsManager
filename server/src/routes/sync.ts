@@ -238,7 +238,7 @@ router.post('/api/sync/import', (req, res) => {
             draft = excluded.draft,
             is_read = releases.is_read,
             assets = excluded.assets,
-            updated_asset_ids = excluded.updated_asset_ids,
+            updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
             repo_name = excluded.repo_name,
@@ -262,7 +262,7 @@ router.post('/api/sync/import', (req, res) => {
             draft = excluded.draft,
             is_read = excluded.is_read,
             assets = excluded.assets,
-            updated_asset_ids = excluded.updated_asset_ids,
+            updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END,
             repo_id = excluded.repo_id,
             repo_full_name = excluded.repo_full_name,
             repo_name = excluded.repo_name,
@@ -272,6 +272,7 @@ router.post('/api/sync/import', (req, res) => {
         for (const r of rels) {
           const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
           const hasExplicitIsRead = typeof r.is_read === 'boolean';
+          const hasExplicitUpdatedAssetIds = Object.hasOwn(r, 'updated_asset_ids');
           const relStmt = hasExplicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
           relStmt.run(
             r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
@@ -286,7 +287,8 @@ router.post('/api/sync/import', (req, res) => {
             r.repo_full_name ?? repository?.full_name ?? null,
             r.repo_name ?? repository?.name ?? null,
             r.zipball_url ?? null,
-            r.tarball_url ?? null
+            r.tarball_url ?? null,
+            hasExplicitUpdatedAssetIds ? 1 : 0
           );
         }
         counts.releases = rels.length;

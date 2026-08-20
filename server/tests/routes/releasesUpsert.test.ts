@@ -20,6 +20,33 @@ const createTestApp = () => {
 /**
  * Mock DB 只记录 prepare 收到的 SQL 与每次 run 的参数，便于断言合并 UPSERT 的行为。
  */
+async function createReleaseDb() {
+  const Database = (await import('better-sqlite3')).default;
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE releases (
+      id INTEGER PRIMARY KEY,
+      tag_name TEXT NOT NULL,
+      name TEXT,
+      body TEXT,
+      html_url TEXT,
+      published_at TEXT,
+      prerelease INTEGER DEFAULT 0,
+      draft INTEGER DEFAULT 0,
+      is_read INTEGER DEFAULT 0,
+      assets TEXT,
+      updated_asset_ids TEXT NOT NULL DEFAULT '[]',
+      repo_id INTEGER NOT NULL,
+      repo_full_name TEXT NOT NULL,
+      repo_name TEXT NOT NULL,
+      zipball_url TEXT,
+      tarball_url TEXT
+    )
+  `);
+  getDbMock.mockReturnValue(db);
+  return db;
+}
+
 function captureStatements() {
   const statements: { sql: string; params: unknown[][] }[] = [];
   const exec: Record<string, unknown> = {};
@@ -69,6 +96,8 @@ describe('PUT /api/releases merge upsert', () => {
     expect(sql).not.toContain('is_read = excluded.is_read');
     // 新插入时 is_read 传入 0（默认未读）
     expect(statements[0].params[8]).toBe(0);
+    expect(statements[0].params[16]).toBe(0);
+    expect(sql).toContain('updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END');
   });
 
   it('overwrites is_read when the release carries it explicitly', async () => {
@@ -81,6 +110,7 @@ describe('PUT /api/releases merge upsert', () => {
     const sql = statements[0].sql;
     expect(sql).toContain('is_read = excluded.is_read');
     expect(statements[0].params[8]).toBe(1);
+    expect(statements[0].params[16]).toBe(0);
   });
 
   it('persists updated_asset_ids with release data', async () => {
@@ -91,8 +121,39 @@ describe('PUT /api/releases merge upsert', () => {
       .expect(200);
 
     const sql = statements[0].sql;
-    expect(sql).toContain('updated_asset_ids = excluded.updated_asset_ids');
+    expect(sql).toContain('updated_asset_ids = CASE WHEN ? = 1 THEN excluded.updated_asset_ids ELSE releases.updated_asset_ids END');
     expect(statements[0].params[10]).toBe('[100,101]');
+    expect(statements[0].params[16]).toBe(1);
+  });
+
+  it('preserves stored asset markers when the update omits updated_asset_ids', async () => {
+    const db = await createReleaseDb();
+    try {
+      db.prepare(`
+        INSERT INTO releases (
+          id, tag_name, name, body, html_url, published_at,
+          prerelease, draft, is_read, assets, updated_asset_ids,
+          repo_id, repo_full_name, repo_name, zipball_url, tarball_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        1, 'v0', 'Old release', null, 'https://example.com/old', null,
+        0, 0, 1, '[]', '[100,101]', 10, 'owner/repo', 'repo', null, null
+      );
+
+      await request(createTestApp())
+        .put('/api/releases')
+        .send({ releases: [sampleRelease({ name: 'New release' })] })
+        .expect(200);
+
+      const row = db.prepare('SELECT updated_asset_ids, name FROM releases WHERE id = 1').get() as {
+        updated_asset_ids: string;
+        name: string;
+      };
+      expect(row.updated_asset_ids).toBe('[100,101]');
+      expect(row.name).toBe('New release');
+    } finally {
+      db.close();
+    }
   });
 
   it('updates data columns while preserving is_read on conflict', async () => {
