@@ -82,26 +82,40 @@ describe('ReleaseCard asset updated indicator', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the per-asset indicator even when the release is already read (expand must not clear it)', () => {
-    renderCard({ isUnread: false });
-    expect(screen.getByText('资产已更新')).toBeInTheDocument();
-  });
-
-  it('shows the per-asset indicator while the release is unread', () => {
+  it('shows container-level and per-asset indicators from the same source (updated_asset_ids)', () => {
     renderCard({ isUnread: true });
     // 容器级与资产级标识都会展示
     expect(screen.getAllByText('资产已更新')).toHaveLength(2);
   });
 
-  it('does not show the indicator for assets without an asset id (source code links)', () => {
+  it('shows no indicator once updated_asset_ids is cleared (release marked read)', () => {
     renderCard({
       isUnread: false,
+      release: makeRelease(1, { updated_asset_ids: [] }),
+    });
+    expect(screen.queryByText('资产已更新')).not.toBeInTheDocument();
+  });
+
+  it('regression: asset updated_at newer than published_at alone shows no indicator', () => {
+    // makeRelease 的资产 updated_at 晚于 published_at，但没有 updated_asset_ids
+    // （即资产相对上次拉取未变化）时不得出现任何“资产已更新”标识。
+    renderCard({
+      isUnread: true,
+      release: makeRelease(1, { updated_asset_ids: undefined }),
+    });
+    expect(screen.queryByText('资产已更新')).not.toBeInTheDocument();
+  });
+
+  it('does not show the indicator for assets without an asset id (source code links)', () => {
+    renderCard({
+      isUnread: true,
       release: makeRelease(1, { updated_asset_ids: [101] }),
       downloadLinks: [
         { name: 'Source code (v1.zip)', url: 'https://example.com/v1.zip', size: 0, downloadCount: 0 },
       ],
     });
-    expect(screen.queryByText('资产已更新')).not.toBeInTheDocument();
+    // 容器级标识仍展示（updated_asset_ids 非空），但源码行没有 assetId，不展示资产级标识
+    expect(screen.getAllByText('资产已更新')).toHaveLength(1);
   });
 
   it('marks only the clicked asset as read via onMarkAssetAsRead', () => {

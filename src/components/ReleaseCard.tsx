@@ -69,7 +69,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const effectiveTime = effectiveReleaseTime(release);
-  const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release, isUnread);
+  const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release);
 
   // RPC download support — use refs to avoid stale closure in async handler
   const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore();
