@@ -42,6 +42,7 @@ export const ReleaseTimeline: React.FC = () => {
     addReleases,
     upsertReleases,
     markReleaseAsRead,
+    markAssetAsRead,
     markAllReleasesAsRead,
     batchUnsubscribeReleases,
     removeReleasesByRepoFullName,
@@ -1241,6 +1242,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                 onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                 onMarkAsRead={() => markReleaseAsRead(release.id)}
+                onMarkAssetAsRead={markAssetAsRead}
                 language={language}
                 formatFileSize={formatFileSize}
               />
@@ -1341,6 +1343,7 @@ export const ReleaseTimeline: React.FC = () => {
                             onToggleFullContent={(e) => toggleFullContent(release.id, e)}
                             onUnsubscribe={() => handleUnsubscribeRelease(release.repository.id)}
                             onMarkAsRead={() => markReleaseAsRead(release.id)}
+                            onMarkAssetAsRead={markAssetAsRead}
                             language={language}
                             formatFileSize={formatFileSize}
                           />
