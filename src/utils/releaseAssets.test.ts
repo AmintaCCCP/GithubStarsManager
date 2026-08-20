@@ -8,7 +8,6 @@ import {
   findReleasesWithChangedAssets,
   hasAssetsChanged,
   latestEffectiveRelease,
-  hasAssetsUpdatedAfterPublish,
   shouldShowAssetsUpdatedIndicator,
 } from './releaseAssets';
 
@@ -241,81 +240,26 @@ describe('latestEffectiveRelease', () => {
   });
 });
 
-describe('hasAssetsUpdatedAfterPublish', () => {
-  const makeRelease = (overrides: Partial<Release> = {}): Release => ({
-    id: 1,
-    tag_name: 'v1',
-    name: 'Release 1',
-    body: null,
-    published_at: '2026-01-01T00:00:00Z',
-    html_url: 'https://github.com/owner/repo/releases/tag/v1',
-    assets: [],
-    repository: { id: 1, full_name: 'owner/repo', name: 'repo' },
-    ...overrides,
-  });
-
-  it('returns true when an asset is updated after publication', () => {
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({
-      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00.001Z' })],
-    }))).toBe(true);
-  });
-
-  it('compares timestamps by time value across equivalent formats', () => {
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({
-      published_at: '2026-01-01T08:00:00+08:00',
-      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
-    }))).toBe(false);
-  });
-
-  it('returns false when assets are unchanged or updated at publication time', () => {
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({
-      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
-    }))).toBe(false);
-    expect(hasAssetsUpdatedAfterPublish(makeRelease())).toBe(false);
-  });
-
-  it('treats missing or invalid timestamps as unchanged', () => {
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({
-      published_at: 'not-a-date',
-      assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
-    }))).toBe(false);
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({
-      published_at: '2026-01-01T00:00:00Z',
-      assets: [makeAsset({ updated_at: 'not-a-date' })],
-    }))).toBe(false);
-  });
-
-  it('returns false when assets are missing', () => {
-    expect(hasAssetsUpdatedAfterPublish(makeRelease({ assets: undefined }))).toBe(false);
-  });
-});
-
 describe('shouldShowAssetsUpdatedIndicator', () => {
-  const release: Pick<Release, 'published_at' | 'assets'> = {
-    published_at: '2026-01-01T00:00:00Z',
-    assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
-  };
-
-  it('shows the indicator only while the release is unread', () => {
-    expect(shouldShowAssetsUpdatedIndicator(release, true)).toBe(true);
-    expect(shouldShowAssetsUpdatedIndicator(release, false)).toBe(false);
+  it('shows the indicator only when there are undismissed updated asset ids', () => {
+    expect(shouldShowAssetsUpdatedIndicator({ updated_asset_ids: [101] })).toBe(true);
+    expect(shouldShowAssetsUpdatedIndicator({ updated_asset_ids: [101, 202] })).toBe(true);
   });
 
-  it('does not show the indicator when no asset was updated after publication', () => {
-    expect(shouldShowAssetsUpdatedIndicator({
+  it('does not show the indicator without updated asset ids', () => {
+    expect(shouldShowAssetsUpdatedIndicator({ updated_asset_ids: [] })).toBe(false);
+    expect(shouldShowAssetsUpdatedIndicator({})).toBe(false);
+    expect(shouldShowAssetsUpdatedIndicator({ updated_asset_ids: undefined })).toBe(false);
+  });
+
+  it('does not infer the indicator from asset timestamps being newer than published_at', () => {
+    // 回归：GitHub 资产几乎都在 Release 创建后上传，updated_at > published_at 恒常见。
+    // 该条件不代表“资产相对用户上次拉取发生了变化”，不得作为标识依据。
+    const release: Pick<Release, 'published_at' | 'assets' | 'updated_asset_ids'> = {
       published_at: '2026-01-01T00:00:00Z',
-      assets: [makeAsset({ updated_at: '2026-01-01T00:00:00Z' })],
-    }, true)).toBe(false);
-  });
-
-  it('does not show the indicator when timestamps are invalid', () => {
-    expect(shouldShowAssetsUpdatedIndicator({
-      published_at: 'not-a-date',
       assets: [makeAsset({ updated_at: '2026-01-02T00:00:00Z' })],
-    }, true)).toBe(false);
-    expect(shouldShowAssetsUpdatedIndicator({
-      published_at: '2026-01-01T00:00:00Z',
-      assets: [makeAsset({ updated_at: 'not-a-date' })],
-    }, true)).toBe(false);
+      updated_asset_ids: undefined,
+    };
+    expect(shouldShowAssetsUpdatedIndicator(release)).toBe(false);
   });
 });

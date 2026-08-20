@@ -124,27 +124,15 @@ export function latestEffectiveRelease<T extends Pick<Release, 'published_at' | 
 }
 
 /**
- * 判断是否存在发布时间之后更新过的资产。
- * 使用时间值比较，而不是比较不同格式的时间字符串，避免时区或毫秒精度差异造成误判。
- */
-export function hasAssetsUpdatedAfterPublish(
-  release: Pick<Release, 'published_at' | 'assets'>
-): boolean {
-  const publishedTime = new Date(release.published_at).getTime();
-  if (Number.isNaN(publishedTime) || !Array.isArray(release.assets)) return false;
-
-  return release.assets.some((asset) => {
-    const assetTime = new Date(asset.updated_at).getTime();
-    return !Number.isNaN(assetTime) && assetTime > publishedTime;
-  });
-}
-
-/**
- * “资产已更新”是未读更新提示的一部分；Release 被标记为已读后应立即隐藏该提示。
+ * 判断 Release 容器是否应展示“资产已更新”标识。
+ *
+ * 唯一事实来源是 `updated_asset_ids`：它只在增量刷新发现“资产相对上次拉取发生了变化”
+ * 时由 findReleasesWithChangedAssets 写入，且随用户逐条点击资产或点击 Release 而清除。
+ * 不能用“资产 updated_at 晚于 published_at”推断——GitHub 上资产几乎总是在 Release
+ * 创建之后上传的，该条件对大多数 Release 恒为真，会造成大面积误报。
  */
 export function shouldShowAssetsUpdatedIndicator(
-  release: Pick<Release, 'published_at' | 'assets'>,
-  isUnread: boolean
+  release: Pick<Release, 'updated_asset_ids'>
 ): boolean {
-  return isUnread && hasAssetsUpdatedAfterPublish(release);
+  return (release.updated_asset_ids?.length ?? 0) > 0;
 }
