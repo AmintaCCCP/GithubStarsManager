@@ -123,7 +123,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onToggleWorkflows();
                   onMarkAsRead();
                 }}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
+                className={`h-7 flex items-center gap-0 space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isWorkflowsExpanded
                     ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary'
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'

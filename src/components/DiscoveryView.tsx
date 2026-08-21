@@ -1030,9 +1030,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 </div>
                 <div className="relative group/refresh shrink-0">
                   <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
-                    className="linear-icon-button p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('刷新', 'Refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
@@ -1220,7 +1222,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
                     <Loader2 className="w-7 h-7 animate-spin text-primary" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-6000 rounded-full animate-ping opacity-75" />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-green rounded-full animate-ping opacity-75" />
                 </div>
                 <div className="text-center space-y-1.5">
                   <p className="text-foreground dark:text-muted-foreground font-medium text-sm">

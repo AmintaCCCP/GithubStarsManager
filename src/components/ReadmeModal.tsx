@@ -624,12 +624,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
             <div className="flex items-center space-x-1">
               {readmeVariants.length > 1 && (
-                <>
                 <Select value={selectedReadmeKey} onValueChange={handleReadmeVariantChange} disabled={loading || variantsLoading}>
                   <SelectTrigger className="h-9 w-28 max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>
                   <SelectContent>{readmeVariants.map((variant) => <SelectItem key={variant.key} value={variant.key}>{variant.label}</SelectItem>)}</SelectContent>
                 </Select>
-                </>
               )}
               {readmeContent && !loading && (
                 isTranslated ? (

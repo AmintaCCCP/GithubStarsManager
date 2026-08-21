@@ -1141,6 +1141,7 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Mark All Read button */}
             <Button
+              variant="ghost"
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
               className="flex items-center space-x-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1252,33 +1253,33 @@ export const ReleaseTimeline: React.FC = () => {
                       <LayoutGrid className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-sm text-foreground dark:text-foreground">
+                      <span className="block font-semibold text-sm text-foreground dark:text-foreground">
                         {repository.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                      </span>
+                      <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
                         {repository.full_name}
-                      </p>
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 min-w-0 ml-2">
                     <div className="text-right min-w-0">
-                      <p className="text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
+                      <span className="block text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
                         {releases.length} {t('个版本', 'releases')}
-                      </p>
+                      </span>
                       {latestRelease && (
                         <>
-                          <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
+                          <span className="block text-xs text-muted-foreground dark:text-muted-foreground truncate">
                             {t('最新:', 'Latest:')} {latestRelease.tag_name}
-                          </p>
+                          </span>
                           {latestEffectiveTime && (
-                            <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap flex items-center justify-end gap-1">
+                            <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                               {latestAssetsUpdated && (
                                 <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
                                   {t('资产已更新', 'Assets updated')}
                                 </span>
                               )}
-                            </p>
+                            </span>
                           )}
                         </>
                       )}

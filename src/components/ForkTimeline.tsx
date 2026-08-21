@@ -608,12 +608,13 @@ export const ForkTimeline: React.FC = () => {
               <Button
                 type="button"
                 variant="ghost"
+                size="icon"
                 onClick={() => {
                   setForkSearchQuery('');
                   setCurrentPage(1);
                 }}
                 aria-label={t('清除搜索', 'Clear search')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
+                className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -672,20 +673,26 @@ export const ForkTimeline: React.FC = () => {
                 </Button>
 
                 {getPageNumbers().map((page, index) => (
-                  <Button
-                    key={index}
-                    onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
-                    disabled={typeof page !== 'number'}
-                    className={`px-3 py-2 rounded-lg text-sm ${
-                      page === clampedPage
-                        ? 'bg-primary text-primary-foreground'
-                        : typeof page === 'number'
-                        ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                        : 'text-muted-foreground cursor-default'
-                    }`}
-                  >
-                    {page}
-                  </Button>
+                  typeof page === 'number' ? (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="ghost"
+                      aria-current={page === clampedPage ? 'page' : undefined}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-2 rounded-lg text-sm ${
+                        page === clampedPage
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ) : (
+                    <span key={index} className="px-3 py-2 text-sm text-muted-foreground">
+                      {page}
+                    </span>
+                  )
                 ))}
 
                 <Button
@@ -858,8 +865,9 @@ export const ForkTimeline: React.FC = () => {
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button
+              variant="outline"
               onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
-              className="ui-button px-4 py-2 text-sm font-medium"
+              className="px-4 py-2 text-sm font-medium"
             >
               {language === 'zh' ? '取消' : 'Cancel'}
             </Button>

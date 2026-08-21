@@ -257,7 +257,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 }}
                 className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isAssetsExpanded
-                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
+                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary'
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
                 title={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}

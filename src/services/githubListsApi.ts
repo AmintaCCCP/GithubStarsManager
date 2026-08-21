@@ -142,7 +142,7 @@ type UserListSummariesPage = {
   user: {
     lists: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<{ id: string; name: string } | null> | null;
+      nodes: Array<GitHubListSummary | null> | null;
     };
   } | null;
 };
@@ -653,7 +653,7 @@ export class GitHubListsApiService {
       }
       summaries.push(
         ...(data.user.lists.nodes ?? []).filter(
-          (node): node is { id: string; name: string } => node !== null
+          (node): node is GitHubListSummary => node !== null
         )
       );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
