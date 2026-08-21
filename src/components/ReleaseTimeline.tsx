@@ -744,7 +744,7 @@ export const ReleaseTimeline: React.FC = () => {
         {subscribedRepoCount > 0 && (
            <div className="mb-6 flex flex-col items-center gap-3">
              {/* Pre-release toggle */}
-             <label className="flex items-center gap-2 cursor-pointer select-none">
+             <div className="flex items-center gap-2 select-none">
                <Button
                  type="button"
                  role="switch"
@@ -757,10 +757,13 @@ export const ReleaseTimeline: React.FC = () => {
                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                  />
                </Button>
-               <span className="text-sm text-muted-foreground dark:text-muted-foreground">
+               <span
+                 className="cursor-pointer text-sm text-muted-foreground dark:text-muted-foreground"
+                 onClick={() => setIncludePreRelease(!includePreRelease)}
+               >
                  {t('包含 Pre-release', 'Include Pre-release')}
                </span>
-             </label>
+             </div>
 
              <div className="flex flex-wrap items-center justify-center gap-2">
                {/* Refresh button */}
@@ -860,7 +863,7 @@ export const ReleaseTimeline: React.FC = () => {
             )}
 
             {/* Pre-release toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <div className="flex items-center gap-1.5 select-none">
               <Button
                 type="button"
                 role="switch"
@@ -873,10 +876,13 @@ export const ReleaseTimeline: React.FC = () => {
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                 />
               </Button>
-              <span className="text-xs text-muted-foreground dark:text-muted-foreground hidden sm:inline">
+              <span
+                className="hidden cursor-pointer text-xs text-muted-foreground dark:text-muted-foreground sm:inline"
+                onClick={() => setIncludePreRelease(!includePreRelease)}
+              >
                 {t('Pre', 'Pre')}
               </span>
-            </label>
+            </div>
 
             {/* Refresh Button */}
             <Button
@@ -1361,6 +1367,8 @@ export const ReleaseTimeline: React.FC = () => {
               typeof page === 'number' ? (
                 <Button
                   key={index}
+                  type="button"
+                  aria-current={page === clampedPage ? 'page' : undefined}
                   onClick={() => handlePageChange(page)}
                   className={`px-3 py-2 rounded-lg text-sm ${
                     page === clampedPage

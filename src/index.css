@@ -859,7 +859,7 @@
     @apply bg-transparent text-muted-foreground px-[10px] py-0 rounded-full border border-border text-[12px] font-medium flex items-center gap-1;
   }
   .pill-success {
-    @apply bg-emerald-600 text-white rounded-full text-[10px] font-medium;
+    @apply bg-emerald-700 text-white rounded-full text-[10px] font-medium;
   }
   .badge-subtle {
     @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-[10px] font-medium;

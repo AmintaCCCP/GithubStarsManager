@@ -255,7 +255,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   e.stopPropagation();
                   onToggleAssets();
                 }}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
+                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isAssetsExpanded
                     ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
@@ -276,7 +276,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   e.stopPropagation();
                   onToggleReleaseNotes();
                 }}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
+                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isReleaseNotesExpanded
                     ? 'bg-muted dark:bg-accent text-muted-foreground dark:text-muted-foreground '
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
@@ -295,7 +295,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               <Button
                 onClick={handleToggleSummary}
                 disabled={summary.status === 'loading'}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap disabled:opacity-70 ${
+                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap disabled:opacity-70 ${
                   isSummaryExpanded
                     ? 'bg-muted dark:bg-accent text-muted-foreground dark:text-muted-foreground'
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
@@ -319,7 +319,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 e.stopPropagation();
                 onUnsubscribe();
               }}
-              className="p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
               title={t('取消订阅 Release', 'Unsubscribe from releases')}
               aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
             >
@@ -329,7 +329,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               href={release.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
               title={t('在GitHub上查看', 'View on GitHub')}
               aria-label={t('在GitHub上查看', 'View on GitHub')}
               onClick={(e) => {

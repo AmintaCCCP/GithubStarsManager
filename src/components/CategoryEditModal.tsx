@@ -896,6 +896,8 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   const iconGrid = useMemo(() => uniqueAvailableIcons.map((iconItem) => (
     <Button
       key={iconItem.name}
+      variant="ghost"
+      aria-pressed={formData.icon === iconItem.icon}
       onClick={() => handleIconSelect(iconItem.icon)}
       className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
         formData.icon === iconItem.icon
@@ -1042,14 +1044,14 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         {/* Default Category Modified Hint */}
         {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
           <div className="p-3 bg-muted dark:bg-amber-600/10 rounded-lg border border-border dark:border-amber-600/20">
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground dark:text-amber-600 mb-2">
+            <p className="text-xs text-amber-600 mb-2">
               {t(
                 `此默认分类已被修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
                 `This default category has been modified. Original: ${originalCategory.icon} ${originalCategory.name}`
               )}
             </p>
             <div className="flex items-center space-x-2">
-              <span className="text-xs text-muted-foreground dark:text-muted-foreground dark:text-amber-600">{t('还原:', 'Reset:')}</span>
+              <span className="text-xs text-amber-600">{t('还原:', 'Reset:')}</span>
               {hasNameIconModified && (
                 <Button
                   onClick={() => {
@@ -1097,7 +1099,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         )}
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
-          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 rounded-lg border border-border dark:border-border dark:border-primary/20">
+          <div className="p-3 bg-muted dark:bg-primary/10 rounded-lg border border-primary/20">
             <p className="text-xs text-primary dark:text-primary">
               {t('编辑默认分类将覆盖原始设置，可随时还原。', 'Editing default category will override original settings. You can reset anytime.')}
             </p>

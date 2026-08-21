@@ -231,7 +231,12 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         </div>
       )}
 
-      <RadioGroup value={activeWebDAVConfig || ''} onValueChange={setActiveWebDAVConfig} className="space-y-3">
+      <RadioGroup
+        value={activeWebDAVConfig || ''}
+        onValueChange={setActiveWebDAVConfig}
+        aria-label={t('当前 WebDAV 配置', 'Active WebDAV configuration')}
+        className="space-y-3"
+      >
         {webdavConfigs.map(config => (
           <div
             key={config.id}

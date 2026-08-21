@@ -45,3 +45,8 @@
 8f9a544 后最新 CodeRabbit review 的 9 个 actionable comments、1 个 outside-diff comment 和 2 个 nitpick 已全部完成：AssetFilterManager filter chips 恢复紧凑 Button dimensions；ForkCard、ReleaseCard、CategoryPanel 的 dark/hover 对比度统一到 semantic tokens；ReleaseCard asset row 使用 h-auto 并清除 invalid active utility；RepositoryCard 与 RepositoryList 的编辑/AI controls 使用共享 ghost/icon Button；RepositoryList progress fill 使用 primary、pause/stop 清理重复 dark backgrounds；MenuManagement switch 使用 p-0；StarSyncPanel RadioGroup 关联 heading；SearchResultStats 与 githubListsApi 完成重复 token/type 清理。业务行为与同步链路不变。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,788.32 kB，独立 checker 2,722.97 KiB，0 vulnerabilities。
+
+
+1a04720 后最新 CodeRabbit review 的所有 comments 已完成修复：ReleaseCard、SubscriptionRepoCard、ReadmeModal 与 CategoryEditModal 的紧凑 controls 覆盖 shared Button 默认尺寸或背景；ReleaseSourceSettingsModal 的 repository-list region 使用 React `useId` 保证多实例唯一；ReleaseTimeline 的 Pre-release 文本、数字分页补齐可交互与 aria 语义；WebDAV RadioGroup、CategoryEdit icon grid 完成 accessible naming；success badge 颜色加深；UpdateChecker 错误布局改为纵向容器。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证再次通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,788.24 kB，独立 checker 2,722.90 KiB，0 vulnerabilities。

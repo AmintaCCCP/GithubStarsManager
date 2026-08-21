@@ -340,8 +340,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       onClick={handleCardClick}
       className={`bg-card border border-border p-5 transition-all duration-200 ${
         desktopSafeMode
-          ? 'rounded-lg hover:shadow-md hover:border-border dark:hover:border-border hover:-translate-y-0.5 cursor-pointer'
-          : 'rounded-xl hover:shadow-lg hover:border-border dark:hover:border-border hover:-translate-y-0.5 cursor-pointer'
+          ? 'rounded-lg hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
+          : 'rounded-xl hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
       }`}
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
@@ -375,6 +375,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               {/* AI Analyze button */}
               <Button
+                size="icon"
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
                 className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
@@ -397,6 +398,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
               {/* ZRead button - hidden on small screens */}
               <Button
+                size="icon"
                 onClick={handleOpenInZRead}
                 className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                 title={t('在ZRead打开', 'Open in ZRead')}
@@ -417,6 +419,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
               {/* Star button */}
               <Button
+                size="icon"
                 onClick={handleStar}
                 disabled={!githubToken || isStarring}
                 className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
