@@ -558,17 +558,6 @@ export const ForkTimeline: React.FC = () => {
             {/* Fork owner selector */}
             <div className="flex items-center space-x-2">
               <span id="fork-owner-label" className="text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
-              <select
-                aria-hidden="true"
-                aria-label={t('选择 Fork 拥有者', 'Select fork owner')}
-                value={activeForkOwner}
-                onChange={(event) => handleForkOwnerChange(event.target.value)}
-                disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}
-                tabIndex={-1}
-                className="sr-only"
-              >
-                {forkOwnerOptions.map(owner => <option key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</option>)}
-              </select>
               <Select value={activeForkOwner} onValueChange={handleForkOwnerChange} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
                 <SelectTrigger className="ui-field h-9 min-w-36 px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
                 <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>

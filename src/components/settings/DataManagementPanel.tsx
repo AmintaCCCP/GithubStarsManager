@@ -1,5 +1,23 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Checkbox } from '../ui/checkbox';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
@@ -1604,28 +1622,33 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       )}
 
       {/* Confirmation Modal */}
-      {confirmation.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-card rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-muted dark:bg-muted/40 border-b border-border dark:border-border">
-              <div className="flex items-center space-x-3">
-                <AlertTriangle className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
-                <h3 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground ">
-                  {getDeleteTitle(confirmation.type!)}
-                </h3>
-              </div>
-            </div>
+      <AlertDialog
+        open={confirmation.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) closeConfirmation();
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
 
-            <div className="p-6 space-y-4">
-              <div className="flex items-start space-x-3 text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 p-4 rounded-lg">
-                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <AlertDialogHeader className="rounded-lg bg-muted p-4 dark:bg-muted/40">
+            <AlertDialogTitle className="flex items-center gap-3 text-muted-foreground">
+              <AlertTriangle className="h-6 w-6" />
+              {getDeleteTitle(confirmation.type!)}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            <AlertDialogDescription asChild>
+              <div className="flex items-start space-x-3 rounded-lg bg-muted p-4 text-muted-foreground dark:bg-muted/40">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
                 <p className="text-sm">{getDeleteDescription(confirmation.type!)}</p>
               </div>
+            </AlertDialogDescription>
 
               {/* GitHub Username Verification for "Delete All" */}
               {confirmation.type === 'all' && user && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground dark:text-muted-foreground">
+                  <label htmlFor="delete-all-github-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground">
                     {t(
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
@@ -1635,6 +1658,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     </span>
                   </label>
                   <Input
+                    id="delete-all-github-username"
                     type="text"
                     value={confirmation.githubUsernameInput}
                     onChange={(e) =>
@@ -1649,55 +1673,65 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </div>
               )}
 
-              <div className="flex space-x-3 pt-4">
-                <Button
-                  onClick={closeConfirmation}
-                  disabled={isDeleting}
-                  className="flex-1 px-4 py-2 text-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {t('取消', 'Cancel')}
-                </Button>
-                <Button
-                  onClick={handleDelete}
-                  disabled={
-                    isDeleting ||
-                    (confirmation.type === 'all' &&
-                      confirmation.githubUsernameInput !== user?.login)
-                  }
-                  className="flex-1 px-4 py-2 bg-destructive hover:bg-red-600 dark:hover:bg-red-700 text-destructive-foreground font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  {isDeleting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('删除中...', 'Deleting...')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      <span>{t('确认删除', 'Confirm Delete')}</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <AlertDialogFooter className="pt-4">
+              <AlertDialogCancel
+                onClick={closeConfirmation}
+                disabled={isDeleting}
+                className="flex-1 bg-muted text-foreground hover:bg-accent dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              >
+                {t('取消', 'Cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete();
+                }}
+                disabled={
+                  isDeleting ||
+                  (confirmation.type === 'all' &&
+                    confirmation.githubUsernameInput !== user?.login)
+                }
+                className="flex-1 bg-destructive font-medium text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{t('删除中...', 'Deleting...')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>{t('确认删除', 'Confirm Delete')}</span>
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </div>
-        </div>
-      )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import Preview Modal */}
       {importPreview.isOpen && importPreview.data && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white dark:bg-card rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-background dark:bg-card border-b border-border dark:border-border">
-              <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-                <h3 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground ">
-                  {t('导入数据预览', 'Import Data Preview')}
-                </h3>
-              </div>
-            </div>
+        <Dialog
+          open={importPreview.isOpen}
+          onOpenChange={(open) => {
+            if (!open && !isImporting) {
+              setImportPreview({ data: null, isOpen: false, fileName: '' });
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader className="rounded-lg bg-background dark:bg-card">
+              <DialogTitle className="flex items-center gap-3 text-muted-foreground">
+                <Upload className="h-6 w-6" />
+                {t('导入数据预览', 'Import Data Preview')}
+              </DialogTitle>
+              <DialogDescription>
+                {t('确认备份文件内容后选择导入方式。', 'Review the backup contents before choosing an import mode.')}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="p-6 space-y-4">
+            <div className="space-y-4">
               <div className="text-sm text-muted-foreground dark:text-muted-foreground">
                 <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
                 <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
@@ -1753,7 +1787,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </div>
               )}
 
-              <div className="flex space-x-3 pt-4">
+              <DialogFooter className="pt-4">
                 <Button
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
@@ -1795,10 +1829,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     <span>{t('覆盖导入', 'Replace Import')}</span>
                   )}
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

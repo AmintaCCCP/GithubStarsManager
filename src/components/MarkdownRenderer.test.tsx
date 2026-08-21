@@ -172,8 +172,10 @@ describe('MarkdownRenderer', () => {
     it('should show line numbers for code blocks with more than 3 lines', () => {
       const content = '```javascript\nline1\nline2\nline3\nline4\n```';
       const { container } = render(<MarkdownRenderer content={content} />);
-      const lineNumbers = container.querySelectorAll('.text-muted-foreground');
-      expect(lineNumbers.length).toBeGreaterThan(0);
+      const mutedElements = container.querySelectorAll('.text-muted-foreground');
+      const texts = Array.from(mutedElements).map((element) => element.textContent?.trim());
+      expect(texts).toContain('1');
+      expect(texts).toContain('4');
     });
 
     it('should not show line numbers for code blocks with 3 or fewer lines', () => {

@@ -67,9 +67,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   const defaultReadmeVariant = useMemo(() => getDefaultReadmeVariant(language), [language]);
 
-  const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const variantsAbortControllerRef = useRef<AbortController | null>(null);
   const isResizingRef = useRef(false);
@@ -464,8 +462,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     await fetchReadmeContent(currentVariant);
   }, [readmeVariants, selectedReadmeKey, defaultReadmeVariant, fetchReadmeContent]);
 
-  const handleReadmeVariantChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextKey = event.target.value;
+  const handleReadmeVariantChange = useCallback((nextKey: string) => {
     if (nextKey === selectedReadmeKey) return;
 
     const nextVariant = readmeVariants.find(variant => variant.key === nextKey);
@@ -564,31 +561,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      previousFocusRef.current = document.activeElement as HTMLElement;
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-      setTimeout(() => {
-        modalRef.current?.focus();
-      }, 0);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      if (document.body.style.overflow === 'hidden') {
-        document.body.style.overflow = 'unset';
-      }
-      previousFocusRef.current?.focus();
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen || !repository) return null;
 
   const tocIndentClass = (level: number): string => {
@@ -617,7 +589,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        ref={modalRef}
         showClose={false}
         aria-describedby={undefined}
         className="w-[calc(100%-2rem)] max-w-[1130px] overflow-hidden p-0"
@@ -625,7 +596,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         <div
           tabIndex={-1}
           className="relative flex max-h-[90vh] w-full flex-col bg-white dark:bg-card"
-          onClick={(e) => e.stopPropagation()}
         >
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
@@ -655,18 +625,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             <div className="flex items-center space-x-1">
               {readmeVariants.length > 1 && (
                 <>
-                <select
-                  aria-hidden="true"
-                  aria-label={t('切换 README 语言', 'Switch README language')}
-                  value={selectedReadmeKey}
-                  onChange={handleReadmeVariantChange}
-                  disabled={loading || variantsLoading}
-                  tabIndex={-1}
-                  className="sr-only"
-                >
-                  {readmeVariants.map((variant) => <option key={variant.key} value={variant.key}>{variant.label}</option>)}
-                </select>
-                <Select value={selectedReadmeKey} onValueChange={(value) => handleReadmeVariantChange({ target: { value } } as React.ChangeEvent<HTMLSelectElement>)} disabled={loading || variantsLoading}>
+                <Select value={selectedReadmeKey} onValueChange={handleReadmeVariantChange} disabled={loading || variantsLoading}>
                   <SelectTrigger className="h-9 w-28 max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>
                   <SelectContent>{readmeVariants.map((variant) => <SelectItem key={variant.key} value={variant.key}>{variant.label}</SelectItem>)}</SelectContent>
                 </Select>
@@ -865,7 +824,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </p>
                 <Button
                   onClick={fetchReadme}
-                  className="px-4 py-2 bg-primary text-destructive-foreground rounded-lg hover:bg-primary/90 dark:bg-destructive/80 dark:hover:bg-destructive transition-colors"
+                  className="rounded-lg px-4 py-2 bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   {language === 'zh' ? '重试' : 'Retry'}
                 </Button>
