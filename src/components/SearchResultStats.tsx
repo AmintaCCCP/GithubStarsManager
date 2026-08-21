@@ -49,7 +49,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (
             <div className="flex items-center space-x-2 text-primary dark:text-primary">
-              <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
               <Search className="w-4 h-4" />
               <span className="font-medium text-sm">
                 {t('实时搜索结果', 'Real-time Search Results')}

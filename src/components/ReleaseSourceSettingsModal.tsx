@@ -57,7 +57,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
       <Button
         type="button"
         onClick={() => setIsExpanded(prev => !prev)}
-        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-white/[0.06]"
+        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
       >
         <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -347,7 +347,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground'}`}>
+                  <div className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
                   </div>
                   <div>
@@ -356,7 +356,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
                     {source.count}
                   </span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}>

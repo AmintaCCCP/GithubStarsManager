@@ -507,7 +507,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
                     dragOverId === category.id && draggingId !== category.id
-                      ? 'border-border dark:border-border dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      ? 'border-border dark:border-border dark:border-primary ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
                       : ''
                   } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >

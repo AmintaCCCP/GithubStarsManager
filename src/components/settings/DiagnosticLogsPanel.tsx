@@ -29,7 +29,7 @@ interface DiagnosticLogsPanelProps {
 }
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
-  debug: 'bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground',
+  debug: 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground',
   info: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
   warn: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
   error: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
@@ -188,7 +188,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             <span className={`px-2 py-0.5 text-xs rounded-full font-medium shrink-0 ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
             <span className="font-medium text-foreground dark:text-foreground truncate">{entry.message}</span>
           </div>
-          <Button onClick={onClose} className="p-1.5 rounded-lg hover:bg-accent dark:hover:bg-white/[0.06] transition-colors shrink-0 ml-2">
+          <Button onClick={onClose} className="p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors shrink-0 ml-2">
             <X className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
           </Button>
         </div>
@@ -527,7 +527,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className="font-medium text-foreground dark:text-foreground">{t('前端调试', 'Frontend Debug')}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${frontendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${frontendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
                     {frontendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')}
                   </span>
                 </div>
@@ -543,7 +543,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('后端调试', 'Backend Debug')}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${backendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${backendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
                     {backendAvailable ? (backendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')) : t('后端未连接', 'Not connected')}
                   </span>
                 </div>
@@ -594,14 +594,14 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <div className="flex items-center rounded-lg border border-border dark:border-border overflow-hidden">
               {(['all', 'frontend', 'backend'] as const).map(scope => (
                 <Button key={scope} onClick={() => setSelectedScope(scope)} disabled={scope === 'backend' && !backendAvailable}
-                  className={`px-3 py-1.5 text-sm transition-colors ${selectedScope === scope ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-white/[0.06]'} ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  className={`px-3 py-1.5 text-sm transition-colors ${selectedScope === scope ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'} ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
                   {scope === 'all' ? t('全部', 'All') : scope === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
                 </Button>
               ))}
             </div>
             <div className="relative" ref={eventTypeRef}>
               <Button onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-white/[0.06] flex items-center space-x-1">
+                className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent flex items-center space-x-1">
                 <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('类型', 'types')}` : t('事件类型', 'Event Type')}</span>
                 <ChevronDown className="w-4 h-4" />
               </Button>
@@ -609,7 +609,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 <div className="absolute top-full left-0 mt-1 bg-white dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]">
                   {availableEventTypes.map(et => (
                     <Button key={et} onClick={() => toggleEventType(et)}
-                      className={`w-full text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-brand-violet/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-white/[0.06]'}`}>
+                      className={`w-full text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'}`}>
                       <span>{language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}</span>
                     </Button>
                   ))}
@@ -618,7 +618,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             </div>
             <div className="flex items-center space-x-2 ml-auto">
               <Button onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
-                className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-white/[0.06] transition-colors disabled:opacity-50" title={t('刷新', 'Refresh')}>
+                className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50" title={t('刷新', 'Refresh')}>
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
               <Button onClick={handleClear} className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent transition-colors flex items-center space-x-1">
@@ -675,11 +675,11 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                         <span className={`px-2 py-0.5 text-xs rounded-full ${entry.source === 'frontend' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' : 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'}`}>
                           {entry.source === 'frontend' ? t('前端', 'FE') : t('后端', 'BE')}
                         </span>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground">
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
                           {language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}
                         </span>
                         <span className="text-xs text-muted-foreground dark:text-muted-foreground" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
-                        <span className="px-1.5 py-0.5 text-xs bg-primary/10 text-primary dark:bg-brand-violet/20 dark:text-primary rounded font-mono">{entry.module}</span>
+                        <span className="px-1.5 py-0.5 text-xs bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary rounded font-mono">{entry.module}</span>
                         {hasHttpDetail && <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
                       </div>
                       <p className="text-sm text-foreground dark:text-foreground mt-1 break-words">{entry.message}</p>
@@ -699,7 +699,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               {visibleCount < filteredEntries.length && (
                 <div className="p-3 text-center border-t border-black/[0.04] dark:border-white/[0.02]">
                   <Button onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
-                    className="text-sm text-primary hover:text-brand-hover transition-colors">
+                    className="text-sm text-primary hover:text-primary/90 transition-colors">
                     {t(`加载更多（还有 ${filteredEntries.length - visibleCount} 条）`, `Load more (${filteredEntries.length - visibleCount} remaining)`)}
                   </Button>
                 </div>

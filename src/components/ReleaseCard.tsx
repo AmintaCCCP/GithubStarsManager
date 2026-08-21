@@ -201,7 +201,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
             {isUnread && (
-              <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse mr-2"></div>
+              <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
             )}
             <div className="linear-platform-icon flex items-center justify-center w-8 h-8 flex-shrink-0">
               <GitBranch className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
@@ -232,7 +232,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDistanceToNow(new Date(effectiveTime), { addSuffix: true })}</span>
                 {showAssetsUpdatedIndicator && (
-                  <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-primary font-medium">
+                  <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
                     {t('资产已更新', 'Assets updated')}
                   </span>
                 )}
@@ -381,7 +381,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
-                        className={`flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 disabled:opacity-60 ${
+                        className={`flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 disabled:opacity-60 ${
                           link.isSourceCode ? 'bg-muted dark:bg-muted/40' : ''
                         }`}
                       >
@@ -401,7 +401,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                           {isAssetUpdated && (
-                            <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-primary font-medium whitespace-nowrap">
+                            <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                               {t('资产已更新', 'Asset updated')}
                             </span>
                           )}
@@ -422,7 +422,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 ${
+                      className={`flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 ${
                         link.isSourceCode ? 'bg-muted dark:bg-muted/40' : ''
                       }`}
                       onClick={(e) => {
@@ -442,7 +442,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                         {isAssetUpdated && (
-                          <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-primary font-medium whitespace-nowrap">
+                          <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                             {t('资产已更新', 'Asset updated')}
                           </span>
                         )}

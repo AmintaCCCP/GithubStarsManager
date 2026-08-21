@@ -500,7 +500,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-primary/20/30 "
+                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-primary/20"
                 >
                   {tag}
                 </span>

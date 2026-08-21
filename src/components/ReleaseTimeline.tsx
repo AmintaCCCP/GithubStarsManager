@@ -808,11 +808,11 @@ export const ReleaseTimeline: React.FC = () => {
                 </p>
                 <div className="bg-white/60 dark:bg-card/60 rounded-lg p-3 text-sm">
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
-                    <span className="w-5 h-5 bg-brand-violet text-white rounded-full flex items-center justify-center text-xs">1</span>
+                    <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">1</span>
                     <span>{t('前往仓库页面', 'Go to Repositories')}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium">
-                    <span className="w-5 h-5 bg-brand-violet text-white rounded-full flex items-center justify-center text-xs">2</span>
+                    <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">2</span>
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
@@ -1266,7 +1266,7 @@ export const ReleaseTimeline: React.FC = () => {
                 >
                   <div className="flex items-center space-x-2">
                     {hasUnread && (
-                      <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse"></div>
                     )}
                     <div className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
                       <LayoutGrid className="w-3.5 h-3.5 text-primary" />
@@ -1294,7 +1294,7 @@ export const ReleaseTimeline: React.FC = () => {
                             <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap flex items-center justify-end gap-1">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                               {latestAssetsUpdated && (
-                                <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-primary font-medium">
+                                <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
                                   {t('资产已更新', 'Assets updated')}
                                 </span>
                               )}

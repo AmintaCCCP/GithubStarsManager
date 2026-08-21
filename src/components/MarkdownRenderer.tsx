@@ -107,7 +107,7 @@ const CodeBlock: React.FC<{
       isBashLike
         ? 'border-border dark:border-border'
         : isPowerShell
-          ? 'border-brand-violet/30 dark:border-brand-violet/30'
+          ? 'border-primary/30 dark:border-primary/30'
           : isCmdLike
             ? 'border-cyan-500/30 dark:border-cyan-400/30'
             : 'border-border dark:border-border'
@@ -133,7 +133,7 @@ const CodeBlock: React.FC<{
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-green-600 animate-pulse" />
               )}
               {isPowerShell && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-brand-violet animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
               )}
               {isCmdLike && (
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />

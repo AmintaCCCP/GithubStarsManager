@@ -119,7 +119,7 @@ export const SearchDemo: React.FC = () => {
         {/* 实时搜索示例 */}
         <div className="space-y-3">
           <div className="flex items-center space-x-2 mb-3">
-            <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
             <h4 className="font-medium text-foreground dark:text-foreground">
               {t('实时搜索', 'Real-time Search')}
             </h4>
@@ -132,7 +132,7 @@ export const SearchDemo: React.FC = () => {
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
-                    ? 'border-brand-violet bg-muted dark:bg-muted/40 dark:bg-primary/20/20'
+                    ? 'border-primary bg-muted dark:bg-muted/40 dark:bg-primary/20'
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
                 }`}
               >
@@ -188,7 +188,7 @@ export const SearchDemo: React.FC = () => {
         <div className="bg-background dark:bg-muted/20 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-3">
             {selectedExample.type === 'realtime' ? (
-              <div className="w-2 h-2 bg-brand-violet rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
             ) : (
               <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             )}
@@ -211,7 +211,7 @@ export const SearchDemo: React.FC = () => {
             </ul>
           </div>
 
-          <div className="mt-4 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/20/20 rounded-lg">
+          <div className="mt-4 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/20 rounded-lg">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
               {selectedExample.type === 'realtime' ? (
                 t(
@@ -237,7 +237,7 @@ export const SearchDemo: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-violet rounded-full"></div>
+              <div className="w-2 h-2 bg-primary rounded-full"></div>
               <span className="font-medium text-foreground dark:text-muted-foreground">
                 {t('实时搜索', 'Real-time Search')}
               </span>
