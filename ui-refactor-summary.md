@@ -19,7 +19,7 @@
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,782.56 kB，独立 checker 实测 2,717.35 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,783.30 kB，独立 checker 实测 2,718.07 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
 | `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |

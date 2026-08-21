@@ -186,6 +186,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             {/* Quick Actions */}
             <div className="flex items-center space-x-1 sm:space-x-2">
               <Button
+                variant="ghost"
                 onClick={onSelectAll}
                 disabled={isProcessing}
                 className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -195,6 +196,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
                 <span>{t('全选', 'Select All')}</span>
               </Button>
               <Button
+                variant="ghost"
                 onClick={handleDeselectAll}
                 disabled={isProcessing}
                 className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -356,6 +358,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-accent mx-2"></div>
 
             <Button
+              variant="ghost"
               onClick={handleClose}
               disabled={isProcessing}
               className="flex-shrink-0 p-2 text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50"

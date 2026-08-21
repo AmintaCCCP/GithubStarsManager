@@ -72,6 +72,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
             {allCategories.filter(cat => cat.id !== 'all').map(category => (
               <Button
                 key={category.id}
+                variant="ghost"
                 onClick={() => setSelectedCategory(category.id)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id

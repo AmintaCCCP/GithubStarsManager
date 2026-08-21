@@ -1163,6 +1163,7 @@ export const SearchBar: React.FC = () => {
 
           {activeFiltersCount > 0 && (
             <Button
+              variant="ghost"
               onClick={clearFilters}
               className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-gray-200 transition-colors"
             >

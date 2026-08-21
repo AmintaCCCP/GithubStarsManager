@@ -74,7 +74,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               </p>
               {sourceFullName && (
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-0.5 flex items-center gap-1">
-                  <span>{t('Forked from', 'Forked from')}</span>
+                  <span>{t('派生自', 'Forked from')}</span>
                   {fork.parent?.html_url || fork.source?.html_url ? (
                     <a
                       href={fork.parent?.html_url || fork.source?.html_url}

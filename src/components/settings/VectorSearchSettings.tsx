@@ -538,10 +538,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Base URL */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-api-url" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('API 地址', 'API URL')}
           </label>
           <Input
+            id="embedding-api-url"
             type="text"
             value={formBaseUrl}
             onChange={(e) => setFormBaseUrl(e.target.value)}
@@ -564,11 +565,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* API Key */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-api-key" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             API Key
           </label>
           <div className="relative">
             <Input
+              id="embedding-api-key"
               type={showApiKey ? 'text' : 'password'}
               value={formApiKey}
               onChange={(e) => setFormApiKey(e.target.value)}
@@ -577,6 +579,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             />
             <Button
               type="button"
+              aria-label={showApiKey ? t('隐藏 API Key', 'Hide API key') : t('显示 API Key', 'Show API key')}
               onClick={() => setShowApiKey(!showApiKey)}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
@@ -592,10 +595,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Model Name */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-model" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('模型名称', 'Model Name')}
           </label>
           <Input
+            id="embedding-model"
             type="text"
             value={formModel}
             onChange={(e) => setFormModel(e.target.value)}
@@ -614,11 +618,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Dimensions */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-dimensions" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('向量维度', 'Vector Dimensions')}
           </label>
           <div className="flex gap-2">
             <Input
+              id="embedding-dimensions"
               type="number"
               value={formDimensions}
               onChange={(e) => setFormDimensions(parseInt(e.target.value) || 1536)}
@@ -690,10 +695,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Worker URL */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="vectorize-worker-url" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('Worker 地址', 'Worker URL')}
           </label>
           <Input
+            id="vectorize-worker-url"
             type="text"
             value={formWorkerUrl}
             onChange={(e) => setFormWorkerUrl(e.target.value)}
@@ -704,11 +710,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Auth Token */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="vectorize-auth-token" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('认证 Token', 'Auth Token')}
           </label>
           <div className="relative">
             <Input
+              id="vectorize-auth-token"
               type={showAuthToken ? 'text' : 'password'}
               value={formAuthToken}
               onChange={(e) => setFormAuthToken(e.target.value)}
@@ -717,6 +724,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             />
             <Button
               type="button"
+              aria-label={showAuthToken ? t('隐藏认证 Token', 'Hide auth token') : t('显示认证 Token', 'Show auth token')}
               onClick={() => setShowAuthToken(!showAuthToken)}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
@@ -862,10 +870,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* README 字符数设置 */}
         {formIndexMode === 'readme' && (
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+            <label htmlFor="readme-max-characters" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
               {t('README 截取字符数', 'README Max Characters')}
             </label>
             <Input
+              id="readme-max-characters"
               type="number"
               value={formReadmeMaxChars}
               onChange={(e) => setFormReadmeMaxChars(Math.max(500, parseInt(e.target.value) || 6000))}

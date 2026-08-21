@@ -322,7 +322,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <div className="flex items-center space-x-3 mb-2">
           <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
-          <h4 className="font-medium text-foreground dark:text-foreground">
+          <h4 id="category-match-mode-label" className="font-medium text-foreground dark:text-foreground">
             {t('仓库归类方式', 'Repository Categorization')}
           </h4>
         </div>
@@ -332,7 +332,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts. Categories you assign manually are always kept and will not be overridden by AI analysis.'
           )}
         </p>
-        <RadioGroup value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
+        <RadioGroup aria-labelledby="category-match-mode-label" value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
           <label className="flex cursor-pointer items-start space-x-3">
             <RadioGroupItem value="effective" id="category-match-effective" className="mt-1" />
             <div>

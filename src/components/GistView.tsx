@@ -379,6 +379,7 @@ export const GistView: React.FC = () => {
                     {sortOptions.map(option => (
                       <Button
                         key={option.value}
+                        variant="ghost"
                         type="button"
                         onClick={() => {
                           setGistSearchFilters({ sortBy: option.value });
