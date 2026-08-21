@@ -35,3 +35,8 @@
 ## 交付文件
 
 完整补丁见 `ui-refactor.patch`；浏览器运行态记录见 `final-browser-verification.md`。
+
+
+最新 CodeRabbit full review 的 findings 已完成收尾：ToastPrimitive.Root 恢复 `pointer-events-auto`；RepositoryCard Release 菜单测试直接激活已定位的 `menuitem`；ReleaseTimeline 的视图、显示模式和最新版本三个手写菜单统一迁移到共享 Radix DropdownMenu，自动获得 menuitem、roving focus、Escape 和 outside-dismiss 语义，同时保持原有模式切换、store 更新与分页重置逻辑；ReleaseTimeline 仓库分组与 ReleaseSourceSettingsModal 仓库列表补齐 `aria-expanded`/`aria-controls`；Tailwind `text-quaternary` 与 `brand.hover` 恢复固定透明度。未修改 store、services、API、同步流程或业务动作。
+
+本轮验证再次通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；本轮 legacy 入口 2,787.81 kB，独立 checker 为 2,722.47 KiB，0 vulnerabilities。

@@ -1,5 +1,6 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter, Settings } from 'lucide-react';
@@ -81,10 +82,6 @@ export const ReleaseTimeline: React.FC = () => {
   const [expandedAssets, setExpandedAssets] = useState<Set<number>>(new Set());
   const [expandedReleaseNotes, setExpandedReleaseNotes] = useState<Set<number>>(new Set());
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
-  // 视图切换下拉菜单状态（本地UI状态）
-  const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
-  const [isShowModeDropdownOpen, setIsShowModeDropdownOpen] = useState(false);
-  const [isLatestModeDropdownOpen, setIsLatestModeDropdownOpen] = useState(false);
   const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
@@ -516,13 +513,11 @@ export const ReleaseTimeline: React.FC = () => {
   const handleShowModeChange = (mode: 'all' | 'unread') => {
     setReleaseShowMode(mode);
     setCurrentPage(1);
-    setIsShowModeDropdownOpen(false);
   };
 
   const handleLatestModeChange = (mode: 'all' | 'latest') => {
     setReleaseLatestMode(mode);
     setCurrentPage(1);
-    setIsLatestModeDropdownOpen(false);
   };
 
   const handleMarkAllRead = async () => {
@@ -946,74 +941,57 @@ export const ReleaseTimeline: React.FC = () => {
             </div>
 
             {/* View Mode Toggle Dropdown */}
-            <div className="relative">
-              <Button
-                onClick={() => {
-                  setIsViewDropdownOpen(!isViewDropdownOpen);
-                  setIsShowModeDropdownOpen(false);
-                  setIsLatestModeDropdownOpen(false);
-                }}
-                variant="ghost"
-              className="ui-button flex items-center space-x-2 px-3 py-2"
-                title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
-              >
-                {viewMode === 'timeline' ? (
-                  <CalendarDays className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                ) : (
-                  <LayoutGrid className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                )}
-                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                  {viewMode === 'timeline' ? t('按日期', 'Timeline') : t('按仓库', 'Repository')}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isViewDropdownOpen ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {/* Dropdown Menu */}
-              {isViewDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsViewDropdownOpen(false)}
-                  />
-                  <div className="ui-menu absolute right-0 mt-2 w-48 z-50 py-1">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setReleaseViewMode('timeline');
-                        setIsViewDropdownOpen(false);
-                        setCurrentPage(1);
-                      }}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        viewMode === 'timeline' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <CalendarDays className={`w-4 h-4 ${viewMode === 'timeline' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('按日期排序', 'Timeline View')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('按发布时间排序', 'Sort by publish date')}</div>
-                      </div>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setReleaseViewMode('repository');
-                        setIsViewDropdownOpen(false);
-                        setCurrentPage(1);
-                      }}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        viewMode === 'repository' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <LayoutGrid className={`w-4 h-4 ${viewMode === 'repository' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('仓库分类', 'Repository View')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('按仓库分组折叠', 'Group by repository')}</div>
-                      </div>
-                    </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="group ui-button flex items-center space-x-2 px-3 py-2"
+                  title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
+                >
+                  {viewMode === 'timeline' ? (
+                    <CalendarDays className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                  ) : (
+                    <LayoutGrid className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
+                    {viewMode === 'timeline' ? t('按日期', 'Timeline') : t('按仓库', 'Repository')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setReleaseViewMode('timeline');
+                    setCurrentPage(1);
+                  }}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    viewMode === 'timeline' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <CalendarDays className={`w-4 h-4 mt-0.5 ${viewMode === 'timeline' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('按日期排序', 'Timeline View')}</div>
+                    <div className="text-xs text-muted-foreground">{t('按发布时间排序', 'Sort by publish date')}</div>
                   </div>
-                </>
-              )}
-            </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setReleaseViewMode('repository');
+                    setCurrentPage(1);
+                  }}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    viewMode === 'repository' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <LayoutGrid className={`w-4 h-4 mt-0.5 ${viewMode === 'repository' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('仓库分类', 'Repository View')}</div>
+                    <div className="text-xs text-muted-foreground">{t('按仓库分组折叠', 'Group by repository')}</div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1061,112 +1039,90 @@ export const ReleaseTimeline: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Show Mode Dropdown */}
-            <div className="relative">
-              <Button
-                onClick={() => {
-                  setIsShowModeDropdownOpen(!isShowModeDropdownOpen);
-                  setIsViewDropdownOpen(false);
-                  setIsLatestModeDropdownOpen(false);
-                }}
-                variant="ghost"
-              className="ui-button flex items-center space-x-2 px-3 py-2"
-                title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
-              >
-                <Filter className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                  {releaseShowMode === 'all' ? t('全部', 'All') : t('仅未读', 'Unread')}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isShowModeDropdownOpen ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {isShowModeDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsShowModeDropdownOpen(false)} />
-                  <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleShowModeChange('all')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        releaseShowMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <Filter className={`w-4 h-4 ${releaseShowMode === 'all' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('显示全部', 'Show All')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('显示所有Release', 'Show all releases')}</div>
-                      </div>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleShowModeChange('unread')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        releaseShowMode === 'unread' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <Filter className={`w-4 h-4 ${releaseShowMode === 'unread' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('只显示未读的Release', 'Only show unread releases')}</div>
-                      </div>
-                    </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="group ui-button flex items-center space-x-2 px-3 py-2"
+                  title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
+                >
+                  <Filter className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
+                    {releaseShowMode === 'all' ? t('全部', 'All') : t('仅未读', 'Unread')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem
+                  onSelect={() => handleShowModeChange('all')}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    releaseShowMode === 'all' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <Filter className={`w-4 h-4 mt-0.5 ${releaseShowMode === 'all' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('显示全部', 'Show All')}</div>
+                    <div className="text-xs text-muted-foreground">{t('显示所有Release', 'Show all releases')}</div>
                   </div>
-                </>
-              )}
-            </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => handleShowModeChange('unread')}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    releaseShowMode === 'unread' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <Filter className={`w-4 h-4 mt-0.5 ${releaseShowMode === 'unread' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
+                    <div className="text-xs text-muted-foreground">{t('只显示未读的Release', 'Only show unread releases')}</div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Latest Mode Dropdown */}
-            <div className="relative">
-              <Button
-                onClick={() => {
-                  setIsLatestModeDropdownOpen(!isLatestModeDropdownOpen);
-                  setIsViewDropdownOpen(false);
-                  setIsShowModeDropdownOpen(false);
-                }}
-                variant="ghost"
-              className="ui-button flex items-center space-x-2 px-3 py-2"
-                title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
-              >
-                <Package className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                  {releaseLatestMode === 'all' ? t('全部版本', 'All Versions') : t('仅最新', 'Latest')}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isLatestModeDropdownOpen ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {isLatestModeDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsLatestModeDropdownOpen(false)} />
-                  <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleLatestModeChange('all')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        releaseLatestMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <Package className={`w-4 h-4 ${releaseLatestMode === 'all' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('显示全部版本', 'Show All Versions')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('显示所有Release记录', 'Show all release records')}</div>
-                      </div>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleLatestModeChange('latest')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
-                        releaseLatestMode === 'latest' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
-                      }`}
-                    >
-                      <Package className={`w-4 h-4 ${releaseLatestMode === 'latest' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
-                      <div>
-                        <div className="text-sm font-medium">{t('仅显示最新版本', 'Latest Version Only')}</div>
-                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
-                      </div>
-                    </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="group ui-button flex items-center space-x-2 px-3 py-2"
+                  title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
+                >
+                  <Package className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
+                    {releaseLatestMode === 'all' ? t('全部版本', 'All Versions') : t('仅最新', 'Latest')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem
+                  onSelect={() => handleLatestModeChange('all')}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    releaseLatestMode === 'all' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <Package className={`w-4 h-4 mt-0.5 ${releaseLatestMode === 'all' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('显示全部版本', 'Show All Versions')}</div>
+                    <div className="text-xs text-muted-foreground">{t('显示所有Release记录', 'Show all release records')}</div>
                   </div>
-                </>
-              )}
-            </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => handleLatestModeChange('latest')}
+                  className={`flex items-start space-x-3 px-4 py-2.5 ${
+                    releaseLatestMode === 'latest' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  <Package className={`w-4 h-4 mt-0.5 ${releaseLatestMode === 'latest' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium">{t('仅显示最新版本', 'Latest Version Only')}</div>
+                    <div className="text-xs text-muted-foreground">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Items per page selector */}
             <div className="flex items-center space-x-2">
@@ -1278,6 +1234,8 @@ export const ReleaseTimeline: React.FC = () => {
                 <Button
                   variant="ghost"
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`release-group-${repository.id}`}
                   className="w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center space-x-2">
@@ -1327,6 +1285,7 @@ export const ReleaseTimeline: React.FC = () => {
 
                 {/* Repository Releases (Collapsible) */}
                 <div
+                  id={`release-group-${repository.id}`}
                   className="grid transition-[grid-template-rows] duration-300 ease-in-out"
                   style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                 >

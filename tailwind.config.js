@@ -60,11 +60,11 @@ export default {
         'text-primary': 'hsl(var(--foreground) / <alpha-value>)',
         'text-secondary': 'hsl(var(--muted-foreground) / <alpha-value>)',
         'text-tertiary': 'hsl(var(--muted-foreground) / <alpha-value>)',
-        'text-quaternary': 'hsl(var(--muted-foreground) / <alpha-value>)',
+        'text-quaternary': 'hsl(var(--muted-foreground) / 0.7)',
         brand: {
           indigo: 'hsl(var(--primary) / <alpha-value>)',
           violet: 'hsl(var(--accent-foreground) / <alpha-value>)',
-          hover: 'hsl(var(--primary) / <alpha-value>)',
+          hover: 'hsl(var(--primary) / 0.9)',
         },
         'security-lavender': 'hsl(var(--accent-foreground) / <alpha-value>)',
         'status-green': 'rgb(22 163 74 / <alpha-value>)',
