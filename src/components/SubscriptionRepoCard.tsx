@@ -579,13 +579,15 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
             {t('取消', 'Cancel')}
           </Button>
           <Button
+            type="button"
+            variant="destructive"
             onClick={() => {
               setUnstarConfirmOpen(false);
               if (pendingUnstarAction) {
                 pendingUnstarAction();
               }
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-white hover:bg-accent dark:bg-muted/40 transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium"
           >
             {t('确认取消', 'Confirm Unstar')}
           </Button>

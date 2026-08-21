@@ -27,11 +27,11 @@ Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGro
 | `npm run lint` | 通过，0 errors、0 warnings |
 | `npx tsc -b` | 通过，无 TypeScript 诊断 |
 | `npm run test:run` | 通过，29 个测试文件、326 个测试全部通过；无 React/Radix act、Unhandled 或 Warning 输出 |
-| `npm run build` | 通过；legacy 入口 2,779.63 kB，低于 3,000 kB 预算阈值，无 chunk warning |
+| `npm run build` | 通过；legacy 入口 2,779.72 kB，低于 3,000 kB 预算阈值，无 chunk warning |
 | `git diff --check` | 通过 |
 | `npm audit --omit=dev --audit-level=high` | `found 0 vulnerabilities` |
 | ReadmeModal + RepositoryCard 定向回归 | 通过，13/13；无测试 warning |
 
 ## 交付与审查状态
 
-首轮 CodeRabbit findings 已全部修复并通过上述质量门禁。当前工作树位于 `refactor/shadcn-audit-zero-warnings`，下一步将仅提交跟踪中的源代码、测试和审计摘要，排除本地生成的 patch、截图和临时回归文件；随后推送 PR #284 并触发第二次 `@coderabbitai full review`。
+首轮 CodeRabbit findings 已全部修复并通过上述质量门禁。第二次 `@coderabbitai full review` 报告的 2 个 outside-diff findings 已修复：SubscriptionRepoCard 的确认取消 Star 按钮已使用 destructive 语义色，ForkTimeline 的 page-size 与 target-branch SelectTrigger 已关联可见 label。第二轮 lint、tsc、326 个测试、build、diff check 与安全审计均通过；下一步将推送该修复并触发最终 full review 确认清零。
