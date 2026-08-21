@@ -258,6 +258,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           </div>
           <Button
             type="button"
+            variant="ghost"
+            size="icon"
             role="switch"
             aria-checked={form.enabled}
             aria-label={t('启用网络代理', 'Enable network proxy')}
@@ -282,7 +284,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 try { await electronProxy.setProxy(newForm); } catch { /* best effort */ }
               }
             }}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+            className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${form.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
@@ -343,8 +345,9 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             <div>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setShowAuth(!showAuth)}
-                className="text-sm text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
+                className="h-auto p-0 text-sm text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
               >
                 {showAuth ? t('隐藏认证', 'Hide Authentication') : t('需要认证（可选）', 'Authentication (optional)')}
               </Button>
@@ -379,9 +382,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                       />
                       <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
+                        className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </Button>

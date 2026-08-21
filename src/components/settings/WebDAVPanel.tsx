@@ -142,10 +142,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="webdav-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <Input
+                id="webdav-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -155,10 +156,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="webdav-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('WebDAV URL', 'WebDAV URL')} *
               </label>
               <Input
+                id="webdav-url"
                 type="url"
                 value={form.url}
                 onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
@@ -168,10 +170,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="webdav-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('用户名', 'Username')} *
               </label>
               <Input
+                id="webdav-username"
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
@@ -181,10 +184,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="webdav-password" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('密码', 'Password')} *
               </label>
               <Input
+                id="webdav-password"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
@@ -194,10 +198,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="webdav-path" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('路径', 'Path')} *
               </label>
               <Input
+                id="webdav-path"
                 type="text"
                 value={form.path}
                 onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}

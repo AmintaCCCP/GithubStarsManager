@@ -165,18 +165,24 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 {/* Order arrows */}
                 <div className="flex flex-col flex-shrink-0">
                   <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleMoveUp(index)}
                     disabled={index === 0}
-                    className="p-0.5 rounded hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                     title={t('上移', 'Move up')}
                     aria-label={t(`${meta.labelZh}上移`, `Move ${meta.labelEn} up`)}
                   >
                     <ChevronUp className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
                   </Button>
                   <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleMoveDown(index)}
                     disabled={index === sortedConfig.length - 1}
-                    className="p-0.5 rounded hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                     title={t('下移', 'Move down')}
                     aria-label={t(`${meta.labelZh}下移`, `Move ${meta.labelEn} down`)}
                   >

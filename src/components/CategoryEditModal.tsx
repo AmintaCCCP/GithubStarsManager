@@ -964,7 +964,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           
           {/* Custom Icon Input */}
           {showCustomInput && (
-            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 border border-border dark:border-border dark:border-primary/20 rounded-lg">
+            <div className="mb-3 p-3 bg-muted dark:bg-primary/10 border border-border dark:border-primary/20 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Input
                   aria-label={t('自定义图标', 'Custom icon')}
@@ -988,7 +988,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     setShowCustomInput(false);
                     setCustomIcon('');
                   }}
-                  className="px-3 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
+                  className="px-3 py-2 bg-muted hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
                 >
                   {t('取消', 'Cancel')}
                 </Button>
@@ -1041,7 +1041,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Default Category Modified Hint */}
         {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
-          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-amber-600/10 rounded-lg border border-border dark:border-border dark:border-amber-600/20">
+          <div className="p-3 bg-muted dark:bg-amber-600/10 rounded-lg border border-border dark:border-amber-600/20">
             <p className="text-xs text-muted-foreground dark:text-muted-foreground dark:text-amber-600 mb-2">
               {t(
                 `此默认分类已被修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
@@ -1060,7 +1060,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       icon: originalCategory.icon
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-amber-600/30 transition-colors"
+                  className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
                 >
                   {t('名字/图标', 'Name/Icon')}
                 </Button>
@@ -1074,7 +1074,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       keywords: originalCategory.keywords.join(', ')
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-amber-600/30 transition-colors"
+                  className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
                 >
                   {t('关键词', 'Keywords')}
                 </Button>
@@ -1088,7 +1088,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     keywords: originalCategory.keywords.join(', ')
                   });
                 }}
-                className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-destructive/20 dark:text-destructive rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-destructive/30 transition-colors"
+                className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive rounded hover:bg-accent dark:hover:bg-destructive/30 transition-colors"
               >
                 {t('全部', 'All')}
               </Button>
@@ -1116,7 +1116,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-accent dark:bg-green-600/80 dark:hover:bg-green-600' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>

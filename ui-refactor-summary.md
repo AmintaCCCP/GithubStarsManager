@@ -19,12 +19,14 @@
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,783.35 kB，独立 checker 实测 2,718.12 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,789.46 kB，独立 checker 实测 2,724.09 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
 | `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |
 | `git diff --check` | 通过。 |
 | 生产预览 | 通过；登录壳层、语言切换、主题切换、token 输入、连接入口和 GitHub 外链正常渲染，控制台无 React/Radix/资源加载错误。 |
+
+最新 CodeRabbit full review 的 9 个 findings 已完成修复：所有受影响的 compact Button controls 均明确使用 ghost/icon sizing；SearchBar sort menu 已迁移到 Radix radio menu semantics；SortAlgorithmTooltip 使用受控 Popover 支持触摸设备；ReleaseTimeline、ReleaseSourceSettingsModal、NetworkPanel、WebDAVPanel、AIConfigPanel、GeneralPanel 和 MenuManagementPanel 的 accessible names、group associations、padding 和变体已补齐；Discovery topic/platform 请求 key、BulkAction live region、semantic color tokens、duplicate utilities 和 Settings tab ref stability 已同步修正。
 
 ## 依赖变更
 

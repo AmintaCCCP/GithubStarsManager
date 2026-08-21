@@ -1,8 +1,9 @@
 import React from 'react';
 import { Info } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { DiscoveryChannelId } from '../types';
 import { Button } from './ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface SortAlgorithmTooltipProps {
   channelId: DiscoveryChannelId;
@@ -69,19 +70,59 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
   };
 
   const info = getAlgorithmInfo(channelId);
+  const [open, setOpen] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 rounded-full text-muted-foreground dark:text-muted-foreground/70" aria-label={info.title}>
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  }, []);
+
+  const cancelClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        cancelClose();
+        setOpen(nextOpen);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 rounded-full text-muted-foreground dark:text-muted-foreground/70"
+          aria-label={info.title}
+          onMouseEnter={() => { cancelClose(); setOpen(true); }}
+          onMouseLeave={scheduleClose}
+          onFocus={() => { cancelClose(); setOpen(true); }}
+          onBlur={scheduleClose}
+        >
           <Info className="h-4 w-4" />
         </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" align="start" className="w-[calc(100vw-2rem)] max-w-sm whitespace-pre-line p-4 text-left">
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        onMouseEnter={cancelClose}
+        onMouseLeave={scheduleClose}
+        className="w-[calc(100vw_-_2rem)] max-w-sm whitespace-pre-line bg-popover p-4 text-left text-popover-foreground"
+      >
         <h4 className="mb-2 text-sm font-semibold">{info.title}</h4>
         {info.highlight && <p className="mb-2 text-sm font-medium text-primary">{info.highlight}</p>}
         <p className="text-xs leading-relaxed">{info.description}</p>
-      </TooltipContent>
-    </Tooltip>
+      </PopoverContent>
+    </Popover>
   );
 };

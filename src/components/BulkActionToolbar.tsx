@@ -373,6 +373,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       {/* 弱气泡提示 */}
       {tooltip && (
         <div
+          role="status"
+          aria-live="polite"
           className="fixed z-[60] px-3 py-1.5 text-xs text-white bg-gray-800 dark:bg-muted/40 rounded-lg shadow-lg pointer-events-none animate-fade-in"
           style={{
             left: tooltip.x,
