@@ -44,7 +44,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-border dark:border-border dark:border-border dark:border-border p-4 mb-4">
+    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-border p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (
@@ -126,7 +126,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       </div>
 
       {/* 搜索查询显示 */}
-      <div className="mt-3 pt-3 border-t border-border dark:border-border dark:border-border dark:border-border">
+      <div className="mt-3 pt-3 border-t border-border">
         <div className="flex items-center space-x-2 text-sm">
           <span className="text-muted-foreground dark:text-muted-foreground">
             {t('搜索查询:', 'Search Query:')}

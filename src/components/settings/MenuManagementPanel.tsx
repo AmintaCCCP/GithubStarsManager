@@ -194,7 +194,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 <Button
                   onClick={() => handleToggle(item.id)}
                   disabled={!meta.canHide}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
                     !meta.canHide
                       ? 'bg-primary cursor-not-allowed opacity-75'
                       : item.visible

@@ -423,7 +423,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <Button
               onClick={handleAddCategory}
               disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-accent dark:bg-muted/40' : 'bg-gray-300 text-muted-foreground dark:bg-accent dark:text-muted-foreground cursor-not-allowed'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90' : 'bg-gray-300 text-muted-foreground dark:bg-accent dark:text-muted-foreground cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>

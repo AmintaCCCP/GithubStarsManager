@@ -951,7 +951,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   event.stopPropagation();
                   setEditModalOpen(true);
                 }}
-                className="linear-icon-button flex h-8 w-8 items-center justify-center text-primary"
+                variant="ghost"
+                size="icon"
+                className="text-primary"
                 title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
                 aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
               >

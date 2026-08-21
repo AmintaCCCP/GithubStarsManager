@@ -113,11 +113,18 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message?: string; type?: string; extensions?: { code?: string } }>;
 }
 
+type UserListNode = {
+  id: string;
+  name: string;
+  description: string | null;
+  isPrivate: boolean;
+};
+
 type UserListsPage = {
   user: {
     lists: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<{ id: string; name: string; description: string | null; isPrivate: boolean } | null> | null;
+      nodes: Array<UserListNode | null> | null;
     };
   } | null;
 };
@@ -545,7 +552,7 @@ export class GitHubListsApiService {
       const nodes = data.user.lists.nodes ?? [];
       summaries.push(
         ...nodes
-          .filter((node): node is { id: string; name: string; description: string | null; isPrivate: boolean } => node !== null)
+          .filter((node): node is UserListNode => node !== null)
           .map((node) => ({ ...node, description: node.description ?? undefined }))
       );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
