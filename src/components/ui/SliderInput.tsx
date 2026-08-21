@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { Slider } from './slider';
 
 interface SliderInputProps {
   value: number;
@@ -19,16 +19,10 @@ export const SliderInput: React.FC<SliderInputProps> = ({
   max,
   step = 1,
   marks,
+  label,
   formatValue,
   showMarks = true,
 }) => {
-  const isInteger = step % 1 === 0;
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = isInteger ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
-    if (!isNaN(newValue)) onChange(newValue);
-  }, [onChange, isInteger]);
-
   const displayValue = formatValue ? formatValue(value) : value;
   const range = max - min;
   const markItems = marks || defaultMarks(min, max);
@@ -36,29 +30,25 @@ export const SliderInput: React.FC<SliderInputProps> = ({
   return (
     <div className="w-full">
       <div className="flex items-center gap-3">
-        <input
-          type="range"
+        <Slider
           min={min}
           max={max}
           step={step}
-          value={value}
-          onChange={handleChange}
-          className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          value={[value]}
+          onValueChange={([nextValue]) => onChange(nextValue)}
+          aria-label={label}
+          className="flex-1"
         />
-        <span className="min-w-[2.5rem] text-center text-sm font-medium text-gray-900 dark:text-white tabular-nums">
+        <span className="min-w-[2.5rem] text-center text-sm font-medium tabular-nums text-foreground dark:text-foreground">
           {displayValue}
         </span>
       </div>
       {showMarks && markItems.length > 0 && (
-        <div className="relative h-4 mt-1 -mx-[10px] px-[10px]">
+        <div className="relative mx-[-10px] mt-1 h-4 px-[10px]">
           {markItems.map((mark) => {
             const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
             return (
-              <span
-                key={mark}
-                className="absolute text-[10px] text-gray-400 dark:text-gray-500 -translate-x-1/2 tabular-nums"
-                style={{ left: `${pct}%` }}
-              >
+              <span key={mark} className="absolute -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground dark:text-muted-foreground" style={{ left: `${pct}%` }}>
                 {formatValue ? formatValue(mark) : mark}
               </span>
             );
@@ -77,7 +67,7 @@ function defaultMarks(min: number, max: number): number[] {
   }
   const step = Math.ceil((max - min) / 4);
   const marks: number[] = [min];
-  for (let v = min + step; v < max; v += step) marks.push(v);
+  for (let value = min + step; value < max; value += step) marks.push(value);
   marks.push(max);
   return marks;
 }

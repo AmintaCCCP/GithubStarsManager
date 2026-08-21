@@ -172,14 +172,14 @@ describe('MarkdownRenderer', () => {
     it('should show line numbers for code blocks with more than 3 lines', () => {
       const content = '```javascript\nline1\nline2\nline3\nline4\n```';
       const { container } = render(<MarkdownRenderer content={content} />);
-      const lineNumbers = container.querySelectorAll('.text-gray-400');
+      const lineNumbers = container.querySelectorAll('.text-muted-foreground');
       expect(lineNumbers.length).toBeGreaterThan(0);
     });
 
     it('should not show line numbers for code blocks with 3 or fewer lines', () => {
       const content = '```javascript\nline1\nline2\n```';
       const { container } = render(<MarkdownRenderer content={content} />);
-      const lineNumbers = container.querySelectorAll('.text-gray-400');
+      const lineNumbers = container.querySelectorAll('.text-muted-foreground');
       const hasLineNumbers = Array.from(lineNumbers).some(el => 
         el.textContent?.trim() === '1' || el.textContent?.trim() === '2'
       );

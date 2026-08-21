@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import { safeWriteText } from '../utils/clipboardUtils';
 import { getGistFileCount, getGistPrimaryLanguage, getGistTitle } from '../utils/gistUtils';
+import { Button } from './ui/button';
 
 interface GistCardProps {
   gist: Gist;
@@ -166,12 +167,12 @@ export const GistCard: React.FC<GistCardProps> = ({
   return (
     <article
       onClick={() => onOpen(gist)}
-      className="group cursor-pointer rounded-lg border border-black/[0.06] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-indigo/30 hover:shadow-md dark:border-white/[0.04] dark:bg-white/[0.03] dark:hover:border-brand-indigo/40"
+      className="group cursor-pointer rounded-lg border border-border bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-border dark:bg-white/[0.03] dark:hover:border-primary/40"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-text-primary">{title}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500 dark:text-text-tertiary">
+          <h3 className="truncate text-lg font-semibold text-foreground dark:text-foreground">{title}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground dark:text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <User className="h-4 w-4" />
               {gist.owner?.login || t('未知', 'Unknown')}
@@ -190,72 +191,72 @@ export const GistCard: React.FC<GistCardProps> = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <button
+          <Button
             type="button"
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-brand-indigo/10 hover:text-brand-indigo disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-brand-indigo/15 dark:hover:text-white"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-primary/15 dark:hover:text-primary-foreground"
             title={t('AI分析', 'AI analyze')}
           >
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleCopyLink}
-            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-light-surface hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={t('复制链接', 'Copy link')}
           >
             <Copy className="h-4 w-4" />
-          </button>
+          </Button>
           <a
             href={gist.html_url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-light-surface hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={t('打开链接', 'Open link')}
           >
             <ExternalLink className="h-4 w-4" />
           </a>
           {gist.starred && (
-            <button
+            <Button
               type="button"
               onClick={handleUnstar}
               disabled={isMutating}
-              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
               title={t('取消收藏', 'Unstar')}
             >
               <StarOff className="h-4 w-4" />
-            </button>
+            </Button>
           )}
           {isMine && (
             <>
-              <button
+              <Button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   onEdit(gist);
                 }}
-                className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-light-surface hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
                 title={t('编辑', 'Edit')}
               >
                 <Edit3 className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleDelete}
                 disabled={isMutating}
-                className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
                 title={t('删除', 'Delete')}
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </>
           )}
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-2 text-sm leading-6 text-gray-600 dark:text-text-secondary">
+      <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground dark:text-muted-foreground">
         {gist.ai_summary || gist.description || fileNames || t('暂无描述', 'No description')}
       </p>
 

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Info } from 'lucide-react';
 import type { DiscoveryChannelId } from '../types';
+import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface SortAlgorithmTooltipProps {
   channelId: DiscoveryChannelId;
@@ -8,8 +10,6 @@ interface SortAlgorithmTooltipProps {
 }
 
 export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ channelId, language }) => {
-  const [isVisible, setIsVisible] = useState(false);
-
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const getAlgorithmInfo = (channel: DiscoveryChannelId): { title: string; description: string; highlight: string } => {
@@ -70,40 +70,18 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
 
   const info = getAlgorithmInfo(channelId);
 
-  return (
-    <div className="relative inline-flex items-center">
-      <button
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-        onClick={() => setIsVisible(!isVisible)}
-        className="p-1 rounded-full text-gray-400 dark:text-text-quaternary hover:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
-      >
-        <Info className="w-4 h-4" />
-      </button>
-
-      {isVisible && (
-        <div className="absolute top-full mt-2 left-0 sm:left-1/2 sm:-translate-x-1/2 z-[9999]" style={{ zIndex: 9999 }}>
-          <div className="relative bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-xl p-4 w-[calc(100vw-2rem)] sm:w-80 max-w-[calc(100vw-2rem)]">
-            {/* Arrow */}
-            <div className="absolute top-0 left-4 sm:left-1/2 sm:-translate-x-1/2 -translate-y-full z-[10000]">
-              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-black/[0.06] dark:border-b-white/[0.04]" />
-              <div className="absolute left-1/2 -translate-x-1/2 top-0.5 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white dark:border-b-panel-dark" />
-            </div>
-
-            <h4 className="font-semibold text-gray-900 dark:text-text-primary mb-2 text-sm">
-              {info.title}
-            </h4>
-            {info.highlight && (
-              <p className="text-sm font-medium text-brand-violet dark:text-brand-violet mb-2">
-                {info.highlight}
-              </p>
-            )}
-            <p className="text-xs text-gray-700 dark:text-text-tertiary whitespace-pre-line leading-relaxed">
-              {info.description}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
+    return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 rounded-full text-muted-foreground dark:text-muted-foreground/70" aria-label={info.title}>
+          <Info className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start" className="w-[calc(100vw-2rem)] max-w-sm whitespace-pre-line p-4 text-left">
+        <h4 className="mb-2 text-sm font-semibold">{info.title}</h4>
+        {info.highlight && <p className="mb-2 text-sm font-medium text-primary">{info.highlight}</p>}
+        <p className="text-xs leading-relaxed">{info.description}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 };

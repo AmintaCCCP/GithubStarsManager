@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, TrendingUp, GitFork, FileCode2 } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, TrendingUp, GitFork, FileCode2, Menu, X } from 'lucide-react';
+import { Button } from './ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import { HeaderMenuId, AppState } from '../types';
@@ -56,100 +59,97 @@ export const Header: React.FC = () => {
               />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="truncate text-xl font-medium text-gray-900 dark:text-text-primary tracking-tight">
+              <h1 className="truncate text-xl font-medium text-foreground dark:text-foreground tracking-tight">
                 GitHub Stars Manager
               </h1>
-              <p className="truncate text-sm text-gray-500 dark:text-text-tertiary">
+              <p className="truncate text-sm text-muted-foreground dark:text-muted-foreground">
                 AI-powered repository management
               </p>
             </div>
             <div className="min-w-0 sm:hidden">
-              <h1 className="truncate text-base font-bold text-gray-900 dark:text-text-primary tracking-tight">
+              <h1 className="truncate text-base font-bold text-foreground dark:text-foreground tracking-tight">
                 GitHub Stars
               </h1>
             </div>
           </div>
 
           {/* Navigation - Desktop & Tablet (≥768px) */}
-          <nav className="hidden md:flex flex-nowrap items-center space-x-1 hd-btns lg:hd-btns">
+          <nav className="hidden items-center gap-1 hd-btns md:flex lg:hd-btns">
             {visibleMenus.map(menuItem => {
               const meta = MENU_META[menuItem.id];
               const Icon = meta.icon;
+              const label = t(meta.labelZh, meta.labelEn);
               const isActive = currentView === menuItem.id;
               return (
-                <button
+                <Button
                   key={menuItem.id}
+                  type="button"
+                  variant={isActive ? 'secondary' : 'ghost'}
+                  size="sm"
                   onClick={() => setCurrentView(menuItem.id as AppState['currentView'])}
-                  title={t(meta.labelZh, meta.labelEn)}
-                  aria-label={t(meta.labelZh, meta.labelEn)}
-                  className={`linear-nav-item flex items-center whitespace-nowrap font-medium ${
-                    isActive ? 'is-active' : ''
-                  } xl:px-3 xl:py-1.5 p-2`}
+                  title={label}
+                  aria-label={label}
+                  className={`whitespace-nowrap xl:px-3 ${isActive ? 'shadow-sm' : ''}`}
                 >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="hidden xl:inline ml-2">{t(meta.labelZh, meta.labelEn)}</span>
-                </button>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="hidden xl:inline">{label}</span>
+                </Button>
               );
             })}
           </nav>
 
           {/* Mobile Dropdown Menu (<768px) */}
-          {mobileMenuOpen && (
-            <div className="absolute top-[calc(100%+1px)] left-0 right-0 md:hidden bg-light-bg dark:bg-surface-3 border-b border-black/[0.06] dark:border-white/[0.04] shadow-dialog animate-expand-fade z-[100]">
-              <nav className="flex flex-col p-2 space-y-1">
-                {visibleMenus.map(menuItem => {
-                  const meta = MENU_META[menuItem.id];
-                  const Icon = meta.icon;
-                  const isActive = currentView === menuItem.id;
-                  return (
-                    <button
-                      key={menuItem.id}
-                      onClick={() => {
-                        setCurrentView(menuItem.id as AppState['currentView']);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`linear-nav-item flex items-center px-4 py-3 font-medium ${
-                        isActive ? 'is-active' : ''
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 mr-3" />
-                      {t(meta.labelZh, meta.labelEn)}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-          )}
+          <DropdownMenu open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label={t('菜单', 'Menu')}
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 md:hidden">
+              {visibleMenus.map(menuItem => {
+                const meta = MENU_META[menuItem.id];
+                const Icon = meta.icon;
+                const isActive = currentView === menuItem.id;
+                return (
+                  <DropdownMenuItem
+                    key={menuItem.id}
+                    onSelect={() => {
+                      setCurrentView(menuItem.id as AppState['currentView']);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={isActive ? 'bg-muted dark:bg-accent' : undefined}
+                  >
+                    <Icon className="mr-3 h-4 w-4" />
+                    {t(meta.labelZh, meta.labelEn)}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* User Actions */}
           <div className="flex items-center gap-2 sm:gap-3 hd-btns lg:hd-btns">
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="linear-icon-button md:hidden p-2"
-              aria-label={t('菜单', 'Menu')}
-            >
-              <svg className="w-5 h-5 text-gray-700 dark:text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-
             {/* Theme Toggle */}
-            <button
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="linear-icon-button p-2"
-              title={t('切换主题', 'Toggle theme')}
-            >
-              {theme === 'light' ? (
-                <Moon className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-              ) : (
-                <Sun className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                  aria-label={t('切换主题', 'Toggle theme')}
+                >
+                  {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t('切换主题', 'Toggle theme')}</TooltipContent>
+            </Tooltip>
 
             {/* User Profile */}
             {user && (
@@ -160,28 +160,35 @@ export const Header: React.FC = () => {
                   className="w-8 h-8 rounded-full"
                 />
                 <div className="min-w-0 hidden sm:block">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <p className="truncate text-sm font-medium text-foreground dark:text-foreground">
                     {user.name || user.login}
                   </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    const confirmed = await confirm(
-                      t('退出登录确认', 'Logout Confirmation'),
-                      language === 'zh'
-                        ? '退出后您的 AI 配置、WebDAV 设置、自定义分类等数据仍会保留。如需完全清除所有数据，请前往「设置 → 数据管理」。'
-                        : 'Your AI configs, WebDAV settings, custom categories and other data will be preserved. To completely clear all data, please go to "Settings → Data Management".',
-                      { type: 'warning' }
-                    );
-                    if (confirmed) {
-                      logout();
-                    }
-                  }}
-                    className="linear-icon-button p-2"
-                  title={t('退出登录', 'Logout')}
-                >
-                  <LogOut className="w-4 h-4 text-gray-700 dark:text-text-secondary" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={async () => {
+                        const confirmed = await confirm(
+                          t('退出登录确认', 'Logout Confirmation'),
+                          language === 'zh'
+                            ? '退出后您的 AI 配置、WebDAV 设置、自定义分类等数据仍会保留。如需完全清除所有数据，请前往「设置 → 数据管理」。'
+                            : 'Your AI configs, WebDAV settings, custom categories and other data will be preserved. To completely clear all data, please go to "Settings → Data Management".',
+                          { type: 'warning' }
+                        );
+                        if (confirmed) {
+                          logout();
+                        }
+                      }}
+                      aria-label={t('退出登录', 'Logout')}
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('退出登录', 'Logout')}</TooltipContent>
+                </Tooltip>
               </div>
             )}
           </div>

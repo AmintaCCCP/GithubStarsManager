@@ -14,6 +14,8 @@ import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptim
 import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory, buildCategoryHints } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
+import { Button } from './ui/button';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -987,7 +989,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-text-tertiary mb-4">
+        <p className="text-muted-foreground dark:text-muted-foreground mb-4">
           {searchFilters.query ? (
             language === 'zh' 
               ? `未找到与"${searchFilters.query}"相关的仓库。`
@@ -1001,7 +1003,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
         </p>
         {searchFilters.query && (
-          <div className="text-sm text-gray-400 dark:text-text-tertiary">
+          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
             <p className="mb-2">
               {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
             </p>
@@ -1036,7 +1038,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* AI Analysis Dropdown Button */}
           <div className="relative">
-            <button
+            <Button
               onClick={() => setShowDropdown(!showDropdown)}
               disabled={isLoading}
               className="linear-filter-toggle flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 disabled:opacity-50 text-sm font-medium"
@@ -1049,46 +1051,46 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 }
               </span>
               <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </button>
+            </Button>
 
             {/* Dropdown Menu */}
             {showDropdown && !isLoading && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-dialog z-10">
-                <button
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-dialog z-10">
+                <Button
                   onClick={() => handleAIAnalyze(false)}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-white/[0.04]"
+                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-border"
                 >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('分析全部', 'Analyze All')}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+                  <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                     {t(`分析 ${filteredRepositories.length} 个仓库`, `Analyze ${filteredRepositories.length} repositories`)}
                   </div>
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-white/[0.04]"
+                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
                 >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+                  <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                     {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
                   </div>
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleAIAnalyze(false, true)}
                   disabled={failedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('重新分析失败的', 'Re-analyze Failed')}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+                  <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                     {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
                   </div>
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1096,70 +1098,47 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (
             <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-20 sm:w-32 bg-gray-200 dark:bg-white/10 rounded-full h-2">
+              <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
                 <div
-                  className="bg-gray-100 dark:bg-white/[0.04] h-2 rounded-full transition-all duration-300"
+                  className="bg-muted dark:bg-muted/40 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-text-tertiary">
+              <span className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {Math.round((analysisProgress.current / analysisProgress.total) * 100)}%
               </span>
-              <button
+              <Button
                 onClick={handlePauseResume}
-                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
+                className="p-1 sm:p-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 hover:bg-accent dark:bg-muted/40 dark:hover:bg-amber-600/30 transition-colors"
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleStop}
-                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-red/20 dark:text-status-red hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-red/30 transition-colors text-xs sm:text-sm"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:bg-muted/40 dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
               >
                 {t('停止', 'Stop')}
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-text-tertiary">
+              <span className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('显示内容:', 'Display:')}
               </span>
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <label 
-                  className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                  title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}
-                >
-                  <input
-                    type="radio"
-                    name="displayContent"
-                    checked={showAISummary}
-                    onChange={() => hasAnalyzedRepos && setShowAISummary(true)}
-                    disabled={!hasAnalyzedRepos}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
-                  />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
-                    {t('AI分析内容', 'AI Analysis')}
-                  </span>
+              <RadioGroup value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
+                <label className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
+                  <RadioGroupItem value="ai" id="display-content-ai" disabled={!hasAnalyzedRepos} />
+                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
                 </label>
-                <label 
-                  className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer"
-                  title={t('显示仓库原始描述', 'Show repository original description')}
-                >
-                  <input
-                    type="radio"
-                    name="displayContent"
-                    checked={!showAISummary}
-                    onChange={() => setShowAISummary(false)}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
-                  />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
-                    {t('原始描述', 'Original')}
-                  </span>
+                <label className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
+                  <RadioGroupItem value="original" id="display-content-original" />
+                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
                 </label>
-              </div>
+              </RadioGroup>
             </div>
           )}
 
@@ -1167,7 +1146,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5 sm:text-right">
+          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right">
             <div className="flex items-center justify-between">
               <div>
                 {t(
@@ -1175,7 +1154,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
                 )}
                 {repositories.length !== filteredRepositories.length && (
-                  <span className="ml-2 text-brand-violet dark:text-brand-violet">
+                  <span className="ml-2 text-primary dark:text-primary">
                     {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
                   </span>
                 )}
@@ -1201,27 +1180,27 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
 
           {!isLoading && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-black/[0.06] bg-light-surface p-0.5 dark:border-white/[0.04] dark:bg-white/[0.04]" role="group" aria-label={t('仓库布局', 'Repository layout')}>
-              <button
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+              <Button
                 type="button"
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           )}
         </div>

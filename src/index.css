@@ -818,65 +818,65 @@
 
 @layer components {
   .linear-bg-base {
-    @apply bg-marketing-black text-text-primary;
+    @apply bg-background text-foreground;
   }
   .linear-bg-panel {
-    @apply bg-panel-dark text-text-primary;
+    @apply bg-card text-card-foreground;
   }
-  
-   .btn-ghost {
-    @apply bg-white/[0.02] text-text-primary border border-white/[0.04] rounded-md px-3 py-1.5 transition-colors duration-200;
+
+  .btn-ghost {
+    @apply border border-transparent bg-transparent text-muted-foreground rounded-md px-3 py-1.5 transition-colors duration-200;
   }
   .btn-ghost:hover {
-    @apply bg-white/5 border-white/[0.04];
+    @apply bg-accent text-accent-foreground;
   }
   .btn-ghost:focus {
-    @apply shadow-focus outline-none;
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
   .btn-subtle {
-    @apply bg-white/[0.04] text-text-secondary rounded-md px-[6px] py-0 transition-colors duration-200;
+    @apply bg-muted text-muted-foreground rounded-md px-[6px] py-0 transition-colors duration-200;
   }
   .btn-subtle:hover {
-    @apply bg-white/10 text-text-primary;
+    @apply bg-accent text-accent-foreground;
   }
 
   .btn-primary {
-    @apply bg-brand-indigo text-white px-4 py-2 rounded-md transition-colors duration-200 border border-transparent;
+    @apply border border-transparent bg-primary text-primary-foreground px-4 py-2 rounded-md transition-colors duration-200;
   }
   .btn-primary:hover {
-    @apply bg-brand-hover;
+    @apply bg-primary/90;
   }
 
   .btn-icon {
-    @apply bg-white/[0.03] text-text-primary border border-white/[0.08] rounded-full p-2 flex items-center justify-center transition-colors duration-200;
+    @apply bg-background text-foreground border border-border rounded-full p-2 flex items-center justify-center transition-colors duration-200;
   }
   .btn-icon:hover {
-    @apply bg-white/10;
+    @apply bg-accent text-accent-foreground;
   }
 
   .pill {
-    @apply bg-transparent text-text-secondary px-[10px] py-0 rounded-full border border-border-primary text-[12px] font-medium flex items-center gap-1;
+    @apply bg-transparent text-muted-foreground px-[10px] py-0 rounded-full border border-border text-[12px] font-medium flex items-center gap-1;
   }
   .pill-success {
-    @apply bg-status-emerald text-text-primary rounded-full text-[10px] font-medium;
+    @apply bg-emerald-600 text-white rounded-full text-[10px] font-medium;
   }
   .badge-subtle {
-    @apply bg-white/5 text-text-primary px-2 py-0 rounded-sm border border-white/[0.04] text-[10px] font-medium;
+    @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-[10px] font-medium;
   }
 
   .input-base {
-    @apply bg-white/[0.02] text-text-secondary border border-white/[0.08] rounded-md px-[14px] py-[12px] focus:outline-none focus:border-white/20 focus:shadow-focus transition-all duration-200;
+    @apply bg-background text-foreground border border-input rounded-md px-[14px] py-[12px] focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all duration-200;
   }
   .input-search {
-    @apply bg-transparent text-text-primary focus:outline-none placeholder:text-text-tertiary;
+    @apply bg-transparent text-foreground focus:outline-none placeholder:text-muted-foreground;
   }
-  
+
   .linear-card {
-    @apply bg-white/[0.03] border border-white/[0.08] rounded-lg shadow-subtle hover:bg-white/[0.05] transition-colors duration-200;
+    @apply bg-card text-card-foreground border border-border rounded-lg shadow-sm hover:bg-accent/30 transition-colors duration-200;
   }
   .linear-panel {
-    @apply bg-white/[0.03] border border-white/[0.08] rounded-xl shadow-elevated;
+    @apply bg-card text-card-foreground border border-border rounded-lg shadow-md;
   }
 }
 
@@ -1040,50 +1040,92 @@ html.dark::-webkit-scrollbar-thumb:hover {
 
 :root {
   color-scheme: light;
-  --ui-canvas: #f7f7f8;
-  --ui-panel: #ffffff;
-  --ui-panel-muted: #f3f3f5;
-  --ui-panel-hover: #eeeeF1;
-  --ui-text: #242428;
-  --ui-text-muted: #777780;
-  --ui-text-faint: #9b9ba4;
-  --ui-line: #e2e2e7;
-  --ui-line-subtle: #ececef;
-  --ui-line-strong: #d4d4dc;
-  --ui-accent: #5e6ad2;
-  --ui-accent-hover: #4f59bc;
-  --ui-accent-soft: rgba(94, 106, 210, 0.11);
-  --ui-accent-ring: rgba(94, 106, 210, 0.22);
-  --ui-success: #2f8f62;
-  --ui-danger: #c7555b;
-  --ui-shadow-card: 0 1px 2px rgba(20, 20, 25, 0.025), 0 8px 24px rgba(20, 20, 25, 0.035);
-  --ui-shadow-float: 0 18px 48px rgba(20, 20, 25, 0.12), 0 2px 8px rgba(20, 20, 25, 0.06);
-  --ui-radius-xs: 5px;
-  --ui-radius-sm: 7px;
-  --ui-radius-md: 9px;
-  --ui-radius-lg: 12px;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+
+  /* Compatibility aliases for existing application-shell utilities. */
+  --ui-canvas: hsl(var(--background));
+  --ui-panel: hsl(var(--card));
+  --ui-panel-muted: hsl(var(--muted));
+  --ui-panel-hover: hsl(var(--accent));
+  --ui-text: hsl(var(--foreground));
+  --ui-text-muted: hsl(var(--muted-foreground));
+  --ui-text-faint: hsl(var(--muted-foreground) / 0.75);
+  --ui-line: hsl(var(--border));
+  --ui-line-subtle: hsl(var(--border) / 0.7);
+  --ui-line-strong: hsl(var(--border) / 1.15);
+  --ui-accent: hsl(var(--primary));
+  --ui-accent-hover: hsl(var(--primary) / 0.9);
+  --ui-accent-soft: hsl(var(--accent));
+  --ui-accent-ring: hsl(var(--ring) / 0.25);
+  --ui-success: #16a34a;
+  --ui-danger: hsl(var(--destructive));
+  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ui-shadow-float: 0 10px 24px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.04);
+  --ui-radius-xs: calc(var(--radius) - 4px);
+  --ui-radius-sm: calc(var(--radius) - 2px);
+  --ui-radius-md: var(--radius);
+  --ui-radius-lg: calc(var(--radius) + 4px);
 }
 
 html.dark {
   color-scheme: dark;
-  --ui-canvas: #111113;
-  --ui-panel: #19191c;
-  --ui-panel-muted: #202023;
-  --ui-panel-hover: #28282d;
-  --ui-text: #f4f4f5;
-  --ui-text-muted: #aaaab3;
-  --ui-text-faint: #777780;
-  --ui-line: #2d2d32;
-  --ui-line-subtle: #242429;
-  --ui-line-strong: #3b3b42;
-  --ui-accent: #7473e8;
-  --ui-accent-hover: #8988ef;
-  --ui-accent-soft: rgba(116, 115, 232, 0.17);
-  --ui-accent-ring: rgba(116, 115, 232, 0.27);
-  --ui-success: #5cc18a;
-  --ui-danger: #e5747b;
-  --ui-shadow-card: none;
-  --ui-shadow-float: 0 20px 52px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 47.4% 11.2%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 47.4% 11.2%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+
+  --ui-canvas: hsl(var(--background));
+  --ui-panel: hsl(var(--card));
+  --ui-panel-muted: hsl(var(--muted));
+  --ui-panel-hover: hsl(var(--accent));
+  --ui-text: hsl(var(--foreground));
+  --ui-text-muted: hsl(var(--muted-foreground));
+  --ui-text-faint: hsl(var(--muted-foreground) / 0.75);
+  --ui-line: hsl(var(--border));
+  --ui-line-subtle: hsl(var(--border) / 0.7);
+  --ui-line-strong: hsl(var(--border) / 1.15);
+  --ui-accent: hsl(var(--primary));
+  --ui-accent-hover: hsl(var(--primary) / 0.9);
+  --ui-accent-soft: hsl(var(--accent));
+  --ui-accent-ring: hsl(var(--ring) / 0.3);
+  --ui-success: #4ade80;
+  --ui-danger: hsl(var(--destructive));
+  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --ui-shadow-float: 0 18px 36px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.2);
 }
 
 html,
@@ -1092,9 +1134,14 @@ body,
   min-height: 100%;
 }
 
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
 body {
-  background: var(--ui-canvas);
-  color: var(--ui-text);
+  @apply bg-background text-foreground;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   letter-spacing: -0.01em;
@@ -1209,18 +1256,18 @@ textarea:focus-visible,
 
 .ui-button-primary,
 .btn-primary {
-  color: #fff;
-  background: var(--ui-accent);
-  border: 1px solid var(--ui-accent);
-  border-radius: var(--ui-radius-sm);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary));
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
 .ui-button-primary:hover,
 .btn-primary:hover {
-  background: var(--ui-accent-hover);
-  border-color: var(--ui-accent-hover);
+  background: hsl(var(--primary) / 0.9);
+  border-color: hsl(var(--primary) / 0.9);
 }
 
 .ui-button:active,

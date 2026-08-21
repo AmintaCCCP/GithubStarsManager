@@ -1,3 +1,5 @@
+import { Input } from './ui/input';
+import { Button } from './ui/button';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { ForkRepo, GitHubOrganization, WorkflowDefinition } from '../types';
@@ -8,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
 import { useDialog } from '../hooks/useDialog';
 import { Modal } from './Modal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 export const ForkTimeline: React.FC = () => {
   const {
@@ -544,34 +547,35 @@ export const ForkTimeline: React.FC = () => {
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-text-primary mb-2">
+            <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
               {t('复刻', 'Fork')}
             </h2>
-            <p className="text-gray-700 dark:text-text-tertiary">
+            <p className="text-muted-foreground dark:text-muted-foreground">
               {t(`管理 ${currentOwnerLabel} 的 ${ownerForks.length} 个Fork仓库`, `Manage ${ownerForks.length} forked repositories for ${currentOwnerLabel}`)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Fork owner selector */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700 dark:text-text-tertiary">{t('拥有者:', 'Owner:')}</span>
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
               <select
-                value={activeForkOwner}
-                onChange={(e) => handleForkOwnerChange(e.target.value)}
                 aria-label={t('选择 Fork 拥有者', 'Select fork owner')}
+                value={activeForkOwner}
+                onChange={(event) => handleForkOwnerChange(event.target.value)}
                 disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}
-                className="ui-field px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                tabIndex={-1}
+                className="sr-only"
               >
-                {forkOwnerOptions.map(owner => (
-                  <option key={owner.id} value={owner.login}>
-                    {owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}
-                  </option>
-                ))}
+                {forkOwnerOptions.map(owner => <option key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</option>)}
               </select>
+              <Select value={activeForkOwner} onValueChange={handleForkOwnerChange} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
+                <SelectTrigger className="ui-field h-9 min-w-36 px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
+                <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
 
             {isLoadingOrganizations && (
-              <span className="flex items-center space-x-1 text-sm text-gray-500 dark:text-text-tertiary">
+              <span className="flex items-center space-x-1 text-sm text-muted-foreground dark:text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{t('加载组织中...', 'Loading organizations...')}</span>
               </span>
@@ -579,28 +583,28 @@ export const ForkTimeline: React.FC = () => {
 
             {/* Last Refresh Time */}
             {lastRefreshTime && (
-              <span className="w-full text-sm text-gray-500 dark:text-text-tertiary lg:w-auto">
+              <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
               </span>
             )}
 
             {/* Refresh Button */}
-            <button
+            <Button
               onClick={handleRefresh}
               disabled={forkIsRefreshing}
               className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{forkIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Search Bar */}
         <div className="ui-toolbar p-3 sm:p-4 mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
-            <input
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
+            <Input
               type="text"
               placeholder={t('搜索Fork...', 'Search forks...')}
               value={searchQuery}
@@ -608,18 +612,18 @@ export const ForkTimeline: React.FC = () => {
                 setForkSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ui-field w-full pl-10 pr-10 py-2 text-gray-900 dark:text-text-primary"
+              className="ui-field w-full pl-10 pr-10 py-2 text-foreground dark:text-foreground"
             />
             {searchQuery && (
-              <button
+              <Button
                 onClick={() => {
                   setForkSearchQuery('');
                   setCurrentPage(1);
                 }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -627,14 +631,14 @@ export const ForkTimeline: React.FC = () => {
         {/* Results Info and Pagination Controls */}
         <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <span className="text-sm text-gray-700 dark:text-text-tertiary">
+            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t(
                 `显示 ${displayStart}-${displayEnd} 共 ${filteredForks.length} 个Fork`,
                 `Showing ${displayStart}-${displayEnd} of ${filteredForks.length} forks`
               )}
             </span>
             {searchQuery && (
-              <span className="text-sm text-brand-violet dark:text-brand-violet">
+              <span className="text-sm text-primary dark:text-primary">
                 ({t('已筛选', 'filtered')})
               </span>
             )}
@@ -643,71 +647,62 @@ export const ForkTimeline: React.FC = () => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             {/* Items per page selector */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700 dark:text-text-tertiary">{t('每页:', 'Per page:')}</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="ui-field px-3 py-1 text-sm"
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-              </select>
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+              <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
+                <SelectTrigger className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
+              </Select>
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center space-x-1 overflow-x-auto pb-1">
-                <button
+                <Button
                   onClick={() => handlePageChange(1)}
                   disabled={clampedPage === 1}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsLeft className="w-4 h-4" />
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handlePageChange(clampedPage - 1)}
                   disabled={clampedPage === 1}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                </button>
+                </Button>
 
                 {getPageNumbers().map((page, index) => (
-                  <button
+                  <Button
                     key={index}
                     onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
                     disabled={typeof page !== 'number'}
                     className={`px-3 py-2 rounded-lg text-sm ${
                       page === clampedPage
-                        ? 'bg-brand-indigo text-white'
+                        ? 'bg-primary text-primary-foreground'
                         : typeof page === 'number'
-                        ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10'
-                        : 'text-gray-400 cursor-default'
+                        ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                        : 'text-muted-foreground cursor-default'
                     }`}
                   >
                     {page}
-                  </button>
+                  </Button>
                 ))}
 
-                <button
+                <Button
                   onClick={() => handlePageChange(clampedPage + 1)}
                   disabled={clampedPage === totalPages}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronRight className="w-4 h-4" />
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handlePageChange(totalPages)}
                   disabled={clampedPage === totalPages}
-                  className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsRight className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -718,22 +713,22 @@ export const ForkTimeline: React.FC = () => {
       <div className="space-y-2">
         {paginatedForks.length === 0 ? (
           <div className="ui-empty-state text-center py-12">
-            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
+            <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
               {searchQuery ? t('无符合条件的结果', 'No matching results') : t('没有Fork仓库', 'No Forked Repositories')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-text-tertiary">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               {searchQuery
                 ? t('没有找到匹配的 Fork', 'No matching forks found.')
                 : t(`${currentOwnerLabel} 下暂无 Fork 仓库，请刷新或切换拥有者。`, `No forked repositories found for ${currentOwnerLabel}. Refresh or switch owner.`)}
             </p>
             {searchQuery && (
-              <button
+              <Button
                 onClick={() => setForkSearchQuery('')}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('清除搜索', 'Clear Search')}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -772,52 +767,52 @@ export const ForkTimeline: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-center mt-8">
           <div className="flex items-center space-x-1">
-            <button
+            <Button
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
-            </button>
+            </Button>
 
             {getPageNumbers().map((page, index) => (
-              <button
+              <Button
                 key={index}
                 onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
                 disabled={typeof page !== 'number'}
                 className={`px-3 py-2 rounded-lg text-sm ${
                   page === clampedPage
-                    ? 'bg-brand-indigo text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : typeof page === 'number'
-                    ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10'
-                    : 'text-gray-400 cursor-default'
+                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                    : 'text-muted-foreground cursor-default'
                 }`}
               >
                 {page}
-              </button>
+              </Button>
             ))}
 
-            <button
+            <Button
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -829,52 +824,43 @@ export const ForkTimeline: React.FC = () => {
         title={language === 'zh' ? '同步上游代码 (Sync upstream)' : 'Sync Upstream'}
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-text-tertiary">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             {language === 'zh' 
               ? `选择要将上游变更合并到的分支 (${syncModal.full_name})：`
               : `Select the branch to merge upstream changes into for ${syncModal.full_name}:`}
           </p>
 
           <div className="flex flex-col space-y-2">
-            <label className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+            <label className="text-sm font-medium text-foreground dark:text-muted-foreground">
               {language === 'zh' ? '目标分支 (Target Branch)' : 'Target Branch'}
             </label>
             {isFetchingBranches ? (
-              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-text-tertiary py-2">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-muted-foreground py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{language === 'zh' ? '加载分支列表中...' : 'Loading branches...'}</span>
               </div>
             ) : (
-              <select
-                value={syncModal.branch}
-                onChange={(e) => setSyncModal(prev => ({ ...prev, branch: e.target.value }))}
-                className="ui-field w-full px-3 py-2 dark:text-text-primary"
-              >
-                {syncModalBranches.length > 0 ? (
-                  syncModalBranches.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))
-                ) : (
-                  <option value={syncModal.branch}>{syncModal.branch}</option>
-                )}
-              </select>
+              <Select value={syncModal.branch} onValueChange={(value) => setSyncModal(prev => ({ ...prev, branch: value }))}>
+                <SelectTrigger className="ui-field h-10 w-full px-3 py-2 dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectContent>{syncModalBranches.length > 0 ? syncModalBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>) : <SelectItem value={syncModal.branch}>{syncModal.branch}</SelectItem>}</SelectContent>
+              </Select>
             )}
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <button
+            <Button
               onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
               className="ui-button px-4 py-2 text-sm font-medium"
             >
               {language === 'zh' ? '取消' : 'Cancel'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={confirmSyncUpstream}
               disabled={isFetchingBranches || !syncModal.branch}
               className="ui-button-primary px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {language === 'zh' ? '确认同步' : 'Sync Branch'}
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>
