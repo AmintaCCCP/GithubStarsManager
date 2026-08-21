@@ -168,8 +168,8 @@ describe('RepositoryCard view modes', () => {
     await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
-    await screen.findByRole('menuitem', { name: '取消订阅 Release' });
-    await user.keyboard('{ArrowDown}');
+    const unsubscribe = await screen.findByRole('menuitem', { name: '取消订阅 Release' });
+    unsubscribe.focus();
     await user.keyboard('{Enter}');
     expect(storeState.toggleReleaseSubscription).toHaveBeenCalledWith(repository.id);
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消订阅 Release' })).not.toBeInTheDocument());

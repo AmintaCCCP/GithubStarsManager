@@ -57,6 +57,8 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
       <Button
         type="button"
         onClick={() => setIsExpanded(prev => !prev)}
+        aria-expanded={isExpanded}
+        aria-controls="release-source-repositories"
         className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
       >
         <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
@@ -64,7 +66,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
       </Button>
 
       {isExpanded && (
-        <div className="mt-2 space-y-2">
+        <div id="release-source-repositories" className="mt-2 space-y-2">
           {repos.length === 0 ? (
             <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
               {emptyText}
