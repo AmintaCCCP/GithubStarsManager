@@ -85,8 +85,6 @@ export const SearchBar: React.FC = () => {
   const { toast, confirm } = useDialog();
   
   const [showFilters, setShowFilters] = useState(false);
-  const [showSyncMenu, setShowSyncMenu] = useState(false);
-  const syncMenuRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState(searchFilters.query);
   const [isSearching, setIsSearching] = useState(false);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -946,17 +944,6 @@ export const SearchBar: React.FC = () => {
     return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
   };
 
-  // 同步下拉菜单点击外部关闭
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (syncMenuRef.current && !syncMenuRef.current.contains(event.target as Node)) {
-        setShowSyncMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行
   const handleStarAndListSync = async () => {
     const confirmed = await confirm(
@@ -974,7 +961,6 @@ export const SearchBar: React.FC = () => {
       { type: 'warning' }
     );
     if (!confirmed) return;
-    setShowSyncMenu(false);
     await handleStarSync('stars-and-lists');
   };
 
@@ -1205,11 +1191,12 @@ export const SearchBar: React.FC = () => {
 
           {/* Sync Button */}
           <div className="flex items-center gap-2 ml-1">
-            <div className="relative" ref={syncMenuRef}>
+            <DropdownMenu>
               <div className="flex items-center">
                 <div className="ui-button-primary inline-flex items-stretch overflow-hidden">
                   <Button
-                    onClick={() => { setShowSyncMenu(false); handleStarSync(); }}
+                    type="button"
+                    onClick={() => { void handleStarSync(); }}
                     disabled={isSyncingStars}
                     className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
                     title={t('同步星标仓库列表', 'Sync starred repositories')}
@@ -1217,46 +1204,36 @@ export const SearchBar: React.FC = () => {
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
                     <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
                   </Button>
-                  <Button
-                    onClick={() => setShowSyncMenu(!showSyncMenu)}
-                    disabled={isSyncingStars}
-                    aria-haspopup="menu"
-                    aria-expanded={showSyncMenu}
-                    className="inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-white/20"
-                    title={t('更多同步选项', 'More sync options')}
-                  >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSyncMenu ? 'rotate-180' : ''}`} />
-                  </Button>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      disabled={isSyncingStars}
+                      aria-label={t('更多同步选项', 'More sync options')}
+                      className="group inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-white/20"
+                      title={t('更多同步选项', 'More sync options')}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                    </Button>
+                  </DropdownMenuTrigger>
                 </div>
               </div>
-
-              {showSyncMenu && (
-                <div
-                  role="menu"
-                  onKeyDown={(e) => { if (e.key === 'Escape') setShowSyncMenu(false); }}
-                  className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-[9999] overflow-hidden"
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  disabled={isSyncingStars}
+                  onSelect={() => { void handleStarSync('stars-only'); }}
+                  className="justify-start text-sm"
                 >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    role="menuitem"
-                    onClick={() => { setShowSyncMenu(false); handleStarSync('stars-only'); }}
-                    className="flex w-full items-center justify-start gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-                  >
-                    <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    role="menuitem"
-                    onClick={handleStarAndListSync}
-                    className="flex w-full items-center justify-start gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-                  >
-                    <span className="whitespace-nowrap">{t('同步星标仓库及 list', 'Sync starred repos & lists')}</span>
-                  </Button>
-                </div>
-              )}
-            </div>
+                  <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={isSyncingStars}
+                  onSelect={() => { void handleStarAndListSync(); }}
+                  className="justify-start text-sm"
+                >
+                  <span className="whitespace-nowrap">{t('同步星标仓库及 list', 'Sync starred repos & lists')}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="group relative">
               <Clock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70 cursor-help" />
               <div className="absolute right-0 top-full mt-2 w-max p-2 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-foreground dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
