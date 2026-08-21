@@ -175,6 +175,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                 />
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => removeFile(file.id)}
                   disabled={visibleFiles.length === 1}
                   className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"

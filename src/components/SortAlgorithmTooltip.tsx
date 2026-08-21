@@ -106,8 +106,6 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
           aria-label={info.title}
           onMouseEnter={() => { cancelClose(); setOpen(true); }}
           onMouseLeave={scheduleClose}
-          onFocus={() => { cancelClose(); setOpen(true); }}
-          onBlur={scheduleClose}
         >
           <Info className="h-4 w-4" />
         </Button>
@@ -117,6 +115,7 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
         align="start"
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}
+        onOpenAutoFocus={(event) => event.preventDefault()}
         className="w-[calc(100vw_-_2rem)] max-w-sm whitespace-pre-line bg-popover p-4 text-left text-popover-foreground"
       >
         <h4 className="mb-2 text-sm font-semibold">{info.title}</h4>

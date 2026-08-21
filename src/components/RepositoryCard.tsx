@@ -54,6 +54,7 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
 
   return (
     <Button
+      size="sm"
       {...props}
       onClick={handleClick}
       disabled={disabled || selectionMode}

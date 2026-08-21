@@ -81,6 +81,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 key={channel.id}
                 onClick={() => onChannelSelect(channel.id)}
                 variant="ghost"
+                aria-pressed={isSelected}
                 className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ${
                   isSelected
                     ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'

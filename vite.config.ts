@@ -16,10 +16,8 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    // The app intentionally ships as a single-screen SPA with broad legacy browser
-    // compatibility. Keep Vite's warning threshold informational and independent
-    // from the 3,000 KiB hard budget enforced by check:bundle-size.
-    chunkSizeWarningLimit: 3500,
+    // Warn before the 3,000 KiB hard budget enforced by check:bundle-size.
+    chunkSizeWarningLimit: 3072,
     rolldownOptions: {
       checks: {
         // The legacy plugin dominates production build time by design; this diagnostic

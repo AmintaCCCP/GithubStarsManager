@@ -36,9 +36,6 @@ jobs:
       # env:
       #   VITE_BASE_PATH: './'
 
-    - name: Enforce web bundle budget
-      run: npm run check:bundle-size
-      
     - name: Verify and fix web build
       shell: bash
       run: |

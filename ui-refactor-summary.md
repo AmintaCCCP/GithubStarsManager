@@ -50,3 +50,8 @@
 1a04720 后最新 CodeRabbit review 的所有 comments 已完成修复：ReleaseCard、SubscriptionRepoCard、ReadmeModal 与 CategoryEditModal 的紧凑 controls 覆盖 shared Button 默认尺寸或背景；ReleaseSourceSettingsModal 的 repository-list region 使用 React `useId` 保证多实例唯一；ReleaseTimeline 的 Pre-release 文本、数字分页补齐可交互与 aria 语义；WebDAV RadioGroup、CategoryEdit icon grid 完成 accessible naming；success badge 颜色加深；UpdateChecker 错误布局改为纵向容器。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证再次通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,788.24 kB，独立 checker 2,722.90 KiB，0 vulnerabilities。
+
+
+2de4162 后最新 CodeRabbit review 的全部 comments 已完成修复：ReleaseTimeline repository disclosure 仅使用 phrasing spans；Discovery、Fork、Gist、Release、Repository controls 补齐共享 Button variants、compact size 与分页 aria 语义；SortAlgorithmTooltip 修复 Popover focus loop；Select primitives 增加 side-aware offsets、退出动画和长标签裁剪；Readme fragment、githubListsApi 类型、query-string 类型依赖、CI 重复 bundle step 与 Vite warning threshold 完成维护清理；Discovery loading indicator 与 success badge 使用有效且具备对比度的 semantic colors。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.01 kB，独立 checker 2,724.63 KiB，0 vulnerabilities。
