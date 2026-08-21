@@ -144,7 +144,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
 
   return (
     <div 
-      className="relative w-full border-b border-border dark:border-border bg-background95 dark:bg-card/95 backdrop-blur-sm"
+      className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm"
     >
       {/* 滚动容器 */}
       <div

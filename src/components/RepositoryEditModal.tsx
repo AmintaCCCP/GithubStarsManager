@@ -597,7 +597,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   // Unified card styles with enhanced light mode optimization
   const sectionClass = "p-5 bg-white dark:bg-card rounded-xl border border-gray-200/80 dark:border-border shadow-sm";
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "w-full px-4 py-3 bg-accent/50/50 dark:bg-muted/40 border border-gray-200 dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
+  const inputClass = "w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-gray-200 dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-gray-200/80 dark:border-border";
@@ -668,7 +668,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 {t('AI总结', 'AI Summary')}
               </span>
             ) : editIntent.description === 'reset-to-original' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-mutedtext-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <FileText className="w-3 h-3 mr-1" />
                 {t('原始描述', 'Original')}
               </span>
@@ -793,8 +793,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-original'
-                    ? 'bg-mutedtext-foregroundborder-border dark:bg-accent dark:text-foreground dark:border-white/20'
-                    : 'bg-white text-muted-foregroundborder-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
+                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-white/20'
+                    : 'bg-white text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -881,8 +881,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-original'
-                    ? 'bg-mutedtext-foregroundborder-border dark:bg-accent dark:text-foreground dark:border-white/20'
-                    : 'bg-white text-muted-foregroundborder-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent'
+                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-white/20'
+                    : 'bg-white text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />

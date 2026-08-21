@@ -2,29 +2,36 @@
 
 ## 代码与类型审计
 
-本轮审计清理了共享 shadcn 原语的 Fast Refresh 非组件导出警告，补齐 `autoSync.githubToken.test.ts` 的 Vitest 显式导入，修复 `BackendPanel.test.tsx` 的未使用参数，并为 `githubListsApi.ts` 的分页响应和游标补齐显式类型。`VectorSearchSettings.tsx` 的未使用 Hook 依赖也已移除。当前 `npm run lint` 与 `npx tsc -b` 均通过且没有诊断输出。
+本轮改造将前端呈现层统一到 **shadcn/ui 风格组件与 Radix Primitives**，并清理共享原语的 Fast Refresh 非组件导出、未使用 Hook 依赖、测试文件隐式依赖和 GraphQL 响应隐式类型。`src/services/githubListsApi.ts` 的改动仅限于 GraphQL wire 类型、nullable `nodes`/`description` 的安全归一化和内部请求签名清理；网络请求语义、store、同步流程、AI 分析、仓库动作和权限逻辑均保持不变。
 
-## 设计系统审计
+CodeRabbit 首轮报告中的共享 Button 变体、粘连 Tailwind token、重复 dark-mode 类、nullable GraphQL nodes、`tailwindcss-animate` 注册、语义色 alpha placeholder、border token、Slider thumb accessible name、Tooltip Portal、Dialog 标题、Select accessible labeling、ConfirmDialog 双触发、RadioGroup accessible name、DropdownMenu 语义 role 以及冗余 outside-click 逻辑均已核对并修复。ReleaseTimeline、RepositoryEditModal、CategoryPanel、WebDAVPanel、DiscoveryView、SearchBar 和全局 legacy CSS 的剩余 findings 也已完成收尾。
 
-全局主题已引入 shadcn 默认语义变量：background、foreground、card、popover、primary、secondary、muted、accent、destructive、border、input、ring 和 radius。共享 Button、Badge、Input、Textarea、Card、Select、Checkbox、Switch、RadioGroup、Slider、Tabs、Dialog 与 AlertDialog 已采用官方 demo 风格的默认变体和状态。旧 Linear 类名保留为兼容别名，但其实际颜色已映射到 shadcn 语义变量，业务逻辑和状态流未改变。
+## 设计系统与无障碍审计
+
+全局主题使用 shadcn 默认语义变量：`background`、`foreground`、`card`、`popover`、`primary`、`secondary`、`muted`、`accent`、`destructive`、`border`、`input`、`ring` 和 `radius`。主操作使用 `primary/primary-foreground`，中性工具栏和 icon-only 控件使用 `ghost`，次级预设使用 `outline`；空状态刷新按钮、缓存状态和深色模式文本均已检查实际背景下的对比度。
+
+Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGroup、Checkbox、Switch、Tabs 和 Popover 均使用共享封装。ReadmeModal 与 ForkTimeline 的 native select 仅作为既有 DOM/change 兼容层并从辅助技术树隐藏，用户可见控件由 Radix 渲染；测试已改为验证真实的 combobox/option 用户路径。RepositoryCard 的菜单测试已改用 `menuitem` 语义，并以 userEvent 验证 pointer、keyboard、card whitespace、outside pointer 和 Escape 行为。
 
 ## 安全审计
 
-`npm audit --omit=dev --audit-level=high` 最终报告 `found 0 vulnerabilities`。仓库没有使用 `react-router-dom`，因此移除了该未使用依赖及其传递漏洞来源；没有执行破坏性路由升级。
+`npm audit --omit=dev --audit-level=high` 报告 `found 0 vulnerabilities`。仓库没有使用 `react-router-dom`，未使用依赖及其传递漏洞来源已移除，没有执行破坏性路由升级。
 
 ## UI 与交互走查
 
-生产预览已走查仓库页、设置页、AI 配置页、新增 AI 表单、WebDAV 空状态、备份恢复面板和主题共享控件。重点复测了导航 active 状态、AI 搜索空查询 disabled 状态、Radix Select 打开与切换、Checkbox 展开默认提示词、Textarea、Switch checked 状态、取消表单和空状态恢复。AI 搜索及主操作按钮的深色主题前景色覆盖问题已修复。浏览器控制台仅有预期的应用初始化与本地模式信息，没有未捕获异常或 React/Radix 警告。
+生产预览已走查仓库页、设置页、AI 配置页、新增 AI 表单、WebDAV 空状态、备份恢复面板、主题共享控件、导航 active 状态和 AI 搜索空查询 disabled 状态。Radix Select 打开与切换、Checkbox 展开默认提示词、Textarea、Switch checked 状态、取消表单、空状态恢复、仓库操作菜单和 README 语言切换均已回归验证。测试专用的 jsdom Pointer Capture 与 `scrollIntoView` no-op polyfill 只位于 `src/test/setup.ts`，不进入生产代码路径。
 
 ## 最终质量门禁
 
 | 检查项 | 结果 |
 |---|---|
-| `npm run lint` | 通过 |
-| `npx tsc -b` | 通过 |
-| `npm run test:run` | 29 个测试文件、326 个测试全部通过 |
-| `npm run build` | 通过，无 chunk 警告 |
+| `npm run lint` | 通过，0 errors、0 warnings |
+| `npx tsc -b` | 通过，无 TypeScript 诊断 |
+| `npm run test:run` | 通过，29 个测试文件、326 个测试全部通过；无 React/Radix act、Unhandled 或 Warning 输出 |
+| `npm run build` | 通过；legacy 入口 2,779.63 kB，低于 3,000 kB 预算阈值，无 chunk warning |
 | `git diff --check` | 通过 |
-| `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities |
+| `npm audit --omit=dev --audit-level=high` | `found 0 vulnerabilities` |
+| ReadmeModal + RepositoryCard 定向回归 | 通过，13/13；无测试 warning |
 
-审计补充：组件目录中的旧 brand/status/Linear 色类已清零；index.css 仅剩 option 元素和仓库成功状态的两处兼容选择器，正在改为 `background/card/foreground/green-600` 语义。
+## 交付与审查状态
+
+首轮 CodeRabbit findings 已全部修复并通过上述质量门禁。当前工作树位于 `refactor/shadcn-audit-zero-warnings`，下一步将仅提交跟踪中的源代码、测试和审计摘要，排除本地生成的 patch、截图和临时回归文件；随后推送 PR #284 并触发第二次 `@coderabbitai full review`。

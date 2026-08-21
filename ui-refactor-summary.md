@@ -2,7 +2,7 @@
 
 ## 目标与边界
 
-本次改造将前端呈现层统一迁移到 **shadcn/ui 风格组件 + Radix Primitives**。未修改 store、services、API 请求、业务 handler、数据结构、同步流程、AI 分析流程、仓库动作或用户权限逻辑。
+本次改造将前端呈现层统一迁移到 **shadcn/ui 风格组件 + Radix Primitives**。未改变 store、业务流程、同步流程、AI 分析流程、仓库动作或用户权限逻辑；`src/services/githubListsApi.ts` 仅补充 GraphQL 响应的显式类型、nullable 节点过滤和内部请求签名清理，网络请求语义保持不变。
 
 ## 迁移内容
 
@@ -19,16 +19,16 @@
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成。构建仍提示既有的主 bundle 体积较大警告，但不影响构建成功。 |
-| `npm run test -- --run` | 通过；29 个测试文件、326 个测试全部通过。 |
-| ReadmeModal/ForkTimeline 定向回归 | 通过；12 个测试全部通过。 |
-| `npx tsc -b` | 本次迁移涉及的前端组件错误已清零；剩余 31 项来自仓库既有测试全局类型声明和 `src/services/githubListsApi.ts` 的基线问题。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,779.63 kB，低于 `vite.config.ts` 的 3,000 kB 受控预算阈值。 |
+| `npm run test:run` | 通过；29 个测试文件、326 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
+| ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
+| `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |
 | `git diff --check` | 通过。 |
 | 生产预览 | 通过；登录壳层、语言切换、主题切换、token 输入、连接入口和 GitHub 外链正常渲染，控制台无 React/Radix/资源加载错误。 |
 
 ## 依赖变更
 
-`package.json` 与 `package-lock.json` 已补充 Radix Primitives 以及 `class-variance-authority`、`clsx`、`tailwind-merge` 等 shadcn/ui 常用样式依赖。正式代码中已删除一次性迁移脚本，工作区只保留源代码、共享组件和验证说明。
+`package.json` 与 `package-lock.json` 已补充 Radix Primitives 以及 `class-variance-authority`、`clsx`、`tailwind-merge` 等 shadcn/ui 常用样式依赖。`tailwindcss-animate` 已注册到 Tailwind 配置；正式代码中已删除一次性迁移脚本，测试专用的 jsdom Radix API polyfill 位于 `src/test/setup.ts`，不进入生产代码路径。
 
 ## 交付文件
 

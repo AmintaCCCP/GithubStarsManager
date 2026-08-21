@@ -113,12 +113,12 @@ export const LoginScreen: React.FC = () => {
           </div>
 
           {repositories.length > 0 && lastSync && (
-            <div className="mb-4 rounded-lg border border-border bg-green-600 p-3 dark:border-border">
-              <div className="flex items-center space-x-2 text-green-600">
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/30">
+              <div className="flex items-center space-x-2 text-green-800 dark:text-green-200">
                 <div className="h-2 w-2 rounded-full bg-green-600" />
                 <span className="text-sm font-medium">{t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}</span>
               </div>
-              <p className="mt-1 text-xs text-green-600">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
+              <p className="mt-1 text-xs text-green-700 dark:text-green-300">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
             </div>
           )}
 

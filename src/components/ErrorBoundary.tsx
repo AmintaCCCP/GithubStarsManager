@@ -119,6 +119,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="mb-4">
                 <Button
                   onClick={this.handleToggleDetails}
+                  variant="ghost"
                   className="text-sm text-primary dark:text-primary hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground dark:text-muted-foreground underline"
                 >
                   {strings.toggleDetails}
@@ -155,7 +156,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 </Button>
                 <Button
                   onClick={this.handleReportIssue}
-                  className="w-full px-4 py-2 bg-mutedtext-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
+                  variant="ghost"
+                  className="w-full px-4 py-2 bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   {strings.reportIssue}
                 </Button>

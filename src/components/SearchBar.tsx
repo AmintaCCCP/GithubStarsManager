@@ -1027,17 +1027,21 @@ export const SearchBar: React.FC = () => {
                 {t('搜索历史', 'Search History')}
               </span>
               <Button
+                type="button"
+                variant="ghost"
                 onClick={clearSearchHistory}
-                className="text-xs text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground dark:text-muted-foreground transition-colors"
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 {t('清除', 'Clear')}
               </Button>
             </div>
             {searchHistory.map((historyQuery, index) => (
               <Button
+                type="button"
+                variant="ghost"
                 key={index}
                 onClick={() => handleHistoryItemClick(historyQuery)}
-                className="w-full px-3 py-2 text-left text-sm text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent transition-colors flex items-center space-x-2"
+                className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
               >
                 <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
                 <span className="truncate">{historyQuery}</span>
@@ -1062,9 +1066,11 @@ export const SearchBar: React.FC = () => {
               .slice(0, 5)
               .map((suggestion, index) => (
                 <Button
+                  type="button"
+                  variant="ghost"
                   key={index}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full px-3 py-2 text-left text-sm text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent transition-colors flex items-center space-x-2"
+                  className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">
                     <div className="w-2 h-2 bg-muted dark:bg-muted/40 rounded-full"></div>
@@ -1078,8 +1084,11 @@ export const SearchBar: React.FC = () => {
           <div className="relative flex shrink-0 items-center gap-1 sm:gap-2">
           {searchQuery && (
             <Button
+              type="button"
+              variant="ghost"
               onClick={handleClearSearch}
-              className="p-1.5 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300 transition-colors"
+              aria-label={t('清除搜索', 'Clear search')}
+              className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               title={t('清除搜索', 'Clear search')}
             >
               <X className="w-4 h-4" />
@@ -1229,17 +1238,19 @@ export const SearchBar: React.FC = () => {
                 >
                   <Button
                     type="button"
+                    variant="ghost"
                     role="menuitem"
                     onClick={() => { setShowSyncMenu(false); handleStarSync('stars-only'); }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent transition-colors"
+                    className="flex w-full items-center justify-start gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                   >
                     <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>
                   </Button>
                   <Button
                     type="button"
+                    variant="ghost"
                     role="menuitem"
                     onClick={handleStarAndListSync}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent transition-colors"
+                    className="flex w-full items-center justify-start gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                   >
                     <span className="whitespace-nowrap">{t('同步星标仓库及 list', 'Sync starred repos & lists')}</span>
                   </Button>
@@ -1569,8 +1580,9 @@ export const SearchBar: React.FC = () => {
                 <Button
                   key={preset.label}
                   type="button"
+                  variant="outline"
                   onClick={() => setSearchFilters({ minStars: preset.value })}
-                  className="px-2 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+                  className="rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
                 >
                   ≥{preset.label}
                 </Button>

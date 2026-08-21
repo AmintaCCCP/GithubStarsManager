@@ -72,10 +72,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       <div className="space-y-4">
         {/* Filter Name */}
         <div>
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <label htmlFor="filter-name" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             过滤器名称
           </label>
           <Input
+            id="filter-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -86,13 +87,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
         {/* Keywords */}
         <div>
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <label htmlFor="filter-keywords" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             匹配关键词
           </label>
           
           {/* Add keyword input */}
           <div className="flex space-x-2 mb-3">
             <Input
+              id="filter-keywords"
               type="text"
               value={newKeyword}
               onChange={(e) => setNewKeyword(e.target.value)}
@@ -124,7 +126,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   >
                     <span>{keyword}</span>
                     <Button
+                      type="button"
+                      variant="ghost"
                       onClick={() => handleRemoveKeyword(index)}
+                      aria-label={`删除关键词 ${keyword}`}
                       className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
                     >
                       <X className="w-3 h-3" />

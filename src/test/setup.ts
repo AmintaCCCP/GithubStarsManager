@@ -31,6 +31,31 @@ Object.defineProperty(window, 'ResizeObserver', {
 
 window.fetch = vi.fn();
 
+// Radix pointer interactions call the Pointer Capture API, which jsdom does not
+// implement. Keep these no-op methods test-only so user-event can exercise the
+// same trigger path as the browser without changing production behavior.
+if (!Element.prototype.scrollIntoView) {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: () => undefined,
+  });
+}
+
+if (!Element.prototype.hasPointerCapture) {
+  Object.defineProperty(Element.prototype, 'hasPointerCapture', {
+    configurable: true,
+    value: () => false,
+  });
+  Object.defineProperty(Element.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: () => undefined,
+  });
+  Object.defineProperty(Element.prototype, 'releasePointerCapture', {
+    configurable: true,
+    value: () => undefined,
+  });
+}
+
 // Node >=22 exposes an experimental global `localStorage` (undefined unless
 // `--localstorage-file` is passed), which vitest copies in and shadows jsdom's
 // real Storage even once a non-opaque test origin is configured. Provide a

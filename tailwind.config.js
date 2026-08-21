@@ -1,4 +1,5 @@
 import typography from '@tailwindcss/typography';
+import animate from 'tailwindcss-animate';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -52,37 +53,37 @@ export default {
         border: 'hsl(var(--border) / <alpha-value>)',
         input: 'hsl(var(--input) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
-        'marketing-black': 'hsl(var(--background))',
-        'panel-dark': 'hsl(var(--card))',
-        'surface-3': 'hsl(var(--muted))',
-        'surface-sec': 'hsl(var(--accent))',
-        'text-primary': 'hsl(var(--foreground))',
-        'text-secondary': 'hsl(var(--muted-foreground))',
-        'text-tertiary': 'hsl(var(--muted-foreground))',
-        'text-quaternary': 'hsl(var(--muted-foreground) / 0.7)',
+        'marketing-black': 'hsl(var(--background) / <alpha-value>)',
+        'panel-dark': 'hsl(var(--card) / <alpha-value>)',
+        'surface-3': 'hsl(var(--muted) / <alpha-value>)',
+        'surface-sec': 'hsl(var(--accent) / <alpha-value>)',
+        'text-primary': 'hsl(var(--foreground) / <alpha-value>)',
+        'text-secondary': 'hsl(var(--muted-foreground) / <alpha-value>)',
+        'text-tertiary': 'hsl(var(--muted-foreground) / <alpha-value>)',
+        'text-quaternary': 'hsl(var(--muted-foreground) / <alpha-value>)',
         brand: {
-          indigo: 'hsl(var(--primary))',
-          violet: 'hsl(var(--accent-foreground))',
-          hover: 'hsl(var(--primary) / 0.9)',
+          indigo: 'hsl(var(--primary) / <alpha-value>)',
+          violet: 'hsl(var(--accent-foreground) / <alpha-value>)',
+          hover: 'hsl(var(--primary) / <alpha-value>)',
         },
-        'security-lavender': 'hsl(var(--accent-foreground))',
-        'status-green': '#16a34a',
-        'status-emerald': '#16a34a',
-        'status-amber': '#d97706',
-        'status-red': 'hsl(var(--destructive))',
-        'border-primary': 'hsl(var(--border))',
-        'border-secondary': 'hsl(var(--border))',
-        'border-tertiary': 'hsl(var(--border))',
-        'line-tint': 'hsl(var(--muted))',
-        'line-tertiary': 'hsl(var(--border))',
-        'light-bg': 'hsl(var(--background))',
-        'light-surface': 'hsl(var(--muted))',
-        'light-border': 'hsl(var(--border))',
-        'light-border-alt': 'hsl(var(--border))',
+        'security-lavender': 'hsl(var(--accent-foreground) / <alpha-value>)',
+        'status-green': 'rgb(22 163 74 / <alpha-value>)',
+        'status-emerald': 'rgb(22 163 74 / <alpha-value>)',
+        'status-amber': 'rgb(217 119 6 / <alpha-value>)',
+        'status-red': 'hsl(var(--destructive) / <alpha-value>)',
+        'border-primary': 'hsl(var(--border) / <alpha-value>)',
+        'border-secondary': 'hsl(var(--border) / <alpha-value>)',
+        'border-tertiary': 'hsl(var(--border) / <alpha-value>)',
+        'line-tint': 'hsl(var(--muted) / <alpha-value>)',
+        'line-tertiary': 'hsl(var(--border) / <alpha-value>)',
+        'light-bg': 'hsl(var(--background) / <alpha-value>)',
+        'light-surface': 'hsl(var(--muted) / <alpha-value>)',
+        'light-border': 'hsl(var(--border) / <alpha-value>)',
+        'light-border-alt': 'hsl(var(--border) / <alpha-value>)',
         // Legacy aliases intentionally resolve to the same semantic defaults.
-        'primary-legacy': 'hsl(var(--primary))',
-        'secondary-legacy': 'hsl(var(--secondary))',
-        'accent-legacy': 'hsl(var(--accent))'
+        'primary-legacy': 'hsl(var(--primary) / <alpha-value>)',
+        'secondary-legacy': 'hsl(var(--secondary) / <alpha-value>)',
+        'accent-legacy': 'hsl(var(--accent) / <alpha-value>)'
       },
       fontWeight: {
         'light': '300',
@@ -167,5 +168,6 @@ export default {
   },
   plugins: [
     typography,
+    animate,
   ],
 };
