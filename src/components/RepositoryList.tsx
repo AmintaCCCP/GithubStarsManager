@@ -1059,7 +1059,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => handleAIAnalyze(false)}
-                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-border"
+                  className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-border"
                 >
                   <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('分析全部', 'Analyze All')}
@@ -1072,7 +1072,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   variant="ghost"
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
+                  className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
                 >
                   <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('分析未分析的', 'Analyze Unanalyzed')}
@@ -1085,7 +1085,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   variant="ghost"
                   onClick={() => handleAIAnalyze(false, true)}
                   disabled={failedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('重新分析失败的', 'Re-analyze Failed')}

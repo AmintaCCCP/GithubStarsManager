@@ -264,6 +264,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors disabled:opacity-50"
+                  aria-label={t('测试连接', 'Test Connection')}
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -275,6 +276,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 <Button
                   onClick={() => handleEdit(config)}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+                  aria-label={t('编辑', 'Edit')}
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -291,6 +293,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                     }
                   }}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+                  aria-label={t('删除', 'Delete')}
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

@@ -775,6 +775,7 @@ export const ForkTimeline: React.FC = () => {
             <Button
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
+              aria-label={t('第一页', 'First page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -782,6 +783,7 @@ export const ForkTimeline: React.FC = () => {
             <Button
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
+              aria-label={t('上一页', 'Previous page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -807,6 +809,7 @@ export const ForkTimeline: React.FC = () => {
             <Button
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
+              aria-label={t('下一页', 'Next page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
@@ -814,6 +817,7 @@ export const ForkTimeline: React.FC = () => {
             <Button
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
+              aria-label={t('最后一页', 'Last page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />

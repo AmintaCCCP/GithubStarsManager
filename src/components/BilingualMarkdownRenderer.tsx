@@ -368,6 +368,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
             return (
               <Button
                 key={mode}
+                variant="ghost"
                 onClick={() => handleModeChange(mode)}
                 disabled={disabled}
                 className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${

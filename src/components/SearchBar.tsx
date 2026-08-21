@@ -1147,6 +1147,8 @@ export const SearchBar: React.FC = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
+            aria-expanded={showFilters}
+            aria-controls="advanced-filters-panel"
             onClick={() => setShowFilters(!showFilters)}
             className={`linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm ${
               showFilters || activeFiltersCount > 0 ? 'is-active' : ''
@@ -1253,7 +1255,7 @@ export const SearchBar: React.FC = () => {
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="mt-5 pt-5 border-t ui-divider space-y-5">
+        <div id="advanced-filters-panel" className="mt-5 pt-5 border-t ui-divider space-y-5">
           {/* Status Filters */}
           <div>
             <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">

@@ -1272,6 +1272,7 @@ export const ReleaseTimeline: React.FC = () => {
               <div key={repository.id} className="ui-card overflow-hidden">
                 {/* Repository Header */}
                 <Button
+                  variant="ghost"
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
                   className="w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
                 >
@@ -1394,20 +1395,23 @@ export const ReleaseTimeline: React.FC = () => {
             </Button>
             
             {getPageNumbers().map((page, index) => (
-              <Button
-                key={index}
-                onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
-                disabled={typeof page !== 'number'}
-                className={`px-3 py-2 rounded-lg text-sm ${
-                  page === clampedPage
-                    ? 'bg-primary text-primary-foreground'
-                    : typeof page === 'number'
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                    : 'text-muted-foreground cursor-default'
-                }`}
-              >
-                {page}
-              </Button>
+              typeof page === 'number' ? (
+                <Button
+                  key={index}
+                  onClick={() => handlePageChange(page)}
+                  className={`px-3 py-2 rounded-lg text-sm ${
+                    page === clampedPage
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                  }`}
+                >
+                  {page}
+                </Button>
+              ) : (
+                <span key={index} className="px-3 py-2 text-sm text-muted-foreground">
+                  {page}
+                </span>
+              )
             ))}
             
             <Button
