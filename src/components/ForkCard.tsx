@@ -53,7 +53,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
             {isUnread && (
-              <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse mr-2"></div>
+              <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
             )}
             <div className="flex items-center justify-center w-8 h-8 bg-muted dark:bg-muted/40 rounded-lg flex-shrink-0 border border-transparent dark:border-border">
               <GitFork className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
@@ -64,7 +64,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   {fork.name}
                 </h4>
                 {fork.language && (
-                  <span className="px-1.5 py-0.5 bg-muted dark:bg-white/[0.06] text-muted-foreground dark:text-muted-foreground text-xs font-medium rounded-md border border-border dark:border-border shrink-0">
+                  <span className="px-1.5 py-0.5 bg-muted dark:bg-accent/60 text-muted-foreground dark:text-muted-foreground text-xs font-medium rounded-md border border-border dark:border-border shrink-0">
                     {fork.language}
                   </span>
                 )}
@@ -216,7 +216,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   {workflows.map((workflow) => (
                     <div
                       key={workflow.id}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center space-x-2 min-w-0 flex-1">

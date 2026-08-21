@@ -1227,7 +1227,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </div>
           ) : displayContent.isAnalyzed ? (
             <div
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-brand-indigo/10 to-brand-violet/10 text-primary dark:from-brand-indigo/20 dark:to-brand-violet/20 dark:text-primary border border-brand-violet/20 dark:border-brand-violet/20"
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-primary/10 to-primary/10 text-primary dark:from-primary/20 dark:to-primary/20 dark:text-primary border border-primary/20 dark:border-primary/20"
               title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
             >
               <Sparkles className="w-3 h-3" />

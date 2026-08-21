@@ -881,7 +881,7 @@
 }
 
 option {
-  @apply bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary;
+  @apply bg-background dark:bg-card text-foreground;
 }
 
 /* ========== Enhanced Text Area & Input Styles for Light Mode ========== */
@@ -1478,7 +1478,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 }
 
 .repository-card .status,
-.repository-card [class*="text-status-emerald"] {
+.repository-card [class*="text-green-600"] {
   color: var(--ui-success);
 }
 

@@ -597,7 +597,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   // Unified card styles with enhanced light mode optimization
   const sectionClass = "p-5 bg-white dark:bg-card rounded-xl border border-gray-200/80 dark:border-border shadow-sm";
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "w-full px-4 py-3 bg-accent/50/50 dark:bg-muted/40 border border-gray-200 dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
+  const inputClass = "w-full px-4 py-3 bg-accent/50/50 dark:bg-muted/40 border border-gray-200 dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-gray-200/80 dark:border-border";
@@ -613,7 +613,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     >
       <div className="space-y-5">
         {/* Repository Info Header */}
-        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-border dark:border-brand-violet/20">
+        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-border dark:border-primary/20">
           <img
             src={repository.owner.avatar_url}
             alt={repository.owner.login}
@@ -965,7 +965,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Category Lock - Enhanced */}
-          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-status-amber/10 rounded-xl border border-gray-200/80 dark:border-border dark:border-amber-600/20 shadow-sm">
+          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-gray-200/80 dark:border-border dark:border-amber-600/20 shadow-sm">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (

@@ -941,7 +941,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           
           {/* Custom Icon Input */}
           {showCustomInput && (
-            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 border border-border dark:border-border dark:border-brand-violet/20 rounded-lg">
+            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 border border-border dark:border-border dark:border-primary/20 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Input
                   type="text"
@@ -1084,7 +1084,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         )}
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
-          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 rounded-lg border border-border dark:border-border dark:border-brand-violet/20">
+          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 rounded-lg border border-border dark:border-border dark:border-primary/20">
             <p className="text-xs text-primary dark:text-primary">
               {t('编辑默认分类将覆盖原始设置，可随时还原。', 'Editing default category will override original settings. You can reset anytime.')}
             </p>

@@ -45,7 +45,7 @@ export const SyncModeChoiceModal: React.FC = () => {
         <div className="space-y-3">
           <AlertDialogAction
             onClick={() => handleChooseSyncMode('stars')}
-            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-brand-violet/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
+            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
           >
             <Star className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>
@@ -57,7 +57,7 @@ export const SyncModeChoiceModal: React.FC = () => {
           </AlertDialogAction>
           <AlertDialogAction
             onClick={() => handleChooseSyncMode('stars-and-lists')}
-            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-brand-violet/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
+            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
           >
             <ListChecks className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>

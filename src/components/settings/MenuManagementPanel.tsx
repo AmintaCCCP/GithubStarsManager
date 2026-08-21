@@ -140,9 +140,9 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 onDragEnd={handleDragEnd}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing select-none ${
                   isDragging
-                    ? 'opacity-50 border-brand-violet/30 bg-brand-violet/5'
+                    ? 'opacity-50 border-primary/30 bg-primary/5'
                     : isDragOver
-                      ? 'border-brand-violet/50 bg-brand-violet/5 scale-[1.01]'
+                      ? 'border-primary/50 bg-primary/5 scale-[1.01]'
                       : 'border-border dark:border-border hover:bg-background dark:hover:bg-white/[0.03]'
                 }`}
               >
@@ -190,9 +190,9 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                   disabled={!meta.canHide}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
                     !meta.canHide
-                      ? 'bg-brand-violet cursor-not-allowed opacity-75'
+                      ? 'bg-primary cursor-not-allowed opacity-75'
                       : item.visible
-                        ? 'bg-brand-violet'
+                        ? 'bg-primary'
                         : 'bg-accent dark:bg-accent'
                   }`}
                   title={!meta.canHide ? t('此菜单不可关闭', 'This menu cannot be hidden') : undefined}

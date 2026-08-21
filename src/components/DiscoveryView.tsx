@@ -213,7 +213,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
       
       {/* Active indicator */}
       <div
-        className="absolute bottom-0 h-0.5 bg-brand-violet rounded-full transition-transform duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
         style={{
           width: indicatorStyle.width,
           transform: `translateX(${indicatorStyle.translateX}px)`,
@@ -402,7 +402,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
       <Button
         onClick={onLoadMore}
         disabled={isLoading}
-        className="w-full py-3.5 rounded-xl font-medium bg-muted dark:bg-muted/20 border border-border dark:border-border hover:bg-accent dark:hover:bg-white/[0.06] text-foreground dark:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
+        className="w-full py-3.5 rounded-xl font-medium bg-muted dark:bg-muted/20 border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
       >
         {isLoading ? (
           <>
@@ -432,7 +432,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, languag
   
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
-      <div className="w-1.5 h-1.5 rounded-full bg-brand-violet" />
+      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
       <span>
         {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{currentCount}</strong> {t('个项目', 'items')}
         {totalCount > 0 && currentCount < totalCount && (
@@ -1325,7 +1325,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
                 : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-black/[0.04] dark:border-border/50 text-sm'}>
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-violet" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>
                     {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('个项目', 'items')}
                   </span>

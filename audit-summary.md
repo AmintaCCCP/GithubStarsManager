@@ -26,3 +26,5 @@
 | `npm run build` | 通过，无 chunk 警告 |
 | `git diff --check` | 通过 |
 | `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities |
+
+审计补充：组件目录中的旧 brand/status/Linear 色类已清零；index.css 仅剩 option 元素和仓库成功状态的两处兼容选择器，正在改为 `background/card/foreground/green-600` 语义。

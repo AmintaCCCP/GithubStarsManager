@@ -1446,7 +1446,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-white/[0.06] transition-colors"
+                className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-accent transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
@@ -1489,7 +1489,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-background dark:hover:bg-white/[0.06] transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-background dark:hover:bg-accent transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
@@ -1508,7 +1508,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <Button
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.count === 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-white/[0.06] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{t('删除', 'Delete')}</span>
@@ -1576,7 +1576,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </thead>
                 <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-background dark:hover:bg-white/[0.06]">
+                    <tr key={log.id} className="hover:bg-background dark:hover:bg-accent">
                       <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">
                         {log.timestamp}
                       </td>

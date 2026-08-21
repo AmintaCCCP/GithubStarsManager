@@ -362,7 +362,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       isSelected
                         ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
                         : isDragTarget
-                          ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-status-emerald dark:bg-green-600/10 dark:text-green-600 dark:ring-status-emerald/30'
+                          ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
                           : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
@@ -459,7 +459,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               isSelected
                                 ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
                                 : isDragTarget
-                                  ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-status-emerald dark:bg-green-600/10 dark:text-green-600 dark:ring-status-emerald/30'
+                                  ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
                                   : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
                             }`}
                             title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
@@ -557,7 +557,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             isSelected
                               ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
                               : isDragTarget
-                                ? 'bg-green-50 text-green-600 ring-1 ring-status-emerald dark:bg-green-600/10 dark:text-green-600 dark:ring-status-emerald/30'
+                                ? 'bg-green-50 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
                           } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
                           title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}

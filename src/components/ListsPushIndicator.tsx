@@ -47,7 +47,7 @@ export const ListsPushIndicator: React.FC = () => {
       </div>
       <div className="h-2 rounded-full bg-black/[0.06] dark:bg-muted/40 overflow-hidden mb-2">
         <div
-          className="h-full bg-brand-violet dark:bg-brand-violet transition-all duration-200"
+          className="h-full bg-primary dark:bg-primary transition-all duration-200"
           style={{ width: `${percent}%` }}
         />
       </div>

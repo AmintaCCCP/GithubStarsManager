@@ -75,7 +75,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
                 onClick={() => setSelectedCategory(category.id)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
-                    ? 'border-brand-violet bg-muted dark:bg-muted/40 dark:bg-primary/10'
+                    ? 'border-primary bg-muted dark:bg-muted/40 dark:bg-primary/10'
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-white/20'
                 }`}
               >

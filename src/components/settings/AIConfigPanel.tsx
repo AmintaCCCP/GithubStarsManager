@@ -683,7 +683,7 @@ Repository information:
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-gray-300 bg-accent/50 dark:border-white/[0.12] dark:bg-white/[0.06]'
+                ? 'border-gray-300 bg-accent/50 dark:border-white/[0.12] dark:bg-accent/60'
                 : 'border-border dark:border-border hover:border-border dark:hover:border-white/[0.08]'
             }`}
           >

@@ -85,7 +85,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
             <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><Calendar className="h-4 w-4" /><span>{t('发布日期:', 'Release Date:')} {formatDate(updateInfo.releaseDate)}</span></div>
             <div>
               <h4 className="mb-2 font-medium text-foreground dark:text-foreground">{t('更新内容:', "What's New:")}</h4>
-              <ul className="space-y-1">{updateInfo.changelog.map((item, index) => <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-violet" /><span>{item}</span></li>)}</ul>
+              <ul className="space-y-1">{updateInfo.changelog.map((item, index) => <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{item}</span></li>)}</ul>
             </div>
           </div>}
           <DialogFooter>
