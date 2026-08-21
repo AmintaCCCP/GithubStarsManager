@@ -136,7 +136,7 @@ export const SearchDemo: React.FC = () => {
                 type="button"
                 variant="ghost"
                 onClick={() => handleExampleClick(example)}
-                className={`w-full p-3 text-left rounded-lg border transition-all ${
+                className={`w-full justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
                     ? 'border-primary bg-muted dark:bg-muted/40 dark:bg-primary/20'
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
@@ -171,7 +171,7 @@ export const SearchDemo: React.FC = () => {
                 type="button"
                 variant="ghost"
                 onClick={() => handleExampleClick(example)}
-                className={`w-full p-3 text-left rounded-lg border transition-all ${
+                className={`w-full justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
                     ? 'border-border dark:border-border bg-muted dark:bg-muted/40 '
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'

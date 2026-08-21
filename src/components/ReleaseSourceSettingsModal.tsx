@@ -88,6 +88,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
               <div className="flex items-center gap-1">
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
@@ -97,6 +98,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                 </Button>
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
@@ -182,6 +184,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
         renderActions={(repo) => (
           <Button
             type="button"
+            variant="destructive"
             onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-destructive"
             title={t('移除仓库', 'Remove repository')}

@@ -644,7 +644,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 className="w-8 h-8 rounded-full"
               />
               <div>
-                <DialogTitle id="readme-modal-title" className="text-lg font-semibold text-foreground dark:text-foreground">
+                <DialogTitle className="text-lg font-semibold text-foreground dark:text-foreground">
                   {repository.full_name}
                 </DialogTitle>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate max-w-[260px]" title={currentReadmeVariant.path || 'README'}>

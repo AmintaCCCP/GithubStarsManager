@@ -973,6 +973,7 @@ export const ReleaseTimeline: React.FC = () => {
                   />
                   <div className="ui-menu absolute right-0 mt-2 w-48 z-50 py-1">
                     <Button
+                      variant="ghost"
                       onClick={() => {
                         setReleaseViewMode('timeline');
                         setIsViewDropdownOpen(false);
@@ -989,6 +990,7 @@ export const ReleaseTimeline: React.FC = () => {
                       </div>
                     </Button>
                     <Button
+                      variant="ghost"
                       onClick={() => {
                         setReleaseViewMode('repository');
                         setIsViewDropdownOpen(false);
@@ -1077,6 +1079,7 @@ export const ReleaseTimeline: React.FC = () => {
                   <div className="fixed inset-0 z-40" onClick={() => setIsShowModeDropdownOpen(false)} />
                   <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
                     <Button
+                      variant="ghost"
                       onClick={() => handleShowModeChange('all')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
                         releaseShowMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
@@ -1089,6 +1092,7 @@ export const ReleaseTimeline: React.FC = () => {
                       </div>
                     </Button>
                     <Button
+                      variant="ghost"
                       onClick={() => handleShowModeChange('unread')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
                         releaseShowMode === 'unread' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
@@ -1128,6 +1132,7 @@ export const ReleaseTimeline: React.FC = () => {
                   <div className="fixed inset-0 z-40" onClick={() => setIsLatestModeDropdownOpen(false)} />
                   <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
                     <Button
+                      variant="ghost"
                       onClick={() => handleLatestModeChange('all')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
                         releaseLatestMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
@@ -1140,6 +1145,7 @@ export const ReleaseTimeline: React.FC = () => {
                       </div>
                     </Button>
                     <Button
+                      variant="ghost"
                       onClick={() => handleLatestModeChange('latest')}
                       className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
                         releaseLatestMode === 'latest' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
