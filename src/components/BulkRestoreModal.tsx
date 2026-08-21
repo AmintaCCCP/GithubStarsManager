@@ -150,11 +150,11 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Checkbox checked={config.description.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, description: { ...prev.description, enabled: checked === true } }))} />
+              <Checkbox aria-labelledby="bulk-restore-description-heading" checked={config.description.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, description: { ...prev.description, enabled: checked === true } }))} />
               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-foreground dark:text-white">
-                {t('描述', 'Description')}
-              </span>
+                <span id="bulk-restore-description-heading" className="text-sm font-medium text-foreground dark:text-white">
+                  {t('描述', 'Description')}
+                </span>
               {stats.hasCustomDesc > 0 && (
                 <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                   ({t(`${stats.hasCustomDesc} 个自定义`, `${stats.hasCustomDesc} custom`)})
@@ -186,11 +186,11 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Checkbox checked={config.tags.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, enabled: checked === true } }))} />
+              <Checkbox aria-labelledby="bulk-restore-tags-heading" checked={config.tags.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, enabled: checked === true } }))} />
               <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm font-medium text-foreground dark:text-white">
-                {t('标签', 'Tags')}
-              </span>
+                <span id="bulk-restore-tags-heading" className="text-sm font-medium text-foreground dark:text-white">
+                  {t('标签', 'Tags')}
+                </span>
               {stats.hasCustomTags > 0 && (
                 <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                   ({t(`${stats.hasCustomTags} 个自定义`, `${stats.hasCustomTags} custom`)})
@@ -222,11 +222,11 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         <div className={sectionClass}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Checkbox checked={config.category.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, category: { ...prev.category, enabled: checked === true } }))} />
+              <Checkbox aria-labelledby="bulk-restore-category-heading" checked={config.category.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, category: { ...prev.category, enabled: checked === true } }))} />
               <FolderOpen className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm font-medium text-foreground dark:text-white">
-                {t('分类', 'Category')}
-              </span>
+                <span id="bulk-restore-category-heading" className="text-sm font-medium text-foreground dark:text-white">
+                  {t('分类', 'Category')}
+                </span>
               {stats.hasCustomCategory > 0 && (
                 <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                   ({t(`${stats.hasCustomCategory} 个自定义`, `${stats.hasCustomCategory} custom`)})

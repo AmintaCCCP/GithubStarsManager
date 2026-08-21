@@ -689,7 +689,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   // 主题改变时刷新数据
   useEffect(() => {
-    if (selectedDiscoveryChannel === 'topic' && discoverySelectedTopic) {
+    if (selectedDiscoveryChannel === 'topic') {
       refreshChannel('topic', 1, false);
     }
   }, [discoverySelectedTopic, selectedDiscoveryChannel, refreshChannel]);
