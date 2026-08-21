@@ -2,15 +2,34 @@ import * as React from 'react';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '../../lib/utils';
 
-type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
+type SliderRootProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>;
+type SliderProps = Omit<SliderRootProps, 'value' | 'defaultValue' | 'onValueChange' | 'onValueCommit'> & {
+  value?: number;
+  defaultValue?: number;
+  onValueChange?: (value: number) => void;
+  onValueCommit?: (value: number) => void;
   thumbLabel?: string;
 };
 
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, thumbLabel, ...props }, ref) => (
-  <SliderPrimitive.Root ref={ref} className={cn('relative flex w-full touch-none select-none items-center', className)} {...props}>
+>(({ className, thumbLabel, value, defaultValue, onValueChange, onValueCommit, ...props }, ref) => (
+  <SliderPrimitive.Root
+    ref={ref}
+    className={cn('relative flex w-full touch-none select-none items-center', className)}
+    value={value === undefined ? undefined : [value]}
+    defaultValue={defaultValue === undefined ? undefined : [defaultValue]}
+    onValueChange={(values) => {
+      const [nextValue] = values;
+      if (nextValue !== undefined) onValueChange?.(nextValue);
+    }}
+    onValueCommit={(values) => {
+      const [nextValue] = values;
+      if (nextValue !== undefined) onValueCommit?.(nextValue);
+    }}
+    {...props}
+  >
     <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary">
       <SliderPrimitive.Range className="absolute h-full bg-primary" />
     </SliderPrimitive.Track>

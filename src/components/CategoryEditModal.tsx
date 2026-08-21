@@ -950,6 +950,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             <div className="mb-3 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 border border-border dark:border-border dark:border-primary/20 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Input
+                  aria-label={t('自定义图标', 'Custom icon')}
                   type="text"
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}

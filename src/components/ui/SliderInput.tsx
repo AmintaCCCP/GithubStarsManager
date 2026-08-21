@@ -35,8 +35,8 @@ export const SliderInput: React.FC<SliderInputProps> = ({
           min={min}
           max={max}
           step={step}
-          value={[value]}
-          onValueChange={([nextValue]) => onChange(nextValue)}
+          value={value}
+          onValueChange={onChange}
           thumbLabel={label}
           className="flex-1"
         />
