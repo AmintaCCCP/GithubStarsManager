@@ -579,9 +579,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             />
             <Button
               type="button"
+              variant="ghost"
               aria-label={showApiKey ? t('隐藏 API Key', 'Hide API key') : t('显示 API Key', 'Show API key')}
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
               {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -724,9 +725,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             />
             <Button
               type="button"
+              variant="ghost"
               aria-label={showAuthToken ? t('隐藏认证 Token', 'Hide auth token') : t('显示认证 Token', 'Show auth token')}
               onClick={() => setShowAuthToken(!showAuthToken)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
               {showAuthToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -835,6 +837,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </label>
           <div className="grid grid-cols-2 gap-2">
             <Button
+              variant="outline"
               onClick={() => setFormIndexMode('description')}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
@@ -850,6 +853,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               </div>
             </Button>
             <Button
+              variant="outline"
               onClick={() => setFormIndexMode('readme')}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
@@ -1110,8 +1114,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       {/* Section 7: Deploy Guide */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <Button
+          variant="ghost"
           onClick={() => setShowDeployGuide(!showDeployGuide)}
-          className="w-full flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors"
+          className="h-auto w-full flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors"
         >
           <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
             <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
