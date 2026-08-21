@@ -53,12 +53,12 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
         <CardHeader>
           <div className="flex items-center space-x-3">
             <Star className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <CardTitle>{t('同步范围', 'Sync Scope')}</CardTitle>
+            <CardTitle id="star-sync-scope-heading">{t('同步范围', 'Sync Scope')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground dark:text-muted-foreground">{t('选择同步按钮默认拉取的数据范围：仅星标仓库，或星标仓库及 GitHub Lists。', 'Choose what the sync button pulls by default: starred repos only, or starred repos plus GitHub Lists.')}</p>
-          <RadioGroup value={syncMode} onValueChange={(value) => { setSyncMode(value as 'stars' | 'stars-and-lists'); setSyncModeConfigured(true); }} className="grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
+          <RadioGroup value={syncMode} aria-labelledby="star-sync-scope-heading" onValueChange={(value) => { setSyncMode(value as 'stars' | 'stars-and-lists'); setSyncModeConfigured(true); }} className="grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
             <Label htmlFor="sync-mode-stars" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
               <RadioGroupItem value="stars" id="sync-mode-stars" />
               <span><span className="block text-base font-medium text-foreground dark:text-foreground">{t('仅同步星标仓库', 'Starred repos only')}</span><span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">{t('与以前行为一致', 'Same as before')}</span></span>

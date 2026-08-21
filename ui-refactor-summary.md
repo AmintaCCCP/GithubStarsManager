@@ -40,3 +40,8 @@
 最新 CodeRabbit full review 的 findings 已完成收尾：ToastPrimitive.Root 恢复 `pointer-events-auto`；RepositoryCard Release 菜单测试直接激活已定位的 `menuitem`；ReleaseTimeline 的视图、显示模式和最新版本三个手写菜单统一迁移到共享 Radix DropdownMenu，自动获得 menuitem、roving focus、Escape 和 outside-dismiss 语义，同时保持原有模式切换、store 更新与分页重置逻辑；ReleaseTimeline 仓库分组与 ReleaseSourceSettingsModal 仓库列表补齐 `aria-expanded`/`aria-controls`；Tailwind `text-quaternary` 与 `brand.hover` 恢复固定透明度。未修改 store、services、API、同步流程或业务动作。
 
 本轮验证再次通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；本轮 legacy 入口 2,787.81 kB，独立 checker 为 2,722.47 KiB，0 vulnerabilities。
+
+
+8f9a544 后最新 CodeRabbit review 的 9 个 actionable comments、1 个 outside-diff comment 和 2 个 nitpick 已全部完成：AssetFilterManager filter chips 恢复紧凑 Button dimensions；ForkCard、ReleaseCard、CategoryPanel 的 dark/hover 对比度统一到 semantic tokens；ReleaseCard asset row 使用 h-auto 并清除 invalid active utility；RepositoryCard 与 RepositoryList 的编辑/AI controls 使用共享 ghost/icon Button；RepositoryList progress fill 使用 primary、pause/stop 清理重复 dark backgrounds；MenuManagement switch 使用 p-0；StarSyncPanel RadioGroup 关联 heading；SearchResultStats 与 githubListsApi 完成重复 token/type 清理。业务行为与同步链路不变。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,788.32 kB，独立 checker 2,722.97 KiB，0 vulnerabilities。

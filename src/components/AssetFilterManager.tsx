@@ -182,7 +182,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       <Button
                         variant="ghost"
                         onClick={() => handlePresetToggle(preset.id)}
-                        className="flex items-center space-x-1.5"
+                        className="h-auto min-h-0 flex items-center space-x-1.5 p-0"
                         title={preset.keywords.join(', ')}
                         type="button"
                         aria-pressed={isSelected}
@@ -195,7 +195,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         <Button
                           variant="ghost"
                           onClick={() => handleEditFilter(preset)}
-                          className="p-0.5 rounded hover:bg-white/20 dark:hover:bg-accent transition-colors"
+                          className="h-6 w-6 rounded p-0 hover:bg-white/20 dark:hover:bg-accent transition-colors"
                           title={t('编辑', 'Edit')}
                           type="button"
                           aria-label={t('编辑', 'Edit')}
@@ -229,7 +229,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     <Button
                       variant="ghost"
                       onClick={() => onFilterToggle(filter.id)}
-                      className="flex items-center space-x-2 flex-1"
+                      className="h-auto min-h-0 flex flex-1 items-center space-x-2 p-0"
                       aria-pressed={selectedFilters.includes(filter.id)}
                       aria-label={`${filter.name} (${filter.keywords.join(', ')})`}
                       title={`${filter.name} (${filter.keywords.join(', ')})`}
@@ -245,7 +245,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       <Button
                         variant="ghost"
                         onClick={() => handleEditFilter(filter)}
-                        className="p-1 rounded hover:bg-accent dark:hover:bg-accent transition-colors"
+                        className="h-6 w-6 rounded p-0 hover:bg-accent dark:hover:bg-accent transition-colors"
                         title={t('编辑', 'Edit')}
                         type="button"
                         aria-label={t('编辑', 'Edit')}
@@ -255,7 +255,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       <Button
                         variant="destructive"
                         onClick={() => handleDeleteFilter(filter.id)}
-                        className="p-1 rounded transition-colors"
+                        className="h-6 w-6 rounded p-0 transition-colors"
                         title={t('删除', 'Delete')}
                         type="button"
                         aria-label={t('删除', 'Delete')}

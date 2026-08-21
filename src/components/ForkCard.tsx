@@ -125,7 +125,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 }}
                 className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
                   isWorkflowsExpanded
-                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
+                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary'
                     : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
                 title={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}

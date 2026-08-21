@@ -381,7 +381,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
-                        className={`flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 disabled:opacity-60 ${
+                        className={`h-auto flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0 disabled:opacity-60 ${
                           link.isSourceCode ? 'bg-muted dark:bg-muted/40' : ''
                         }`}
                       >
@@ -478,11 +478,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 {(release.body || '').length > truncatedBody.length && (
                   <div className="mt-3 flex items-center justify-center space-x-2">
                     <Button
+                      variant="default"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleFullContent(e);
                       }}
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-primary text-primary-foreground rounded hover:bg-accent dark:bg-muted/40 active:bg-muted dark:bg-muted/40 transition-all duration-200 text-xs font-medium min-w-[120px]"
+                      className="h-auto flex items-center justify-center space-x-1 px-3 py-1.5 rounded hover:bg-primary/90 active:bg-primary/80 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:active:bg-primary/80 transition-all duration-200 text-xs font-medium min-w-[120px]"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>{isFullContent ? t('收起', 'Collapse') : t('查看完整', 'View Full')}</span>
@@ -491,7 +492,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       href={release.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded hover:bg-accent dark:hover:bg-accent active:bg-gray-300 dark:active:bg-accent/500 transition-all duration-200 text-xs font-medium whitespace-nowrap"
+                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-muted text-foreground rounded hover:bg-accent hover:text-accent-foreground active:bg-accent/80 dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground dark:active:bg-accent/80 transition-all duration-200 text-xs font-medium whitespace-nowrap"
                       onClick={(e) => {
                         e.stopPropagation();
                         onMarkAsRead();
