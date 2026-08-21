@@ -27,11 +27,11 @@ Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGro
 | `npm run lint` | 通过，0 errors、0 warnings |
 | `npx tsc -b` | 通过，无 TypeScript 诊断 |
 | `npm run test:run` | 通过，29 个测试文件、326 个测试全部通过；无 React/Radix act、Unhandled 或 Warning 输出 |
-| `npm run build` | 通过；legacy 入口 2,779.72 kB，低于 3,000 kB 预算阈值，无 chunk warning |
+| `npm run build` | 通过；legacy 入口 2,779.61 kB，低于 3,000 kB 预算阈值，无 chunk warning |
 | `git diff --check` | 通过 |
 | `npm audit --omit=dev --audit-level=high` | `found 0 vulnerabilities` |
 | ReadmeModal + RepositoryCard 定向回归 | 通过，13/13；无测试 warning |
 
 ## 交付与审查状态
 
-首轮 CodeRabbit findings 已全部修复并通过上述质量门禁。第二次 `@coderabbitai full review` 报告的 2 个 outside-diff findings 已修复：SubscriptionRepoCard 的确认取消 Star 按钮已使用 destructive 语义色，ForkTimeline 的 page-size 与 target-branch SelectTrigger 已关联可见 label。第二轮 lint、tsc、326 个测试、build、diff check 与安全审计均通过；下一步将推送该修复并触发最终 full review 确认清零。
+首轮 CodeRabbit findings 已全部修复并通过上述质量门禁。第二次 `@coderabbitai full review` 报告的 2 个 outside-diff findings 已修复：SubscriptionRepoCard 的确认取消 Star 按钮已使用 destructive 语义色，ForkTimeline 的 page-size 与 target-branch SelectTrigger 已关联可见 label。最终 full review 又发现 SubscriptionRepoCard 卡片容器仍使用 `bg-white`，现已改为 `bg-card` 并清理重复 dark token。最后一轮 lint、tsc、326 个测试、build、diff check 与安全审计均通过，下一步将推送并触发最终复核确认零 findings。
