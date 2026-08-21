@@ -619,6 +619,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       <DialogContent
         ref={modalRef}
         showClose={false}
+        aria-describedby={undefined}
         className="w-[calc(100%-2rem)] max-w-[1130px] overflow-hidden p-0"
       >
         <div
@@ -797,7 +798,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 variant="ghost"
                 onClick={onClose}
                 className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
-                aria-label="Close"
+                aria-label={t('关闭', 'Close')}
               >
                 <X className="w-5 h-5" />
               </Button>

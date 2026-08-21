@@ -19,8 +19,8 @@
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,779.61 kB，低于 `vite.config.ts` 的 3,000 kB 受控预算阈值。 |
-| `npm run test:run` | 通过；29 个测试文件、326 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,781.01 kB，独立 checker 实测 2,715.84 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
+| `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |
 | `git diff --check` | 通过。 |
@@ -28,7 +28,7 @@
 
 ## 依赖变更
 
-`package.json` 与 `package-lock.json` 已补充 Radix Primitives 以及 `class-variance-authority`、`clsx`、`tailwind-merge` 等 shadcn/ui 常用样式依赖。`tailwindcss-animate` 已注册到 Tailwind 配置；正式代码中已删除一次性迁移脚本，测试专用的 jsdom Radix API polyfill 位于 `src/test/setup.ts`，不进入生产代码路径。
+`package.json` 与 `package-lock.json` 已补充 Radix Primitives 以及 `class-variance-authority`、`clsx`、`tailwind-merge` 等 shadcn/ui 常用样式依赖。`tailwindcss-animate` 已注册到 Tailwind 配置；`check:bundle-size` 与 CI 独立 step 对 3,000 KiB hard budget 执行失败保护。正式代码中已删除一次性迁移脚本，测试专用的 jsdom Radix API polyfill 位于 `src/test/setup.ts`，不进入生产代码路径。
 
 ## 交付文件
 

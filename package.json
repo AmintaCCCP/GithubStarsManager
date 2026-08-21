@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npm run sync-version",
-    "build": "vite build",
+    "build": "vite build && npm run check:bundle-size",
+    "check:bundle-size": "node scripts/check-bundle-size.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

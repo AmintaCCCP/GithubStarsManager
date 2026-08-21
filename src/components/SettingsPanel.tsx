@@ -428,7 +428,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   if (isModal) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent showClose={false} aria-labelledby="settings-modal-title" className="h-[85vh] max-w-5xl overflow-hidden p-0">
+        <DialogContent showClose={false} aria-labelledby="settings-modal-title" aria-describedby={undefined} className="h-[85vh] max-w-5xl overflow-hidden p-0">
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between border-b ui-divider bg-background px-5 py-4 dark:bg-card sm:px-6">
               <div className="flex items-center space-x-3">

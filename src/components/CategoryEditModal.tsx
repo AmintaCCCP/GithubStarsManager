@@ -842,15 +842,20 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   }, [category, isCreating, isOpen]);
 
   const handleSave = () => {
-    if (!formData.name.trim()) {
+    const categoryName = formData.name.trim();
+    if (!categoryName) {
       toast(language === 'zh' ? '请输入分类名称' : 'Please enter category name', 'error');
+      return;
+    }
+    if (categoryName.toLowerCase() === 'none') {
+      toast(language === 'zh' ? 'none 是保留名称，请使用其他分类名称' : 'The name "none" is reserved. Please choose another category name.', 'error');
       return;
     }
 
     if (isCreating) {
       const categoryData: Category = {
         id: Date.now().toString(),
-        name: formData.name.trim(),
+        name: categoryName,
         icon: formData.icon,
         keywords: formData.keywords.split(',').map(k => k.trim()).filter(k => k),
         isCustom: true
@@ -858,7 +863,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       addCustomCategory(categoryData);
     } else if (category) {
       const updates = {
-        name: formData.name.trim(),
+        name: categoryName,
         icon: formData.icon,
         keywords: formData.keywords.split(',').map(k => k.trim()).filter(k => k),
       };
@@ -917,10 +922,11 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       <div className="space-y-4">
         {/* Category Name */}
         <div>
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <label htmlFor="category-name" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('分类名称', 'Category Name')} *
           </label>
           <Input
+            id="category-name"
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -1012,10 +1018,11 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Keywords */}
         <div>
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <label htmlFor="category-keywords" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('关键词', 'Keywords')}
           </label>
           <Input
+            id="category-keywords"
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}

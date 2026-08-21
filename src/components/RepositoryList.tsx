@@ -1057,6 +1057,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             {showDropdown && !isLoading && (
               <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-dialog z-10">
                 <Button
+                  variant="ghost"
                   onClick={() => handleAIAnalyze(false)}
                   className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-border"
                 >
@@ -1068,6 +1069,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   </div>
                 </Button>
                 <Button
+                  variant="ghost"
                   onClick={() => handleAIAnalyze(true)}
                   disabled={unanalyzedCount === 0}
                   className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
@@ -1080,6 +1082,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   </div>
                 </Button>
                 <Button
+                  variant="ghost"
                   onClick={() => handleAIAnalyze(false, true)}
                   disabled={failedCount === 0}
                   className="w-full px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1183,6 +1186,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
@@ -1193,6 +1197,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </Button>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}

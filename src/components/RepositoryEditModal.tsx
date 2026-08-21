@@ -851,7 +851,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <SelectTrigger className={inputClass}><SelectValue placeholder={t('选择分类...', 'Select category...')} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t('选择分类...', 'Select category...')}</SelectItem>
-              {allCategories.filter(cat => cat.id !== 'all').map(category => <SelectItem key={category.id} value={category.name}>{category.icon} {category.name}</SelectItem>)}
+              {allCategories.filter(cat => cat.id !== 'all' && cat.name.trim().toLowerCase() !== 'none').map(category => <SelectItem key={category.id} value={category.name}>{category.icon} {category.name}</SelectItem>)}
             </SelectContent>
           </Select>
 

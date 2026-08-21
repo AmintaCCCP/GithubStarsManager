@@ -125,10 +125,11 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
     >
       <div className="space-y-5">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground dark:text-foreground">
+          <label htmlFor="gist-description" className="text-sm font-medium text-foreground dark:text-foreground">
             {t('描述', 'Description')}
           </label>
           <Input
+            id="gist-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             className="w-full rounded-lg border border-border bg-white px-3 py-2 text-foreground outline-none transition-colors focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
@@ -165,6 +166,8 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
             <div key={file.id} className="space-y-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-white/[0.03]">
               <div className="flex items-center gap-2">
                 <Input
+                  id={`gist-file-name-${file.id}`}
+                  aria-label={t(`文件名 ${index + 1}`, `Filename ${index + 1}`)}
                   value={file.filename}
                   onChange={(event) => updateFile(file.id, { filename: event.target.value })}
                   className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
@@ -181,6 +184,8 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                 </Button>
               </div>
               <Textarea
+                id={`gist-file-content-${file.id}`}
+                aria-label={t(`文件内容 ${index + 1}`, `File content ${index + 1}`)}
                 value={file.content}
                 onChange={(event) => updateFile(file.id, { content: event.target.value })}
                 rows={8}
