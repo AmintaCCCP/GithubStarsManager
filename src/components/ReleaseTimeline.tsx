@@ -756,7 +756,7 @@ export const ReleaseTimeline: React.FC = () => {
                  aria-checked={includePreRelease}
                  aria-label={t('包含 Pre-release', 'Include Pre-release')}
                  onClick={() => setIncludePreRelease(!includePreRelease)}
-                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+                 className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
                >
                  <span
                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
@@ -872,7 +872,7 @@ export const ReleaseTimeline: React.FC = () => {
                 aria-checked={includePreRelease}
                 aria-label={t('包含 Pre-release', 'Include Pre-release')}
                 onClick={() => setIncludePreRelease(!includePreRelease)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+                className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
@@ -894,6 +894,7 @@ export const ReleaseTimeline: React.FC = () => {
             </Button>
             <Button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
+              variant="ghost"
               className="ui-button flex items-center space-x-2 px-3 py-2"
               title={t('Release 来源设置', 'Release Source Settings')}
             >
@@ -952,7 +953,8 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsShowModeDropdownOpen(false);
                   setIsLatestModeDropdownOpen(false);
                 }}
-                className="ui-button flex items-center space-x-2 px-3 py-2"
+                variant="ghost"
+              className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
               >
                 {viewMode === 'timeline' ? (
@@ -1066,7 +1068,8 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsViewDropdownOpen(false);
                   setIsLatestModeDropdownOpen(false);
                 }}
-                className="ui-button flex items-center space-x-2 px-3 py-2"
+                variant="ghost"
+              className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
               >
                 <Filter className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
@@ -1119,7 +1122,8 @@ export const ReleaseTimeline: React.FC = () => {
                   setIsViewDropdownOpen(false);
                   setIsShowModeDropdownOpen(false);
                 }}
-                className="ui-button flex items-center space-x-2 px-3 py-2"
+                variant="ghost"
+              className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
               >
                 <Package className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
@@ -1168,7 +1172,7 @@ export const ReleaseTimeline: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>

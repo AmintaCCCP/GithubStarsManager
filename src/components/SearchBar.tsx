@@ -14,7 +14,14 @@ import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortReposi
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
 import { Button } from './ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import type { Repository } from '../types';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
@@ -44,15 +51,17 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) =
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        {sortOptions.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => onChange(option.value)}
-            className={value === option.value ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
-          >
-            {t(option.labelZh, option.labelEn)}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as SortBy)}>
+          {sortOptions.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.value}
+              value={option.value}
+              className={value === option.value ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
+            >
+              {t(option.labelZh, option.labelEn)}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1147,6 +1156,7 @@ export const SearchBar: React.FC = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
+            variant="ghost"
             aria-expanded={showFilters}
             aria-controls="advanced-filters-panel"
             onClick={() => setShowFilters(!showFilters)}
@@ -1187,6 +1197,7 @@ export const SearchBar: React.FC = () => {
             onClick={() => setSearchFilters({
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
+            variant="ghost"
             className="ui-button px-3 py-2 text-sm"
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
@@ -1270,6 +1281,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isAnalyzed === true}
                   title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === true
                       ? filterChipActiveClass
@@ -1289,6 +1301,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isAnalyzed === false}
                   title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === false
                       ? filterChipActiveClass
@@ -1308,6 +1321,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.analysisFailed === true}
                   title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.analysisFailed === true
                       ? filterChipActiveClass
@@ -1327,6 +1341,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isSubscribed === true}
                   title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === true
                       ? filterChipActiveClass
@@ -1346,6 +1361,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isSubscribed === false}
                   title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === false
                       ? filterChipActiveClass
@@ -1365,6 +1381,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isEdited === true}
                   title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isEdited === true
                       ? filterChipActiveClass
@@ -1384,6 +1401,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isCategoryLocked === true}
                   title={t('显示分类已锁定的仓库（同步时不会自动更改分类）', 'Show repositories with locked category (won\'t auto-change during sync)')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === true
                       ? filterChipActiveClass
@@ -1403,6 +1421,7 @@ export const SearchBar: React.FC = () => {
                   })}
                   aria-pressed={searchFilters.isCategoryLocked === false}
                   title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
+                  variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === false
                       ? filterChipActiveClass
@@ -1429,6 +1448,7 @@ export const SearchBar: React.FC = () => {
                     key={language}
                     onClick={() => handleLanguageToggle(language)}
                     aria-pressed={searchFilters.languages.includes(language)}
+                    variant="ghost"
                     className={`${filterTagBaseClass} ${
                       searchFilters.languages.includes(language)
                         ? filterChipActiveClass
@@ -1454,7 +1474,8 @@ export const SearchBar: React.FC = () => {
                     key={platform}
                     onClick={() => handlePlatformToggle(platform)}
                     aria-pressed={searchFilters.platforms.includes(platform)}
-                    className={`${filterChipBaseClass} ${
+                    variant="ghost"
+                  className={`${filterChipBaseClass} ${
                       searchFilters.platforms.includes(platform)
                         ? filterChipActiveClass
                         : filterChipInactiveClass
@@ -1480,6 +1501,7 @@ export const SearchBar: React.FC = () => {
                     key={license}
                     onClick={() => handleLicenseToggle(license)}
                     aria-pressed={(searchFilters.licenses ?? []).includes(license)}
+                    variant="ghost"
                     className={`${filterTagBaseClass} ${
                       (searchFilters.licenses ?? []).includes(license)
                         ? filterChipActiveClass
@@ -1507,6 +1529,7 @@ export const SearchBar: React.FC = () => {
                     key={tag}
                     onClick={() => handleTagToggle(tag)}
                     aria-pressed={searchFilters.tags.includes(tag)}
+                    variant="ghost"
                     className={`${filterTagBaseClass} ${
                       searchFilters.tags.includes(tag)
                         ? filterChipActiveClass

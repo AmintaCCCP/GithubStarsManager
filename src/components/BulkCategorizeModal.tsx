@@ -77,8 +77,8 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
                 onClick={() => setSelectedCategory(category.id)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
-                    ? 'border-primary bg-muted dark:bg-muted/40 dark:bg-primary/10'
-                    : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-white/20'
+                    ? 'border-primary bg-muted dark:bg-primary/10'
+                    : 'border-border dark:hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -95,14 +95,14 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-muted dark:bg-muted/40 dark:bg-destructive/10 border border-border dark:border-border dark:border-destructive/20 rounded-lg p-3">
+          <div className="bg-muted dark:bg-destructive/10 border border-border dark:border-destructive/20 rounded-lg p-3">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
               {error}
             </p>
           </div>
         )}
 
-        <div className="bg-muted dark:bg-muted/40 dark:bg-amber-600/10 border border-border dark:border-border dark:border-amber-600/20 rounded-lg p-3">
+        <div className="bg-muted dark:bg-amber-600/10 border border-border dark:border-amber-600/20 rounded-lg p-3">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
             {t('提示：此操作将覆盖这些仓库现有的自定义分类。', 'Note: This operation will overwrite the existing custom categories of these repositories.')}
           </p>

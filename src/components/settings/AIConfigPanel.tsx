@@ -683,7 +683,10 @@ Repository information:
         </div>
       )}
 
-      <RadioGroup value={activeAIConfig || ''} onValueChange={setActiveAIConfig} className="space-y-3">
+      <h4 id="active-ai-config-heading" className="mb-3 text-sm font-medium text-foreground">
+        {t('当前 AI 配置', 'Active AI configuration')}
+      </h4>
+      <RadioGroup aria-labelledby="active-ai-config-heading" value={activeAIConfig || ''} onValueChange={setActiveAIConfig} className="space-y-3">
         {aiConfigs.map(config => (
           <div
             key={config.id}

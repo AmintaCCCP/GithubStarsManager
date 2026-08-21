@@ -255,7 +255,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       <Button
                         variant="destructive"
                         onClick={() => handleDeleteFilter(filter.id)}
-                        className="p-1 rounded hover:bg-accent dark:bg-muted/40 hover:text-muted-foreground dark:text-muted-foreground dark:hover:bg-accent dark:bg-muted/40 dark:hover:text-muted-foreground dark:text-muted-foreground transition-colors"
+                        className="p-1 rounded transition-colors"
                         title={t('删除', 'Delete')}
                         type="button"
                         aria-label={t('删除', 'Delete')}

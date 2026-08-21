@@ -162,7 +162,11 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
           <Button
             key={tab.id}
             ref={(el) => {
-              if (el) tabRefs.current.set(tab.id, el);
+              if (el) {
+                tabRefs.current.set(tab.id, el);
+              } else {
+                tabRefs.current.delete(tab.id);
+              }
             }}
             type="button"
             variant={activeTab === tab.id ? 'secondary' : 'ghost'}

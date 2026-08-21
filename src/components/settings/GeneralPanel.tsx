@@ -26,11 +26,11 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         <CardHeader>
           <div className="flex items-center space-x-3">
             <Globe className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <CardTitle>{t('语言设置', 'Language Settings')}</CardTitle>
+            <CardTitle id="language-settings-title">{t('语言设置', 'Language Settings')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <RadioGroup value={language} onValueChange={(value) => setLanguage(value as 'zh' | 'en')} className="grid max-w-md grid-cols-2 gap-4">
+          <RadioGroup aria-labelledby="language-settings-title" value={language} onValueChange={(value) => setLanguage(value as 'zh' | 'en')} className="grid max-w-md grid-cols-2 gap-4">
             <Label htmlFor="language-zh" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
               <RadioGroupItem value="zh" id="language-zh" />
               <span>
