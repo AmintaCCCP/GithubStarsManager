@@ -270,11 +270,12 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       )}
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-        <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
+        <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
           {t('API 密钥', 'API Secret')}
         </label>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <Input
+            id="backend-api-secret"
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}

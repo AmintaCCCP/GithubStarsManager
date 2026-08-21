@@ -17,9 +17,9 @@ export default defineConfig({
   },
   build: {
     // The app intentionally ships as a single-screen SPA with broad legacy browser
-    // compatibility. Its legacy entry is currently about 2.8 MB after minification;
-    // keep a little headroom while still surfacing genuinely outsized future bundles.
-    chunkSizeWarningLimit: 3000,
+    // compatibility. Keep Vite's warning threshold informational and independent
+    // from the 3,000 KiB hard budget enforced by check:bundle-size.
+    chunkSizeWarningLimit: 3500,
     rolldownOptions: {
       checks: {
         // The legacy plugin dominates production build time by design; this diagnostic

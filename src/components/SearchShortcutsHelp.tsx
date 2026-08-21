@@ -3,7 +3,7 @@ import { HelpCircle, Keyboard, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { searchShortcuts } from '../hooks/useSearchShortcuts';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 export const SearchShortcutsHelp: React.FC = () => {
   const [showHelp, setShowHelp] = useState(false);
@@ -18,6 +18,7 @@ export const SearchShortcutsHelp: React.FC = () => {
       <DialogContent showClose={false} className="max-w-md">
         <DialogHeader>
           <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Keyboard className="h-5 w-5 text-primary" /><DialogTitle>{t('搜索快捷键', 'Search Shortcuts')}</DialogTitle></div><Button type="button" variant="ghost" size="icon" onClick={() => setShowHelp(false)} aria-label={t('关闭', 'Close')}><X className="h-5 w-5" /></Button></div>
+          <DialogDescription>{t('查看可用的搜索键盘快捷键。', 'View the available keyboard shortcuts for search.')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           {searchShortcuts.map((shortcut, index) => <div key={index} className="flex items-center justify-between rounded-lg bg-background px-3 py-2 dark:bg-muted/40"><div className="flex items-center space-x-3"><kbd className="rounded border border-border bg-white px-2 py-1 font-mono text-xs text-foreground dark:border-border dark:bg-card dark:text-muted-foreground">{shortcut.key}</kbd><span className="text-sm text-foreground dark:text-muted-foreground">{language === 'zh' ? shortcut.description : shortcut.descriptionEn}</span></div></div>)}

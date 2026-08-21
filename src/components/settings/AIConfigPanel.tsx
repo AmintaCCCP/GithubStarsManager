@@ -689,7 +689,11 @@ Repository information:
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <RadioGroupItem value={config.id} id={`active-ai-${config.id}`} />
+                <RadioGroupItem
+                  value={config.id}
+                  id={`active-ai-${config.id}`}
+                  aria-label={config.name || t('AI配置', 'AI configuration')}
+                />
                 <div>
                   <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
                     {config.name}

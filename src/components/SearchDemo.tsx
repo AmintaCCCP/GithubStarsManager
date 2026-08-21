@@ -108,7 +108,11 @@ export const SearchDemo: React.FC = () => {
           </div>
         </div>
         <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => setShowDemo(false)}
+          aria-label={t('关闭搜索演示', 'Close search demo')}
           className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300 transition-colors"
         >
           ×
@@ -129,6 +133,8 @@ export const SearchDemo: React.FC = () => {
             .map((example, index) => (
               <Button
                 key={index}
+                type="button"
+                variant="ghost"
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
@@ -162,6 +168,8 @@ export const SearchDemo: React.FC = () => {
             .map((example, index) => (
               <Button
                 key={index}
+                type="button"
+                variant="ghost"
                 onClick={() => handleExampleClick(example)}
                 className={`w-full p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query

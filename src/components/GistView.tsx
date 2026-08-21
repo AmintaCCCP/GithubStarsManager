@@ -339,11 +339,15 @@ export const GistView: React.FC = () => {
                 {query && (
                   <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
                       setQuery('');
                       setGistSearchFilters({ query: '' });
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground"
+                    aria-label={t('清除搜索', 'Clear search')}
+                    title={t('清除搜索', 'Clear search')}
+                    className="absolute right-2 top-1/2 h-7 w-7 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </Button>

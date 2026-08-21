@@ -62,6 +62,9 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         variant="outline"
         size="icon"
         onMouseDown={() => canDecrement && startRepeat(-step)}
+        onClick={(event) => {
+          if (event.detail === 0 && canDecrement) stepValue(-step);
+        }}
         onMouseUp={stopRepeat}
         onMouseLeave={stopRepeat}
         onTouchStart={() => canDecrement && startRepeat(-step)}
@@ -80,6 +83,9 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         variant="outline"
         size="icon"
         onMouseDown={() => canIncrement && startRepeat(step)}
+        onClick={(event) => {
+          if (event.detail === 0 && canIncrement) stepValue(step);
+        }}
         onMouseUp={stopRepeat}
         onMouseLeave={stopRepeat}
         onTouchStart={() => canIncrement && startRepeat(step)}

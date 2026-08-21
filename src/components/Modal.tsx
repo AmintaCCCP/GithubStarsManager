@@ -22,7 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'max-w-md',
 }) => (
   <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-    <DialogContent className={maxWidth}>
+    <DialogContent aria-describedby={undefined} className={maxWidth}>
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>

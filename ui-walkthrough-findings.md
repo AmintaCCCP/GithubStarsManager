@@ -18,9 +18,9 @@
 
 交互复测：Select 从 OpenAI Chat Completions 切换到 OpenAI Responses 后，接口预览地址同步更新为 `/responses`，说明表单行为保持正常。勾选“使用自定义提示词”后，Radix Checkbox 显示 checked 状态，默认提示词自动填入 Textarea，“恢复默认提示词”按钮出现，Textarea 可见且未出现布局溢出。
 
-Slider 复测显示 Radix Slider aria 值仍为 `1`，范围为 `1–10`；上次点击因自定义提示词展开后页面高度变化未命中滑块。已通过 DOM 边界确认 thumb 当前位于 x=783–803、y=527–547，后续按实际边界点击复测。
+Slider 复测显示 Radix Slider aria 值初始为 `1`，范围为 `1–10`；已通过新增 `src/components/ui/SliderInput.test.tsx` 完成真实交互回归。pointer 路径使用 userEvent 在 mock 的 Root 宽度 100、clientX=60 边界点击，`aria-valuenow` 从 `1` 更新为 `6`；keyboard 路径聚焦 thumb 后发送 ArrowRight，`aria-valuenow` 从 `1` 更新为 `2`。两项测试均通过且无 React/Radix warning。
 
-Slider DOM 结构检查确认 Radix Root 为 `relative flex w-full ... flex-1`，track 使用 `h-2 bg-secondary`，thumb 使用 shadcn `h-5 w-5 border-2 border-primary bg-background`；当前 aria 值仍为 1。组件结构本身正常，后续仅需使用 Root 的实际边界进行点击验证。
+Slider DOM 结构检查确认 Radix Root 为 `relative flex w-full ... flex-1`，track 使用 `h-2 bg-secondary`，thumb 使用 shadcn `h-5 w-5 border-2 border-primary bg-background`；组件结构和 pointer/keyboard 用户路径均已验证。
 
 取消新增 AI 配置后页面回到空状态，未保存内容未残留。WebDAV 空状态页的主按钮、卡片、图标和提示文案均可见，布局未溢出；各设置 Tabs 在切换后保持统一 active 状态。
 
