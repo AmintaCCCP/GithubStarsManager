@@ -13,13 +13,13 @@
 | 表单控件 | NumberInput、SliderInput、StepperInput、登录页、搜索栏、Discovery、AI、网络、WebDAV、备份、数据管理、分类、同步、MCP、向量搜索、诊断等设置面板统一使用共享 Input/Textarea/Select/Checkbox/Switch/Slider/RadioGroup。 |
 | 页面与卡片 | Header、SettingsPanel、RepositoryList、RepositoryCard、ReleaseTimeline、ForkTimeline、SearchBar、DiscoverySidebar、各类 Repository/Release/Gist/Fork/Subscription 卡片、更新提示、批量操作栏及轻量操作按钮全部接入共享 Button/Badge/Tooltip 等原语。 |
 | 交互与主题 | 补充 Radix `data-state` 关闭动画 token；保留现有主题令牌、深色模式、中英文切换、响应式布局、键盘行为、禁用态和外部链接语义。 |
-| 回归兼容 | ReadmeModal 和 ForkTimeline 保留不可见的原生 select 兼容层，用于维持既有 DOM 测试和外部 change 事件契约；用户可见选择器仍由 Radix Select 渲染。DataManagementPanel 的导出选择由 Radix Checkbox 驱动，并将既有 DOM 查询适配到 Radix 的 `data-state=checked`。 |
+| 回归兼容 | ReadmeModal 和 ForkTimeline 已移除不可见的原生 select 兼容层，用户可见选择器完全由 Radix Select 渲染；对应测试已改用可见 combobox/option 交互。DataManagementPanel 的导出选择由 Radix Checkbox 驱动，并将既有 DOM 查询适配到 Radix 的 `data-state=checked`。 |
 
 ## 验证结果
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,782.24 kB，独立 checker 实测 2,717.03 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,783.35 kB，独立 checker 实测 2,718.12 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
 | `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |

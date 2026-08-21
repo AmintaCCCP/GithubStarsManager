@@ -667,6 +667,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 ) : isTranslateError ? (
                   <>
                     <Button
+                      variant="ghost"
                       onClick={handleTranslate}
                       className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       title={t('重试翻译', 'Retry Translation')}
@@ -685,6 +686,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   </>
                 ) : (
                   <Button
+                    variant="ghost"
                     onClick={handleTranslate}
                     disabled={isTranslating}
                     className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
@@ -725,6 +727,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => setShowToc(!showToc)}
+                  aria-label={t('目录', 'Table of Contents')}
                   className={`p-2 rounded-lg transition-colors ${
                     showToc
                       ? 'bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary'
@@ -737,6 +740,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               <Button
                 variant="ghost"
+                aria-label={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
                 onClick={cycleFontSize}
                 className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}

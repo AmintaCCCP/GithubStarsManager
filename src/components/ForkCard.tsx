@@ -145,7 +145,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onMarkAsRead();
                 }}
                 disabled={isSyncing || !needsSync}
-                className={`p-1 rounded transition-colors disabled:cursor-not-allowed ${
+                className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
                   needsSync
                     ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
                     : 'bg-muted text-gray-300 dark:text-muted-foreground cursor-not-allowed'
@@ -241,7 +241,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                           onMarkAsRead();
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
-                        className="ml-2 p-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        className="ml-2 h-8 w-8 p-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                         aria-label={workflow.state === 'disabled'
                           ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
                           : `${language === 'zh' ? '运行工作流' : 'Run workflow'}: ${workflow.name}`

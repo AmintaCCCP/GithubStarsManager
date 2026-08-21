@@ -487,6 +487,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
         </span>
         {alt && <span className="text-muted-foreground dark:text-muted-foreground/70 truncate max-w-[120px]">{alt}</span>}
         <Button
+          variant="ghost"
           onClick={handleRetry}
           className="ml-auto px-2 py-0.5 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
         >

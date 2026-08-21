@@ -1284,12 +1284,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
             {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (
               <Button
+                variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className="absolute inset-y-0 left-0 flex items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                className="absolute inset-y-0 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
                 title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -1302,6 +1303,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {/* 选择按钮 */}
           {onSelect && (
             <Button
+              variant="ghost"
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();

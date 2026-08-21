@@ -586,6 +586,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
                             className={`p-1.5 rounded ${hasChanges ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-accent dark:hover:bg-white/[0.12] dark:text-muted-foreground' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
+                            aria-label={t('保存', 'Save')}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />
@@ -593,6 +594,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <Button
                             onClick={handleCancelEdit}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                            aria-label={t('取消', 'Cancel')}
                             title={t('取消', 'Cancel')}
                           >
                             <X className="w-4 h-4" />
@@ -666,6 +668,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('置顶', 'Move to top')}
                             title={t('置顶', 'Move to top')}
                           >
                             <ArrowUpToLine className="w-4 h-4" />
@@ -674,6 +677,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('上移', 'Move up')}
                             title={t('上移', 'Move up')}
                           >
                             <ArrowUp className="w-4 h-4" />
@@ -682,6 +686,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('下移', 'Move down')}
                             title={t('下移', 'Move down')}
                           >
                             <ArrowDown className="w-4 h-4" />
@@ -690,6 +695,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('置底', 'Move to bottom')}
                             title={t('置底', 'Move to bottom')}
                           >
                             <ArrowDownToLine className="w-4 h-4" />
@@ -702,6 +708,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 onClick={() => handleStartEdit(category)}
                                 className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
@@ -709,6 +716,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 onClick={() => handleDeleteCategory(category.id)}
                                 className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('删除', 'Delete')}
                                 title={t('删除', 'Delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -719,6 +727,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 onClick={() => handleStartEdit(category)}
                                 className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
@@ -726,6 +735,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 onClick={() => hideDefaultCategory(category.id)}
                                 className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                                aria-label={t('隐藏', 'Hide')}
                                 title={t('隐藏', 'Hide')}
                               >
                                 <EyeOff className="w-4 h-4" />

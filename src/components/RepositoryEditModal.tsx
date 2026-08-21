@@ -1025,11 +1025,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 <span key={index} className={tagClass}>
                   {tag}
                   <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="ml-1.5 p-0.5 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors"
+                    className="ml-1.5 h-7 w-7 p-0 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors"
                     title={t('移除', 'Remove')}
                   >
                     <X className="w-3 h-3" />
