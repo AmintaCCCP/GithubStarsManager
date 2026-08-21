@@ -9,6 +9,7 @@ import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
 import { FloatingTooltip } from './FloatingTooltip';
 import { useDialog } from '../hooks/useDialog';
+import { Button } from './ui/button';
 
 interface SubscriptionRepoCardProps {
   repo: DiscoveryRepo;
@@ -115,7 +116,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   };
 
   const rankBadgeClass = useMemo(() => {
-    return 'bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary';
+    return 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground';
   }, []);
 
   const platformIconMap = useMemo(() => ({
@@ -337,10 +338,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <>
     <div 
       onClick={handleCardClick}
-      className={`bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] p-5 transition-all duration-200 ${
+      className={`bg-white dark:bg-card border border-border dark:border-border p-5 transition-all duration-200 ${
         desktopSafeMode
-          ? 'rounded-lg hover:shadow-md hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
-          : 'rounded-xl hover:shadow-lg hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
+          ? 'rounded-lg hover:shadow-md hover:border-border dark:border-border dark:hover:border-border dark:border-border hover:-translate-y-0.5 cursor-pointer'
+          : 'rounded-xl hover:shadow-lg hover:border-border dark:border-border dark:hover:border-border dark:border-border hover:-translate-y-0.5 cursor-pointer'
       }`}
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
@@ -365,7 +366,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   className="w-6 h-6 rounded-full flex-shrink-0"
                 />
               )}
-              <span className="font-semibold text-gray-900 dark:text-text-primary truncate">
+              <span className="font-semibold text-foreground dark:text-foreground truncate">
                 {cardTitle}
               </span>
             </div>
@@ -373,15 +374,15 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
             {/* Action buttons */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               {/* AI Analyze button */}
-              <button
+              <Button
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
                 className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isAnalyzed
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
                     : isFailed
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-                    : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
+                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
                 }`}
                 title={
                   isAnalyzed 
@@ -398,36 +399,36 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 ) : (
                   <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
-              </button>
+              </Button>
 
               {/* ZRead button - hidden on small screens */}
-              <button
+              <Button
                 onClick={handleOpenInZRead}
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                 title={t('在ZRead打开', 'Open in ZRead')}
               >
                 <BookOpen className="w-4 h-4" />
-              </button>
+              </Button>
 
               {/* GitHub button - hidden on small screens */}
               <a
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                 title={t('在GitHub打开', 'Open on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
               </a>
 
               {/* Star button */}
-              <button
+              <Button
                 onClick={handleStar}
                 disabled={!githubToken || isStarring}
                 className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
-                    ? 'bg-brand-indigo text-white shadow-sm dark:bg-brand-indigo/80 dark:text-white'
-                    : 'bg-light-surface text-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-white/[0.08] hover:text-gray-700 dark:hover:text-text-secondary'
+                    ? 'bg-primary text-primary-foreground shadow-sm dark:bg-primary/80 dark:text-primary-foreground'
+                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground dark:hover:text-muted-foreground'
                 }`}
                 title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
               >
@@ -438,7 +439,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 ) : (
                   <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -454,7 +455,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               onTouchStart={() => setDescTooltip((v) => !v)}
               tabIndex={0}
             >
-              <p className="text-sm text-gray-700 dark:text-text-tertiary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                 {repo.description}
               </p>
               <FloatingTooltip
@@ -479,8 +480,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               onTouchStart={() => setAiTooltip((v) => !v)}
               tabIndex={0}
             >
-              <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+              <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                 {repo.ai_summary}
               </p>
               <FloatingTooltip
@@ -499,7 +500,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 "
+                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-primary/20/30 "
                 >
                   {tag}
                 </span>
@@ -510,12 +511,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           {/* Platform icons */}
           {repo.ai_platforms && repo.ai_platforms.length > 0 && (
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-gray-400 dark:text-text-tertiary">
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                 {t('平台:', 'Platforms:')}
               </span>
               <div className="flex items-center gap-1">
                 {repo.ai_platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="text-gray-500 dark:text-text-tertiary" title={platform}>
+                  <span key={platform} className="text-muted-foreground dark:text-muted-foreground" title={platform}>
                     {getPlatformIcon(platform)}
                   </span>
                 ))}
@@ -524,7 +525,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-text-tertiary">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-muted-foreground">
             {repo.language && (
               <div className="flex items-center gap-1">
                 <div
@@ -558,35 +559,35 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       maxWidth="max-w-sm"
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-3 text-gray-700 dark:text-text-secondary ">
+        <div className="flex items-center gap-3 text-muted-foreground dark:text-muted-foreground ">
           <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <p className="text-sm text-gray-700 dark:text-text-tertiary">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             {language === 'zh' 
               ? `确定要取消 Star "${repo.full_name}" 吗？这将会从您的 GitHub 收藏中移除该仓库。`
               : `Are you sure you want to unstar "${repo.full_name}"? This will remove the repository from your GitHub stars.`}
           </p>
         </div>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={() => {
               setUnstarConfirmOpen(false);
               setPendingUnstarAction(null);
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
           >
             {t('取消', 'Cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               setUnstarConfirmOpen(false);
               if (pendingUnstarAction) {
                 pendingUnstarAction();
               }
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-white hover:bg-accent dark:bg-muted/40 transition-colors"
           >
             {t('确认取消', 'Confirm Unstar')}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

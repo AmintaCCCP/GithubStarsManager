@@ -1,3 +1,4 @@
+import { Button } from './ui/button';
 import { memo, useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import {
@@ -233,7 +234,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
         const wrapper = document.createElement('div');
         wrapper.setAttribute(ATTR_TRANSLATION, 'true');
         wrapper.className =
-          'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-gray-600 dark:text-text-tertiary text-sm leading-relaxed';
+          'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-muted-foreground dark:text-muted-foreground text-sm leading-relaxed';
 
         if (segments[i].hasInlineCode) {
           // 修改正则以支持带属性的 code 标签（如 <code class="...">）
@@ -344,7 +345,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       <style>{BILINGUAL_MODE_CSS}</style>
 
       {!isControlled && (
-        <div className="flex items-center justify-end gap-1 mb-3 pb-2 border-b border-gray-100 dark:border-white/[0.04]">
+        <div className="flex items-center justify-end gap-1 mb-3 pb-2 border-b border-gray-100 dark:border-border">
           {[
             {
               mode: 'original' as DisplayMode,
@@ -365,22 +366,22 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
             const active = displayMode === mode;
             const disabled = mode !== 'original' && !isTranslated;
             return (
-              <button
+              <Button
                 key={mode}
                 onClick={() => handleModeChange(mode)}
                 disabled={disabled}
                 className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
                   active
-                    ? 'bg-brand-indigo/20 text-brand-violet dark:bg-brand-indigo/10'
+                    ? 'bg-primary/20 text-primary dark:bg-primary/10'
                     : disabled
-                      ? 'text-gray-300 dark:text-text-quaternary cursor-not-allowed'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-light-surface dark:hover:bg-white/5'
+                      ? 'text-gray-300 dark:text-muted-foreground/70 cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300 hover:bg-muted dark:hover:bg-white/5'
                 }`}
                 title={label}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{label}</span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -397,7 +398,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       </div>
 
       {status === 'translating' && (
-        <div className="flex items-center justify-center py-4 gap-2 text-sm text-gray-500 dark:text-text-tertiary">
+        <div className="flex items-center justify-center py-4 gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span>
             {language === 'zh' ? '翻译中...' : 'Translating...'}

@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { Button } from './button';
 
 interface StepperInputProps {
   value: number;
@@ -21,8 +22,8 @@ export const StepperInput: React.FC<StepperInputProps> = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clamp = useCallback((v: number) => {
-    let result = v;
+  const clamp = useCallback((nextValue: number) => {
+    let result = nextValue;
     if (min !== undefined) result = Math.max(min, result);
     if (max !== undefined) result = Math.min(max, result);
     return result;
@@ -56,33 +57,39 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 
   return (
     <div className={`inline-flex items-center ${className}`}>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="icon"
         onMouseDown={() => canDecrement && startRepeat(-step)}
         onMouseUp={stopRepeat}
         onMouseLeave={stopRepeat}
         onTouchStart={() => canDecrement && startRepeat(-step)}
         onTouchEnd={stopRepeat}
         disabled={!canDecrement}
-        className="flex items-center justify-center w-8 h-8 rounded-l-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        aria-label="Decrease"
+        className="h-8 w-8 rounded-r-none"
       >
-        <Minus className="w-3.5 h-3.5" />
-      </button>
-      <span className="flex items-center justify-center min-w-[2.5rem] h-8 px-2 border-t border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-white tabular-nums select-none">
+        <Minus className="h-3.5 w-3.5" />
+      </Button>
+      <span className="flex h-8 min-w-[2.5rem] select-none items-center justify-center border-y border-input bg-white px-2 text-sm font-medium tabular-nums text-foreground dark:border-input dark:bg-muted/40 dark:text-foreground">
         {value}
       </span>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="icon"
         onMouseDown={() => canIncrement && startRepeat(step)}
         onMouseUp={stopRepeat}
         onMouseLeave={stopRepeat}
         onTouchStart={() => canIncrement && startRepeat(step)}
         onTouchEnd={stopRepeat}
         disabled={!canIncrement}
-        className="flex items-center justify-center w-8 h-8 rounded-r-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        aria-label="Increase"
+        className="h-8 w-8 rounded-l-none"
       >
-        <Plus className="w-3.5 h-3.5" />
-      </button>
+        <Plus className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 };

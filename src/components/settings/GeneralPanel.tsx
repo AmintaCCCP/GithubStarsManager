@@ -1,9 +1,12 @@
-import React from 'react';
-import { Globe, Package, Mail, ExternalLink, Github, Twitter } from 'lucide-react';
+import { ExternalLink, Github, Globe, Mail, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { version } from '../../../package.json';
 import { PROJECT_REPO_URL } from '../../constants/project';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Label } from '../ui/label';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -15,123 +18,76 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Package className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
-          {t('通用设置', 'General Settings')}
-        </h3>
+        <Package className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">{t('通用设置', 'General Settings')}</h3>
       </div>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
-        <div className="flex items-center space-x-3 mb-4">
-          <Globe className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
-            {t('语言设置', 'Language Settings')}
-          </h4>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 max-w-md">
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
-            <input
-              type="radio"
-              name="language"
-              value="zh"
-              checked={language === 'zh'}
-              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
-            />
-            <div>
-              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
-                中文
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <Globe className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('语言设置', 'Language Settings')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup value={language} onValueChange={(value) => setLanguage(value as 'zh' | 'en')} className="grid max-w-md grid-cols-2 gap-4">
+            <Label htmlFor="language-zh" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
+              <RadioGroupItem value="zh" id="language-zh" />
+              <span>
+                <span className="block text-base font-medium text-foreground dark:text-foreground">中文</span>
+                <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">Simplified Chinese</span>
               </span>
-              <p className="text-xs text-gray-500 dark:text-text-tertiary">
-                Simplified Chinese
-              </p>
-            </div>
-          </label>
-          <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10 transition-colors">
-            <input
-              type="radio"
-              name="language"
-              value="en"
-              checked={language === 'en'}
-              onChange={(e) => setLanguage(e.target.value as 'zh' | 'en')}
-              className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
-            />
-            <div>
-              <span className="text-base font-medium text-gray-900 dark:text-text-primary">
-                English
+            </Label>
+            <Label htmlFor="language-en" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
+              <RadioGroupItem value="en" id="language-en" />
+              <span>
+                <span className="block text-base font-medium text-foreground dark:text-foreground">English</span>
+                <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">US English</span>
               </span>
-              <p className="text-xs text-gray-500 dark:text-text-tertiary">
-                US English
-              </p>
-            </div>
-          </label>
-        </div>
-      </div>
+            </Label>
+          </RadioGroup>
+        </CardContent>
+      </Card>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
-        <div className="flex items-center space-x-3 mb-4">
-          <Package className="w-5 h-5 text-gray-700 dark:text-text-secondary " />
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
-            {t('检查更新', 'Check for Updates')}
-          </h4>
-        </div>
-        
-        <div className="flex items-center justify-between">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <Package className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('检查更新', 'Check for Updates')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-700 dark:text-text-tertiary mb-1">
-              {t(`当前版本: v${version}`, `Current Version: v${version}`)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-text-tertiary">
-              {t('检查是否有新版本可用', 'Check if a new version is available')}
-            </p>
+            <p className="mb-1 text-sm text-muted-foreground dark:text-muted-foreground">{t(`当前版本: v${version}`, `Current Version: v${version}`)}</p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{t('检查是否有新版本可用', 'Check if a new version is available')}</p>
           </div>
           <UpdateChecker />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
-        <div className="flex items-center space-x-3 mb-4">
-          <Mail className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
-            {t('联系方式', 'Contact Information')}
-          </h4>
-        </div>
-        
-        <p className="text-sm text-gray-700 dark:text-text-tertiary mb-4">
-          {t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}
-        </p>
-        
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => {
-              const newWindow = window.open('https://x.com/GoodMan_Lee', '_blank', 'noopener,noreferrer');
-              if (newWindow) {
-                newWindow.opener = null;
-              }
-            }}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-brand-indigo hover:bg-brand-hover text-white rounded-lg transition-colors"
-          >
-            <Twitter className="w-5 h-5" />
-            <span>Twitter</span>
-            <ExternalLink className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={() => {
-              const newWindow = window.open(PROJECT_REPO_URL, '_blank', 'noopener,noreferrer');
-              if (newWindow) {
-                newWindow.opener = null;
-              }
-            }}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary border border-black/[0.06] dark:border-white/[0.04] rounded-lg transition-colors"
-          >
-            <Github className="w-5 h-5" />
-            <span>{t('GitHub', 'GitHub')}</span>
-            <ExternalLink className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <Mail className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('联系方式', 'Contact Information')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground dark:text-muted-foreground">{t('如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：', 'If you encounter any issues or have suggestions while using the app, feel free to contact me through:')}</p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button type="button" onClick={() => { const newWindow = window.open('https://x.com/GoodMan_Lee', '_blank', 'noopener,noreferrer'); if (newWindow) newWindow.opener = null; }} className="gap-2">
+              <Twitter className="h-5 w-5" />
+              <span>Twitter</span>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { const newWindow = window.open(PROJECT_REPO_URL, '_blank', 'noopener,noreferrer'); if (newWindow) newWindow.opener = null; }} className="gap-2">
+              <Github className="h-5 w-5" />
+              <span>{t('GitHub', 'GitHub')}</span>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

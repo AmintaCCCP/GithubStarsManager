@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { Button } from './ui/button';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -62,20 +63,22 @@ export const BackToTop: React.FC = () => {
   }, [isVisible, triggerBounce]);
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="icon"
       onClick={scrollToTop}
       className={`
         fixed z-50
         flex items-center justify-center
         w-12 h-12
         bg-white dark:bg-white/[0.06]
-        text-gray-700 dark:text-text-secondary
+        text-muted-foreground dark:text-muted-foreground
         rounded-full
         shadow-lg hover:shadow-xl
-        border border-gray-200 dark:border-white/[0.08]
+        border border-gray-200 dark:border-border
         transform transition-[opacity,transform,background-color] duration-300 ease-out
-        hover:scale-110 hover:bg-gray-50 dark:hover:bg-white/[0.1]
+        hover:scale-110 hover:bg-accent dark:hover:bg-white/[0.1]
         focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
         ${isVisible && !readmeModalOpen
@@ -92,7 +95,7 @@ export const BackToTop: React.FC = () => {
       tabIndex={isVisible && !readmeModalOpen ? 0 : -1}
       title={language === 'zh' ? '回到顶部' : 'Back to top'}
     >
-      <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
-    </button>
+      <ArrowUp className="h-5 w-5 sm:h-6 sm:w-6" />
+    </Button>
   );
 };

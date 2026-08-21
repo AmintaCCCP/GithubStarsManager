@@ -1,3 +1,6 @@
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter, Settings } from 'lucide-react';
 import { Release } from '../types';
@@ -731,11 +734,11 @@ export const ReleaseTimeline: React.FC = () => {
     return (
       <>
       <div className="text-center py-12">
-               <Package className="w-16 h-16 text-gray-500 dark:text-quaternary mx-auto mb-4" />
-         <h3 className="text-lg font-medium text-gray-900 dark:text-text-primary mb-2">
+               <Package className="w-16 h-16 text-muted-foreground dark:text-quaternary mx-auto mb-4" />
+         <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-2">
           {subscribedRepoCount === 0 ? t('没有Release订阅', 'No Release Subscriptions') : t('没有最近的Release', 'No Recent Releases')}
         </h3>
-             <p className="text-gray-500 dark:text-text-tertiary mb-6 max-w-md mx-auto">
+             <p className="text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
                {subscribedRepoCount === 0
                  ? t('从仓库页面订阅仓库Release以在此查看更新。', 'Subscribe to repository releases from the Repositories tab to see updates here.')
                  : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。点击下方刷新按钮获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Click the refresh button below to get the latest updates.`)
@@ -747,43 +750,43 @@ export const ReleaseTimeline: React.FC = () => {
            <div className="mb-6 flex flex-col items-center gap-3">
              {/* Pre-release toggle */}
              <label className="flex items-center gap-2 cursor-pointer select-none">
-               <button
+               <Button
                  type="button"
                  role="switch"
                  aria-checked={includePreRelease}
                  onClick={() => setIncludePreRelease(!includePreRelease)}
-                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
+                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
                >
                  <span
                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                  />
-               </button>
-               <span className="text-sm text-gray-600 dark:text-text-secondary">
+               </Button>
+               <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                  {t('包含 Pre-release', 'Include Pre-release')}
                </span>
              </label>
 
              <div className="flex flex-wrap items-center justify-center gap-2">
                {/* Refresh button */}
-               <button
+               <Button
                  onClick={handleRefresh}
                  disabled={releaseIsRefreshing}
-                 className="flex items-center space-x-2 px-6 py-3 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
                  <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
-               </button>
-               <button
+               </Button>
+               <Button
                  onClick={() => setIsReleaseSourceSettingsOpen(true)}
-                 className="flex items-center space-x-2 px-4 py-3 bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary rounded-lg hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
+                 className="flex items-center space-x-2 px-4 py-3 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
                  title={t('Release 来源设置', 'Release Source Settings')}
                >
                  <Settings className="w-5 h-5" />
                  <span>{t('来源设置', 'Sources')}</span>
-               </button>
+               </Button>
              </div>
             {lastRefreshTime && (
-              <p className="text-sm text-gray-500 dark:text-text-tertiary">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </p>
             )}
@@ -791,40 +794,40 @@ export const ReleaseTimeline: React.FC = () => {
         )}
 
         {subscribedRepoCount === 0 && (
-          <div className="bg-light-surface dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.04] rounded-xl p-6 max-w-lg mx-auto">
+          <div className="bg-muted dark:bg-muted/20 border border-border dark:border-border rounded-xl p-6 max-w-lg mx-auto">
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-brand-indigo/20 rounded-full flex items-center justify-center">
-                <Bell className="w-6 h-6 text-brand-violet " />
+              <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+                <Bell className="w-6 h-6 text-primary " />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-700 dark:text-text-secondary mb-2">
+                <h3 className="font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                   {t('订阅仓库Release', 'Subscribe to Repository Releases')}
                 </h3>
-                <p className="text-sm text-gray-700 dark:text-text-secondary mb-3 leading-relaxed">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3 leading-relaxed">
                   {t('订阅后，您可以在这里查看所有关注仓库的最新发布版本，第一时间获取更新动态。', 'Subscribe to receive the latest release updates from your favorite repositories in one place.')}
                 </p>
-                <div className="bg-white/60 dark:bg-panel-dark/60 rounded-lg p-3 text-sm">
-                  <div className="flex items-center space-x-2 text-gray-700 dark:text-text-secondary font-medium mb-2">
+                <div className="bg-white/60 dark:bg-card/60 rounded-lg p-3 text-sm">
+                  <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
                     <span className="w-5 h-5 bg-brand-violet text-white rounded-full flex items-center justify-center text-xs">1</span>
                     <span>{t('前往仓库页面', 'Go to Repositories')}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-gray-700 dark:text-text-secondary font-medium">
+                  <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium">
                     <span className="w-5 h-5 bg-brand-violet text-white rounded-full flex items-center justify-center text-xs">2</span>
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
-                <div className="mt-4 rounded-lg bg-white/60 dark:bg-panel-dark/60 p-3 text-sm text-gray-700 dark:text-text-secondary">
+                <div className="mt-4 rounded-lg bg-white/60 dark:bg-card/60 p-3 text-sm text-muted-foreground dark:text-muted-foreground">
                   <p className="mb-3">
                     {t('也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。', 'You can also use Watch repository sync or a custom repository list as release sources.')}
                   </p>
-                  <button
+                  <Button
                     onClick={() => setIsReleaseSourceSettingsOpen(true)}
-                    className="inline-flex items-center space-x-2 rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover"
+                    className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                     title={t('Release 来源设置', 'Release Source Settings')}
                   >
                     <Settings className="w-4 h-4" />
                     <span>{t('配置 Release 来源', 'Configure Release Sources')}</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -845,56 +848,56 @@ export const ReleaseTimeline: React.FC = () => {
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-text-primary mb-2">
+            <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
               {t('Release时间线', 'Release Timeline')}
             </h2>
-            <p className="text-gray-700 dark:text-text-tertiary">
+            <p className="text-muted-foreground dark:text-muted-foreground">
               {t(`来自您的 ${activeReleaseRepoCount} 个订阅仓库的最新Release`, `Latest releases from your ${activeReleaseRepoCount} subscribed repositories`)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Last Refresh Time */}
             {lastRefreshTime && (
-              <span className="w-full text-sm text-gray-500 dark:text-text-tertiary lg:w-auto">
+              <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
                 {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
               </span>
             )}
 
             {/* Pre-release toggle */}
             <label className="flex items-center gap-1.5 cursor-pointer select-none">
-              <button
+              <Button
                 type="button"
                 role="switch"
                 aria-checked={includePreRelease}
                 onClick={() => setIncludePreRelease(!includePreRelease)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                 />
-              </button>
-              <span className="text-xs text-gray-600 dark:text-text-secondary hidden sm:inline">
+              </Button>
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground hidden sm:inline">
                 {t('Pre', 'Pre')}
               </span>
             </label>
 
             {/* Refresh Button */}
-            <button
+            <Button
               onClick={handleRefresh}
               disabled={releaseIsRefreshing}
               className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
               className="ui-button flex items-center space-x-2 px-3 py-2"
               title={t('Release 来源设置', 'Release Source Settings')}
             >
-              <Settings className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
-              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">{t('来源', 'Sources')}</span>
-            </button>
+              <Settings className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('来源', 'Sources')}</span>
+            </Button>
           </div>
         </div>
 
@@ -902,8 +905,8 @@ export const ReleaseTimeline: React.FC = () => {
         <div className="ui-toolbar p-3 sm:p-4 mb-4">
           {/* Search Bar */}
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary w-5 h-5" />
-            <input
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
+            <Input
               type="text"
               placeholder={t('搜索Release...', 'Search releases...')}
               value={searchQuery}
@@ -911,18 +914,18 @@ export const ReleaseTimeline: React.FC = () => {
                 setReleaseSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ui-field w-full pl-10 pr-10 py-2 text-gray-900 dark:text-text-primary"
+              className="ui-field w-full pl-10 pr-10 py-2 text-foreground dark:text-foreground"
             />
             {searchQuery && (
-              <button
+              <Button
                 onClick={() => {
                   setReleaseSearchQuery('');
                   setCurrentPage(1);
                 }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-text-quaternary hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-300"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
 
@@ -938,7 +941,7 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* View Mode Toggle Dropdown */}
             <div className="relative">
-              <button
+              <Button
                 onClick={() => {
                   setIsViewDropdownOpen(!isViewDropdownOpen);
                   setIsShowModeDropdownOpen(false);
@@ -948,15 +951,15 @@ export const ReleaseTimeline: React.FC = () => {
                 title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
               >
                 {viewMode === 'timeline' ? (
-                  <CalendarDays className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
+                  <CalendarDays className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                 ) : (
-                  <LayoutGrid className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
+                  <LayoutGrid className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                 )}
-                <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                   {viewMode === 'timeline' ? t('按日期', 'Timeline') : t('按仓库', 'Repository')}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-text-tertiary transition-transform ${isViewDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isViewDropdownOpen ? 'rotate-180' : ''}`} />
+              </Button>
 
               {/* Dropdown Menu */}
               {isViewDropdownOpen && (
@@ -966,38 +969,38 @@ export const ReleaseTimeline: React.FC = () => {
                     onClick={() => setIsViewDropdownOpen(false)}
                   />
                   <div className="ui-menu absolute right-0 mt-2 w-48 z-50 py-1">
-                    <button
+                    <Button
                       onClick={() => {
                         setReleaseViewMode('timeline');
                         setIsViewDropdownOpen(false);
                         setCurrentPage(1);
                       }}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        viewMode === 'timeline' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        viewMode === 'timeline' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <CalendarDays className={`w-4 h-4 ${viewMode === 'timeline' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <CalendarDays className={`w-4 h-4 ${viewMode === 'timeline' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('按日期排序', 'Timeline View')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('按发布时间排序', 'Sort by publish date')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('按发布时间排序', 'Sort by publish date')}</div>
                       </div>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => {
                         setReleaseViewMode('repository');
                         setIsViewDropdownOpen(false);
                         setCurrentPage(1);
                       }}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        viewMode === 'repository' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        viewMode === 'repository' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <LayoutGrid className={`w-4 h-4 ${viewMode === 'repository' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <LayoutGrid className={`w-4 h-4 ${viewMode === 'repository' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('仓库分类', 'Repository View')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('按仓库分组折叠', 'Group by repository')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('按仓库分组折叠', 'Group by repository')}</div>
                       </div>
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -1008,7 +1011,7 @@ export const ReleaseTimeline: React.FC = () => {
         {/* Results Info and Controls */}
         <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <span className="text-sm text-gray-700 dark:text-text-tertiary">
+            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {viewMode === 'timeline'
                 ? releaseShowMode === 'unread'
                   ? t(
@@ -1031,17 +1034,17 @@ export const ReleaseTimeline: React.FC = () => {
               }
             </span>
             {releaseShowMode === 'all' && unreadCount > 0 && (
-              <span className="text-sm text-brand-violet dark:text-brand-violet">
+              <span className="text-sm text-primary dark:text-primary">
                 ({unreadCount} {t('未读', 'unread')})
               </span>
             )}
             {(searchQuery || selectedFilters.length > 0) && (
-              <span className="text-sm text-brand-violet dark:text-brand-violet">
+              <span className="text-sm text-primary dark:text-primary">
                 ({t('已筛选', 'filtered')})
               </span>
             )}
             {releaseLatestMode === 'latest' && (
-              <span className="text-sm text-brand-violet dark:text-brand-violet">
+              <span className="text-sm text-primary dark:text-primary">
                 ({t('仅最新', 'latest only')})
               </span>
             )}
@@ -1050,7 +1053,7 @@ export const ReleaseTimeline: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3">
             {/* Show Mode Dropdown */}
             <div className="relative">
-              <button
+              <Button
                 onClick={() => {
                   setIsShowModeDropdownOpen(!isShowModeDropdownOpen);
                   setIsViewDropdownOpen(false);
@@ -1059,41 +1062,41 @@ export const ReleaseTimeline: React.FC = () => {
                 className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
               >
-                <Filter className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
-                <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                <Filter className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                   {releaseShowMode === 'all' ? t('全部', 'All') : t('仅未读', 'Unread')}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-text-tertiary transition-transform ${isShowModeDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isShowModeDropdownOpen ? 'rotate-180' : ''}`} />
+              </Button>
 
               {isShowModeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsShowModeDropdownOpen(false)} />
                   <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
-                    <button
+                    <Button
                       onClick={() => handleShowModeChange('all')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        releaseShowMode === 'all' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        releaseShowMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <Filter className={`w-4 h-4 ${releaseShowMode === 'all' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <Filter className={`w-4 h-4 ${releaseShowMode === 'all' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('显示全部', 'Show All')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('显示所有Release', 'Show all releases')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('显示所有Release', 'Show all releases')}</div>
                       </div>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleShowModeChange('unread')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        releaseShowMode === 'unread' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        releaseShowMode === 'unread' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <Filter className={`w-4 h-4 ${releaseShowMode === 'unread' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <Filter className={`w-4 h-4 ${releaseShowMode === 'unread' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('只显示未读的Release', 'Only show unread releases')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('只显示未读的Release', 'Only show unread releases')}</div>
                       </div>
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -1101,7 +1104,7 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Latest Mode Dropdown */}
             <div className="relative">
-              <button
+              <Button
                 onClick={() => {
                   setIsLatestModeDropdownOpen(!isLatestModeDropdownOpen);
                   setIsViewDropdownOpen(false);
@@ -1110,41 +1113,41 @@ export const ReleaseTimeline: React.FC = () => {
                 className="ui-button flex items-center space-x-2 px-3 py-2"
                 title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
               >
-                <Package className="w-4 h-4 text-gray-700 dark:text-text-tertiary" />
-                <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                <Package className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                   {releaseLatestMode === 'all' ? t('全部版本', 'All Versions') : t('仅最新', 'Latest')}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-text-tertiary transition-transform ${isLatestModeDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${isLatestModeDropdownOpen ? 'rotate-180' : ''}`} />
+              </Button>
 
               {isLatestModeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsLatestModeDropdownOpen(false)} />
                   <div className="ui-menu absolute left-0 mt-2 w-48 z-50 py-1">
-                    <button
+                    <Button
                       onClick={() => handleLatestModeChange('all')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        releaseLatestMode === 'all' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        releaseLatestMode === 'all' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <Package className={`w-4 h-4 ${releaseLatestMode === 'all' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <Package className={`w-4 h-4 ${releaseLatestMode === 'all' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('显示全部版本', 'Show All Versions')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('显示所有Release记录', 'Show all release records')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('显示所有Release记录', 'Show all release records')}</div>
                       </div>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleLatestModeChange('latest')}
-                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
-                        releaseLatestMode === 'latest' ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-900 dark:text-text-primary font-medium' : 'text-gray-700 dark:text-text-secondary'
+                      className={`w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-muted dark:hover:bg-accent transition-colors ${
+                        releaseLatestMode === 'latest' ? 'bg-muted dark:bg-accent text-foreground dark:text-foreground font-medium' : 'text-muted-foreground dark:text-muted-foreground'
                       }`}
                     >
-                      <Package className={`w-4 h-4 ${releaseLatestMode === 'latest' ? 'text-gray-900 dark:text-text-primary' : 'text-gray-500 dark:text-text-tertiary'}`} />
+                      <Package className={`w-4 h-4 ${releaseLatestMode === 'latest' ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground'}`} />
                       <div>
                         <div className="text-sm font-medium">{t('仅显示最新版本', 'Latest Version Only')}</div>
-                        <div className="text-xs text-gray-500 dark:text-text-tertiary">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
+                        <div className="text-xs text-muted-foreground dark:text-muted-foreground">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
                       </div>
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -1152,32 +1155,23 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Items per page selector */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700 dark:text-text-tertiary">{t('每页:', 'Per page:')}</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="ui-field px-3 py-1 text-sm"
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-              </select>
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+              <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
+                <SelectTrigger className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
+              </Select>
             </div>
 
             {/* Mark All Read button */}
-            <button
+            <Button
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
-              className="flex items-center space-x-2 px-3 py-2 bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title={t('全部标记为已读', 'Mark all as read')}
             >
               {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">{t('全部已读', 'Mark All Read')}</span>
-            </button>
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('全部已读', 'Mark All Read')}</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -1186,13 +1180,13 @@ export const ReleaseTimeline: React.FC = () => {
        <div className="space-y-2">
          {paginatedReleases.length === 0 ? (
            <div className="ui-empty-state text-center py-12">
-            <Package className="w-12 h-12 text-gray-400 dark:text-text-secondary mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-text-secondary mb-1">
+            <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
               {releaseShowMode === 'unread'
                 ? t('没有未读的 Release', 'No unread releases')
                 : t('无符合条件的结果', 'No matching results')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-text-tertiary">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               {releaseShowMode === 'unread'
                 ? t('所有 Release 都已标记为已读', 'All releases have been marked as read')
                 : selectedFilters.length > 0
@@ -1200,20 +1194,20 @@ export const ReleaseTimeline: React.FC = () => {
                   : t('没有找到匹配的 Release', 'No matching releases found.')}
             </p>
             {releaseShowMode === 'unread' && (
-              <button
+              <Button
                 onClick={() => handleShowModeChange('all')}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('查看全部', 'Show All')}
-              </button>
+              </Button>
             )}
             {selectedFilters.length > 0 && releaseShowMode !== 'unread' && (
-              <button
+              <Button
                 onClick={handleClearFilters}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('清除过滤器', 'Clear Filters')}
-              </button>
+              </Button>
             )}
           </div>
         ) : viewMode === 'timeline' ? (
@@ -1266,41 +1260,41 @@ export const ReleaseTimeline: React.FC = () => {
             return (
               <div key={repository.id} className="ui-card overflow-hidden">
                 {/* Repository Header */}
-                <button
+                <Button
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
-                  className="w-full flex items-center justify-between p-2 hover:bg-light-bg dark:hover:bg-white/10/50 transition-colors"
+                  className="w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center space-x-2">
                     {hasUnread && (
                       <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse"></div>
                     )}
-                    <div className="flex items-center justify-center w-6 h-6 bg-brand-indigo/20 rounded flex-shrink-0">
-                      <LayoutGrid className="w-3.5 h-3.5 text-brand-violet" />
+                    <div className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
+                      <LayoutGrid className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-sm text-gray-900 dark:text-text-primary">
+                      <h3 className="font-semibold text-sm text-foreground dark:text-foreground">
                         {repository.name}
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                         {repository.full_name}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 min-w-0 ml-2">
                     <div className="text-right min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-text-tertiary hidden sm:block">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
                         {releases.length} {t('个版本', 'releases')}
                       </p>
                       {latestRelease && (
                         <>
-                          <p className="text-xs text-gray-400 dark:text-text-tertiary truncate">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
                             {t('最新:', 'Latest:')} {latestRelease.tag_name}
                           </p>
                           {latestEffectiveTime && (
-                            <p className="text-xs text-gray-400 dark:text-text-quaternary whitespace-nowrap flex items-center justify-end gap-1">
+                            <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap flex items-center justify-end gap-1">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                               {latestAssetsUpdated && (
-                                <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
+                                <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-primary font-medium">
                                   {t('资产已更新', 'Assets updated')}
                                 </span>
                               )}
@@ -1310,10 +1304,10 @@ export const ReleaseTimeline: React.FC = () => {
                       )}
                     </div>
                     <div className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
-                      <ChevronDown className="w-4 h-4 text-gray-400 dark:text-text-quaternary" />
+                      <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
                     </div>
                   </div>
-                </button>
+                </Button>
 
                 {/* Repository Releases (Collapsible) */}
                 <div
@@ -1321,7 +1315,7 @@ export const ReleaseTimeline: React.FC = () => {
                   style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                 >
                   <div className="overflow-hidden min-h-0">
-                    <div className="border-t ui-divider bg-light-bg dark:bg-panel-dark/50">
+                    <div className="border-t ui-divider bg-background dark:bg-card/50">
                       <div className="p-1.5 space-y-1.5">
                       {releases.map(({ release, displayLinks }) => {
                         const isUnread = isReleaseUnread(release.id);
@@ -1367,52 +1361,52 @@ export const ReleaseTimeline: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-center mt-8">
           <div className="flex items-center space-x-1">
-            <button
+            <Button
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
-            </button>
+            </Button>
             
             {getPageNumbers().map((page, index) => (
-              <button
+              <Button
                 key={index}
                 onClick={() => typeof page === 'number' ? handlePageChange(page) : undefined}
                 disabled={typeof page !== 'number'}
                 className={`px-3 py-2 rounded-lg text-sm ${
                   page === clampedPage
-                    ? 'bg-brand-indigo text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : typeof page === 'number'
-                    ? 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10'
-                    : 'text-gray-400 cursor-default'
+                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                    : 'text-muted-foreground cursor-default'
                 }`}
               >
                 {page}
-              </button>
+              </Button>
             ))}
             
-            <button
+            <Button
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
-              className="p-2 rounded-lg bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -1,3 +1,5 @@
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 import React, { useMemo, useState } from 'react';
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomReleaseRepository, ReleaseSourceId } from '../types';
@@ -52,56 +54,56 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
 
   return (
     <div className="mt-3">
-      <button
+      <Button
         type="button"
         onClick={() => setIsExpanded(prev => !prev)}
-        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-gray-600 transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-text-tertiary dark:hover:bg-white/[0.06]"
+        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-white/[0.06]"
       >
         <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
 
       {isExpanded && (
         <div className="mt-2 space-y-2">
           {repos.length === 0 ? (
-            <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-gray-500 dark:text-text-tertiary">
+            <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
               {emptyText}
             </p>
           ) : visibleRepos.map(repo => (
             <div
               key={normalizeRepoKey(repo.full_name)}
-              className={`flex items-center justify-between gap-3 rounded-lg bg-white dark:bg-white/[0.04] px-3 py-2 ${repo.release_hidden ? 'opacity-60' : ''}`}
+              className={`flex items-center justify-between gap-3 rounded-lg bg-white dark:bg-muted/40 px-3 py-2 ${repo.release_hidden ? 'opacity-60' : ''}`}
             >
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-gray-900 dark:text-text-primary">{repo.full_name}</div>
-                <div className="truncate text-xs text-gray-500 dark:text-text-tertiary">{repo.html_url}</div>
+                <div className="truncate text-sm font-medium text-foreground dark:text-foreground">{repo.full_name}</div>
+                <div className="truncate text-xs text-muted-foreground dark:text-muted-foreground">{repo.html_url}</div>
               </div>
               {renderActions && <div className="flex flex-shrink-0 items-center gap-1">{renderActions(repo)}</div>}
             </div>
           ))}
 
           {repos.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-1 text-xs text-gray-500 dark:text-text-tertiary">
+            <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground dark:text-muted-foreground">
               <span>{t(`第 ${currentPage}/${totalPages} 页`, `Page ${currentPage}/${totalPages}`)}</span>
               <div className="flex items-center gap-1">
-                <button
+                <Button
                   type="button"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="rounded-md p-1.5 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/[0.08]"
+                  className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
                   aria-label={t('上一页', 'Previous page')}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="rounded-md p-1.5 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/[0.08]"
+                  className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
                   aria-label={t('下一页', 'Next page')}
                 >
                   <ChevronRight className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -146,14 +148,14 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
   };
 
   return (
-    <div className="rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface/50 dark:bg-white/[0.02] p-4">
+    <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
       <div className="mb-3">
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">{title}</h4>
-        <p className="mt-1 text-xs text-gray-500 dark:text-text-tertiary">{description}</p>
+        <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{title}</h4>
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{description}</p>
       </div>
 
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={input}
           onChange={(event) => setInput(event.target.value)}
@@ -161,16 +163,16 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
             if (event.key === 'Enter') handleAdd();
           }}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-white dark:bg-white/[0.04] px-3 py-2 text-sm text-gray-900 dark:text-text-primary focus:border-transparent focus:ring-2 focus:ring-brand-violet"
+          className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-white dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
         />
-        <button
+        <Button
           type="button"
           onClick={handleAdd}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />
           {t('添加', 'Add')}
-        </button>
+        </Button>
       </div>
 
       <PaginatedRepoList
@@ -178,15 +180,15 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
         language={language}
         emptyText={t('暂无仓库。', 'No repositories yet.')}
         renderActions={(repo) => (
-          <button
+          <Button
             type="button"
             onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
-            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-status-red dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-status-red"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-destructive"
             title={t('移除仓库', 'Remove repository')}
             aria-label={t('移除仓库', 'Remove repository')}
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       />
     </div>
@@ -236,26 +238,26 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
   };
 
   return (
-    <div className="rounded-lg border border-black/[0.06] dark:border-white/[0.04] bg-light-surface/50 dark:bg-white/[0.02] p-4">
+    <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">{t('Watch 仓库同步', 'Watch repository sync')}</h4>
-          <p className="mt-1 text-xs text-gray-500 dark:text-text-tertiary">
+          <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('Watch 仓库同步', 'Watch repository sync')}</h4>
+          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
             {t(
               '点击同步会拉取当前 GitHub 账号 Watch 的仓库，并作为 Release 来源。',
               'Sync pulls repositories watched by the current GitHub account and uses them as release sources.'
             )}
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={handleSync}
           disabled={isSyncing || !githubToken}
-          className="inline-flex min-h-10 min-w-24 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 min-w-24 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? t('同步中...', 'Syncing...') : t('同步', 'Sync')}
-        </button>
+        </Button>
       </div>
 
       <PaginatedRepoList
@@ -265,15 +267,15 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
         renderActions={(repo) => {
           const hidden = !!repo.release_hidden;
           return (
-            <button
+            <Button
               type="button"
               onClick={() => updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, { release_hidden: !hidden })}
-              className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
               title={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
               aria-label={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
             >
               {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           );
         }}
       />
@@ -323,7 +325,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('Release 来源设置', 'Release Source Settings')} maxWidth="max-w-2xl">
       <div className="space-y-5">
-        <div className="rounded-lg border border-brand-indigo/20 bg-brand-indigo/5 p-4 text-sm text-gray-700 dark:text-text-secondary">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground dark:text-muted-foreground">
           {t(
             '选择刷新 Release 时要检查的来源。多个来源包含同一仓库时会自动去重。',
             'Choose the sources checked when refreshing releases. Repositories appearing in multiple sources are deduplicated.'
@@ -334,34 +336,34 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
           {sourceRows.map(source => {
             const checked = enabledSources.has(source.id);
             return (
-              <button
+              <Button
                 key={source.id}
                 type="button"
                 onClick={() => handleToggle(source.id)}
                 className={`flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
                   checked
-                    ? 'border-brand-indigo/30 bg-brand-indigo/10'
-                    : 'border-black/[0.06] bg-white hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.05]'
+                    ? 'border-primary/30 bg-primary/10'
+                    : 'border-border bg-white hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-white/[0.05]'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-brand-indigo text-white' : 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-text-secondary'}`}>
+                  <div className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-text-primary">{source.title}</div>
-                    <div className="mt-1 text-xs text-gray-500 dark:text-text-tertiary">{source.description}</div>
+                    <div className="text-sm font-semibold text-foreground dark:text-foreground">{source.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{source.description}</div>
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-text-tertiary">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground">
                     {source.count}
                   </span>
-                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
                   </span>
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -385,13 +387,13 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
         )}
 
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {t('完成', 'Done')}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

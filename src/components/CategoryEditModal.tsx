@@ -1,3 +1,5 @@
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 import React, { useState, useEffect } from 'react';
 import { Save, X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
@@ -915,14 +917,14 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       <div className="space-y-4">
         {/* Category Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-900 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('分类名称', 'Category Name')} *
           </label>
-          <input
+          <Input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder={t('输入分类名称', 'Enter category name')}
             autoFocus
           />
@@ -930,76 +932,76 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Icon Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-900 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('选择图标', 'Select Icon')} 
-            <span className="text-xs text-gray-500 dark:text-text-secondary ml-2">
+            <span className="text-xs text-muted-foreground dark:text-muted-foreground ml-2">
               ({availableIcons.length}+ {t('个可选', 'available')})
             </span>
           </label>
           
           {/* Custom Icon Input */}
           {showCustomInput && (
-            <div className="mb-3 p-3 bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10 border border-black/[0.06] dark:border-white/[0.04] dark:border-brand-violet/20 rounded-lg">
+            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 border border-border dark:border-border dark:border-brand-violet/20 rounded-lg">
               <div className="flex items-center space-x-2">
-                <input
+                <Input
                   type="text"
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('输入任意emoji...', 'Enter any emoji...')}
-                  className="flex-1 px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-center text-lg"
+                  className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground text-center text-lg"
                   maxLength={4}
                   autoFocus
                 />
-                <button
+                <Button
                   onClick={handleCustomIconSubmit}
                   disabled={!customIcon.trim()}
-                  className="px-3 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover dark:bg-brand-indigo/80 dark:hover:bg-brand-indigo disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('确定', 'OK')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
                     setShowCustomInput(false);
                     setCustomIcon('');
                   }}
-                  className="px-3 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:bg-white/10 dark:hover:bg-white/20 dark:text-text-secondary"
+                  className="px-3 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
                 >
                   {t('取消', 'Cancel')}
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-brand-violet dark:text-brand-violet mt-2">
+              <p className="text-xs text-primary dark:text-primary mt-2">
                 {t('提示：可以输入任何emoji表情，如 🎯 🎨 🎪 等', 'Tip: You can enter any emoji, like 🎯 🎨 🎪 etc.')}
               </p>
             </div>
           )}
           
-          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-3">
+          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3">
             {availableIcons.map((iconItem) => (
-              <button
+              <Button
                 key={iconItem.name}
                 onClick={() => handleIconSelect(iconItem.icon)}
-                className={`p-2 rounded-lg text-xl hover:bg-light-surface dark:hover:bg-white/10 transition-colors ${
+                className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
                   formData.icon === iconItem.icon
-                    ? 'bg-brand-indigo/20 dark:bg-brand-indigo/30 ring-2 ring-brand-violet'
-                    : 'bg-light-bg dark:bg-white/[0.04]'
+                    ? 'bg-primary/20 dark:bg-primary/30 ring-2 ring-ring'
+                    : 'bg-background dark:bg-muted/40'
                 }`}
                 title={iconItem.icon}
               >
                 {iconItem.icon}
-              </button>
+              </Button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 dark:text-text-secondary mt-1">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
             {t('当前选择:', 'Selected:')} {formData.icon}
-            <button
+            <Button
               onClick={() => setShowCustomInput(true)}
-              className="ml-3 text-brand-violet dark:text-brand-violet hover:underline"
+              className="ml-3 text-primary dark:text-primary hover:underline"
             >
               <Plus className="w-3 h-3 inline mr-1" />
               {t('自定义emoji', 'Custom emoji')}
-            </button>
+            </Button>
           </p>
-          <p className="text-xs text-gray-400 dark:text-text-tertiary mt-1">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
             {t(
               '包含所有常用emoji分类：笑脸、人物、手势、动物、食物、交通、符号等',
               'Includes all common emoji categories: smileys, people, gestures, animals, food, transport, symbols, etc.'
@@ -1009,34 +1011,34 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Keywords */}
         <div>
-          <label className="block text-sm font-medium text-gray-900 dark:text-text-primary mb-2">
+          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('关键词', 'Keywords')}
           </label>
-          <input
+          <Input
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
-            className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-white/[0.04] text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
           />
-          <p className="text-xs text-gray-500 dark:text-text-secondary mt-1">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
             {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
           </p>
         </div>
 
         {/* Default Category Modified Hint */}
         {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
-          <div className="p-3 bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-status-amber/20">
-            <p className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber mb-2">
+          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-amber-600/10 rounded-lg border border-border dark:border-border dark:border-amber-600/20">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground dark:text-amber-600 mb-2">
               {t(
                 `此默认分类已被修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
                 `This default category has been modified. Original: ${originalCategory.icon} ${originalCategory.name}`
               )}
             </p>
             <div className="flex items-center space-x-2">
-              <span className="text-xs text-gray-700 dark:text-text-secondary dark:text-status-amber">{t('还原:', 'Reset:')}</span>
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground dark:text-amber-600">{t('还原:', 'Reset:')}</span>
               {hasNameIconModified && (
-                <button
+                <Button
                   onClick={() => {
                     resetDefaultCategoryNameIcon(category.id);
                     setFormData(prev => ({
@@ -1045,13 +1047,13 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       icon: originalCategory.icon
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
+                  className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-amber-600/30 transition-colors"
                 >
                   {t('名字/图标', 'Name/Icon')}
-                </button>
+                </Button>
               )}
               {hasKeywordsModified && (
-                <button
+                <Button
                   onClick={() => {
                     resetDefaultCategoryKeywords(category.id);
                     setFormData(prev => ({
@@ -1059,12 +1061,12 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       keywords: originalCategory.keywords.join(', ')
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
+                  className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-amber-600/30 transition-colors"
                 >
                   {t('关键词', 'Keywords')}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={() => {
                   resetDefaultCategory(category.id);
                   setFormData({
@@ -1073,39 +1075,39 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     keywords: originalCategory.keywords.join(', ')
                   });
                 }}
-                className="text-xs px-2 py-1 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-red/20 dark:text-status-red rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-red/30 transition-colors"
+                className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-destructive/20 dark:text-destructive rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-destructive/30 transition-colors"
               >
                 {t('全部', 'All')}
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
-          <div className="p-3 bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10 rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-brand-violet/20">
-            <p className="text-xs text-brand-violet dark:text-brand-violet">
+          <div className="p-3 bg-muted dark:bg-muted/40 dark:bg-primary/10 rounded-lg border border-border dark:border-border dark:border-brand-violet/20">
+            <p className="text-xs text-primary dark:text-primary">
               {t('编辑默认分类将覆盖原始设置，可随时还原。', 'Editing default category will override original settings. You can reset anytime.')}
             </p>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-white/[0.04] mt-4">
-          <button
+        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-border mt-4">
+          <Button
             onClick={handleClose}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-900 dark:text-text-primary bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 dark:border dark:border-white/[0.04] transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent dark:border dark:border-border transition-colors"
           >
             <X className="w-4 h-4" />
             <span>{t('取消', 'Cancel')}</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald dark:bg-status-emerald/80 dark:hover:bg-status-emerald' : 'bg-gray-300 text-gray-500 dark:bg-white/5 dark:text-text-tertiary cursor-not-allowed'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-accent dark:bg-muted/40 dark:bg-green-600/80 dark:hover:bg-green-600 dark:bg-green-600/80 dark:hover:bg-green-600' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

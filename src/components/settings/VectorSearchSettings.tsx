@@ -1,3 +1,5 @@
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
 import React, { useState, useCallback } from 'react';
 import {
   Search,
@@ -260,7 +262,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           githubApi.getRepositoryReadme(owner, repo, signal)
       : undefined;
     return { embeddingClient, vectorService, readmeFetcher };
-  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, activeEmbeddingConfig, githubToken]);
+  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, githubToken]);
 
   const handleRebuildIndex = useCallback(async () => {
     const clients = createClients();
@@ -472,10 +474,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Search className="w-5 h-5 text-purple-500" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-foreground dark:text-gray-100">
             {t('向量语义搜索', 'Vector Semantic Search')}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             {t(
               '基于 Cloudflare Vectorize 的语义搜索，能理解自然语言意图，找到语义相关而非仅关键词匹配的仓库。',
               'Semantic search powered by Cloudflare Vectorize. Understands natural language intent to find semantically related repositories.'
@@ -485,19 +487,19 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Toggle */}
-      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+      <div className="flex items-center justify-between p-4 bg-accent/50 dark:bg-card/50 rounded-lg">
         <div>
-          <div className="font-medium text-gray-900 dark:text-gray-100">
+          <div className="font-medium text-foreground dark:text-gray-100">
             {t('启用向量搜索', 'Enable Vector Search')}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
             {t('启用后，AI 搜索将优先走向量检索，失败时自动回退', 'When enabled, AI search will use vector retrieval first, with automatic fallback on failure')}
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setVectorSearchConfig({ enabled: !vectorSearchConfig.enabled })}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            vectorSearchConfig.enabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'
+            vectorSearchConfig.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
           }`}
         >
           <span
@@ -505,24 +507,24 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               vectorSearchConfig.enabled ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
-        </button>
+        </Button>
       </div>
 
       {/* Section 1: Embedding Model Config */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">①</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">①</span>
           {t('Embedding 模型配置', 'Embedding Model Configuration')}
         </h3>
 
         {/* API Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('模型来源', 'Model Source')}
           </label>
           <div className="flex flex-wrap gap-2">
             {EMBEDDING_API_TYPES.map((type) => (
-              <button
+              <Button
                 key={type.value}
                 onClick={() => {
                   setFormApiType(type.value);
@@ -530,22 +532,22 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 }}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                   formApiType === type.value
-                    ? 'bg-brand-indigo text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted dark:bg-card text-muted-foreground dark:text-gray-300 hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
                 {t(type.label, type.labelEn)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {/* Base URL */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('API 地址', 'API URL')}
           </label>
-          <input
+          <Input
             type="text"
             value={formBaseUrl}
             onChange={(e) => setFormBaseUrl(e.target.value)}
@@ -562,33 +564,33 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'http://localhost:11434'
                 : 'https://api.example.com/v1/embeddings'
             }
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
 
         {/* API Key */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             API Key
           </label>
           <div className="relative">
-            <input
+            <Input
               type={showApiKey ? 'text' : 'password'}
               value={formApiKey}
               onChange={(e) => setFormApiKey(e.target.value)}
               placeholder={formApiType === 'ollama' ? t('可留空', 'Optional') : 'sk-xxx'}
-              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-            <button
+            <Button
               type="button"
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
               {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+            </Button>
           </div>
           {formApiType === 'ollama' && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               {t('Ollama 本地模型可留空', 'Ollama local models can leave this empty')}
             </p>
           )}
@@ -596,10 +598,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Model Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('模型名称', 'Model Name')}
           </label>
-          <input
+          <Input
             type="text"
             value={formModel}
             onChange={(e) => setFormModel(e.target.value)}
@@ -612,23 +614,23 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'nomic-embed-text'
                 : 'model-name'
             }
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
 
         {/* Dimensions */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('向量维度', 'Vector Dimensions')}
           </label>
           <div className="flex gap-2">
-            <input
+            <Input
               type="number"
               value={formDimensions}
               onChange={(e) => setFormDimensions(parseInt(e.target.value) || 1536)}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-            <button
+            <Button
               onClick={() => {
                 const dim = DEFAULT_DIMENSIONS[formApiType];
                 setFormDimensions(dim);
@@ -636,10 +638,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 const input = document.querySelector(`input[type="number"]`) as HTMLInputElement;
                 if (input) { input.focus(); input.select(); }
               }}
-              className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+              className="px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-gray-300 rounded-md hover:bg-accent dark:hover:bg-accent"
             >
               {t('自动检测', 'Auto Detect')}
-            </button>
+            </Button>
           </div>
           <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
             ⚠ {t('必须与 Vectorize 索引维度一致', 'Must match Vectorize index dimensions')}
@@ -648,24 +650,24 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Test & Save */}
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={handleTestEmbedding}
             disabled={testingEmbedding || !formBaseUrl || !formModel}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testingEmbedding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {t('测试 Embedding 连接', 'Test Embedding Connection')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSaveEmbeddingConfig}
             className={`px-4 py-2 text-sm rounded-md transition-colors ${
               embeddingSaved
                 ? 'bg-green-500 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
             }`}
           >
             {embeddingSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
-          </button>
+          </Button>
         </div>
 
         {/* Test Result */}
@@ -687,58 +689,58 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 2: Cloudflare Vectorize Connection */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">②</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">②</span>
           {t('Cloudflare Vectorize 连接', 'Cloudflare Vectorize Connection')}
         </h3>
 
         {/* Worker URL */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('Worker 地址', 'Worker URL')}
           </label>
-          <input
+          <Input
             type="text"
             value={formWorkerUrl}
             onChange={(e) => setFormWorkerUrl(e.target.value)}
             placeholder="https://github-stars-vectorize.your-name.workers.dev"
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
 
         {/* Auth Token */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
             {t('认证 Token', 'Auth Token')}
           </label>
           <div className="relative">
-            <input
+            <Input
               type={showAuthToken ? 'text' : 'password'}
               value={formAuthToken}
               onChange={(e) => setFormAuthToken(e.target.value)}
               placeholder={t('Worker 认证令牌', 'Worker authentication token')}
-              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-            <button
+            <Button
               type="button"
               onClick={() => setShowAuthToken(!showAuthToken)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
             >
               {showAuthToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Test */}
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={handleTestWorker}
             disabled={testingWorker || !formWorkerUrl}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testingWorker ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {t('测试 Worker 连接', 'Test Worker Connection')}
-          </button>
+          </Button>
         </div>
 
         {/* Test Result */}
@@ -760,8 +762,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 3: Status */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">③</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">③</span>
           {t('状态', 'Status')}
         </h3>
 
@@ -770,9 +772,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {vectorSearchStatus?.connected ? (
               <CheckCircle className="w-4 h-4 text-green-500" />
             ) : (
-              <XCircle className="w-4 h-4 text-gray-400" />
+              <XCircle className="w-4 h-4 text-muted-foreground" />
             )}
-            <span className="text-gray-700 dark:text-gray-300">
+            <span className="text-muted-foreground dark:text-gray-300">
               {vectorSearchStatus?.connected
                 ? t('Worker 已连接', 'Worker connected')
                 : t('Worker 未连接', 'Worker not connected')}
@@ -782,7 +784,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {activeConfig && (
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <span className="text-gray-700 dark:text-gray-300">
+              <span className="text-muted-foreground dark:text-gray-300">
                 {t('Embedding 模型', 'Embedding model')}: {activeConfig.model}
               </span>
             </div>
@@ -790,8 +792,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
           {vectorSearchStatus?.vectorCount !== undefined && (
             <div className="flex items-center gap-2">
-              <span className="text-gray-500">📊</span>
-              <span className="text-gray-700 dark:text-gray-300">
+              <span className="text-muted-foreground">📊</span>
+              <span className="text-muted-foreground dark:text-gray-300">
                 {t('索引向量数', 'Indexed vectors')}: {vectorSearchStatus.vectorCount.toLocaleString()}
               </span>
             </div>
@@ -799,8 +801,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
           {vectorSearchStatus?.dimensions !== undefined && (
             <div className="flex items-center gap-2">
-              <span className="text-gray-500">📐</span>
-              <span className="text-gray-700 dark:text-gray-300">
+              <span className="text-muted-foreground">📐</span>
+              <span className="text-muted-foreground dark:text-gray-300">
                 {t('向量维度', 'Vector dimensions')}: {vectorSearchStatus.dimensions.toLocaleString()}
               </span>
             </div>
@@ -808,8 +810,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
           {vectorSearchStatus?.lastSyncAt && (
             <div className="flex items-center gap-2">
-              <span className="text-gray-500">🕐</span>
-              <span className="text-gray-700 dark:text-gray-300">
+              <span className="text-muted-foreground">🕐</span>
+              <span className="text-muted-foreground dark:text-gray-300">
                 {t('最后同步', 'Last sync')}: {new Date(vectorSearchStatus.lastSyncAt).toLocaleString()}
               </span>
             </div>
@@ -819,120 +821,120 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 4: Actions */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">④</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">④</span>
           {t('索引管理', 'Index Management')}
         </h3>
 
         {/* 索引内容选择 */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('索引内容', 'Index Content')}
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <button
+            <Button
               onClick={() => setFormIndexMode('description')}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
-                  ? 'border-brand-indigo bg-brand-indigo/5 dark:bg-brand-indigo/10'
+                  ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              <div className="font-medium text-gray-900 dark:text-gray-100">
+              <div className="font-medium text-foreground dark:text-gray-100">
                 {t('仓库描述', 'Description')}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {t('⚡ 速度快，精度较低', '⚡ Fast, lower precision')}
               </div>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setFormIndexMode('readme')}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
-                  ? 'border-brand-indigo bg-brand-indigo/5 dark:bg-brand-indigo/10'
+                  ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              <div className="font-medium text-gray-900 dark:text-gray-100">
+              <div className="font-medium text-foreground dark:text-gray-100">
                 {t('README 内容', 'README Content')}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {t('🎯 精度高，速度较慢', '🎯 High precision, slower')}
               </div>
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* README 字符数设置 */}
         {formIndexMode === 'readme' && (
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
               {t('README 截取字符数', 'README Max Characters')}
             </label>
-            <input
+            <Input
               type="number"
               value={formReadmeMaxChars}
               onChange={(e) => setFormReadmeMaxChars(Math.max(500, parseInt(e.target.value) || 6000))}
               min={500}
               max={20000}
               step={1000}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-indigo focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-ring focus:border-transparent"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('建议 4000-8000，越长精度越高但索引越慢', 'Recommended 4000-8000. Longer = higher precision but slower indexing')}
             </p>
           </div>
         )}
 
         {/* 保存索引配置 */}
-        <button
+        <Button
           onClick={handleSaveWorkerConfig}
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
               ? 'bg-green-500 text-white'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
           }`}
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存索引配置', 'Save Index Config')}
-        </button>
+        </Button>
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             onClick={handleRebuildIndex}
             disabled={isIndexing || !isConfigComplete}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('重建向量索引', 'Rebuild Vector Index')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleIncrementalIndex}
             disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
             {incrementalTargetCount > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-brand-indigo text-white rounded-full">
+              <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
                 {incrementalTargetCount}
               </span>
             )}
-          </button>
+          </Button>
           {isIndexing && (
-            <button
+            <Button
               onClick={handleAbortIndexing}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
             >
               <Square className="w-4 h-4" />
               {t('中止', 'Abort')}
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Progress */}
         {isIndexing && phaseTotal > 0 && (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex justify-between text-sm text-muted-foreground dark:text-muted-foreground">
               <span>
                 {phase === 'readme' && `📖 ${t('获取 README', 'Fetching README')}`}
                 {phase === 'embedding' && `🧠 ${t('生成向量', 'Generating embeddings')}`}
@@ -943,9 +945,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 {phaseDone}/{phaseTotal} ({Math.round((phaseDone / phaseTotal) * 100)}%)
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-accent dark:bg-muted rounded-full h-2">
               <div
-                className="bg-brand-indigo h-2 rounded-full transition-all"
+                className="bg-primary h-2 rounded-full transition-all"
                 style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
               />
             </div>
@@ -969,18 +971,18 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 5: Search Parameters */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑤</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑤</span>
           {t('搜索参数', 'Search Parameters')}
         </h3>
 
         {/* Similarity Threshold */}
         <div className="space-y-1">
-          <label htmlFor="search-threshold" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label htmlFor="search-threshold" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('相似度阈值', 'Similarity Threshold')}
           </label>
           <div className="flex items-center gap-3">
-            <input
+            <Input
               id="search-threshold"
               type="range"
               min={0.1}
@@ -990,30 +992,30 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               onChange={(e) => setFormSearchThreshold(parseFloat(e.target.value))}
               className="flex-1"
             />
-            <span className="text-sm font-mono text-gray-600 dark:text-gray-400 w-12 text-right">
+            <span className="text-sm font-mono text-muted-foreground dark:text-muted-foreground w-12 text-right">
               {formSearchThreshold.toFixed(2)}
             </span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('越高越严格，结果越少但更精确；越低越宽松，召回更多但可能有噪音', 'Higher = stricter, fewer but more precise results; Lower = more recall but may include noise')}
           </p>
         </div>
 
         {/* Top K */}
         <div className="space-y-1">
-          <label htmlFor="search-topk" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label htmlFor="search-topk" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('返回结果数 (Top K)', 'Results Count (Top K)')}
           </label>
-          <input
+          <Input
             id="search-topk"
             type="number"
             value={formSearchTopK}
             onChange={(e) => setFormSearchTopK(Math.max(5, Math.min(50, parseInt(e.target.value) || 30)))}
             min={5}
             max={50}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-indigo focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-ring focus:border-transparent"
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('向量检索返回的最大结果数，越多召回越广但 LLM 重排序成本越高', 'Max results from vector search. More = wider recall but higher LLM reranking cost')}
           </p>
         </div>
@@ -1021,20 +1023,20 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* HyDE Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div className="text-sm font-medium text-muted-foreground dark:text-gray-300">
               {t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('让 AI 生成理想仓库描述再搜索，提升短查询和中文查询的召回率', 'AI generates ideal repo description before searching, improves recall for short/Chinese queries')}
             </p>
           </div>
-          <button
+          <Button
             role="switch"
             aria-checked={formEnableHyDE}
             aria-label={t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
             onClick={() => setFormEnableHyDE(!formEnableHyDE)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              formEnableHyDE ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'
+              formEnableHyDE ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
             }`}
           >
             <span
@@ -1042,26 +1044,26 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 formEnableHyDE ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
-          </button>
+          </Button>
         </div>
 
         {/* Reranking Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div className="text-sm font-medium text-muted-foreground dark:text-gray-300">
               {t('LLM 语义重排序', 'LLM Semantic Reranking')}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('用 LLM 对向量搜索结果做语义排序，显著提升排序质量', 'LLM reranks vector results by semantic relevance, significantly improves ranking quality')}
             </p>
           </div>
-          <button
+          <Button
             role="switch"
             aria-checked={formEnableReranking}
             aria-label={t('LLM 语义重排序', 'LLM Semantic Reranking')}
             onClick={() => setFormEnableReranking(!formEnableReranking)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              formEnableReranking ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'
+              formEnableReranking ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
             }`}
           >
             <span
@@ -1069,119 +1071,119 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 formEnableReranking ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
-          </button>
+          </Button>
         </div>
 
         {/* Save */}
-        <button
+        <Button
           onClick={handleSaveWorkerConfig}
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
               ? 'bg-green-500 text-white'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
           }`}
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存搜索参数', 'Save Search Parameters')}
-        </button>
+        </Button>
       </div>
 
       {/* Section 6: Delete Index */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑥</span>
+        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+          <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑥</span>
           {t('删除索引', 'Delete Index')}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
           {t(
             '如果更换了 Embedding 模型（维度不同），需要删除旧索引后重新创建。',
             'If you changed the Embedding model (different dimensions), you need to delete the old index and recreate it.'
           )}
         </p>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => {
               const cmd = 'npx wrangler vectorize delete github-stars';
               navigator.clipboard.writeText(cmd);
             }}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
           >
             {t('复制删除命令', 'Copy Delete Command')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               const cmd = `npx wrangler vectorize create github-stars --dimensions=${formDimensions} --metric=cosine`;
               navigator.clipboard.writeText(cmd);
             }}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
           >
             {t('复制创建命令', 'Copy Create Command')}
-          </button>
+          </Button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-500">
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
           {t('在 cloudflare-worker 目录下执行以上命令，然后点击上方「重建向量索引」', 'Run these commands in the cloudflare-worker directory, then click "Rebuild Vector Index" above')}
         </p>
       </div>
 
       {/* Section 7: Deploy Guide */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <button
+        <Button
           onClick={() => setShowDeployGuide(!showDeployGuide)}
-          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+          className="w-full flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors"
         >
-          <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">⑦</span>
+          <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+            <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
             {t('部署指南', 'Deploy Guide')}
           </h3>
-          {showDeployGuide ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-        </button>
+          {showDeployGuide ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        </Button>
 
         {showDeployGuide && (
-          <div className="px-4 pb-4 text-sm text-gray-600 dark:text-gray-400 space-y-4">
+          <div className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
             {/* 首次部署 */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-              <p className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
+              <p className="font-medium text-foreground dark:text-gray-100 mb-2">
                 {t('首次部署', 'Initial Deployment')}
               </p>
               <ol className="list-decimal list-inside space-y-1.5">
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm install -g wrangler</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install -g wrangler</code>
                   {t(' 然后 ', ' then ')}
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">wrangler login</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler login</code>
                 </li>
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">
                     npx wrangler vectorize create github-stars --dimensions={formDimensions} --metric=cosine
                   </code>
                 </li>
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker && npm install</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker && npm install</code>
                 </li>
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code>
                 </li>
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
                 </li>
               </ol>
             </div>
 
             {/* 更新部署 */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-              <p className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
+              <p className="font-medium text-foreground dark:text-gray-100 mb-2">
                 {t('更新部署（代码变更后）', 'Redeploy (after code changes)')}
               </p>
               <ol className="list-decimal list-inside space-y-1.5">
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
                 </li>
                 <li>
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
                   {t('（如果依赖有变更，先执行 ', ' (if dependencies changed, run ')}
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">npm install</code>
+                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install</code>
                   {t('）', ')')}
                 </li>
               </ol>
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {t('注意：更新部署不需要重新创建 Vectorize 索引，已有向量数据不受影响。', 'Note: Redeployment does not require recreating the Vectorize index. Existing vector data is preserved.')}
               </p>
             </div>
@@ -1199,7 +1201,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               </p>
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-500">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('详细部署指南请参考', 'For detailed instructions, see')}{' '}
               <a
                 href="https://github.com/AmintaCCCP/GithubStarsManager/blob/main/cloudflare-worker/README.md"

@@ -17,6 +17,8 @@ import {
   Star,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { Button } from './ui/button';
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { isElectron } from '../services/electronProxy';
 import { backend } from '../services/backendAdapter';
 import {
@@ -142,7 +144,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
 
   return (
     <div 
-      className="relative w-full border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg95 dark:bg-panel-dark/95 backdrop-blur-sm"
+      className="relative w-full border-b border-border dark:border-border bg-background95 dark:bg-card/95 backdrop-blur-sm"
     >
       {/* 滚动容器 */}
       <div
@@ -157,32 +159,25 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
         }}
       >
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             ref={(el) => {
               if (el) tabRefs.current.set(tab.id, el);
             }}
+            type="button"
+            variant={activeTab === tab.id ? 'secondary' : 'ghost'}
+            size="sm"
             onClick={() => onTabChange(tab.id)}
             role="tab"
             id={`settings-tab-${tab.id}`}
             aria-selected={activeTab === tab.id}
             aria-controls={`settings-tabpanel-${tab.id}`}
-            className={`
-              flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-full 
-              transition-all duration-150 ease-out snap-center
-              min-h-[36px] touch-manipulation
-              ${activeTab === tab.id
-                ? 'text-gray-900 dark:text-text-primary font-medium'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
-              }
-            `}
-            style={{
-              WebkitTapHighlightColor: 'transparent',
-            }}
+            className="min-h-[36px] shrink-0 snap-center rounded-full touch-manipulation"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="w-4 h-4 flex-shrink-0">{tab.icon}</span>
-            <span className="font-medium text-sm whitespace-nowrap">{tab.label}</span>
-          </button>
+            <span className="h-4 w-4 shrink-0">{tab.icon}</span>
+            <span className="whitespace-nowrap text-sm font-medium">{tab.label}</span>
+          </Button>
         ))}
       </div>
       
@@ -432,70 +427,54 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 模态框模式
   if (isModal) {
     return (
-      <div
-        className="linear-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-      >
-        <div className="linear-modal w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b ui-divider bg-light-bg dark:bg-panel-dark">
-            <div className="flex items-center space-x-3">
-              <Settings className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
-              <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-text-primary">
-                {t('设置', 'Settings')}
-              </h2>
-            </div>
-            <button
-              onClick={handleClose}
-              className="linear-icon-button p-2"
-              aria-label={t('关闭设置', 'Close settings')}
-            >
-              <X className="w-5 h-5 text-gray-500 dark:text-text-tertiary" />
-            </button>
-          </div>
-
-          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-            {/* 侧边栏 - 桌面端 */}
-            <div className="hidden md:block w-64 border-r ui-divider bg-light-bg dark:bg-panel-dark overflow-y-auto">
-              <nav className="p-4 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    role="tab"
-                    id={`settings-tab-${tab.id}`}
-                    aria-selected={activeTab === tab.id}
-                    aria-controls={`settings-tabpanel-${tab.id}`}
-                    className={`linear-settings-nav-item w-full flex items-center space-x-3 px-4 py-3 text-left ${
-                      activeTab === tab.id ? 'is-active font-medium' : ''
-                    }`}
-                  >
-                    {tab.icon}
-                    <span className="font-medium">{tab.label}</span>
-                  </button>
-                ))}
-              </nav>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent showClose={false} aria-labelledby="settings-modal-title" className="h-[85vh] max-w-5xl overflow-hidden p-0">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b ui-divider bg-background px-5 py-4 dark:bg-card sm:px-6">
+              <div className="flex items-center space-x-3">
+                <Settings className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
+                <DialogTitle id="settings-modal-title" className="text-xl font-semibold text-foreground dark:text-foreground">
+                  {t('设置', 'Settings')}
+                </DialogTitle>
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={handleClose} aria-label={t('关闭设置', 'Close settings')}>
+                <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+              </Button>
             </div>
 
-            {/* 移动端标签选择器 */}
-            <div className="md:hidden">
-              <MobileTabNav
-                tabs={tabs}
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-              />
-            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+              <div className="hidden w-64 overflow-y-auto border-r ui-divider bg-background dark:bg-card md:block">
+                <nav className="space-y-1 p-4" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
+                  {tabs.map((tab) => (
+                    <Button
+                      key={tab.id}
+                      type="button"
+                      variant={activeTab === tab.id ? 'secondary' : 'ghost'}
+                      onClick={() => handleTabChange(tab.id)}
+                      role="tab"
+                      id={`settings-tab-${tab.id}`}
+                      aria-selected={activeTab === tab.id}
+                      aria-controls={`settings-tabpanel-${tab.id}`}
+                      className="w-full justify-start gap-3 px-4 py-3 text-left"
+                    >
+                      {tab.icon}
+                      <span className="font-medium">{tab.label}</span>
+                    </Button>
+                  ))}
+                </nav>
+              </div>
 
-            {/* 内容区域 */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="max-w-3xl mx-auto">
-                {renderTabContent()}
+              <div className="md:hidden">
+                <MobileTabNav tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                <div className="mx-auto max-w-3xl">{renderTabContent()}</div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -503,8 +482,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center space-x-3 mb-6">
-        <Settings className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary">
+        <Settings className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
+        <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
           {t('设置', 'Settings')}
         </h2>
       </div>
@@ -515,20 +494,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="ui-panel overflow-hidden">
             <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
-                <button
+                <Button
                   key={tab.id}
+                  type="button"
+                  variant={activeTab === tab.id ? 'secondary' : 'ghost'}
                   onClick={() => handleTabChange(tab.id)}
                   role="tab"
                   id={`settings-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
                   aria-controls={`settings-tabpanel-${tab.id}`}
-                  className={`linear-settings-nav-item w-full flex items-center space-x-3 px-4 py-3 text-left ${
-                    activeTab === tab.id ? 'is-active font-medium' : ''
-                  }`}
+                  className="w-full justify-start gap-3 px-4 py-3 text-left"
                 >
                   {tab.icon}
                   <span className="font-medium">{tab.label}</span>
-                </button>
+                </Button>
               ))}
             </nav>
           </div>

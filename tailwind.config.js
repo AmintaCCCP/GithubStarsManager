@@ -18,82 +18,71 @@ export default {
         mono: ['Berkeley Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
       },
       colors: {
-        // Linear-inspired application surfaces
-        'marketing-black': '#111113',
-        'panel-dark': '#19191c',
-        'surface-3': '#212124',
-        'surface-sec': '#2a2a2f',
-
-        // Text hierarchy for dark application surfaces
-        'text-primary': '#f7f7f8',
-        'text-secondary': '#c9c9d1',
-        'text-tertiary': '#92929d',
-        'text-quaternary': '#696972',
-
-        // Single-purpose accent: action and focus only
-        brand: {
-          indigo: '#5e6ad2',
-          violet: '#7c7bf6',
-          hover: '#6d6ce6',
+        // shadcn semantic surfaces and compatibility aliases
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        card: {
+          DEFAULT: 'hsl(var(--card) / <alpha-value>)',
+          foreground: 'hsl(var(--card-foreground) / <alpha-value>)',
         },
-        'security-lavender': '#8b8abe',
-
-        // Semantic status colors
-        'status-green': '#4cb782',
-        'status-emerald': '#4cb782',
-        'status-amber': '#d89547',
-        'status-red': '#e06c75',
-
-        // Fine application lines; use the lowest contrast that preserves hierarchy
-        'border-primary': '#2b2b30',
-        'border-secondary': '#38383f',
-        'border-tertiary': '#47474f',
-        'line-tint': '#171719',
-        'line-tertiary': '#202024',
-
-        // Light-mode application neutrals
-        'light-bg': '#f7f7f8',
-        'light-surface': '#f1f1f3',
-        'light-border': '#dedee3',
-        'light-border-alt': '#e8e8ec',
-
-        // Keeping existing for gradual migration
+        popover: {
+          DEFAULT: 'hsl(var(--popover) / <alpha-value>)',
+          foreground: 'hsl(var(--popover-foreground) / <alpha-value>)',
+        },
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#0066CC',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
         },
         secondary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
+          DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+          foreground: 'hsl(var(--muted-foreground) / <alpha-value>)',
         },
         accent: {
-          50: '#fefbf0',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
-        }
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
+        },
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
+        'marketing-black': 'hsl(var(--background))',
+        'panel-dark': 'hsl(var(--card))',
+        'surface-3': 'hsl(var(--muted))',
+        'surface-sec': 'hsl(var(--accent))',
+        'text-primary': 'hsl(var(--foreground))',
+        'text-secondary': 'hsl(var(--muted-foreground))',
+        'text-tertiary': 'hsl(var(--muted-foreground))',
+        'text-quaternary': 'hsl(var(--muted-foreground) / 0.7)',
+        brand: {
+          indigo: 'hsl(var(--primary))',
+          violet: 'hsl(var(--accent-foreground))',
+          hover: 'hsl(var(--primary) / 0.9)',
+        },
+        'security-lavender': 'hsl(var(--accent-foreground))',
+        'status-green': '#16a34a',
+        'status-emerald': '#16a34a',
+        'status-amber': '#d97706',
+        'status-red': 'hsl(var(--destructive))',
+        'border-primary': 'hsl(var(--border))',
+        'border-secondary': 'hsl(var(--border))',
+        'border-tertiary': 'hsl(var(--border))',
+        'line-tint': 'hsl(var(--muted))',
+        'line-tertiary': 'hsl(var(--border))',
+        'light-bg': 'hsl(var(--background))',
+        'light-surface': 'hsl(var(--muted))',
+        'light-border': 'hsl(var(--border))',
+        'light-border-alt': 'hsl(var(--border))',
+        // Legacy aliases intentionally resolve to the same semantic defaults.
+        'primary-legacy': 'hsl(var(--primary))',
+        'secondary-legacy': 'hsl(var(--secondary))',
+        'accent-legacy': 'hsl(var(--accent))'
       },
       fontWeight: {
         'light': '300',
@@ -122,6 +111,7 @@ export default {
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
+        'fade-out': 'fadeOut 0.15s ease-in forwards',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-in forwards',
         'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',
@@ -134,6 +124,10 @@ export default {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        fadeOut: {
+          '0%': { opacity: '1' },
+          '100%': { opacity: '0' },
         },
         slideUp: {
           '0%': { transform: 'translateY(100%)', opacity: '0' },
