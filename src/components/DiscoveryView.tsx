@@ -513,6 +513,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
   // 用于记录最近一次自动拉取的频道，防止空频道无限循环拉取
   const autoFetchChannelRef = useRef<string | null>(null);
+  const appliedTopicRef = useRef<string | null | undefined>(undefined);
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const isDesktopSafeMode = useMemo(() => {
@@ -689,9 +690,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   // 主题改变时刷新数据
   useEffect(() => {
-    if (selectedDiscoveryChannel === 'topic') {
-      refreshChannel('topic', 1, false);
-    }
+    if (selectedDiscoveryChannel !== 'topic') return;
+    if (appliedTopicRef.current === discoverySelectedTopic) return;
+    appliedTopicRef.current = discoverySelectedTopic;
+    refreshChannel('topic', 1, false);
   }, [discoverySelectedTopic, selectedDiscoveryChannel, refreshChannel]);
 
   const formatLastRefresh = useCallback((timestamp: string | null) => {

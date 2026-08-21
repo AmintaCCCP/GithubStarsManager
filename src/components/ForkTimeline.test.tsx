@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ForkTimeline } from './ForkTimeline';
 import { useAppStore } from '../store/useAppStore';
@@ -135,7 +136,7 @@ describe('ForkTimeline owner filtering', () => {
   it('shows only personal-account forks by default', async () => {
     render(<ForkTimeline />);
 
-    await screen.findByLabelText('选择 Fork 拥有者');
+    await screen.findByRole('combobox', { name: '拥有者:' });
 
     expect(screen.getByText('personal-fork')).toBeInTheDocument();
     expect(screen.queryByText('org-fork')).not.toBeInTheDocument();
@@ -144,8 +145,10 @@ describe('ForkTimeline owner filtering', () => {
   it('switches to organization-owned forks without mixing personal forks', async () => {
     render(<ForkTimeline />);
 
-    const ownerSelector = await screen.findByLabelText('选择 Fork 拥有者');
-    fireEvent.change(ownerSelector, { target: { value: 'team-org' } });
+    const user = userEvent.setup();
+    const ownerSelector = await screen.findByRole('combobox', { name: '拥有者:' });
+    await user.click(ownerSelector);
+    await user.click(await screen.findByRole('option', { name: 'team-org' }));
 
     expect(await screen.findByText('org-fork')).toBeInTheDocument();
     expect(screen.queryByText('personal-fork')).not.toBeInTheDocument();

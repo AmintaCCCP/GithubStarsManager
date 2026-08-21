@@ -524,6 +524,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   setFormApiType(type.value);
                   setFormDimensions(DEFAULT_DIMENSIONS[type.value]);
                 }}
+                aria-pressed={formApiType === type.value}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                   formApiType === type.value
                     ? 'bg-primary text-primary-foreground'
@@ -839,6 +840,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             <Button
               variant="outline"
               onClick={() => setFormIndexMode('description')}
+              aria-pressed={formIndexMode === 'description'}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
@@ -855,6 +857,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             <Button
               variant="outline"
               onClick={() => setFormIndexMode('readme')}
+              aria-pressed={formIndexMode === 'readme'}
               className={`p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'

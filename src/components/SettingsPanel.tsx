@@ -169,7 +169,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             size="sm"
             onClick={() => onTabChange(tab.id)}
             role="tab"
-            id={`settings-tab-${tab.id}`}
+            id={`settings-tab-mobile-${tab.id}`}
             aria-selected={activeTab === tab.id}
             aria-controls={`settings-tabpanel-${tab.id}`}
             className="min-h-[36px] shrink-0 snap-center rounded-full touch-manipulation"

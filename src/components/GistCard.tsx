@@ -223,6 +223,7 @@ export const GistCard: React.FC<GistCardProps> = ({
           {gist.starred && (
             <Button
               type="button"
+              variant="ghost"
               onClick={handleUnstar}
               disabled={isMutating}
               className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
@@ -235,6 +236,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             <>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={(event) => {
                   event.stopPropagation();
                   onEdit(gist);
@@ -246,6 +248,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               </Button>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={handleDelete}
                 disabled={isMutating}
                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"

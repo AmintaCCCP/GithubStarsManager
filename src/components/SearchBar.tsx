@@ -1266,6 +1266,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({ 
                     isAnalyzed: searchFilters.isAnalyzed === true ? undefined : true 
                   })}
+                  aria-pressed={searchFilters.isAnalyzed === true}
                   title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === true
@@ -1284,6 +1285,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({ 
                     isAnalyzed: searchFilters.isAnalyzed === false ? undefined : false 
                   })}
+                  aria-pressed={searchFilters.isAnalyzed === false}
                   title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === false
@@ -1302,6 +1304,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({ 
                     analysisFailed: searchFilters.analysisFailed === true ? undefined : true 
                   })}
+                  aria-pressed={searchFilters.analysisFailed === true}
                   title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.analysisFailed === true
@@ -1320,6 +1323,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({ 
                     isSubscribed: searchFilters.isSubscribed === true ? undefined : true 
                   })}
+                  aria-pressed={searchFilters.isSubscribed === true}
                   title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === true
@@ -1338,6 +1342,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({ 
                     isSubscribed: searchFilters.isSubscribed === false ? undefined : false 
                   })}
+                  aria-pressed={searchFilters.isSubscribed === false}
                   title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === false
@@ -1356,6 +1361,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({
                     isEdited: searchFilters.isEdited === true ? undefined : true
                   })}
+                  aria-pressed={searchFilters.isEdited === true}
                   title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isEdited === true
@@ -1374,6 +1380,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({
                     isCategoryLocked: searchFilters.isCategoryLocked === true ? undefined : true
                   })}
+                  aria-pressed={searchFilters.isCategoryLocked === true}
                   title={t('显示分类已锁定的仓库（同步时不会自动更改分类）', 'Show repositories with locked category (won\'t auto-change during sync)')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === true
@@ -1392,6 +1399,7 @@ export const SearchBar: React.FC = () => {
                   onClick={() => setSearchFilters({
                     isCategoryLocked: searchFilters.isCategoryLocked === false ? undefined : false
                   })}
+                  aria-pressed={searchFilters.isCategoryLocked === false}
                   title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === false
@@ -1418,6 +1426,7 @@ export const SearchBar: React.FC = () => {
                   <Button
                     key={language}
                     onClick={() => handleLanguageToggle(language)}
+                    aria-pressed={searchFilters.languages.includes(language)}
                     className={`${filterTagBaseClass} ${
                       searchFilters.languages.includes(language)
                         ? filterChipActiveClass
@@ -1442,6 +1451,7 @@ export const SearchBar: React.FC = () => {
                   <Button
                     key={platform}
                     onClick={() => handlePlatformToggle(platform)}
+                    aria-pressed={searchFilters.platforms.includes(platform)}
                     className={`${filterChipBaseClass} ${
                       searchFilters.platforms.includes(platform)
                         ? filterChipActiveClass
@@ -1467,6 +1477,7 @@ export const SearchBar: React.FC = () => {
                   <Button
                     key={license}
                     onClick={() => handleLicenseToggle(license)}
+                    aria-pressed={(searchFilters.licenses ?? []).includes(license)}
                     className={`${filterTagBaseClass} ${
                       (searchFilters.licenses ?? []).includes(license)
                         ? filterChipActiveClass
@@ -1493,6 +1504,7 @@ export const SearchBar: React.FC = () => {
                   <Button
                     key={tag}
                     onClick={() => handleTagToggle(tag)}
+                    aria-pressed={searchFilters.tags.includes(tag)}
                     className={`${filterTagBaseClass} ${
                       searchFilters.tags.includes(tag)
                         ? filterChipActiveClass

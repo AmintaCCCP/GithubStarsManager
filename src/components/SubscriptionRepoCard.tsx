@@ -377,13 +377,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               <Button
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
-                className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isAnalyzed
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                    : isFailed
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                }`}
+                className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
                 title={
                   isAnalyzed 
                     ? t('重新分析', 'Re-analyze') 
@@ -500,7 +494,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-primary/20"
+                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground dark:bg-primary/20"
                 >
                   {tag}
                 </span>

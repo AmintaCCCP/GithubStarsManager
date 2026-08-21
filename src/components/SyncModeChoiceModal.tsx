@@ -1,4 +1,5 @@
 import { ListChecks, Star } from 'lucide-react';
+import { useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ export const SyncModeChoiceModal: React.FC = () => {
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const isOpen = !syncModeConfigured;
+  const firstActionRef = useRef<HTMLButtonElement>(null);
 
   const handleChooseSyncMode = (mode: 'stars' | 'stars-and-lists') => {
     setSyncMode(mode);
@@ -33,6 +35,10 @@ export const SyncModeChoiceModal: React.FC = () => {
   return (
     <AlertDialog open={isOpen} onOpenChange={() => undefined}>
       <AlertDialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          firstActionRef.current?.focus();
+        }}
         onEscapeKeyDown={(event) => event.preventDefault()}
         className="max-w-md p-6 sm:p-7"
       >
@@ -44,6 +50,7 @@ export const SyncModeChoiceModal: React.FC = () => {
         </AlertDialogHeader>
         <div className="space-y-3">
           <AlertDialogAction
+            ref={firstActionRef}
             onClick={() => handleChooseSyncMode('stars')}
             className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
           >

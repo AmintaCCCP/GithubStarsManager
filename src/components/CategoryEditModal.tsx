@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Save, X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
 import { Category } from '../types';
@@ -782,6 +782,8 @@ const availableIcons = [
   { name: '🚢', icon: '🚢' },
 ];
 
+const uniqueAvailableIcons = Array.from(new Map(availableIcons.map((icon) => [icon.name, icon])).values());
+
 interface CategoryEditModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -885,11 +887,26 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         formData.keywords !== (effectiveCategory.keywords?.join(', ') || '')
       );
 
-  const handleIconSelect = (iconValue: string) => {
+  const handleIconSelect = useCallback((iconValue: string) => {
     setFormData(prev => ({ ...prev, icon: iconValue }));
     setShowCustomInput(false);
     setCustomIcon('');
-  };
+  }, []);
+
+  const iconGrid = useMemo(() => uniqueAvailableIcons.map((iconItem) => (
+    <Button
+      key={iconItem.name}
+      onClick={() => handleIconSelect(iconItem.icon)}
+      className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
+        formData.icon === iconItem.icon
+          ? 'bg-primary/20 dark:bg-primary/30 ring-2 ring-ring'
+          : 'bg-background dark:bg-muted/40'
+      }`}
+      title={iconItem.icon}
+    >
+      {iconItem.icon}
+    </Button>
+  )), [formData.icon, handleIconSelect]);
 
   const handleCustomIconSubmit = () => {
     if (customIcon.trim()) {
@@ -941,7 +958,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
             {t('选择图标', 'Select Icon')} 
             <span className="text-xs text-muted-foreground dark:text-muted-foreground ml-2">
-              ({availableIcons.length}+ {t('个可选', 'available')})
+              ({uniqueAvailableIcons.length}+ {t('个可选', 'available')})
             </span>
           </label>
           
@@ -983,20 +1000,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           )}
           
           <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3">
-            {availableIcons.map((iconItem) => (
-              <Button
-                key={iconItem.name}
-                onClick={() => handleIconSelect(iconItem.icon)}
-                className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
-                  formData.icon === iconItem.icon
-                    ? 'bg-primary/20 dark:bg-primary/30 ring-2 ring-ring'
-                    : 'bg-background dark:bg-muted/40'
-                }`}
-                title={iconItem.icon}
-              >
-                {iconItem.icon}
-              </Button>
-            ))}
+            {iconGrid}
           </div>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
             {t('当前选择:', 'Selected:')} {formData.icon}
@@ -1112,7 +1116,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-accent dark:bg-muted/40 dark:bg-green-600/80 dark:hover:bg-green-600 dark:bg-green-600/80 dark:hover:bg-green-600' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-accent dark:bg-green-600/80 dark:hover:bg-green-600' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
