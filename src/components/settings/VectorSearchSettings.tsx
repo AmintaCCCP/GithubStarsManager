@@ -1,5 +1,6 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
 import React, { useState, useCallback } from 'react';
 import {
   Search,
@@ -496,18 +497,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {t('启用后，AI 搜索将优先走向量检索，失败时自动回退', 'When enabled, AI search will use vector retrieval first, with automatic fallback on failure')}
           </div>
         </div>
-        <Button
-          onClick={() => setVectorSearchConfig({ enabled: !vectorSearchConfig.enabled })}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            vectorSearchConfig.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              vectorSearchConfig.enabled ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </Button>
+        <Switch
+          checked={vectorSearchConfig.enabled}
+          onCheckedChange={(enabled) => setVectorSearchConfig({ enabled })}
+          aria-label={t('启用向量搜索', 'Enable Vector Search')}
+        />
       </div>
 
       {/* Section 1: Embedding Model Config */}
@@ -1030,21 +1024,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               {t('让 AI 生成理想仓库描述再搜索，提升短查询和中文查询的召回率', 'AI generates ideal repo description before searching, improves recall for short/Chinese queries')}
             </p>
           </div>
-          <Button
-            role="switch"
-            aria-checked={formEnableHyDE}
+          <Switch
+            checked={formEnableHyDE}
+            onCheckedChange={setFormEnableHyDE}
             aria-label={t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
-            onClick={() => setFormEnableHyDE(!formEnableHyDE)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              formEnableHyDE ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                formEnableHyDE ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </Button>
+          />
         </div>
 
         {/* Reranking Toggle */}
@@ -1057,21 +1041,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               {t('用 LLM 对向量搜索结果做语义排序，显著提升排序质量', 'LLM reranks vector results by semantic relevance, significantly improves ranking quality')}
             </p>
           </div>
-          <Button
-            role="switch"
-            aria-checked={formEnableReranking}
+          <Switch
+            checked={formEnableReranking}
+            onCheckedChange={setFormEnableReranking}
             aria-label={t('LLM 语义重排序', 'LLM Semantic Reranking')}
-            onClick={() => setFormEnableReranking(!formEnableReranking)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              formEnableReranking ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                formEnableReranking ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </Button>
+          />
         </div>
 
         {/* Save */}

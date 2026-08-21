@@ -754,6 +754,7 @@ export const ReleaseTimeline: React.FC = () => {
                  type="button"
                  role="switch"
                  aria-checked={includePreRelease}
+                 aria-label={t('包含 Pre-release', 'Include Pre-release')}
                  onClick={() => setIncludePreRelease(!includePreRelease)}
                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
                >
@@ -869,6 +870,7 @@ export const ReleaseTimeline: React.FC = () => {
                 type="button"
                 role="switch"
                 aria-checked={includePreRelease}
+                aria-label={t('包含 Pre-release', 'Include Pre-release')}
                 onClick={() => setIncludePreRelease(!includePreRelease)}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
               >

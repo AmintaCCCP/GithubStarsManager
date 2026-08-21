@@ -294,10 +294,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           <div className="space-y-4">
             {/* Proxy Type */}
             <div>
-              <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
+              <label id="proxy-type-label" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                 {t('代理类型', 'Proxy Type')}
               </label>
-              <RadioGroup value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ProxyType })} className="grid max-w-md grid-cols-2 gap-3">
+              <RadioGroup aria-labelledby="proxy-type-label" value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ProxyType })} className="grid max-w-md grid-cols-2 gap-3">
                 {(['http', 'socks5'] as ProxyType[]).map((type) => (
                   <label key={type} className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors ${form.type === type ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border hover:bg-background dark:border-border dark:hover:bg-accent'}`}>
                     <RadioGroupItem value={type} id={`proxy-type-${type}`} />
