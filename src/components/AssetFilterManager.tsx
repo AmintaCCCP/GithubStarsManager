@@ -99,11 +99,12 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     <div className="space-y-3">
       {/* Compact Header with Toggle */}
       <div className="flex items-center justify-between">
-        <Button
-          onClick={() => setIsExpanded(!isExpanded)}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center space-x-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent transition-all group"
           title={isExpanded ? t('收起过滤器', 'Collapse filters') : t('展开过滤器', 'Expand filters')}
-          type="button"
           aria-expanded={isExpanded}
           aria-controls="asset-filter-panel"
         >
@@ -128,6 +129,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
         <div className="flex items-center space-x-2">
           {selectedFilters.length > 0 && (
             <Button
+              variant="ghost"
               onClick={onClearFilters}
               className="flex items-center space-x-1 px-2 py-1.5 text-xs text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
               title={t('清除所有筛选', 'Clear all filters')}
@@ -178,6 +180,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       }`}
                     >
                       <Button
+                        variant="ghost"
                         onClick={() => handlePresetToggle(preset.id)}
                         className="flex items-center space-x-1.5"
                         title={preset.keywords.join(', ')}
@@ -190,6 +193,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
                       <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
                         <Button
+                          variant="ghost"
                           onClick={() => handleEditFilter(preset)}
                           className="p-0.5 rounded hover:bg-white/20 dark:hover:bg-accent transition-colors"
                           title={t('编辑', 'Edit')}
@@ -223,6 +227,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     }`}
                   >
                     <Button
+                      variant="ghost"
                       onClick={() => onFilterToggle(filter.id)}
                       className="flex items-center space-x-2 flex-1"
                       aria-pressed={selectedFilters.includes(filter.id)}
@@ -238,6 +243,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     
                     <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                       <Button
+                        variant="ghost"
                         onClick={() => handleEditFilter(filter)}
                         className="p-1 rounded hover:bg-accent dark:hover:bg-accent transition-colors"
                         title={t('编辑', 'Edit')}
@@ -247,6 +253,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         <Edit3 className="w-3 h-3" aria-hidden="true" />
                       </Button>
                       <Button
+                        variant="destructive"
                         onClick={() => handleDeleteFilter(filter.id)}
                         className="p-1 rounded hover:bg-accent dark:bg-muted/40 hover:text-muted-foreground dark:text-muted-foreground dark:hover:bg-accent dark:bg-muted/40 dark:hover:text-muted-foreground dark:text-muted-foreground transition-colors"
                         title={t('删除', 'Delete')}

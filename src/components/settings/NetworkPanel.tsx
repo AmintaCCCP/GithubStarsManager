@@ -310,10 +310,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {/* Host and Port */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                <label htmlFor="proxy-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('主机地址', 'Host')}
                 </label>
                 <Input
+                  id="proxy-host"
                   type="text"
                   value={form.host}
                   onChange={(e) => setForm({ ...form, host: e.target.value })}
@@ -322,10 +323,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                <label htmlFor="proxy-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
                 <Input
+                  id="proxy-port"
                   type="number"
                   value={form.port || ''}
                   onChange={(e) => setForm({ ...form, port: parseInt(e.target.value) || 0 })}
@@ -350,10 +352,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               {showAuth && (
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                    <label htmlFor="proxy-username" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                       {t('用户名', 'Username')}
                     </label>
                     <Input
+                      id="proxy-username"
                       type="text"
                       value={form.username || ''}
                       onChange={(e) => setForm({ ...form, username: e.target.value || undefined })}
@@ -362,11 +365,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                    <label htmlFor="proxy-password" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                       {t('密码', 'Password')}
                     </label>
                     <div className="relative">
                       <Input
+                        id="proxy-password"
                         type={showPassword ? 'text' : 'password'}
                         value={form.password || ''}
                         onChange={(e) => setForm({ ...form, password: e.target.value || undefined })}
@@ -472,10 +476,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {/* Host and Port */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                <label htmlFor="rpc-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('主机地址', 'Host')}
                 </label>
                 <Input
+                  id="rpc-host"
                   type="text"
                   value={rpcForm.host}
                   onChange={(e) => setRpcForm({ ...rpcForm, host: e.target.value })}
@@ -484,10 +489,11 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+                <label htmlFor="rpc-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
                 <Input
+                  id="rpc-port"
                   type="number"
                   value={rpcForm.port || ''}
                   onChange={(e) => setRpcForm({ ...rpcForm, port: parseInt(e.target.value) || 0 })}
@@ -501,11 +507,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
             {/* Secret */}
             <div>
-              <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="rpc-secret" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                 {t('密钥', 'Secret')}
               </label>
               <div className="relative">
                 <Input
+                  id="rpc-secret"
                   type={showSecret ? 'text' : 'password'}
                   value={rpcForm.secret || ''}
                   onChange={(e) => {

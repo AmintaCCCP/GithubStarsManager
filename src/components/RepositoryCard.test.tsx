@@ -123,14 +123,19 @@ describe('RepositoryCard view modes', () => {
 
   it('only exposes similar-repository search in the menu when vector search is available', async () => {
     const user = userEvent.setup();
-    storeState.vectorSearchConfig.enabled = false;
-    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    const originalVectorSearchEnabled = storeState.vectorSearchConfig.enabled;
+    try {
+      storeState.vectorSearchConfig.enabled = false;
+      render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
 
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
-    expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument();
-    expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: '更多操作' }));
+      expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument();
+      expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    } finally {
+      storeState.vectorSearchConfig.enabled = originalVectorSearchEnabled;
+    }
   });
 
   it('closes the list action menu from card whitespace, page whitespace, or Escape', async () => {

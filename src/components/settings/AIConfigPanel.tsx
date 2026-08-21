@@ -435,10 +435,11 @@ Repository information:
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="ai-config-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
               <Input
+                id="ai-config-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -448,22 +449,22 @@ Repository information:
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label id="ai-api-type-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('接口格式', 'API Format')} *
               </label>
               <Select value={form.apiType} onValueChange={(value) => setForm(prev => ({ ...prev, apiType: value as AIApiType }))}>
-                <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="ai-api-type-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="openai">OpenAI (Chat Completions)</SelectItem><SelectItem value="openai-responses">OpenAI (Responses)</SelectItem><SelectItem value="claude">Claude</SelectItem><SelectItem value="gemini">Gemini</SelectItem><SelectItem value="deepseek">DeepSeek</SelectItem><SelectItem value="mimo">Xiaomi MiMo</SelectItem><SelectItem value="openai-compatible">OpenAI Compatible (Custom Endpoint)</SelectItem></SelectContent>
               </Select>
             </div>
 
             {form.apiType === 'mimo' && (
               <div>
-                <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+                <label id="ai-mimo-plan-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                   {t('MiMo 渠道', 'MiMo Channel')} *
                 </label>
                 <Select value={form.mimoPlan} onValueChange={(value) => setForm(prev => ({ ...prev, mimoPlan: value as MiMoPlan }))}>
-                  <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-labelledby="ai-mimo-plan-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="api">{t('API（按量付费）', 'API (Pay-as-you-go)')}</SelectItem><SelectItem value="token-plan">{t('Token Plan（订阅制）', 'Token Plan (Subscription)')}</SelectItem></SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -475,10 +476,11 @@ Repository information:
             )}
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="ai-base-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('API端点', 'API Endpoint')} *
               </label>
               <Input
+                id="ai-base-url"
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
@@ -499,10 +501,11 @@ Repository information:
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="ai-api-key" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('API密钥', 'API Key')} *
               </label>
               <Input
+                id="ai-api-key"
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
@@ -512,10 +515,11 @@ Repository information:
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="ai-model-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('模型名称', 'Model Name')} *
               </label>
               <Input
+                id="ai-model-name"
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
@@ -525,11 +529,12 @@ Repository information:
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label id="ai-concurrency-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('并发数', 'Concurrency')}
               </label>
               <SliderInput
                 value={form.concurrency}
+                label={t('并发数', 'Concurrency')}
                 onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
                 min={1}
                 max={10}
@@ -541,11 +546,11 @@ Repository information:
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label id="ai-reasoning-effort-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('推理强度', 'Reasoning Effort')}
               </label>
               <Select value={form.reasoningEffort || 'default'} onValueChange={(value) => setForm(prev => ({ ...prev, reasoningEffort: value === 'default' ? '' : value as AIReasoningEffort }))}>
-                <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="ai-reasoning-effort-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="default">{t('默认 / 不传', 'Default / Do not send')}</SelectItem><SelectItem value="none">{t('none — 不推理', 'none — No reasoning')}</SelectItem><SelectItem value="low">{t('low — 快速响应', 'low — Quick response')}</SelectItem><SelectItem value="medium">{t('medium — 均衡模式', 'medium — Balanced')}</SelectItem><SelectItem value="high">{t('high — 深度推理', 'high — Deep reasoning')}</SelectItem><SelectItem value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</SelectItem></SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -618,7 +623,7 @@ Repository information:
             {showCustomPrompt && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground">
+                  <label htmlFor="ai-custom-prompt" className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                     {t('自定义提示词', 'Custom Prompt')}
                     {isCustomPromptModified && (
                       <span className="ml-2 text-muted-foreground dark:text-muted-foreground ">
@@ -636,6 +641,7 @@ Repository information:
                   </span>
                 </div>
                 <Textarea
+                  id="ai-custom-prompt"
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}

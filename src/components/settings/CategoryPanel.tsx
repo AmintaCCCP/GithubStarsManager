@@ -75,14 +75,19 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryOrder]);
 
   const handleAddCategory = () => {
-    if (!newCategoryName.trim()) {
+    const categoryName = newCategoryName.trim();
+    if (!categoryName) {
       toast(t('请输入分类名称', 'Please enter category name'), 'error');
+      return;
+    }
+    if (categoryName.toLowerCase() === 'none') {
+      toast(t('none 是保留名称，请使用其他分类名称', 'The name "none" is reserved. Please choose another category name.'), 'error');
       return;
     }
 
     const newCategory = {
       id: `custom-${Date.now()}`,
-      name: newCategoryName.trim(),
+      name: categoryName,
       icon: newCategoryIcon,
       isCustom: true,
       keywords: newCategoryKeywords.split(',').map(k => k.trim()).filter(k => k),
@@ -103,8 +108,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   };
 
   const handleSaveEdit = () => {
-    if (!editName.trim()) {
+    const categoryName = editName.trim();
+    if (!categoryName) {
       toast(t('分类名称不能为空', 'Category name cannot be empty'), 'error');
+      return;
+    }
+    if (categoryName.toLowerCase() === 'none') {
+      toast(t('none 是保留名称，请使用其他分类名称', 'The name "none" is reserved. Please choose another category name.'), 'error');
       return;
     }
 
@@ -112,13 +122,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       const isDefault = allDefaultCategories.some(c => c.id === editingId);
       if (isDefault) {
         updateDefaultCategory(editingId, {
-          name: editName.trim(),
+          name: categoryName,
           icon: editIcon,
           keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
         });
       } else {
         updateCustomCategory(editingId, {
-          name: editName.trim(),
+          name: categoryName,
           icon: editIcon,
           keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
         });
@@ -361,10 +371,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="category-panel-new-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('分类名称', 'Category Name')} *
               </label>
               <Input
+                id="category-panel-new-name"
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
@@ -373,10 +384,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              <label htmlFor="category-panel-new-icon" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('图标', 'Icon')}
               </label>
               <Input
+                id="category-panel-new-icon"
                 type="text"
                 value={newCategoryIcon}
                 onChange={(e) => {
@@ -392,10 +404,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+            <label htmlFor="category-panel-new-keywords" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
               {t('关键词', 'Keywords')}
             </label>
             <Input
+              id="category-panel-new-keywords"
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
@@ -539,6 +552,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         <div className="flex items-center space-x-2">
                           <Input
                             type="text"
+                            aria-label={t('编辑分类图标', 'Edit category icon')}
                             value={editIcon}
                             onChange={(e) => {
                               const value = e.target.value;
@@ -552,6 +566,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           />
                           <Input
                             type="text"
+                            aria-label={t('编辑分类名称', 'Edit category name')}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-white dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
@@ -561,6 +576,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         <div className="flex items-center space-x-2">
                           <Input
                             type="text"
+                            aria-label={t('编辑分类关键词', 'Edit category keywords')}
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
                             className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-white dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
