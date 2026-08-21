@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomReleaseRepository, ReleaseSourceId } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -43,6 +43,7 @@ const PAGE_SIZE = 8;
 const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, emptyText, renderActions }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [page, setPage] = useState(1);
+  const repositoryListId = useId();
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const totalPages = Math.max(1, Math.ceil(repos.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -58,7 +59,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
         type="button"
         onClick={() => setIsExpanded(prev => !prev)}
         aria-expanded={isExpanded}
-        aria-controls="release-source-repositories"
+        aria-controls={repositoryListId}
         className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
       >
         <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
@@ -66,7 +67,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
       </Button>
 
       {isExpanded && (
-        <div id="release-source-repositories" className="mt-2 space-y-2">
+        <div id={repositoryListId} className="mt-2 space-y-2">
           {repos.length === 0 ? (
             <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
               {emptyText}

@@ -742,7 +742,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 variant="ghost"
                 aria-label={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
                 onClick={cycleFontSize}
-                className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
+                className="p-2 rounded-lg text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
               >
                 <Type className="w-4 h-4" />
@@ -760,7 +760,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 variant="ghost"
                 onClick={onClose}
-                className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
+                className="p-2 rounded-lg text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 aria-label={t('关闭', 'Close')}
               >
                 <X className="w-5 h-5" />
@@ -786,7 +786,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                           key={item.id}
                           variant="ghost"
                           onClick={() => scrollToHeading(item.id, item.text)}
-                          className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
+                          className={`h-auto block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id
                               ? 'bg-primary/10 text-primary dark:bg-primary/10 dark:text-primary font-medium'
                               : 'hover:bg-muted dark:hover:bg-white/5'

@@ -66,12 +66,14 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
 
   return (
     <>
-      <Button type="button" onClick={() => checkForUpdates(false)} disabled={isChecking} className="gap-2">
-        {isChecking ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        <span>{isChecking ? t('检查中...', 'Checking...') : t('检查更新', 'Check for Updates')}</span>
-      </Button>
+      <div className="flex flex-col items-start">
+        <Button type="button" onClick={() => checkForUpdates(false)} disabled={isChecking} className="gap-2">
+          {isChecking ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          <span>{isChecking ? t('检查中...', 'Checking...') : t('检查更新', 'Check for Updates')}</span>
+        </Button>
 
-      {error && <div className="mt-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40"><p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p></div>}
+        {error && <div className="mt-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40"><p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p></div>}
+      </div>
 
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
         <DialogContent className="max-w-md">
