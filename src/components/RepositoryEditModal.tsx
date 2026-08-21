@@ -1144,6 +1144,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               placeholder={t('添加自定义标签...', 'Add custom tag...')}
             />
             <Button
+              aria-label={t('添加标签', 'Add tag')}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddTag();
