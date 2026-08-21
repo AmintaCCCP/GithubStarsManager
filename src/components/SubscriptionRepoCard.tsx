@@ -573,6 +573,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               setUnstarConfirmOpen(false);
               setPendingUnstarAction(null);
             }}
+            variant="ghost"
             className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
           >
             {t('取消', 'Cancel')}

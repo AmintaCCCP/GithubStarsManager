@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Slider } from './slider';
 
 interface SliderInputProps {
@@ -36,7 +37,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
           step={step}
           value={[value]}
           onValueChange={([nextValue]) => onChange(nextValue)}
-          aria-label={label}
+          thumbLabel={label}
           className="flex-1"
         />
         <span className="min-w-[2.5rem] text-center text-sm font-medium tabular-nums text-foreground dark:text-foreground">

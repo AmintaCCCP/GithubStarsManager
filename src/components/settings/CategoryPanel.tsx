@@ -448,7 +448,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   isReordering
                     ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
-                    : 'bg-mutedtext-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                    : 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
                 {isReordering ? t('完成', 'Done') : t('调整顺序', 'Reorder')}
@@ -456,7 +456,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               {categoryOrder.length > 0 && (
                 <Button
                   onClick={handleResetOrder}
-                  className="px-3 py-1.5 rounded-lg text-sm bg-mutedtext-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   {t('重置', 'Reset')}
                 </Button>
@@ -576,7 +576,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           </Button>
                           <Button
                             onClick={handleCancelEdit}
-                            className="p-1.5 rounded bg-mutedtext-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                             title={t('取消', 'Cancel')}
                           >
                             <X className="w-4 h-4" />
@@ -657,7 +657,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <Button
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-mutedtext-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('上移', 'Move up')}
                           >
                             <ArrowUp className="w-4 h-4" />
@@ -665,7 +665,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <Button
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-mutedtext-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title={t('下移', 'Move down')}
                           >
                             <ArrowDown className="w-4 h-4" />
@@ -709,7 +709,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               </Button>
                               <Button
                                 onClick={() => hideDefaultCategory(category.id)}
-                                className="p-1.5 rounded bg-mutedtext-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                                className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                                 title={t('隐藏', 'Hide')}
                               >
                                 <EyeOff className="w-4 h-4" />
@@ -741,7 +741,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 <Button
                   key={category.id}
                   onClick={() => showDefaultCategory(category.id)}
-                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-mutedtext-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="w-5 text-center inline-block">{category.icon}</span>

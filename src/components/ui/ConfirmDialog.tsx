@@ -33,9 +33,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   type = 'warning',
 }) => {
   const isDanger = type === 'danger';
+  const confirmingRef = React.useRef(false);
+
+  const handleOpenChange = (open: boolean) => {
+    if (open) return;
+    if (confirmingRef.current) {
+      confirmingRef.current = false;
+      return;
+    }
+    onCancel();
+  };
+
+  const handleConfirm = () => {
+    confirmingRef.current = true;
+    onConfirm();
+  };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+    <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-start gap-4">
@@ -49,9 +64,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>{cancelText}</AlertDialogCancel>
+          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className={isDanger ? 'bg-destructive hover:bg-destructive/90' : undefined}
           >
             {confirmText}

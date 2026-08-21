@@ -183,24 +183,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, [embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus]);
 
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
-  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const menuTriggerInteractionRef = useRef<'pointer' | 'keyboard' | null>(null);
-
-  useEffect(() => {
-    if (!isActionsMenuOpen) return;
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const menuContent = target instanceof Element ? target.closest('[data-repository-actions-menu]') : null;
-      if (!menuTriggerRef.current?.contains(target) && !menuContent) {
-        setIsActionsMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('click', handleDocumentClick);
-    return () => document.removeEventListener('click', handleDocumentClick);
-  }, [isActionsMenuOpen]);
+    const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (viewMode !== 'list' || selectionMode) {
@@ -968,7 +951,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   event.stopPropagation();
                   setEditModalOpen(true);
                 }}
-                className="linear-icon-button flex h-8 w-8 items-center justify-center text-amber-600"
+                className="linear-icon-button flex h-8 w-8 items-center justify-center text-primary"
                 title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
                 aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
               >
@@ -984,47 +967,29 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <Button
                 type="button"
                 variant="ghost"
-                ref={menuTriggerRef}
                 size="icon"
                 title={language === 'zh' ? '更多操作' : 'More actions'}
                 aria-label={language === 'zh' ? '更多操作' : 'More actions'}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  menuTriggerInteractionRef.current = 'pointer';
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    menuTriggerInteractionRef.current = 'keyboard';
-                  }
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (menuTriggerInteractionRef.current) {
-                    menuTriggerInteractionRef.current = null;
-                    return;
-                  }
-                  setIsActionsMenuOpen((open) => !open);
-                }}
+                onClick={(event) => event.stopPropagation()}
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent data-repository-actions-menu align="end" className="w-52" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuContent align="end" className="w-52" onClick={(event) => event.stopPropagation()}>
               <DropdownMenuLabel>{language === 'zh' ? '仓库操作' : 'Repository actions'}</DropdownMenuLabel>
               <DropdownMenuItem
-                role="button"
                 disabled={isAnalyzing}
                 onSelect={() => void handleAIAnalyze()}
               >
                 {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
                 {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
               </DropdownMenuItem>
-              <DropdownMenuItem role="button" onSelect={() => toggleReleaseSubscription(repository.id)}>
+              <DropdownMenuItem onSelect={() => toggleReleaseSubscription(repository.id)}>
                 {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
                 {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
               </DropdownMenuItem>
               {vectorSearchAvailable && (
-                <DropdownMenuItem role="button" disabled={isFindingSimilar} onSelect={() => handleFindSimilar()}>
+                <DropdownMenuItem disabled={isFindingSimilar} onSelect={() => handleFindSimilar()}>
                   {isFindingSimilar ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-2 h-3.5 w-3.5" />}
                   {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
                 </DropdownMenuItem>
@@ -1035,20 +1000,19 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  role="link"
                 >
                   <BookOpen className="mr-2 h-3.5 w-3.5" />
                   {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
                 </a>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <a href={repository.html_url} target="_blank" rel="noopener noreferrer" role="link">
+                <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
                   {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
                 </a>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem role="button" className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
                 <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
                 {language === 'zh' ? '取消 Star' : 'Unstar'}
               </DropdownMenuItem>
@@ -1085,10 +1049,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
-              <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-gray-800 dark:bg-surface-3 text-white dark:text-foreground text-xs rounded-lg shadow-dialog dark:border dark:border-border whitespace-nowrap z-50 animate-fade-in">
+              <div className="absolute top-full right-0 z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-dialog animate-fade-in">
                 {language === 'zh' ? '拖拽我到左侧分类栏' : 'Drag me to left sidebar'}
                 {/* 气泡箭头 */}
-                <div className="absolute bottom-full right-3 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-800 dark:border-b-surface-3"></div>
+                <div className="absolute bottom-full right-3 h-0 w-0 border-x-4 border-b-4 border-l-transparent border-r-transparent border-b-popover"></div>
               </div>
             )}
           </div>
@@ -1104,13 +1068,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={handleAIAnalyze}
             disabled={isAnalyzing}
             selectionMode={selectionMode}
-            className={`${
-              repository.analysis_failed
-              ? 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              : repository.analyzed_at
-                ? 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground'
-            }`}
+            className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={aiButtonTitle}
           >
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
@@ -1143,7 +1101,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground dark:bg-primary/20 dark:text-primary hover:bg-accent dark:bg-muted/40 dark:hover:bg-primary/30 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-primary/20 dark:text-primary dark:hover:bg-primary/30 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -1217,11 +1175,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
               <div className="group relative">
                 <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
-                <div className="absolute left-0 top-full mt-2 w-72 max-w-xs p-3 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-foreground dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
-                  <p className="text-muted-foreground dark:text-gray-300 leading-relaxed">
+                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-normal break-words shadow-lg">
+                  <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
                     {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
                   </p>
-                  <div className="absolute top-[-4px] left-3 w-2 h-2 bg-white dark:bg-card border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+                  <div className="absolute top-[-4px] left-3 h-2 w-2 rotate-45 transform border-l border-t border-border bg-popover"></div>
                 </div>
               </div>
             </div>

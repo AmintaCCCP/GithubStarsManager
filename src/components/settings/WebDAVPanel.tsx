@@ -238,7 +238,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <RadioGroupItem value={config.id} id={`active-webdav-${config.id}`} />
+                <RadioGroupItem
+                  value={config.id}
+                  id={`active-webdav-${config.id}`}
+                  aria-label={config.name || t('WebDAV 配置', 'WebDAV configuration')}
+                />
                 <div>
                   <h4 className="font-medium text-foreground dark:text-foreground">{config.name}</h4>
                   <p className="text-sm text-muted-foreground dark:text-muted-foreground">

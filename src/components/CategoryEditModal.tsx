@@ -995,6 +995,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             {t('当前选择:', 'Selected:')} {formData.icon}
             <Button
               onClick={() => setShowCustomInput(true)}
+              variant="ghost"
               className="ml-3 text-primary dark:text-primary hover:underline"
             >
               <Plus className="w-3 h-3 inline mr-1" />

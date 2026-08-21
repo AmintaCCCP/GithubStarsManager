@@ -193,6 +193,7 @@ export const GistCard: React.FC<GistCardProps> = ({
         <div className="flex shrink-0 items-center gap-1">
           <Button
             type="button"
+            variant="ghost"
             onClick={handleAnalyze}
             disabled={isAnalyzing}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-primary/15 dark:hover:text-primary-foreground"
@@ -202,6 +203,7 @@ export const GistCard: React.FC<GistCardProps> = ({
           </Button>
           <Button
             type="button"
+            variant="ghost"
             onClick={handleCopyLink}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={t('复制链接', 'Copy link')}

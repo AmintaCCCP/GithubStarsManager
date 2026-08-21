@@ -117,7 +117,7 @@ type UserListsPage = {
   user: {
     lists: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<{ id: string; name: string; description?: string; isPrivate: boolean }>;
+      nodes: Array<{ id: string; name: string; description: string | null; isPrivate: boolean } | null> | null;
     };
   } | null;
 };
@@ -126,7 +126,7 @@ type UserListItemsPage = {
   node: {
     items: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
+      nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string } | null> | null;
     };
   } | null;
 };
@@ -135,7 +135,7 @@ type UserListSummariesPage = {
   user: {
     lists: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<{ id: string; name: string }>;
+      nodes: Array<{ id: string; name: string } | null> | null;
     };
   } | null;
 };
@@ -542,7 +542,12 @@ export class GitHubListsApiService {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
 
-      summaries.push(...data.user.lists.nodes);
+      const nodes = data.user.lists.nodes ?? [];
+      summaries.push(
+        ...nodes
+          .filter((node): node is { id: string; name: string; description: string | null; isPrivate: boolean } => node !== null)
+          .map((node) => ({ ...node, description: node.description ?? undefined }))
+      );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
       const nextCursor: string | null = data.user.lists.pageInfo.endCursor;
       // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页
@@ -602,8 +607,8 @@ export class GitHubListsApiService {
         { signal }
       );
       if (!itemPage.node) break;
-      for (const item of itemPage.node.items.nodes) {
-        if (item.nameWithOwner) items.push(item.nameWithOwner);
+      for (const item of itemPage.node.items.nodes ?? []) {
+        if (item?.nameWithOwner) items.push(item.nameWithOwner);
       }
       itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
       const nextItemCursor: string | null = itemPage.node.items.pageInfo.endCursor;
@@ -639,7 +644,11 @@ export class GitHubListsApiService {
       if (!data.user) {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
-      summaries.push(...data.user.lists.nodes);
+      summaries.push(
+        ...(data.user.lists.nodes ?? []).filter(
+          (node): node is { id: string; name: string } => node !== null
+        )
+      );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
       const nextCursor: string | null = data.user.lists.pageInfo.endCursor;
       // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页

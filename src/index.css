@@ -1057,6 +1057,7 @@ html.dark::-webkit-scrollbar-thumb:hover {
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
   --border: 214.3 31.8% 91.4%;
+  --border-strong: 214.3 25% 80%;
   --input: 214.3 31.8% 91.4%;
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
@@ -1071,7 +1072,7 @@ html.dark::-webkit-scrollbar-thumb:hover {
   --ui-text-faint: hsl(var(--muted-foreground) / 0.75);
   --ui-line: hsl(var(--border));
   --ui-line-subtle: hsl(var(--border) / 0.7);
-  --ui-line-strong: hsl(var(--border) / 1.15);
+  --ui-line-strong: hsl(var(--border-strong));
   --ui-accent: hsl(var(--primary));
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
@@ -1105,6 +1106,7 @@ html.dark {
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
   --border: 217.2 32.6% 17.5%;
+  --border-strong: 217.2 32.6% 28%;
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
 
@@ -1117,7 +1119,7 @@ html.dark {
   --ui-text-faint: hsl(var(--muted-foreground) / 0.75);
   --ui-line: hsl(var(--border));
   --ui-line-subtle: hsl(var(--border) / 0.7);
-  --ui-line-strong: hsl(var(--border) / 1.15);
+  --ui-line-strong: hsl(var(--border-strong));
   --ui-accent: hsl(var(--primary));
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
@@ -1171,8 +1173,7 @@ textarea:focus-visible,
   color: var(--ui-text);
 }
 
-.ui-panel,
-.linear-panel {
+.ui-panel {
   background: var(--ui-panel);
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-lg);
@@ -1186,8 +1187,7 @@ textarea:focus-visible,
   box-shadow: var(--ui-shadow-card);
 }
 
-.ui-card,
-.linear-card {
+.ui-card {
   background: var(--ui-panel);
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-md);
@@ -1209,8 +1209,7 @@ textarea:focus-visible,
   border-color: var(--ui-line) !important;
 }
 
-.ui-field,
-.input-base {
+.ui-field {
   color: var(--ui-text);
   background: var(--ui-panel-muted);
   border: 1px solid var(--ui-line);
@@ -1218,25 +1217,21 @@ textarea:focus-visible,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
-.ui-field::placeholder,
-.input-base::placeholder {
+.ui-field::placeholder {
   color: var(--ui-text-faint);
 }
 
-.ui-field:hover,
-.input-base:hover {
+.ui-field:hover {
   border-color: var(--ui-line-strong);
 }
 
-.ui-field:focus,
-.input-base:focus {
+.ui-field:focus {
   background: var(--ui-panel);
   border-color: var(--ui-accent);
   box-shadow: 0 0 0 3px var(--ui-accent-ring);
 }
 
-.ui-button,
-.btn-ghost {
+.ui-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1247,15 +1242,13 @@ textarea:focus-visible,
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
-.ui-button:hover,
-.btn-ghost:hover {
+.ui-button:hover {
   color: var(--ui-text);
   background: var(--ui-panel-hover);
   border-color: var(--ui-line-strong);
 }
 
-.ui-button-primary,
-.btn-primary {
+.ui-button-primary {
   color: hsl(var(--primary-foreground));
   background: hsl(var(--primary));
   border: 1px solid hsl(var(--primary));
@@ -1264,16 +1257,13 @@ textarea:focus-visible,
   transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
-.ui-button-primary:hover,
-.btn-primary:hover {
+.ui-button-primary:hover {
   background: hsl(var(--primary) / 0.9);
   border-color: hsl(var(--primary) / 0.9);
 }
 
 .ui-button:active,
-.ui-button-primary:active,
-.btn-ghost:active,
-.btn-primary:active {
+.ui-button-primary:active {
   transform: translateY(1px);
 }
 

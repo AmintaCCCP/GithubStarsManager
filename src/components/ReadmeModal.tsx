@@ -9,7 +9,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { buildReadmeVariants, DEFAULT_README_VARIANT, type GitHubReadmeCandidateItem, type ReadmeVariant } from '../utils/readmeVariants';
-import { Dialog, DialogContent } from './ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 
 interface TocItem {
   id: string;
@@ -619,7 +619,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       <DialogContent
         ref={modalRef}
         showClose={false}
-        aria-labelledby="readme-modal-title"
         className="w-[calc(100%-2rem)] max-w-[1130px] overflow-hidden p-0"
       >
         <div
@@ -644,9 +643,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 className="w-8 h-8 rounded-full"
               />
               <div>
-                <h3 id="readme-modal-title" className="text-lg font-semibold text-foreground dark:text-foreground">
+                <DialogTitle id="readme-modal-title" className="text-lg font-semibold text-foreground dark:text-foreground">
                   {repository.full_name}
-                </h3>
+                </DialogTitle>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate max-w-[260px]" title={currentReadmeVariant.path || 'README'}>
                   {currentReadmeVariant.isDefault ? 'README' : currentReadmeVariant.path}
                 </p>
@@ -656,6 +655,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               {readmeVariants.length > 1 && (
                 <>
                 <select
+                  aria-hidden="true"
                   aria-label={t('切换 README 语言', 'Switch README language')}
                   value={selectedReadmeKey}
                   onChange={handleReadmeVariantChange}
@@ -666,7 +666,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   {readmeVariants.map((variant) => <option key={variant.key} value={variant.key}>{variant.label}</option>)}
                 </select>
                 <Select value={selectedReadmeKey} onValueChange={(value) => handleReadmeVariantChange({ target: { value } } as React.ChangeEvent<HTMLSelectElement>)} disabled={loading || variantsLoading}>
-                  <SelectTrigger className="h-9 w-28 max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-labelledby="readme-modal-title"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 w-28 max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>
                   <SelectContent>{readmeVariants.map((variant) => <SelectItem key={variant.key} value={variant.key}>{variant.label}</SelectItem>)}</SelectContent>
                 </Select>
                 </>
@@ -675,6 +675,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 isTranslated ? (
                   <>
                     <Button
+                      variant="ghost"
                       onClick={handleRevertTranslation}
                       className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary"
                       title={t('关闭翻译', 'Close Translation')}
@@ -689,6 +690,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     ]).map(({ mode, icon: Icon, label }) => (
                       <Button
                         key={mode}
+                        variant="ghost"
                         onClick={() => setDisplayMode(mode)}
                         className={`flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors ${
                           displayMode === mode
@@ -713,6 +715,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                       <span className="hidden sm:inline">{t('重试', 'Retry')}</span>
                     </Button>
                     <Button
+                      variant="ghost"
                       onClick={handleRevertTranslation}
                       className="flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300 hover:bg-muted dark:hover:bg-white/5"
                       title={t('关闭翻译', 'Close Translation')}
@@ -760,6 +763,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               {tocItems.length > 0 && (
                 <Button
+                  variant="ghost"
                   onClick={() => setShowToc(!showToc)}
                   className={`p-2 rounded-lg transition-colors ${
                     showToc
@@ -772,6 +776,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </Button>
               )}
               <Button
+                variant="ghost"
                 onClick={cycleFontSize}
                 className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
@@ -789,6 +794,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 <span className="hidden sm:inline">{t('在 GitHub 上查看', 'View on GitHub')}</span>
               </a>
               <Button
+                variant="ghost"
                 onClick={onClose}
                 className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 aria-label="Close"
@@ -814,6 +820,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                       return (
                         <Button
                           key={item.id}
+                          variant="ghost"
                           onClick={() => scrollToHeading(item.id, item.text)}
                           className={`block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id

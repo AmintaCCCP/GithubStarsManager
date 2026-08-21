@@ -608,7 +608,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   e.stopPropagation();
                                   void handleDeleteCategory(category);
                                 }}
-                                className="p-1 rounded-md text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent dark:bg-muted/40"
+                                variant="ghost"
+                                className="p-1 rounded-md text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent"
                                 title={t('删除分类', 'Delete category')}
                                 aria-label={t('删除分类', 'Delete category')}
                               >
@@ -620,6 +621,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   e.stopPropagation();
                                   void handleHideDefaultCategory(category);
                                 }}
+                                variant="ghost"
                                 className="p-1 rounded-md text-muted-foreground hover:bg-accent dark:text-muted-foreground dark:hover:bg-accent"
                                 title={t('隐藏默认分类', 'Hide default category')}
                                 aria-label={t('隐藏默认分类', 'Hide default category')}

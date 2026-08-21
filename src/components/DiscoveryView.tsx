@@ -171,7 +171,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 
   return (
     <div 
-      className="relative w-full border-b border-border dark:border-border bg-background95 dark:bg-card/95 backdrop-blur-sm lg:hidden"
+      className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm lg:hidden"
     >
       <div
         ref={scrollContainerRef}
@@ -191,6 +191,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               if (el) tabRefs.current.set(channel.id, el);
             }}
             onClick={() => onChannelSelect(channel.id)}
+            variant="ghost"
             role="tab"
             aria-selected={selectedChannel === channel.id}
             className={`
@@ -258,6 +259,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
     <div className="relative" ref={dropdownRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
+        variant="ghost"
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
       >
         <Filter className="w-4 h-4" />
@@ -274,7 +276,8 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
                 onPlatformChange(p.id);
                 setIsOpen(false);
               }}
-                className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
+              variant="ghost"
+              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 platform === p.id
                   ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
                   : 'text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent'
@@ -332,6 +335,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       <Button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        variant="outline"
         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
       >
         {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
@@ -349,6 +353,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                 onChange(option.value);
                 setIsOpen(false);
               }}
+              variant="ghost"
               className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 value === option.value
                   ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
@@ -1242,7 +1247,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
                         {t('搜索发现', 'Search & Discover')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foregroundleading-relaxed">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
                       </p>
                     </div>
@@ -1262,16 +1267,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
                         {t('暂无数据', 'No data yet')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foregroundleading-relaxed">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
                       </p>
                     </div>
                     <Button
+                      variant="default"
                       onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                       disabled={currentIsLoading}
                       className={isDesktopSafeMode
-                        ? 'px-6 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent dark:bg-muted/40 dark:bg-green-600/80 dark:hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-medium'
-                        : 'px-6 py-2.5 rounded-xl bg-white dark:bg-muted/40 border border-border dark:border-border text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                        ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
+                        : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                     >
                       <RefreshCw className="w-4 h-4" />
                       {t('立即刷新', 'Refresh Now')}
