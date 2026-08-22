@@ -1106,8 +1106,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </span>
               <Button
                 variant="ghost"
+                size="icon"
                 onClick={handlePauseResume}
-                className="p-1 sm:p-1.5 rounded-lg bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
+                className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -1115,7 +1116,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <Button
                 variant="ghost"
                 onClick={handleStop}
-                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
+                className="h-7 px-2 sm:px-3 py-1 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
               >
                 {t('停止', 'Stop')}
               </Button>
@@ -1183,10 +1184,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <Button
                 type="button"
                 variant="ghost"
+                size="icon"
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -1194,10 +1196,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <Button
                 type="button"
                 variant="ghost"
+                size="icon"
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />
