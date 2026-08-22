@@ -135,6 +135,7 @@ export const SearchDemo: React.FC = () => {
                 key={index}
                 type="button"
                 variant="ghost"
+                aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
                 className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
@@ -170,6 +171,7 @@ export const SearchDemo: React.FC = () => {
                 key={index}
                 type="button"
                 variant="ghost"
+                aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
                 className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query

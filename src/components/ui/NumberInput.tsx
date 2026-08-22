@@ -4,6 +4,7 @@ import { Input } from './input';
 interface NumberInputProps {
   value: number | undefined;
   onChange: (value: number | undefined) => void;
+  id?: string;
   min?: number;
   max?: number;
   step?: number;
@@ -18,6 +19,7 @@ const INVALID_KEYS_FLOAT = new Set(['e', 'E', '+']);
 export const NumberInput: React.FC<NumberInputProps> = ({
   value,
   onChange,
+  id,
   min,
   max,
   step = 1,
@@ -82,6 +84,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
 
   return (
     <Input
+      id={id}
       type="number"
       value={value !== undefined ? value : ''}
       onChange={handleChange}

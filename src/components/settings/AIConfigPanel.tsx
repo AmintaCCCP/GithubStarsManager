@@ -567,9 +567,9 @@ Repository information:
               <div
                 className={`mb-3 flex items-center space-x-2 rounded-lg p-3 ${
                   notification.type === 'success'
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
+                    ? 'bg-status-green/10 text-status-green dark:bg-status-green/10'
                     : notification.type === 'error'
-                      ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
+                      ? 'bg-destructive/10 text-destructive dark:bg-destructive/10'
                       : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
                 }`}
               >

@@ -261,7 +261,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             disabled={saving || loading}
             onClick={() => void handleToggle(!mcpConfig.enabled)}
             aria-label={t('启用 MCP 服务', 'Enable MCP service')}
-            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background ${
               mcpConfig.enabled ? 'bg-primary' : 'bg-accent dark:bg-accent'
             }`}
           >
@@ -464,7 +464,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               type="button"
               variant="ghost"
               onClick={() => void copyText('json', agentConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-foreground hover:opacity-90"
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
             >
               <Copy className="w-3.5 h-3.5" />
               {copiedKey === 'json' ? t('已复制', 'Copied') : t('复制 JSON', 'Copy JSON')}

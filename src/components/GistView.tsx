@@ -302,6 +302,7 @@ export const GistView: React.FC = () => {
                 <Button
                   key={category.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => setSelectedGistCategory(category.id)}
                   className={`linear-settings-nav-item flex w-full items-center justify-between px-3 py-2 text-sm ${
                     active ? 'is-active' : ''

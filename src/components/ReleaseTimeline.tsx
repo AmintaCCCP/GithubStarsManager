@@ -1296,7 +1296,7 @@ export const ReleaseTimeline: React.FC = () => {
                   className="grid transition-[grid-template-rows] duration-300 ease-in-out"
                   style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                 >
-                  <div className="overflow-hidden min-h-0">
+                  <div className="overflow-hidden min-h-0" hidden={!isExpanded} aria-hidden={!isExpanded}>
                     <div className="border-t ui-divider bg-background dark:bg-card/50">
                       <div className="p-1.5 space-y-1.5">
                       {releases.map(({ release, displayLinks }) => {

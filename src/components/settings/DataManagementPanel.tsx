@@ -164,6 +164,26 @@ const hasMaskedSecrets = (data: ExportData['data']): boolean => {
   );
 };
 
+const UI_SETTINGS_DATA_KEYS = [
+  'theme',
+  'language',
+  'isSidebarCollapsed',
+  'releaseViewMode',
+  'releaseSelectedFilters',
+  'releaseSearchQuery',
+  'releaseExpandedRepositories',
+] as const;
+
+const resolveImportTypes = (data: ExportData['data']): string[] => {
+  const present = Object.keys(data).filter(
+    (key) => data[key as keyof ExportData['data']] !== undefined
+  );
+  if (UI_SETTINGS_DATA_KEYS.some((key) => present.includes(key))) {
+    present.push('uiSettings');
+  }
+  return present;
+};
+
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
   const {
     user,
@@ -1679,7 +1699,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('输入GitHub用户名', 'Enter GitHub username')}
-                    className="w-full px-4 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-border dark:border-border dark:bg-muted/40 dark:text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring dark:bg-muted/40 dark:text-foreground"
                   />
                 </div>
               )}
@@ -1808,8 +1828,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </Button>
                 <Button
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'merge');
+                    importData(resolveImportTypes(importPreview.data!.data), 'merge');
                   }}
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
@@ -1825,8 +1844,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </Button>
                 <Button
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'replace');
+                    importData(resolveImportTypes(importPreview.data!.data), 'replace');
                   }}
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
