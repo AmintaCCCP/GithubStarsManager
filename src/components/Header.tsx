@@ -87,6 +87,7 @@ export const Header: React.FC = () => {
                   variant={isActive ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setCurrentView(menuItem.id as AppState['currentView'])}
+                  aria-pressed={isActive}
                   title={label}
                   aria-label={label}
                   className={`whitespace-nowrap xl:px-3 ${isActive ? 'shadow-sm' : ''}`}
@@ -123,6 +124,7 @@ export const Header: React.FC = () => {
                       setCurrentView(menuItem.id as AppState['currentView']);
                       setMobileMenuOpen(false);
                     }}
+                    aria-current={isActive ? 'page' : undefined}
                     className={isActive ? 'bg-muted dark:bg-accent' : undefined}
                   >
                     <Icon className="mr-3 h-4 w-4" />
