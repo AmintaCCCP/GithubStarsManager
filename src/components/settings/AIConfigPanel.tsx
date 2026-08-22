@@ -580,12 +580,19 @@ Repository information:
 
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-4">
-                <label className="flex cursor-pointer items-center space-x-2">
-                  <Checkbox checked={form.useCustomPrompt} onCheckedChange={(checked) => handleUseCustomPromptChange(checked === true)} />
-                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('使用自定义提示词', 'Use Custom Prompt')}</span>
-                </label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="ai-use-custom-prompt"
+                    checked={form.useCustomPrompt}
+                    onCheckedChange={(checked) => handleUseCustomPromptChange(checked === true)}
+                  />
+                  <label htmlFor="ai-use-custom-prompt" className="text-sm font-medium text-foreground dark:text-muted-foreground">
+                    {t('使用自定义提示词', 'Use Custom Prompt')}
+                  </label>
+                </div>
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleToggleDefaultPrompt}
                   disabled={showCustomPrompt}
                   className={`flex items-center space-x-1 text-sm ${
@@ -601,6 +608,7 @@ Repository information:
               {form.useCustomPrompt && (
                 <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleRestoreDefaultPrompt}
                   className="text-sm text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
                 >
@@ -730,6 +738,7 @@ Repository information:
               
               <div className="flex items-center space-x-2">
                 <Button
+                  variant="ghost"
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
                   className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-white/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
@@ -742,6 +751,7 @@ Repository information:
                   )}
                 </Button>
                 <Button
+                  variant="ghost"
                   onClick={() => handleEdit(config)}
                   className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-white/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('编辑', 'Edit')}
@@ -749,6 +759,7 @@ Repository information:
                   <Edit3 className="w-4 h-4" />
                 </Button>
                 <Button
+                  variant="ghost"
                   onClick={async () => {
                     const confirmed = await confirm(
                       t('确定要删除这个AI配置吗？', 'Delete AI Configuration?'),

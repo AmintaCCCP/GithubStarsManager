@@ -596,6 +596,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <div className="flex items-center rounded-lg border border-border dark:border-border overflow-hidden">
               {(['all', 'frontend', 'backend'] as const).map(scope => (
                 <Button key={scope} onClick={() => setSelectedScope(scope)} disabled={scope === 'backend' && !backendAvailable}
+                  aria-pressed={selectedScope === scope}
                   className={`px-3 py-1.5 text-sm transition-colors ${selectedScope === scope ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'} ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
                   {scope === 'all' ? t('全部', 'All') : scope === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
                 </Button>

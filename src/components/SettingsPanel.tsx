@@ -426,7 +426,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     );
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isModal) return null;
 
   // 模态框模式
   if (isModal) {

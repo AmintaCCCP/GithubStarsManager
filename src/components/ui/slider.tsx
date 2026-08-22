@@ -8,7 +8,7 @@ type SliderProps = Omit<SliderRootProps, 'value' | 'defaultValue' | 'onValueChan
   defaultValue?: number;
   onValueChange?: (value: number) => void;
   onValueCommit?: (value: number) => void;
-  thumbLabel?: string;
+  thumbLabel: string;
 };
 
 const Slider = React.forwardRef<

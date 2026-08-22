@@ -203,7 +203,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     isOpen: boolean;
     fileName: string;
   }>({ data: null, isOpen: false, fileName: '' });
-  const exportItems = [
+  const exportItems = useMemo(() => [
     { key: 'repositories', label: t('仓库数据', 'Repositories') },
     { key: 'releases', label: t('Release数据', 'Releases') },
     { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
@@ -215,7 +215,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
     { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
     { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
-  ];
+  ], [t]);
   const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>(() => exportItems.map((item) => item.key));
 
   const addLog = useCallback((operation: string, success: boolean, details?: string) => {
@@ -1389,8 +1389,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
             <div className="space-y-2 mb-4">
               {exportItems.map((item) => (
-                <label key={item.key} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
+                <div key={item.key} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
                   <Checkbox
+                    id={`export-type-${item.key}`}
                     checked={selectedExportTypes.includes(item.key)}
                     onCheckedChange={(checked) => {
                       setSelectedExportTypes((prev) => (
@@ -1400,8 +1401,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       ));
                     }}
                   />
-                  <span>{item.label}</span>
-                </label>
+                  <label htmlFor={`export-type-${item.key}`}>{item.label}</label>
+                </div>
               ))}
             </div>
             <Button
@@ -1533,6 +1534,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   </div>
                 </div>
                 <Button
+                  variant="ghost"
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.count === 0}
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

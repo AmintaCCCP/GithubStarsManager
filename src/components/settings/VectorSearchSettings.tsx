@@ -30,6 +30,8 @@ import {
 import { GitHubApiService } from '../../services/githubApi';
 import type { EmbeddingApiType, EmbeddingConfig } from '../../types';
 import { normalizeLicense } from '../../utils/licenseFilter';
+import { SliderInput } from '../ui/SliderInput';
+import { useDialog } from '../../hooks/useDialog';
 
 interface VectorSearchSettingsProps {
   t: (zh: string, en: string) => string;
@@ -70,6 +72,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     githubToken,
     updateRepositoriesMetadata,
   } = useAppStore();
+  const { toast } = useDialog();
 
   // Local form state for embedding config
   const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
@@ -514,10 +517,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* API Type */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <h4 id="embedding-model-source-label" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('模型来源', 'Model Source')}
-          </label>
-          <div className="flex flex-wrap gap-2">
+          </h4>
+          <div role="group" aria-labelledby="embedding-model-source-label" className="flex flex-wrap gap-2">
             {EMBEDDING_API_TYPES.map((type) => (
               <Button
                 key={type.value}
@@ -835,10 +838,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* 索引内容选择 */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <h4 id="embedding-index-content-label" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('索引内容', 'Index Content')}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
+          </h4>
+          <div role="group" aria-labelledby="embedding-index-content-label" className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
               onClick={() => setFormIndexMode('description')}
@@ -990,24 +993,19 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Similarity Threshold */}
         <div className="space-y-1">
-          <label htmlFor="search-threshold" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <div className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
             {t('相似度阈值', 'Similarity Threshold')}
-          </label>
-          <div className="flex items-center gap-3">
-            <Input
-              id="search-threshold"
-              type="range"
-              min={0.1}
-              max={0.8}
-              step={0.05}
-              value={formSearchThreshold}
-              onChange={(e) => setFormSearchThreshold(parseFloat(e.target.value))}
-              className="flex-1"
-            />
-            <span className="text-sm font-mono text-muted-foreground dark:text-muted-foreground w-12 text-right">
-              {formSearchThreshold.toFixed(2)}
-            </span>
           </div>
+          <SliderInput
+            value={formSearchThreshold}
+            onChange={setFormSearchThreshold}
+            min={0.1}
+            max={0.8}
+            step={0.05}
+            label={t('相似度阈值', 'Similarity Threshold')}
+            formatValue={(value) => value.toFixed(2)}
+            showMarks={false}
+          />
           <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('越高越严格，结果越少但更精确；越低越宽松，召回更多但可能有噪音', 'Higher = stricter, fewer but more precise results; Lower = more recall but may include noise')}
           </p>
@@ -1093,18 +1091,28 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </p>
         <div className="flex gap-2">
           <Button
-            onClick={() => {
+            onClick={async () => {
               const cmd = 'npx wrangler vectorize delete github-stars';
-              navigator.clipboard.writeText(cmd);
+              try {
+                await navigator.clipboard.writeText(cmd);
+              } catch (error) {
+                console.warn('Failed to copy delete command:', error);
+                toast(t('复制删除命令失败', 'Failed to copy delete command'), 'error');
+              }
             }}
             className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
           >
             {t('复制删除命令', 'Copy Delete Command')}
           </Button>
           <Button
-            onClick={() => {
+            onClick={async () => {
               const cmd = `npx wrangler vectorize create github-stars --dimensions=${formDimensions} --metric=cosine`;
-              navigator.clipboard.writeText(cmd);
+              try {
+                await navigator.clipboard.writeText(cmd);
+              } catch (error) {
+                console.warn('Failed to copy create command:', error);
+                toast(t('复制创建命令失败', 'Failed to copy create command'), 'error');
+              }
             }}
             className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
           >

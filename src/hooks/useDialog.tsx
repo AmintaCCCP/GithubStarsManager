@@ -1,5 +1,6 @@
 import React, { useState, useCallback, createContext, useContext, ReactNode, useMemo, useRef } from 'react';
 import { Toast, ToastType } from '../components/ui/Toast';
+import * as ToastPrimitive from '@radix-ui/react-toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 interface ToastState {
@@ -105,26 +106,29 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
   }), [toast, confirm]);
 
   return (
-    <DialogContext.Provider value={value}>
-      {children}
-      {toastState && (
-        <Toast
-          key={toastState.key}
-          message={toastState.message}
-          type={toastState.type}
-          onClose={closeToast}
+    <ToastPrimitive.Provider swipeDirection="right">
+      <DialogContext.Provider value={value}>
+        {children}
+        {toastState && (
+          <Toast
+            key={toastState.key}
+            message={toastState.message}
+            type={toastState.type}
+            onClose={closeToast}
+          />
+        )}
+        <ConfirmDialog
+          isOpen={confirmState.isOpen}
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmText={confirmState.confirmText}
+          cancelText={confirmState.cancelText}
+          type={confirmState.type}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
         />
-      )}
-      <ConfirmDialog
-        isOpen={confirmState.isOpen}
-        title={confirmState.title}
-        message={confirmState.message}
-        confirmText={confirmState.confirmText}
-        cancelText={confirmState.cancelText}
-        type={confirmState.type}
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
-      />
-    </DialogContext.Provider>
+      </DialogContext.Provider>
+      <ToastPrimitive.Viewport className="pointer-events-none fixed inset-0 z-[100] flex flex-col items-end gap-2 p-4" />
+    </ToastPrimitive.Provider>
   );
 };
