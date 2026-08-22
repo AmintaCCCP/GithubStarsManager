@@ -587,14 +587,13 @@ Repository information:
                     checked={form.useCustomPrompt}
                     onCheckedChange={(checked) => handleUseCustomPromptChange(checked === true)}
                   />
-                  <button
-                    type="button"
+                  <span
                     id="ai-use-custom-prompt-label"
-                    className="text-left text-sm font-medium text-foreground dark:text-muted-foreground"
+                    className="cursor-pointer text-left text-sm font-medium text-foreground dark:text-muted-foreground"
                     onClick={() => handleUseCustomPromptChange(!form.useCustomPrompt)}
                   >
                     {t('使用自定义提示词', 'Use Custom Prompt')}
-                  </button>
+                  </span>
                 </div>
                 <Button
                   type="button"
