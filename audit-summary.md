@@ -123,3 +123,13 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 状态；只有后续 review 明确报告 `Actionable comments posted: 0`，才能确认审查收尾。
 
 业务逻辑、store、services、API 和同步流程保持不变。
+
+## Round-23 CodeRabbit remediation status
+
+2026-08-22 07:49:32Z 的 subsequent CodeRabbit full review 报告 1 条 inline accessibility finding：BulkCategorizeModal 的分类失败提示已增加 `role="alert"`，确保 `onCategorize` rejection 能被屏幕阅读器播报。未改变 store、services、API、同步流程、AI 行为或数据流。
+
+本轮定向及全量测试均通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。`npm run lint` 通过且 0 errors/0 warnings；`npx tsc -b` 通过；`npm run build` 通过，legacy 入口 2,794.05 kB，独立 bundle checker 为 2,728.57 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 报告 `found 0 vulnerabilities`。
+
+本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 状态；只有后续 review 明确报告 `Actionable comments posted: 0`，才能确认审查收尾。
+
+业务逻辑、store、services、API 和同步流程保持不变。
