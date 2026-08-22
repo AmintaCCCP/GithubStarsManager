@@ -104,7 +104,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     </span>
                     <Button
                       onClick={this.handleCopyError}
-                      className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent dark:bg-muted/40 transition-colors"
+                      className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                     >
                       {strings.copyError}
                     </Button>
@@ -121,7 +121,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   onClick={this.handleToggleDetails}
                   aria-expanded={showDetails}
                   variant="ghost"
-                  className="text-sm text-primary dark:text-primary hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground dark:text-muted-foreground underline"
+                  className="text-sm text-primary dark:text-primary hover:text-muted-foreground dark:hover:text-muted-foreground underline"
                 >
                   {strings.toggleDetails}
                 </Button>
