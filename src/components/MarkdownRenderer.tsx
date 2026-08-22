@@ -931,7 +931,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     input: (props) => {
       if (props.type === 'checkbox') {
         return (
-          <Input
+          <input
             {...props}
             readOnly
             className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-ring dark:border-border dark:bg-muted/40"

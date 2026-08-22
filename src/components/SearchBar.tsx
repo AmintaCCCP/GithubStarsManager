@@ -1198,6 +1198,7 @@ export const SearchBar: React.FC = () => {
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
             variant="ghost"
+            aria-label={searchFilters.sortOrder === 'desc' ? t('按降序排列', 'Sort descending') : t('按升序排列', 'Sort ascending')}
             className="ui-button px-3 py-2 text-sm"
           >
             {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}

@@ -55,3 +55,8 @@
 2de4162 后最新 CodeRabbit review 的全部 comments 已完成修复：ReleaseTimeline repository disclosure 仅使用 phrasing spans；Discovery、Fork、Gist、Release、Repository controls 补齐共享 Button variants、compact size 与分页 aria 语义；SortAlgorithmTooltip 修复 Popover focus loop；Select primitives 增加 side-aware offsets、退出动画和长标签裁剪；Readme fragment、githubListsApi 类型、query-string 类型依赖、CI 重复 bundle step 与 Vite warning threshold 完成维护清理；Discovery loading indicator 与 success badge 使用有效且具备对比度的 semantic colors。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.01 kB，独立 checker 2,724.63 KiB，0 vulnerabilities。
+
+
+3544acf 后最新 CodeRabbit review 的所有 comments 已完成修复：Markdown checkbox 使用原生 input；RepositoryCard selection、ReleaseTimeline repository header、MCP/Network switches 覆盖 shared Button 默认布局；RepositoryEdit tag remove、RepositoryList display mode、SearchBar sort order 补齐 accessible names；ScrollArea 与 Separator 使用 semantic theme tokens；DiscoveryView 清理冗余 ternary。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.35 kB，独立 checker 2,724.95 KiB，0 vulnerabilities。

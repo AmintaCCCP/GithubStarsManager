@@ -1312,7 +1312,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+              className={`flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
                 isSelected
                   ? 'bg-accent text-foreground dark:bg-accent dark:text-foreground'
                   : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'

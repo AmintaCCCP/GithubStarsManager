@@ -1243,7 +1243,7 @@ export const ReleaseTimeline: React.FC = () => {
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
                   aria-expanded={isExpanded}
                   aria-controls={`release-group-${repository.id}`}
-                  className="w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
+                  className="h-auto w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center space-x-2">
                     {hasUnread && (

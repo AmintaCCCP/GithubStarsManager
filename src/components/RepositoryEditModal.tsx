@@ -1032,6 +1032,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                     }}
                     className="ml-1.5 h-7 w-7 p-0 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors"
                     title={t('移除', 'Remove')}
+                    aria-label={t(`移除标签 ${tag}`, `Remove tag ${tag}`)}
                   >
                     <X className="w-3 h-3" />
                   </Button>
