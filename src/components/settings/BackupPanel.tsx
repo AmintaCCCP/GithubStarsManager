@@ -351,7 +351,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       </div>
 
       {!activeConfig && (
-        <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
+        <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
           <div className="flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground mt-0.5" />
             <div>

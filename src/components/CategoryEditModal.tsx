@@ -982,6 +982,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   {t('确定', 'OK')}
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={() => {
                     setShowCustomInput(false);
                     setCustomIcon('');
@@ -1110,6 +1111,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         {/* Action Buttons */}
         <div className="flex justify-end space-x-3 pt-4 border-t dark:border-border mt-4">
           <Button
+            variant="outline"
             onClick={handleClose}
             className="flex items-center space-x-2 px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent dark:border dark:border-border transition-colors"
           >
