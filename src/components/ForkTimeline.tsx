@@ -780,6 +780,8 @@ export const ForkTimeline: React.FC = () => {
         <div className="flex items-center justify-center mt-8">
           <div className="flex items-center space-x-1">
             <Button
+              type="button"
+              variant="ghost"
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
               aria-label={t('第一页', 'First page')}
@@ -788,6 +790,8 @@ export const ForkTimeline: React.FC = () => {
               <ChevronsLeft className="w-4 h-4" />
             </Button>
             <Button
+              type="button"
+              variant="ghost"
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
               aria-label={t('上一页', 'Previous page')}
@@ -820,6 +824,8 @@ export const ForkTimeline: React.FC = () => {
             ))}
 
             <Button
+              type="button"
+              variant="ghost"
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
               aria-label={t('下一页', 'Next page')}
@@ -828,6 +834,8 @@ export const ForkTimeline: React.FC = () => {
               <ChevronRight className="w-4 h-4" />
             </Button>
             <Button
+              type="button"
+              variant="ghost"
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
               aria-label={t('最后一页', 'Last page')}
