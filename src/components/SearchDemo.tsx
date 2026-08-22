@@ -64,7 +64,7 @@ export const SearchDemo: React.FC = () => {
 
   if (!showDemo) {
     return (
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-border dark:border-border dark:border-border dark:border-border p-4 mb-6">
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-border p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-primary/20 dark:bg-primary/20 rounded-lg">
@@ -113,7 +113,7 @@ export const SearchDemo: React.FC = () => {
           size="icon"
           onClick={() => setShowDemo(false)}
           aria-label={t('关闭搜索演示', 'Close search demo')}
-          className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
+          className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
         >
           ×
         </Button>
@@ -139,8 +139,8 @@ export const SearchDemo: React.FC = () => {
                 onClick={() => handleExampleClick(example)}
                 className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
-                    ? 'border-primary bg-muted dark:bg-muted/40 dark:bg-primary/20'
-                    : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
+                    ? 'border-primary bg-muted dark:bg-primary/20'
+                    : 'border-border hover:border-border dark:border-border dark:hover:border-border'
                 }`}
               >
                 <span className="flex items-center space-x-2 mb-1">
@@ -176,7 +176,7 @@ export const SearchDemo: React.FC = () => {
                 className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
                   selectedExample?.query === example.query
                     ? 'border-border dark:border-border bg-muted dark:bg-muted/40 '
-                    : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
+                    : 'border-border hover:border-border dark:border-border dark:hover:border-border'
                 }`}
               >
                 <span className="flex items-center space-x-2 mb-1">
@@ -221,7 +221,7 @@ export const SearchDemo: React.FC = () => {
             </ul>
           </div>
 
-          <div className="mt-4 p-3 bg-muted dark:bg-muted/40 dark:bg-primary/20 rounded-lg">
+          <div className="mt-4 p-3 bg-muted dark:bg-primary/20 rounded-lg">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
               {selectedExample.type === 'realtime' ? (
                 t(
