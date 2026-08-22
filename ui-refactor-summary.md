@@ -111,3 +111,11 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本轮定向回归为 6 个测试文件/21 个测试全部通过；全量质量门禁为 31 个测试文件/332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,793.84 kB，独立 checker 2,728.36 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
 
 本节为待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
+
+## Round-22 CodeRabbit remediation status
+
+2026-08-22 07:36:40Z 的 subsequent CodeRabbit full review 报告 4 条 inline findings，均已完成最小范围修复：BilingualMarkdownRenderer display controls 使用 `size="sm"` 与紧凑高度；ReadmeModal 目录和字体 icon controls 使用 `size="icon"` 与方形尺寸；DiscoveryView 的时间范围、主题和编程语言 SelectTrigger 补充本地化 accessible names；StarSyncPanel 显式导入 React namespace 以支持 `React.FC` 类型引用。未改变 store、services、API、同步流程、AI 行为或数据流。
+
+本轮定向回归为 6 个测试文件/21 个测试全部通过；完整质量门禁为 31 个测试文件/332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,794.04 kB，独立 checker 2,728.56 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
+
+本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。

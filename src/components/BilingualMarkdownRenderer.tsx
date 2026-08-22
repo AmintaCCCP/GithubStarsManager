@@ -369,10 +369,11 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
               <Button
                 key={mode}
                 variant="ghost"
+                size="sm"
                 onClick={() => handleModeChange(mode)}
                 disabled={disabled}
                 aria-pressed={active}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+                className={`flex h-7 items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
                   active
                     ? 'bg-primary/20 text-primary dark:bg-primary/10'
                     : disabled

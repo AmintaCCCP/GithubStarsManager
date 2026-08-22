@@ -725,9 +725,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               {tocItems.length > 0 && (
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={() => setShowToc(!showToc)}
                   aria-label={t('目录', 'Table of Contents')}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`h-8 w-8 rounded-lg p-0 transition-colors ${
                     showToc
                       ? 'bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary'
                       : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
@@ -739,9 +740,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               <Button
                 variant="ghost"
+                size="icon"
                 aria-label={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
                 onClick={cycleFontSize}
-                className="p-2 rounded-lg text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
+                className="h-8 w-8 rounded-lg p-0 text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
               >
                 <Type className="w-4 h-4" />
