@@ -132,6 +132,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   const updateGist = useAppStore(state => state.updateGist);
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
+  const [loadedContents, setLoadedContents] = useState<Record<string, string>>({});
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
@@ -139,6 +140,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
   const handleContentLoaded = (filename: string, content: string) => {
+    setLoadedContents(previous => ({ ...previous, [filename]: content }));
     if (!gist) return;
     const state = useAppStore.getState();
     const latest =
@@ -160,6 +162,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   useEffect(() => {
     setActiveFilename(files[0]?.filename || '');
+    setLoadedContents({});
   }, [gist?.id, files]);
 
   const handleCopy = async (text: string, message: string) => {
@@ -237,7 +240,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               </div>
               <Button
                 type="button"
-                onClick={() => handleCopy(activeFile.content || '', t('文件内容已复制', 'File copied'))}
+                onClick={() => handleCopy(loadedContents[activeFile.filename] ?? activeFile.content ?? '', t('文件内容已复制', 'File copied'))}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
                 <Copy className="h-4 w-4" />

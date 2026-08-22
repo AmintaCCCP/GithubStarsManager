@@ -109,7 +109,11 @@
 
 .category-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  scrollbar-color: transparent transparent;
+}
+
+.category-scrollbar.is-scrolling {
+  scrollbar-color: rgba(156, 163, 175, 0.8) transparent;
 }
 
 .category-scrollbar::-webkit-scrollbar {
@@ -122,25 +126,27 @@
 }
 
 .category-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.5);
+  background: transparent;
   border-radius: 3px;
   transition: background 0.2s ease;
 }
 
-.category-scrollbar::-webkit-scrollbar-thumb:hover,
 .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
   background: rgba(156, 163, 175, 0.8);
 }
 
 .dark .category-scrollbar {
-  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+  scrollbar-color: transparent transparent;
+}
+
+.dark .category-scrollbar.is-scrolling {
+  scrollbar-color: rgba(75, 85, 99, 0.8) transparent;
 }
 
 .dark .category-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.5);
+  background: transparent;
 }
 
-.dark .category-scrollbar::-webkit-scrollbar-thumb:hover,
 .dark .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
   background: rgba(75, 85, 99, 0.8);
 }
@@ -989,9 +995,10 @@ textarea::-webkit-resizer {
 
 /* ---- 窗口级原生滚动条（仅作用于 document 滚动容器，不影响各组件 opt-in 滚动条类） ---- */
 
-/* 消灭窗口底部横向滚动条，并为下拉菜单打开保留稳定的 viewport gutter。 */
+/* 固定窗口滚动槽并裁掉页面级横向溢出，避免 portal 下拉打开时 viewport 横向晃动。 */
 html {
   overflow-x: hidden;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 

@@ -26,13 +26,14 @@ describe('SliderInput', () => {
     const user = userEvent.setup();
     render(<ControlledSlider />);
     const slider = screen.getByRole('slider', { name: 'Concurrency' });
-    const sliderRoot = slider.parentElement?.parentElement as HTMLElement;
+    const sliderRoot = slider.closest('[data-orientation][dir]') as HTMLElement | null;
+    expect(sliderRoot).not.toBeNull();
     expect(sliderRoot).toHaveAttribute('data-orientation', 'horizontal');
     expect(slider).toHaveAttribute('aria-valuenow', '1');
 
-    const getBoundingClientRect = vi.spyOn(sliderRoot, 'getBoundingClientRect').mockReturnValue(sliderRootRect);
+    const getBoundingClientRect = vi.spyOn(sliderRoot as HTMLElement, 'getBoundingClientRect').mockReturnValue(sliderRootRect);
     try {
-      await user.pointer({ target: sliderRoot, coords: { clientX: 60, clientY: 10 }, keys: '[MouseLeft]' });
+      await user.pointer({ target: sliderRoot as HTMLElement, coords: { clientX: 60, clientY: 10 }, keys: '[MouseLeft]' });
 
       await waitFor(() => expect(slider).toHaveAttribute('aria-valuenow', '6'));
     } finally {

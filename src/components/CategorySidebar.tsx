@@ -530,8 +530,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 <div
                   ref={categoryListRef}
                   onScroll={handleCategoryScroll}
-                  className={`space-y-1 overflow-y-auto max-h-[calc(100vh-12rem)] pr-3 category-scrollbar ${isScrolling ? 'is-scrolling' : ''}`}
+                  className={`-mr-4 max-h-[calc(100vh-12rem)] min-w-0 overflow-y-auto category-scrollbar ${isScrolling ? 'is-scrolling' : ''}`}
                 >
+                  <div className="space-y-1 pr-3">
                   {allCategories.map((category, index) => {
                     const count = getCategoryCount(category);
                     const isSelected = selectedCategory === category.id;
@@ -645,6 +646,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}

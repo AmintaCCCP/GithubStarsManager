@@ -331,8 +331,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               </label>
               <RadioGroup aria-labelledby="proxy-type-label" value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ProxyType })} className="grid max-w-md grid-cols-2 gap-3">
                 {(['http', 'socks5'] as ProxyType[]).map((type) => (
-                  <label key={type} className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors ${form.type === type ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border hover:bg-background dark:border-border dark:hover:bg-accent'}`}>
-                    <RadioGroupItem value={type} id={`proxy-type-${type}`} />
+                  <label key={type} onClick={() => setForm({ ...form, type })} className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors ${form.type === type ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border hover:bg-background dark:border-border dark:hover:bg-accent'}`}>
+                    <RadioGroupItem value={type} id={`proxy-type-${type}`} aria-label={type.toUpperCase()} />
                     <span className="text-sm font-medium uppercase text-foreground dark:text-foreground">{type}</span>
                   </label>
                 ))}
