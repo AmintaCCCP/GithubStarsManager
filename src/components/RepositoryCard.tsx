@@ -54,8 +54,8 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
 
   return (
     <Button
-      size="icon"
       {...props}
+      size="icon"
       onClick={handleClick}
       disabled={disabled || selectionMode}
       className={`${baseClasses} ${variantClasses[variant]} ${selectionClasses} ${className}`}

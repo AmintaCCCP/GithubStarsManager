@@ -762,9 +762,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
-          useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
-          store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
-          useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+          if (importedData.releaseSubscriptions !== undefined) {
+            useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
+          }
+          if (importedData.releaseSourceSettings !== undefined) {
+            store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
+          }
+          if (importedData.readReleases !== undefined) {
+            useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+          }
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
           // 旧备份可能缺少新增的 licenses 字段，导入时默认 [] 保持 SearchFilters 契约

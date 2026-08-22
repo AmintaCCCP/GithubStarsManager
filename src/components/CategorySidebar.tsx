@@ -413,6 +413,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 展开按钮 - 放在折叠状态的顶部 */}
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={toggleSidebar}
                   className="linear-icon-button w-8 h-8 flex items-center justify-center transition-all duration-200"
                   title={t('展开侧栏 (Ctrl/Cmd+B)', 'Expand Sidebar (Ctrl/Cmd+B)')}
@@ -480,6 +481,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 添加分类按钮 */}
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={handleAddCategory}
                   className="linear-icon-button w-8 h-8 flex items-center justify-center"
                   title={t('添加分类', 'Add Category')}
