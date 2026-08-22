@@ -861,12 +861,34 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             }));
           store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
         }
-        if (selectedTypes.includes('customCategories') && importedData.customCategories) {
-          const existingIds = new Set(store.customCategories.map(c => c.id));
-          const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
-          useAppStore.setState({ 
-            customCategories: [...store.customCategories, ...newCategories] 
-          });
+        if (selectedTypes.includes('customCategories')) {
+          if (importedData.customCategories) {
+            const existingIds = new Set(store.customCategories.map(c => c.id));
+            const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
+            useAppStore.setState({
+              customCategories: [...store.customCategories, ...newCategories]
+            });
+          }
+          if (importedData.hiddenDefaultCategoryIds) {
+            const current = useAppStore.getState().hiddenDefaultCategoryIds;
+            useAppStore.setState({
+              hiddenDefaultCategoryIds: Array.from(new Set([...current, ...importedData.hiddenDefaultCategoryIds])),
+            });
+          }
+          if (importedData.defaultCategoryOverrides) {
+            useAppStore.setState({
+              defaultCategoryOverrides: {
+                ...useAppStore.getState().defaultCategoryOverrides,
+                ...importedData.defaultCategoryOverrides,
+              },
+            });
+          }
+          if (importedData.categoryOrder) {
+            const current = useAppStore.getState().categoryOrder;
+            useAppStore.setState({
+              categoryOrder: Array.from(new Set([...current, ...importedData.categoryOrder])),
+            });
+          }
         }
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
           const existingIds = new Set(store.assetFilters.map(f => f.id));
