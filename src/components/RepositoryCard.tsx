@@ -1357,7 +1357,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* README Modal - Using portal to render outside card container */}
-      {createPortal(
+      {readmeModalOpen && createPortal(
         <ReadmeModal
           isOpen={readmeModalOpen}
           onClose={() => setReadmeModalOpen(false)}

@@ -72,7 +72,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
           <span>{isChecking ? t('检查中...', 'Checking...') : t('检查更新', 'Check for Updates')}</span>
         </Button>
 
-        {error && <div className="mt-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40"><p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p></div>}
+        {error && <div role="alert" className="mt-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40"><p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p></div>}
       </div>
 
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>

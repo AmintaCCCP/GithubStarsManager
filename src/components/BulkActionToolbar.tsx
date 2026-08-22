@@ -354,7 +354,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={t('恢复 Star', 'Restore stars')}
+              aria-label={t('批量还原', 'Bulk Restore')}
               onClick={(e) => handleAction('restore', e)}
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
