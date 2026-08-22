@@ -1082,6 +1082,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 size="icon"
                 onClick={handlePauseResume}
                 className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
+                aria-label={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
