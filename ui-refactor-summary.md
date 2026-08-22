@@ -26,6 +26,8 @@
 | `git diff --check` | 通过。 |
 | 生产预览 | 通过；登录壳层、语言切换、主题切换、token 输入、连接入口和 GitHub 外链正常渲染，控制台无 React/Radix/资源加载错误。 |
 
+说明：早期 release evidence 曾记录 29 个测试文件、326 个测试，这是迁移前基线。当前提交新增的回归测试已纳入最终门禁，因此最终准确总数为 31 个测试文件、329 个测试，后续记录均以此为准。
+
 最新 CodeRabbit full review 的 9 个 findings 已完成修复：所有受影响的 compact Button controls 均明确使用 ghost/icon sizing；SearchBar sort menu 已迁移到 Radix radio menu semantics；SortAlgorithmTooltip 使用受控 Popover 支持触摸设备；ReleaseTimeline、ReleaseSourceSettingsModal、NetworkPanel、WebDAVPanel、AIConfigPanel、GeneralPanel 和 MenuManagementPanel 的 accessible names、group associations、padding 和变体已补齐；Discovery topic/platform 请求 key、BulkAction live region、semantic color tokens、duplicate utilities 和 Settings tab ref stability 已同步修正。
 
 ## 依赖变更
@@ -75,3 +77,8 @@ ff639df 后最新 CodeRabbit review 的所有 comments 已完成修复：BackupP
 57ee771 后最新 CodeRabbit review 的全部 comments 已完成修复：BulkRestore/RepositoryList radio options 补齐 accessible names；DiscoveryView 清理卸载 tab refs；ForkTimeline 底部分页与 DiagnosticLogs/BulkAction controls 统一 shared variants 和 compact sizing；SearchBar 输入高度调整；MenuManagement switch 修正 knob 对齐；VectorSearch、Settings、Backend、DataManagement 长内容按钮增加 h-auto。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,791.81 kB，独立 checker 2,726.38 KiB，0 vulnerabilities。
+
+
+a5175b9 后最新 CodeRabbit review 的 comments 已处理：FilterModal 保存按钮使用 primary-derived hover surface；ReleaseCard RPC 资产行使用 ghost variant；测试证据说明明确区分迁移前 29/326 历史基线与当前新增回归测试后的最终 31/329 总数。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,791.76 kB，独立 checker 2,726.34 KiB，0 vulnerabilities。
