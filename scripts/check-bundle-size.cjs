@@ -3,7 +3,7 @@ const path = require('node:path');
 
 const DIST_ASSETS_DIR = path.resolve('dist/assets');
 const MAX_BUNDLE_KIB = 3000;
-const LEGACY_ENTRY_PATTERN = /^index-legacy-.*\.js$/;
+const LEGACY_ASSET_PATTERN = /-legacy-.*\.js$/;
 
 if (!fs.existsSync(DIST_ASSETS_DIR)) {
   console.error(`Bundle budget check failed: ${DIST_ASSETS_DIR} does not exist.`);
@@ -12,7 +12,7 @@ if (!fs.existsSync(DIST_ASSETS_DIR)) {
 
 const legacyEntries = fs
   .readdirSync(DIST_ASSETS_DIR)
-  .filter((fileName) => LEGACY_ENTRY_PATTERN.test(fileName));
+  .filter((fileName) => LEGACY_ASSET_PATTERN.test(fileName));
 
 if (legacyEntries.length === 0) {
   console.error('Bundle budget check failed: no legacy entry was generated in dist/assets.');
