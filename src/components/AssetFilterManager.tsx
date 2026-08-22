@@ -229,7 +229,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     <Button
                       variant="ghost"
                       onClick={() => onFilterToggle(filter.id)}
-                      className="h-auto min-h-0 flex flex-1 items-center space-x-2 p-0"
+                      className="h-auto min-h-0 flex flex-1 items-center justify-start space-x-2 p-0"
                       aria-pressed={selectedFilters.includes(filter.id)}
                       aria-label={`${filter.name} (${filter.keywords.join(', ')})`}
                       title={`${filter.name} (${filter.keywords.join(', ')})`}
