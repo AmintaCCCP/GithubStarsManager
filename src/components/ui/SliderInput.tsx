@@ -7,7 +7,7 @@ interface SliderInputProps {
   min: number;
   max: number;
   step?: number;
-  label?: string;
+  label: string;
   marks?: number[];
   formatValue?: (value: number) => string;
   showMarks?: boolean;

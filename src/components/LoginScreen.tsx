@@ -78,10 +78,10 @@ export const LoginScreen: React.FC = () => {
     <div className="linear-login-shell flex min-h-screen items-center justify-center p-4 transition-colors duration-300">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
         <div className="linear-login-toggle flex items-center overflow-hidden">
-          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} className="w-16 rounded-none px-3 py-2">
+          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} aria-pressed={language === 'zh'} className="w-16 rounded-none px-3 py-2">
             中文
           </Button>
-          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} className="w-16 rounded-none px-3 py-2">
+          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} className="w-16 rounded-none px-3 py-2">
             EN
           </Button>
         </div>

@@ -119,6 +119,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="mb-4">
                 <Button
                   onClick={this.handleToggleDetails}
+                  aria-expanded={showDetails}
                   variant="ghost"
                   className="text-sm text-primary dark:text-primary hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground dark:text-muted-foreground underline"
                 >

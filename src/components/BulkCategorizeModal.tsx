@@ -1,5 +1,5 @@
 import { Button } from './ui/button';
-import React, { useState, useEffect } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { Modal } from './Modal';
 import { Repository } from '../types';
@@ -21,6 +21,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
   const { customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const categorySelectionLabelId = useId();
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
 
@@ -64,11 +65,15 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
         </p>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <h3 id={categorySelectionLabelId} className="mb-2 block text-sm font-medium text-foreground dark:text-foreground">
             {t('选择分类', 'Select Category')}
-          </label>
+          </h3>
 
-          <div className="max-h-64 overflow-y-auto space-y-2">
+          <div
+            role="group"
+            aria-labelledby={categorySelectionLabelId}
+            className="max-h-64 overflow-y-auto space-y-2"
+          >
             {allCategories.filter(cat => cat.id !== 'all').map(category => (
               <Button
                 key={category.id}

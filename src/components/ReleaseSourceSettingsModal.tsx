@@ -348,7 +348,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 key={source.id}
                 type="button"
                 onClick={() => handleToggle(source.id)}
-                className={`flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
+                className={`h-auto flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
                   checked
                     ? 'border-primary/30 bg-primary/10'
                     : 'border-border bg-white hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-white/[0.05]'
