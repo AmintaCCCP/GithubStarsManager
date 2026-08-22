@@ -620,6 +620,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                     key={et}
                     checked={selectedEventTypes.has(et)}
                     onCheckedChange={() => toggleEventType(et)}
+                    onSelect={(event) => event.preventDefault()}
                   >
                     {language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}
                   </DropdownMenuCheckboxItem>
