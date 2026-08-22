@@ -612,7 +612,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       title={t('编辑仓库信息', 'Edit Repository Info')}
       maxWidth="max-w-2xl"
     >
-      <div className="space-y-5">
+      <div
+        className="space-y-5"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         {/* Repository Info Header */}
         <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-primary/20">
           <img

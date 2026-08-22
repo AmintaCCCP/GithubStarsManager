@@ -517,6 +517,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
         && currentStore.discoverySelectedTopic === topicRequestSelection?.topic
         && currentStore.discoveryPlatform === topicRequestSelection?.platform;
     };
+    const ownsTopicLoading = () => (
+      topicRequestVersion === null || topicRequestVersionRef.current === topicRequestVersion
+    );
 
     if (!githubToken) {
       toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
@@ -639,7 +642,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       if (append) {
         setDiscoveryLoadingMore(channelId, false);
-      } else if (isCurrentTopicRequest()) {
+      } else if (ownsTopicLoading()) {
         setDiscoveryLoading(channelId, false);
       }
     }

@@ -13,7 +13,7 @@ export const SearchShortcutsHelp: React.FC = () => {
   return (
     <Dialog open={showHelp} onOpenChange={setShowHelp}>
       <DialogTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-muted-foreground dark:text-muted-foreground" aria-label={t('查看搜索快捷键', 'View search shortcuts')}>
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-muted-foreground dark:text-muted-foreground">
           <Keyboard className="h-3 w-3" /><span>{t('快捷键', 'Shortcuts')}</span>
         </Button>
       </DialogTrigger>

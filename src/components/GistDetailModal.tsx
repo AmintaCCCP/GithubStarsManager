@@ -247,7 +247,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
                 {t('复制文件', 'Copy file')}
               </Button>
             </div>
-            <HighlightedCode file={activeFile} onContentLoaded={handleContentLoaded} />
+            <HighlightedCode key={activeFile.filename} file={activeFile} onContentLoaded={handleContentLoaded} />
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground dark:border-border dark:text-muted-foreground">

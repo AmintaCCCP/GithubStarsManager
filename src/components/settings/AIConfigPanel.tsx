@@ -739,9 +739,10 @@ Repository information:
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
+                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -752,14 +753,16 @@ Repository information:
                 </Button>
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     const confirmed = await confirm(
                       t('确定要删除这个AI配置吗？', 'Delete AI Configuration?'),
@@ -774,7 +777,7 @@ Repository information:
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />
