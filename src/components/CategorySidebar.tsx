@@ -364,7 +364,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       isSelected
                         ? 'bg-accent text-accent-foreground font-medium'
                         : isDragTarget
-                          ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
+                          ? 'bg-green-50 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
                           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
@@ -380,7 +380,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                         isSelected
                           ? 'bg-primary text-primary-foreground'
                           : isDragTarget
-                            ? 'bg-muted dark:bg-muted/40 text-green-600 dark:bg-green-600/30 dark:text-green-600'
+                            ? 'bg-green-50 text-green-600 dark:bg-green-600/30 dark:text-green-600'
                             : 'bg-secondary text-secondary-foreground'
                       }`}
                     >
@@ -463,7 +463,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               isSelected
                                 ? 'bg-accent text-accent-foreground font-medium'
                                 : isDragTarget
-                                  ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
+                                  ? 'bg-green-50 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
                                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                             }`}
                             title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}

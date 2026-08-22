@@ -409,7 +409,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      aria-label={t('查看完整描述', 'View full description')}
+                      title={t('查看完整描述', 'View full description')}
                       onClick={(event) => event.stopPropagation()}
                       className="relative mb-3 block w-full cursor-text text-left"
                     >
@@ -437,7 +437,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      aria-label={t('查看完整 AI 摘要', 'View full AI summary')}
+                      title={t('查看完整 AI 摘要', 'View full AI summary')}
                       onClick={(event) => event.stopPropagation()}
                       className="relative mb-3 flex w-full cursor-text items-start gap-1.5 text-left"
                     >

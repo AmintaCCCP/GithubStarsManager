@@ -167,14 +167,15 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const handleProxyToggle = async (enabled: boolean) => {
     if (isProxyToggling) return;
     const previousForm = form;
+    const previousConfig = proxyConfig;
     setIsProxyToggling(true);
-    const newForm = { ...form, enabled };
-    setForm(newForm);
+    const newConfig = { ...proxyConfig, enabled };
+    setForm(currentForm => ({ ...currentForm, enabled }));
     setTestResult(null);
 
     try {
       if (isElectron()) {
-        await electronProxy.setProxy(newForm);
+        await electronProxy.setProxy(newConfig);
       }
 
       if (backend.isAvailable) {
@@ -185,17 +186,17 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
         const resp = await fetch('/api/settings/proxy', {
           method: 'PUT',
           headers: authHeaders,
-          body: JSON.stringify(newForm),
+          body: JSON.stringify(newConfig),
         });
         if (!resp.ok) {
           throw new Error(`Backend returned ${resp.status}`);
         }
       }
 
-      setProxyConfig(newForm);
+      setProxyConfig(newConfig);
     } catch (e) {
       if (isElectron()) {
-        try { await electronProxy.setProxy(previousForm); } catch { /* best effort */ }
+        try { await electronProxy.setProxy(previousConfig); } catch { /* best effort */ }
       }
       setForm(previousForm);
       setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
@@ -271,8 +272,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     if (isRpcToggling) return;
     const previousForm = rpcForm;
     setIsRpcToggling(true);
-    const newForm = { ...rpcForm, enabled };
-    setRpcForm(newForm);
+    const newConfig = { ...rpcDownloadConfig, enabled };
+    setRpcForm(currentForm => ({ ...currentForm, enabled }));
     setRpcTestResult(null);
 
     try {
@@ -283,12 +284,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
         const body: Record<string, unknown> = {
-          enabled: newForm.enabled,
-          host: newForm.host,
-          port: newForm.port,
+          enabled: newConfig.enabled,
+          host: newConfig.host,
+          port: newConfig.port,
         };
-        if (newForm.secret) {
-          body.secret = newForm.secret;
+        if (newConfig.secret) {
+          body.secret = newConfig.secret;
         }
         const resp = await fetch(`${base}/settings/rpc-download`, {
           method: 'PUT',
@@ -300,7 +301,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
         }
       }
 
-      setRpcDownloadConfig(newForm);
+      setRpcDownloadConfig(newConfig);
     } catch (e) {
       setRpcForm(previousForm);
       setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
