@@ -510,6 +510,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
+    if (!githubToken) {
+      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      return;
+    }
+
     const topicRequestVersion = channelId === 'topic' ? ++topicRequestVersionRef.current : null;
     const topicRequestSelection = channelId === 'topic'
       ? { topic: discoverySelectedTopic, platform: discoveryPlatform }
@@ -524,11 +529,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
     const ownsTopicLoading = () => (
       topicRequestVersion === null || topicRequestVersionRef.current === topicRequestVersion
     );
-
-    if (!githubToken) {
-      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
 
     if (append) {
       setDiscoveryLoadingMore(channelId, true);
