@@ -391,7 +391,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         <div
           role="status"
           aria-live="polite"
-          className="fixed z-[60] px-3 py-1.5 text-xs text-white bg-gray-800 dark:bg-muted/40 rounded-lg shadow-lg pointer-events-none animate-fade-in"
+          className="fixed z-[60] rounded-lg bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-lg pointer-events-none animate-fade-in"
           style={{
             left: tooltip.x,
             top: tooltip.y,
@@ -399,7 +399,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           }}
         >
           {tooltip.message}
-          <div className="absolute left-1/2 -bottom-1 w-2 h-2 bg-gray-800 dark:bg-muted/40 transform -translate-x-1/2 rotate-45"></div>
+          <div className="absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 transform bg-popover"></div>
         </div>
       )}
     </div>
