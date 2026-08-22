@@ -168,7 +168,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-card border-t border-border dark:border-border shadow-lg z-50 ${
+      className={`fixed bottom-0 left-0 right-0 bg-card dark:bg-card border-t border-border dark:border-border shadow-lg z-50 ${
         isClosing ? 'animate-slide-down' : 'animate-slide-up'
       } ${isShaking ? 'animate-shake' : ''}`}
       onClick={handleToolbarClick}
@@ -371,7 +371,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               )}
             </Button>
 
-            <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-accent mx-2"></div>
+            <div className="hidden sm:block w-px h-6 bg-muted dark:bg-accent mx-2"></div>
 
             <Button
               variant="ghost"

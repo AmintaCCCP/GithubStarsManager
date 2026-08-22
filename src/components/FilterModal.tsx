@@ -81,7 +81,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例如: macOS"
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-white dark:bg-muted/40 text-foreground dark:text-foreground"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
           />
         </div>
 
@@ -100,7 +100,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               onChange={(e) => setNewKeyword(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入关键词，如: mac, dmg"
-              className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-white dark:bg-muted/40 text-foreground dark:text-foreground"
+              className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
             />
             <Button
               onClick={handleAddKeyword}
@@ -122,7 +122,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center space-x-1 px-3 py-1 bg-gray-900 text-white dark:bg-white/[0.12] dark:text-white font-medium rounded-lg text-sm"
+                    className="flex items-center space-x-1 px-3 py-1 bg-gray-900 text-white dark:bg-card/[0.12] dark:text-foreground font-medium rounded-lg text-sm"
                   >
                     <span>{keyword}</span>
                     <Button
@@ -166,7 +166,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!name.trim() || keywords.length === 0}
-            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-green-600/80 dark:hover:bg-green-600'}`}
+            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-green-600/80 dark:hover:bg-green-600'}`}
           >
             {filter ? '保存' : '创建'}
           </Button>

@@ -443,7 +443,7 @@ Repository information:
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
               />
             </div>
@@ -484,7 +484,7 @@ Repository information:
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={getEndpointPlaceholder(form.apiType, form.mimoPlan)}
               />
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -509,7 +509,7 @@ Repository information:
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('输入API密钥', 'Enter API key')}
               />
             </div>
@@ -523,7 +523,7 @@ Repository information:
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder="gpt-4"
               />
             </div>
@@ -653,7 +653,7 @@ Repository information:
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
                 />
               </div>
@@ -700,7 +700,7 @@ Repository information:
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-gray-300 bg-accent/50 dark:border-white/[0.12] dark:bg-accent/60'
+                ? 'border-border bg-accent/50 dark:border-border/[0.12] dark:bg-accent/60'
                 : 'border-border dark:border-border hover:border-border dark:hover:border-white/[0.08]'
             }`}
           >
@@ -741,7 +741,7 @@ Repository information:
                   variant="ghost"
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-white/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -753,7 +753,7 @@ Repository information:
                 <Button
                   variant="ghost"
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-white/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -774,7 +774,7 @@ Repository information:
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-white/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

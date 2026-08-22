@@ -683,7 +683,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             onClick={handleSaveEmbeddingConfig}
             className={`px-4 py-2 text-sm rounded-md transition-colors ${
               embeddingSaved
-                ? 'bg-green-500 text-white'
+                ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
             }`}
           >
@@ -906,8 +906,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formReadmeMaxCharsInput}
               onChange={(e) => setFormReadmeMaxCharsInput(e.target.value)}
               onBlur={() => {
-                const parsed = Number(formReadmeMaxCharsInput);
-                const maxChars = Number.isInteger(parsed)
+                const raw = formReadmeMaxCharsInput.trim();
+                const parsed = Number(raw);
+                const maxChars = raw !== '' && Number.isInteger(parsed)
                   ? Math.min(20000, Math.max(500, parsed))
                   : 6000;
                 setFormReadmeMaxChars(maxChars);
@@ -929,7 +930,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           onClick={handleSaveWorkerConfig}
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
-              ? 'bg-green-500 text-white'
+              ? 'bg-green-600 text-white hover:bg-green-700'
               : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
           }`}
         >
@@ -1045,8 +1046,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             value={formSearchTopKInput}
             onChange={(e) => setFormSearchTopKInput(e.target.value)}
             onBlur={() => {
-              const parsed = Number(formSearchTopKInput);
-              const topK = Number.isInteger(parsed)
+              const raw = formSearchTopKInput.trim();
+              const parsed = Number(raw);
+              const topK = raw !== '' && Number.isInteger(parsed)
                 ? Math.min(50, Math.max(5, parsed))
                 : 30;
               setFormSearchTopK(topK);
@@ -1100,7 +1102,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           onClick={handleSaveWorkerConfig}
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
-              ? 'bg-green-500 text-white'
+              ? 'bg-green-600 text-white hover:bg-green-700'
               : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
           }`}
         >

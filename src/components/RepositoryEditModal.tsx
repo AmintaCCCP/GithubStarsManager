@@ -595,13 +595,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   if (!repository) return null;
 
   // Unified card styles with enhanced light mode optimization
-  const sectionClass = "p-5 bg-white dark:bg-card rounded-xl border border-gray-200/80 dark:border-border shadow-sm";
+  const sectionClass = "p-5 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm";
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-gray-200 dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-gray-300 dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
+  const inputClass = "w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
-  const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-gray-200/80 dark:border-border";
-  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-gray-50 to-white dark:from-white/[0.02] dark:to-white/[0.04] border border-gray-200/80 dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
+  const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
+  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-gray-50 to-white dark:from-white/[0.02] dark:to-white/[0.04] border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
   const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
 
   return (
@@ -779,7 +779,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -794,8 +794,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-original'
-                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-white/20'
-                    : 'bg-white text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
+                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
+                    : 'bg-card text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -810,7 +810,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -868,7 +868,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -883,8 +883,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-original'
-                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-white/20'
-                    : 'bg-white text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent'
+                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
+                    : 'bg-card text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -899,7 +899,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.category === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -967,7 +967,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Category Lock - Enhanced */}
-          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-gray-200/80 dark:border-amber-600/20 shadow-sm">
+          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-border dark:border-amber-600/20 shadow-sm">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
@@ -1057,7 +1057,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5 mr-1.5" />
@@ -1073,7 +1073,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-original'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5 mr-1.5" />
@@ -1088,7 +1088,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-white text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-white/5 dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -1162,13 +1162,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         </div>
 
         {/* Action Buttons - Enhanced */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200/80 dark:border-border">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-border dark:border-border">
           <Button
             onClick={(e) => {
               e.stopPropagation();
               handleCloseWithConfirm();
             }}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-white dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-gray-200 dark:border-border transition-all duration-200 shadow-sm"
+            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm"
           >
             <X className="w-4 h-4" />
             <span className="font-medium">{t('取消', 'Cancel')}</span>

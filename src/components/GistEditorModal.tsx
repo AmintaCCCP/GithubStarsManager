@@ -132,7 +132,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
             id="gist-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded-lg border border-border bg-white px-3 py-2 text-foreground outline-none transition-colors focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground outline-none transition-colors focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
             placeholder={t('这个 gist 是做什么的？', 'What is this gist for?')}
           />
         </div>
@@ -155,7 +155,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
             <Button
               type="button"
               onClick={() => setFiles(prev => [...prev, createEmptyFile()])}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
             >
               <Plus className="h-4 w-4" />
               {t('添加文件', 'Add file')}
@@ -163,14 +163,14 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
           </div>
 
           {visibleFiles.map((file, index) => (
-            <div key={file.id} className="space-y-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-white/[0.03]">
+            <div key={file.id} className="space-y-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-card/[0.03]">
               <div className="flex items-center gap-2">
                 <Input
                   id={`gist-file-name-${file.id}`}
                   aria-label={t(`文件名 ${index + 1}`, `Filename ${index + 1}`)}
                   value={file.filename}
                   onChange={(event) => updateFile(file.id, { filename: event.target.value })}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
                   placeholder={`file-${index + 1}.txt`}
                 />
                 <Button
@@ -190,7 +190,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                 value={file.content}
                 onChange={(event) => updateFile(file.id, { content: event.target.value })}
                 rows={8}
-                className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
+                className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
                 placeholder={t('输入文件内容', 'Enter file content')}
               />
             </div>
@@ -201,7 +201,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
           <Button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-border bg-white px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
           >
             {t('取消', 'Cancel')}
           </Button>

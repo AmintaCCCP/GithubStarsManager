@@ -92,7 +92,7 @@ export const SearchDemo: React.FC = () => {
   }
 
   return (
-    <div className="bg-white dark:bg-card rounded-xl border border-border dark:border-border p-6 mb-6">
+    <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
@@ -113,7 +113,7 @@ export const SearchDemo: React.FC = () => {
           size="icon"
           onClick={() => setShowDemo(false)}
           aria-label={t('关闭搜索演示', 'Close search demo')}
-          className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300 transition-colors"
+          className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
         >
           ×
         </Button>

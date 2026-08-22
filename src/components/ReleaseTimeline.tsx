@@ -751,10 +751,10 @@ export const ReleaseTimeline: React.FC = () => {
                  aria-checked={includePreRelease}
                  aria-label={t('包含 Pre-release', 'Include Pre-release')}
                  onClick={() => setIncludePreRelease(!includePreRelease)}
-                 className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+                 className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
                >
                  <span
-                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
+                   className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                  />
                </Button>
                <span
@@ -805,7 +805,7 @@ export const ReleaseTimeline: React.FC = () => {
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3 leading-relaxed">
                   {t('订阅后，您可以在这里查看所有关注仓库的最新发布版本，第一时间获取更新动态。', 'Subscribe to receive the latest release updates from your favorite repositories in one place.')}
                 </p>
-                <div className="bg-white/60 dark:bg-card/60 rounded-lg p-3 text-sm">
+                <div className="bg-card dark:bg-card/60 rounded-lg p-3 text-sm">
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
                     <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">1</span>
                     <span>{t('前往仓库页面', 'Go to Repositories')}</span>
@@ -815,7 +815,7 @@ export const ReleaseTimeline: React.FC = () => {
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
-                <div className="mt-4 rounded-lg bg-white/60 dark:bg-card/60 p-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                <div className="mt-4 rounded-lg bg-card dark:bg-card/60 p-3 text-sm text-muted-foreground dark:text-muted-foreground">
                   <p className="mb-3">
                     {t('也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。', 'You can also use Watch repository sync or a custom repository list as release sources.')}
                   </p>
@@ -870,10 +870,10 @@ export const ReleaseTimeline: React.FC = () => {
                 aria-checked={includePreRelease}
                 aria-label={t('包含 Pre-release', 'Include Pre-release')}
                 onClick={() => setIncludePreRelease(!includePreRelease)}
-                className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+                className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                 />
               </Button>
               <span
@@ -929,7 +929,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setCurrentPage(1);
                 }}
                 aria-label={t('清除搜索', 'Clear search')}
-                className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
+                className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
               >
                 <X className="w-4 h-4" />
               </Button>

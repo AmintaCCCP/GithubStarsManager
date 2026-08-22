@@ -455,11 +455,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       type="button"
                       variant={activeTab === tab.id ? 'secondary' : 'ghost'}
                       onClick={() => handleTabChange(tab.id)}
+                      size="sm"
                       role="tab"
                       id={`settings-tab-${tab.id}`}
                       aria-selected={activeTab === tab.id}
                       aria-controls={activeTab === tab.id ? `settings-tabpanel-${tab.id}` : undefined}
-                      className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
+                      className="h-9 w-full justify-start gap-3 px-3 text-left"
                     >
                       {tab.icon}
                       <span className="font-medium">{tab.label}</span>
@@ -484,10 +485,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 独立页面模式（兼容原有代码）
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl">
       <div className="flex items-center space-x-3 mb-6">
-        <Settings className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-        <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
+        <Settings className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
           {t('设置', 'Settings')}
         </h2>
       </div>
@@ -495,7 +496,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <div className="ui-panel overflow-hidden">
+          <div className="ui-panel overflow-hidden rounded-md">
             <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
               {tabs.map((tab) => (
                 <Button
@@ -528,7 +529,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* 内容区域 */}
         <div className="flex-1 min-w-0">
-          <div className="ui-panel p-4 sm:p-6">
+          <div className="ui-panel rounded-md p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>

@@ -120,7 +120,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
     }
   };
 
-  const sectionClass = "p-4 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-gray-700";
+  const sectionClass = "p-4 bg-card dark:bg-card rounded-xl border border-border dark:border-border";
 
   return (
     <Modal
@@ -152,7 +152,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <div className="flex items-center space-x-2">
               <Checkbox aria-labelledby="bulk-restore-description-heading" checked={config.description.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, description: { ...prev.description, enabled: checked === true } }))} />
               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span id="bulk-restore-description-heading" className="text-sm font-medium text-foreground dark:text-white">
+                <span id="bulk-restore-description-heading" className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('描述', 'Description')}
                 </span>
               {stats.hasCustomDesc > 0 && (
@@ -167,13 +167,13 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <RadioGroup aria-labelledby="bulk-restore-description-heading" value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="desc-target-original" aria-labelledby="desc-target-original-label" />
-                <span id="desc-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
+                <span id="desc-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {t('默认（GitHub原始）', 'Default (GitHub Original)')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="ai" id="desc-target-ai" aria-labelledby="desc-target-ai-label" />
-                <span id="desc-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <span id="desc-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI总结', 'AI Summary')}</span>
                 </span>
@@ -188,7 +188,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <div className="flex items-center space-x-2">
               <Checkbox aria-labelledby="bulk-restore-tags-heading" checked={config.tags.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, enabled: checked === true } }))} />
               <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span id="bulk-restore-tags-heading" className="text-sm font-medium text-foreground dark:text-white">
+                <span id="bulk-restore-tags-heading" className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('标签', 'Tags')}
                 </span>
               {stats.hasCustomTags > 0 && (
@@ -203,13 +203,13 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <RadioGroup aria-labelledby="bulk-restore-tags-heading" value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="tags-target-original" aria-labelledby="tags-target-original-label" />
-                <span id="tags-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
+                <span id="tags-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {t('默认（Topics）', 'Default (Topics)')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="ai" id="tags-target-ai" aria-labelledby="tags-target-ai-label" />
-                <span id="tags-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <span id="tags-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI标签', 'AI Tags')}</span>
                 </span>
@@ -224,7 +224,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <div className="flex items-center space-x-2">
               <Checkbox aria-labelledby="bulk-restore-category-heading" checked={config.category.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, category: { ...prev.category, enabled: checked === true } }))} />
               <FolderOpen className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span id="bulk-restore-category-heading" className="text-sm font-medium text-foreground dark:text-white">
+                <span id="bulk-restore-category-heading" className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('分类', 'Category')}
                 </span>
               {stats.hasCustomCategory > 0 && (
@@ -239,13 +239,13 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
             <RadioGroup aria-labelledby="bulk-restore-category-heading" value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="cat-target-original" aria-labelledby="cat-target-original-label" />
-                <span id="cat-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
+                <span id="cat-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {t('默认分类', 'Default Category')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="ai" id="cat-target-ai" aria-labelledby="cat-target-ai-label" />
-                <span id="cat-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <span id="cat-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI分类', 'AI Category')}</span>
                 </span>
@@ -285,7 +285,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         )}
 
         {/* Info */}
-        <div className="bg-accent/50 dark:bg-muted/30 border border-gray-100 dark:border-gray-600/50 rounded-lg p-3">
+        <div className="bg-accent/50 dark:bg-muted/30 border border-border dark:border-border rounded-lg p-3">
           <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-start">
             <Info className="w-3.5 h-3.5 mr-1.5 mt-0.5 flex-shrink-0" />
             <span>
@@ -307,7 +307,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           <Button
             onClick={onClose}
             disabled={isProcessing}
-            className="px-4 py-2 text-muted-foreground dark:text-gray-300 bg-muted dark:bg-muted rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
+            className="px-4 py-2 text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
           >
             {t('取消', 'Cancel')}
           </Button>

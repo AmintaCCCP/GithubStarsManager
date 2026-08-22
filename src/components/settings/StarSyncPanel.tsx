@@ -60,11 +60,11 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground dark:text-muted-foreground">{t('选择同步按钮默认拉取的数据范围：仅星标仓库，或星标仓库及 GitHub Lists。', 'Choose what the sync button pulls by default: starred repos only, or starred repos plus GitHub Lists.')}</p>
           <RadioGroup value={syncMode} aria-labelledby="star-sync-scope-heading" onValueChange={(value) => { setSyncMode(value as 'stars' | 'stars-and-lists'); setSyncModeConfigured(true); }} className="grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
-            <Label htmlFor="sync-mode-stars" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
+            <Label htmlFor="sync-mode-stars" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
               <RadioGroupItem value="stars" id="sync-mode-stars" />
               <span><span className="block text-base font-medium text-foreground dark:text-foreground">{t('仅同步星标仓库', 'Starred repos only')}</span><span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">{t('与以前行为一致', 'Same as before')}</span></span>
             </Label>
-            <Label htmlFor="sync-mode-lists" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-white/[0.10]">
+            <Label htmlFor="sync-mode-lists" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
               <RadioGroupItem value="stars-and-lists" id="sync-mode-lists" />
               <span><span className="block text-base font-medium text-foreground dark:text-foreground">{t('同步星标仓库及 list', 'Starred repos & lists')}</span><span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground"><ListChecks className="mr-1 inline h-3 w-3" />{t('拉取 GitHub Lists 并按标签归类', 'Also pull GitHub Lists & categorize by tags')}</span></span>
             </Label>

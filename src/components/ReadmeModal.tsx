@@ -576,7 +576,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   };
 
   const tocTextClass = (level: number): string => {
-    if (level <= 2) return 'font-medium text-foreground dark:text-gray-200';
+    if (level <= 2) return 'font-medium text-foreground dark:text-muted-foreground';
     if (level <= 4) return 'text-muted-foreground dark:text-muted-foreground';
     return 'text-muted-foreground dark:text-muted-foreground text-xs';
   };
@@ -596,7 +596,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       >
         <div
           tabIndex={-1}
-          className="relative flex max-h-[90vh] w-full flex-col bg-white dark:bg-card"
+          className="relative flex max-h-[90vh] w-full flex-col bg-card dark:bg-card"
         >
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
@@ -654,7 +654,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                         className={`flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors ${
                           displayMode === mode
                             ? 'bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary'
-                            : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300 hover:bg-muted dark:hover:bg-white/5'
+                            : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card'
                         }`}
                         title={label}
                       >
@@ -677,7 +677,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleRevertTranslation}
-                      className="flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300 hover:bg-muted dark:hover:bg-white/5"
+                      className="flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card"
                       title={t('关闭翻译', 'Close Translation')}
                     >
                       <X className="w-4 h-4" />
@@ -790,7 +790,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                           className={`h-auto block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id
                               ? 'bg-primary/10 text-primary dark:bg-primary/10 dark:text-primary font-medium'
-                              : 'hover:bg-muted dark:hover:bg-white/5'
+                              : 'hover:bg-muted dark:hover:bg-card'
                           }`}
                           title={displayText}
                         >
@@ -862,7 +862,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 onClick={scrollToTop}
                 aria-label={t('回到顶部', 'Back to top')}
-                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-white dark:bg-muted rounded-full shadow-lg border border-gray-200 dark:border-gray-600 text-muted-foreground dark:text-gray-300 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:hover:text-white transition-all z-10"
+                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:hover:text-white transition-all z-10"
                 title={t('回到顶部', 'Back to top')}
               >
                 <ArrowUp className="w-4 h-4" />

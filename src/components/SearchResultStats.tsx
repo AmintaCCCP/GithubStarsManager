@@ -131,7 +131,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           <span className="text-muted-foreground dark:text-muted-foreground">
             {t('搜索查询:', 'Search Query:')}
           </span>
-          <code className="bg-white dark:bg-card px-2 py-1 rounded border text-foreground dark:text-foreground font-mono">
+          <code className="bg-card dark:bg-card px-2 py-1 rounded border text-foreground dark:text-foreground font-mono">
             "{searchQuery}"
           </code>
           {stats.aiAnalyzed > 0 && (

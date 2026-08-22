@@ -83,13 +83,13 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         fixed z-[1000]
         flex items-center justify-center
         w-12 h-12
-        bg-white dark:bg-accent/60
+        bg-card dark:bg-accent/60
         text-muted-foreground dark:text-muted-foreground
         rounded-full
         shadow-lg hover:shadow-xl
-        border border-gray-200 dark:border-border
+        border border-border dark:border-border
         transform transition-[opacity,transform,background-color] duration-300 ease-out
-        hover:scale-110 hover:bg-accent dark:hover:bg-white/[0.1]
+        hover:scale-110 hover:bg-accent dark:hover:bg-card/[0.1]
         focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
         ${isVisible && !readmeModalOpen

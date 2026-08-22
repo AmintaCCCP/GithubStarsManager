@@ -946,7 +946,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder={t('输入分类名称', 'Enter category name')}
             autoFocus
           />
@@ -971,7 +971,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('输入任意emoji...', 'Enter any emoji...')}
-                  className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground text-center text-lg"
+                  className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground text-center text-lg"
                   maxLength={4}
                   autoFocus
                 />
@@ -1030,7 +1030,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
           />
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -1115,7 +1115,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>

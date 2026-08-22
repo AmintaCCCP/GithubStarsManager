@@ -246,7 +246,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       )}
 
       {/* Enable + status */}
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h4 className="font-medium text-foreground dark:text-foreground">
@@ -310,7 +310,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
 
       {/* Electron local port */}
       {isElectronApp && !backendMode && (
-        <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
+        <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
           <h4 className="font-medium text-foreground dark:text-foreground">
             {t('本地监听', 'Local Listen')}
           </h4>
@@ -358,7 +358,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       )}
 
       {/* Token */}
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-foreground dark:text-foreground">
             {t('访问 Token', 'Access Token')}
@@ -422,7 +422,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       </div>
 
       {/* URLs + copy config */}
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
         <h4 className="font-medium text-foreground dark:text-foreground">
           {t('连接信息', 'Connection')}
         </h4>

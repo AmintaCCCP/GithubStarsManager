@@ -48,26 +48,26 @@ export const Header: React.FC = () => {
   return (
     <header className="linear-header sticky top-0 z-50 hd-drag lg:hd-drag relative">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="linear-header-inner flex items-center justify-between h-14 sm:h-[60px]">
+        <div className="linear-header-inner flex h-14 items-center justify-between">
           {/* Logo and Title */}
           <div className="flex min-w-0 items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
               <img 
                 src="./icon.png" 
                 alt="GitHub Stars Manager" 
-                className="w-10 h-10 object-cover"
+                className="h-full w-full object-cover"
               />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="truncate text-xl font-medium text-foreground dark:text-foreground tracking-tight">
+              <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">
                 GitHub Stars Manager
               </h1>
-              <p className="truncate text-sm text-muted-foreground dark:text-muted-foreground">
+              <p className="truncate text-xs text-muted-foreground">
                 AI-powered repository management
               </p>
             </div>
             <div className="min-w-0 sm:hidden">
-              <h1 className="truncate text-base font-bold text-foreground dark:text-foreground tracking-tight">
+              <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">
                 GitHub Stars
               </h1>
             </div>
@@ -90,7 +90,7 @@ export const Header: React.FC = () => {
                   aria-pressed={isActive}
                   title={label}
                   aria-label={label}
-                  className={`whitespace-nowrap xl:px-3 ${isActive ? 'shadow-sm' : ''}`}
+                  className="whitespace-nowrap xl:px-3"
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="hidden xl:inline">{label}</span>
@@ -162,7 +162,7 @@ export const Header: React.FC = () => {
                   className="w-8 h-8 rounded-full"
                 />
                 <div className="min-w-0 hidden sm:block">
-                  <p className="truncate text-sm font-medium text-foreground dark:text-foreground">
+                  <p className="truncate text-sm font-medium text-foreground">
                     {user.name || user.login}
                   </p>
                 </div>

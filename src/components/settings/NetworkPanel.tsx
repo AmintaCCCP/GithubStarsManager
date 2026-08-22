@@ -249,7 +249,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     <div className="space-y-4">
       {/* Network Proxy Card — only available with backend or Electron */}
       {canUseProxy && (
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Wifi className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
@@ -447,7 +447,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
       )}
 
       {/* RPC Download Card */}
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Download className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />

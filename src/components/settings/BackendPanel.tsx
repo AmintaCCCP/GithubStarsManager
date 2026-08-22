@@ -279,7 +279,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+            className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
             placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
           />
           <Button

@@ -1012,12 +1012,12 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="ui-field h-12 w-full pl-10 pr-3 py-3 text-foreground dark:text-foreground"
+          className="h-10 w-full pl-10 pr-3"
         />
 
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
             <div className="p-2 border-b border-black/[0.04] dark:border-border flex items-center justify-between">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索历史', 'Search History')}
@@ -1048,7 +1048,7 @@ export const SearchBar: React.FC = () => {
 
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
             <div className="p-2 border-b border-black/[0.04] dark:border-border">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索建议', 'Search Suggestions')}
@@ -1084,7 +1084,8 @@ export const SearchBar: React.FC = () => {
               variant="ghost"
               onClick={handleClearSearch}
               aria-label={t('清除搜索', 'Clear search')}
-              className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground"
               title={t('清除搜索', 'Clear search')}
             >
               <X className="w-4 h-4" />
@@ -1095,7 +1096,7 @@ export const SearchBar: React.FC = () => {
             variant="default"
             aria-label={isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}
             disabled={isSearching || !searchQuery.trim()}
-            className="ui-button-primary flex shrink-0 items-center space-x-1 px-2.5 py-1.5 text-sm font-medium disabled:opacity-50 sm:px-4"
+            className="flex shrink-0 items-center sm:px-4"
             title={activeAIConfig
               ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
@@ -1110,11 +1111,11 @@ export const SearchBar: React.FC = () => {
           )}
           <div className="group relative shrink-0">
             <AlertCircle className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70 cursor-help" />
-            <div className="absolute right-0 top-full mt-2 w-80 max-w-xs p-3 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-foreground dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
-              <p className="font-medium mb-1 text-foreground dark:text-white">
+            <div className="invisible absolute right-0 top-full z-[9999] mt-2 w-80 max-w-xs rounded-md border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100 whitespace-normal break-words">
+              <p className="mb-1 font-medium text-popover-foreground">
                 {t('关于AI搜索', 'About AI Search')}
               </p>
-              <p className="text-muted-foreground dark:text-gray-300 leading-relaxed">
+              <p className="leading-relaxed text-muted-foreground">
                 {activeAIConfig ? t(
                   'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
                   'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant results. Supports natural language queries and concept matching.'
@@ -1123,7 +1124,7 @@ export const SearchBar: React.FC = () => {
                   'Fallback mode: Basic text search with default sorting. When no AI service is configured, the system uses basic text matching for search (supports name, description, tags, language, etc.) and applies standard sort and filter controls. This is a lightweight search solution without semantic understanding capabilities.'
                 )}
               </p>
-              <div className="absolute bottom-full right-4 w-2 h-2 bg-white dark:bg-card border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+              <div className="absolute bottom-full right-4 h-2 w-2 rotate-45 border-l border-t border-border bg-popover"></div>
             </div>
           </div>
           </div>
@@ -1179,7 +1180,7 @@ export const SearchBar: React.FC = () => {
             <Button
               variant="ghost"
               onClick={clearFilters}
-              className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-gray-200 transition-colors"
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('清除全部', 'Clear all')}</span>
@@ -1253,14 +1254,14 @@ export const SearchBar: React.FC = () => {
             </DropdownMenu>
             <div className="group relative">
               <Clock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70 cursor-help" />
-              <div className="absolute right-0 top-full mt-2 w-max p-2 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-foreground dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
+              <div className="absolute right-0 top-full mt-2 w-max p-2 bg-card dark:bg-card border border-border dark:border-border text-foreground dark:text-foreground text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
                 <p className="font-medium">
                   {t('最近更新时间', 'Last synced')}
                 </p>
-                <p className="text-muted-foreground dark:text-gray-300 mt-1">
+                <p className="text-muted-foreground dark:text-muted-foreground mt-1">
                   {formatLastSync(lastSync)}
                 </p>
-                <div className="absolute bottom-full right-1 w-2 h-2 bg-white dark:bg-card border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+                <div className="absolute bottom-full right-1 w-2 h-2 bg-card dark:bg-card border-l border-t border-border dark:border-border transform rotate-45"></div>
               </div>
             </div>
           </div>

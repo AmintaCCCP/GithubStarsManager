@@ -159,3 +159,13 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本轮完整门禁通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,794.18 kB，独立 checker 2,728.70 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
+
+## Round-29 shadcn visual parity remediation
+
+本轮根据实际生产预览与官方 shadcn/ui 基线完成视觉收尾：全局 helper 改用 semantic tokens；入口、App shell、登录页、Header、CategorySidebar、SearchBar、RepositoryCard、SettingsPanel、GistView 和 settings panels 统一标准字体层级、控件密度、`rounded-md`/`rounded-xl`、薄边框、popover/card surface、focus ring 和 light/dark 对比度。共享 Button 对齐官方 h-9/h-8/h-10/icon 尺寸与状态，Card 对齐官方 flex/gap/py/title/content 视觉结构；专用图片查看器 overlay 颜色保持不变。所有修改均为 presentation/accessibility 层，业务 stores、services、API、同步流程、AI 行为和数据流保持不变。
+
+实际生产预览验证了 light/dark 登录页面可以正常挂载并呈现，定向回归 17 tests passed；完整门禁为 31 test files / 332 tests passed，ESLint 和 TypeScript 通过，生产 build 与 3,000 KiB bundle hard budget 通过（legacy 2,791.81 kB；checker 2,726.38 KiB），`git diff --check` 通过，生产依赖审计 0 vulnerabilities，测试日志无 React/Radix warnings、act 或 unhandled markers。
+
+该记录对应待提交和推送的本地 round-29 draft。CodeRabbit 的 actionable zero 仍须由下一次针对最终 commit 的 completed full review 明确验证。
+
+References: [shadcn/ui component documentation](https://ui.shadcn.com/docs/components)；[official Button/Card source](https://raw.githubusercontent.com/shadcn-ui/ui/main/apps/v4/registry/new-york-v4/ui/button.tsx)。

@@ -60,7 +60,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
         onClick={() => setIsExpanded(prev => !prev)}
         aria-expanded={isExpanded}
         aria-controls={repositoryListId}
-        className="flex w-full items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-white dark:bg-white/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
+        className="flex w-full items-center justify-between rounded-lg bg-card px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-card dark:bg-card/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
       >
         <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -69,13 +69,13 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
       {isExpanded && (
         <div id={repositoryListId} className="mt-2 space-y-2">
           {repos.length === 0 ? (
-            <p className="rounded-lg bg-white/60 dark:bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
+            <p className="rounded-lg bg-card dark:bg-card/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
               {emptyText}
             </p>
           ) : visibleRepos.map(repo => (
             <div
               key={normalizeRepoKey(repo.full_name)}
-              className={`flex items-center justify-between gap-3 rounded-lg bg-white dark:bg-muted/40 px-3 py-2 ${repo.release_hidden ? 'opacity-60' : ''}`}
+              className={`flex items-center justify-between gap-3 rounded-lg bg-card dark:bg-muted/40 px-3 py-2 ${repo.release_hidden ? 'opacity-60' : ''}`}
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-foreground dark:text-foreground">{repo.full_name}</div>
@@ -169,7 +169,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
             if (event.key === 'Enter') handleAdd();
           }}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-white dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
+          className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
         />
         <Button
           type="button"
@@ -352,7 +352,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 className={`h-auto flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
                   checked
                     ? 'border-primary/30 bg-primary/10'
-                    : 'border-border bg-white hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-white/[0.05]'
+                    : 'border-border bg-card hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-card/[0.05]'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -368,8 +368,8 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
                     {source.count}
                   </span>
-                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
                   </span>
                 </div>
               </Button>
