@@ -48,7 +48,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   // Sync proxy form when store changes externally
   useEffect(() => {
-    setForm(proxyConfig);
+    setForm(currentForm => ({ ...currentForm, enabled: proxyConfig.enabled }));
     if (proxyConfig.username || proxyConfig.password) {
       setShowAuth(true);
     }
@@ -56,7 +56,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   // Sync RPC form when store changes externally
   useEffect(() => {
-    setRpcForm(rpcDownloadConfig);
+    setRpcForm(currentForm => ({ ...currentForm, enabled: rpcDownloadConfig.enabled }));
   }, [rpcDownloadConfig]);
 
   // Load RPC config from backend on mount (to get hasSecret flag)
