@@ -1159,7 +1159,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 7: Deploy Guide */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-accent transition-colors">
+        <div className="flex items-center justify-between p-4">
           <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
             <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
             {t('部署指南', 'Deploy Guide')}

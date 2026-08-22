@@ -2,6 +2,7 @@ import React, { useState, useCallback, createContext, useContext, ReactNode, use
 import { Toast, ToastType } from '../components/ui/Toast';
 import * as ToastPrimitive from '@radix-ui/react-toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { useAppStore } from '../store/useAppStore';
 
 interface ToastState {
   message: string;
@@ -42,6 +43,7 @@ interface DialogProviderProps {
 }
 
 export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
+  const language = useAppStore((state) => state.language);
   const [toastState, setToastState] = useState<ToastState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>({
     isOpen: false,
@@ -114,6 +116,7 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
             key={toastState.key}
             message={toastState.message}
             type={toastState.type}
+            closeLabel={language === 'zh' ? '关闭' : 'Close'}
             onClose={closeToast}
           />
         )}

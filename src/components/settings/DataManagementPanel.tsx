@@ -848,6 +848,65 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
           useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
         }
+        if (selectedTypes.includes('discoveryRepos')) {
+          const currentStore = useAppStore.getState();
+          if (importedData.discoveryRepos) {
+            const mergedDiscoveryRepos = { ...currentStore.discoveryRepos };
+            Object.entries(importedData.discoveryRepos).forEach(([channel, repos]) => {
+              const typedChannel = channel as keyof typeof currentStore.discoveryRepos;
+              const existingIds = new Set((currentStore.discoveryRepos[typedChannel] || []).map(repo => repo.id));
+              mergedDiscoveryRepos[typedChannel] = [
+                ...(currentStore.discoveryRepos[typedChannel] || []),
+                ...repos.filter(repo => !existingIds.has(repo.id)),
+              ];
+            });
+            useAppStore.setState({ discoveryRepos: mergedDiscoveryRepos });
+          }
+          if (importedData.discoveryTotalCount) {
+            useAppStore.setState({ discoveryTotalCount: {
+              ...useAppStore.getState().discoveryTotalCount,
+              ...importedData.discoveryTotalCount,
+            } });
+          }
+          if (importedData.discoveryHasMore) {
+            useAppStore.setState({ discoveryHasMore: {
+              ...useAppStore.getState().discoveryHasMore,
+              ...importedData.discoveryHasMore,
+            } });
+          }
+          if (importedData.discoveryNextPage) {
+            useAppStore.setState({ discoveryNextPage: {
+              ...useAppStore.getState().discoveryNextPage,
+              ...importedData.discoveryNextPage,
+            } });
+          }
+        }
+        if (selectedTypes.includes('subscriptionRepos')) {
+          const currentStore = useAppStore.getState();
+          if (importedData.subscriptionRepos) {
+            const mergedSubscriptionRepos = { ...currentStore.subscriptionRepos };
+            Object.entries(importedData.subscriptionRepos).forEach(([channel, repos]) => {
+              const existingIds = new Set((currentStore.subscriptionRepos[channel] || []).map(repo => repo.id));
+              mergedSubscriptionRepos[channel] = [
+                ...(currentStore.subscriptionRepos[channel] || []),
+                ...repos.filter(repo => !existingIds.has(repo.id)),
+              ];
+            });
+            useAppStore.setState({ subscriptionRepos: mergedSubscriptionRepos });
+          }
+          if (importedData.subscriptionLastRefresh) {
+            useAppStore.setState({ subscriptionLastRefresh: {
+              ...useAppStore.getState().subscriptionLastRefresh,
+              ...importedData.subscriptionLastRefresh,
+            } });
+          }
+          if (importedData.subscriptionChannels) {
+            const existingChannels = useAppStore.getState().subscriptionChannels;
+            const existingIds = new Set(existingChannels.map(channel => channel.id));
+            const newChannels = importedData.subscriptionChannels.filter(channel => !existingIds.has(channel.id));
+            useAppStore.setState({ subscriptionChannels: [...existingChannels, ...newChannels] });
+          }
+        }
         if (selectedTypes.includes('releaseSubscriptions')) {
           if (importedData.releaseSubscriptions) {
             const existingSubs = store.releaseSubscriptions;
@@ -859,6 +918,60 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               store.releaseSourceSettings,
               normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
             ));
+          }
+        }
+        if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
+          const currentFilters = useAppStore.getState().searchFilters;
+          useAppStore.setState({ searchFilters: {
+            ...currentFilters,
+            ...importedData.searchFilters,
+            licenses: importedData.searchFilters.licenses ?? currentFilters.licenses ?? [],
+          } });
+        }
+        if (selectedTypes.includes('uiSettings')) {
+          const importedUiSettings = importedData;
+          const currentStore = useAppStore.getState();
+          useAppStore.setState({
+            ...(importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark'
+              ? { theme: importedUiSettings.theme }
+              : {}),
+            ...(importedUiSettings.language ? { language: importedUiSettings.language } : {}),
+            ...(typeof importedUiSettings.isSidebarCollapsed === 'boolean'
+              ? { isSidebarCollapsed: importedUiSettings.isSidebarCollapsed }
+              : {}),
+            ...(importedUiSettings.releaseViewMode === 'timeline' || importedUiSettings.releaseViewMode === 'repository'
+              ? { releaseViewMode: importedUiSettings.releaseViewMode }
+              : {}),
+            ...(importedUiSettings.releaseSelectedFilters
+              ? { releaseSelectedFilters: importedUiSettings.releaseSelectedFilters }
+              : {}),
+            ...(importedUiSettings.releaseSearchQuery !== undefined
+              ? { releaseSearchQuery: importedUiSettings.releaseSearchQuery }
+              : {}),
+            ...(importedUiSettings.releaseExpandedRepositories
+              ? { releaseExpandedRepositories: new Set(importedUiSettings.releaseExpandedRepositories) }
+              : {}),
+          });
+          if (importedUiSettings.proxyConfig) {
+            const restoredProxy = {
+              ...importedUiSettings.proxyConfig,
+              password: wasIncluded && isRealSecret(importedUiSettings.proxyConfig.password)
+                ? importedUiSettings.proxyConfig.password
+                : currentStore.proxyConfig.password,
+            };
+            useAppStore.setState({ proxyConfig: restoredProxy });
+          }
+          if (importedUiSettings.rpcDownloadConfig) {
+            const restoredRpc = {
+              ...importedUiSettings.rpcDownloadConfig,
+              secret: wasIncluded && isRealSecret(importedUiSettings.rpcDownloadConfig.secret)
+                ? importedUiSettings.rpcDownloadConfig.secret
+                : currentStore.rpcDownloadConfig.secret,
+            };
+            useAppStore.setState({ rpcDownloadConfig: restoredRpc });
+          }
+          if (wasIncluded && importedUiSettings.backendApiSecret !== undefined && isRealSecret(importedUiSettings.backendApiSecret)) {
+            setBackendApiSecret(importedUiSettings.backendApiSecret);
           }
         }
       }

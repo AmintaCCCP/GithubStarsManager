@@ -183,3 +183,6 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本地生产预览已验证：开发服务器空白是旧入口运行时观察，生产构建预览可正常挂载；light/dark 登录页均完成实际截图检查。定向回归 4 个测试文件、17 个测试全部通过，日志无 React/Radix `Warning`、`act`、`Unhandled` 或错误标记。完整门禁通过：31 个测试文件、332 个测试全部通过；ESLint 0 errors/0 warnings；`npx tsc -b` 无诊断；生产 build 通过；legacy 入口 `index-legacy-BpAWmd9K.js` 为 2,791.81 kB，独立 bundle checker 为 2,726.38 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。
 
 本节记录的是已完成本地验证、尚待整理提交、推送并触发 CodeRabbit full review 的 draft；不能以本节作为 CodeRabbit actionable zero 的证据，只有针对最终推送 commit 的完成报告明确写出 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
+
+[1]: https://ui.shadcn.com/docs/components "shadcn/ui Components"
+[2]: https://ui.shadcn.com/docs/theming "shadcn/ui Theming"
