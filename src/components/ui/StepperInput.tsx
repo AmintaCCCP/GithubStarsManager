@@ -40,8 +40,10 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 
   const stepValue = useCallback((delta: number) => {
     const nextValue = clamp(valueRef.current + delta);
+    if (nextValue === valueRef.current) return false;
     valueRef.current = nextValue;
     onChange(nextValue);
+    return true;
   }, [onChange, clamp]);
 
   const stopRepeat = useCallback(() => {
@@ -57,9 +59,11 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 
   const startRepeat = useCallback((delta: number) => {
     stopRepeat();
-    stepValue(delta);
+    if (!stepValue(delta)) return;
     timeoutRef.current = setTimeout(() => {
-      intervalRef.current = setInterval(() => stepValue(delta), 120);
+      intervalRef.current = setInterval(() => {
+        if (!stepValue(delta)) stopRepeat();
+      }, 120);
     }, 400);
   }, [stepValue, stopRepeat]);
 
