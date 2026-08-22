@@ -603,15 +603,25 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               ))}
             </div>
             <div className="relative" ref={eventTypeRef}>
-              <Button onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent flex items-center space-x-1">
+              <Button
+                onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
+                aria-haspopup="menu"
+                aria-expanded={showEventTypeDropdown}
+                aria-controls="diagnostic-event-type-menu"
+                className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent flex items-center space-x-1"
+              >
                 <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('类型', 'types')}` : t('事件类型', 'Event Type')}</span>
                 <ChevronDown className="w-4 h-4" />
               </Button>
               {showEventTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]">
+                <div
+                  id="diagnostic-event-type-menu"
+                  role="menu"
+                  className="absolute top-full left-0 mt-1 bg-white dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]"
+                >
                   {availableEventTypes.map(et => (
                     <Button key={et} onClick={() => toggleEventType(et)}
+                      aria-pressed={selectedEventTypes.has(et)}
                       className={`w-full text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'}`}>
                       <span>{language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}</span>
                     </Button>

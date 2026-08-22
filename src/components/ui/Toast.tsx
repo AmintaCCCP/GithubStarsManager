@@ -15,8 +15,8 @@ interface ToastProps {
 const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
   success: { icon: CheckCircle2, className: 'border-status-green/30 bg-accent/50 text-status-green dark:bg-muted/40' },
   error: { icon: AlertTriangle, className: 'border-destructive/30 bg-accent/50 text-destructive dark:bg-muted/40' },
-  warning: { icon: AlertTriangle, className: 'border-amber-400/40 bg-accent/50 text-amber-500 dark:bg-muted/40 dark:text-amber-400' },
-  info: { icon: Info, className: 'border-gray-200 bg-accent/50 text-muted-foreground dark:border-border dark:bg-muted/40 dark:text-muted-foreground' },
+  warning: { icon: AlertTriangle, className: 'border-status-amber/40 bg-accent/50 text-status-amber dark:bg-muted/40' },
+  info: { icon: Info, className: 'border-border bg-accent/50 text-muted-foreground dark:bg-muted/40' },
 };
 
 export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000 }) => {

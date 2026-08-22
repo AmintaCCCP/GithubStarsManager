@@ -1,3 +1,4 @@
+import React from 'react';
 import { ExternalLink, Github, Globe, Mail, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';

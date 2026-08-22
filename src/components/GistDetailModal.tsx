@@ -212,6 +212,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             <Button
               key={file.filename}
               type="button"
+              aria-pressed={activeFile?.filename === file.filename}
               onClick={() => setActiveFilename(file.filename)}
               className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                 activeFile?.filename === file.filename

@@ -232,11 +232,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusClass = () => {
     switch (status) {
       case 'connected':
-        return 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground';
+        return 'bg-status-green/10 text-status-green dark:bg-status-green/10';
       case 'checking':
         return 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground';
       default:
-        return 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground';
+        return 'bg-destructive/10 text-destructive dark:bg-destructive/10';
     }
   };
 

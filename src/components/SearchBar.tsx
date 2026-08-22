@@ -1551,10 +1551,11 @@ export const SearchBar: React.FC = () => {
             </h4>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 sm:gap-4">
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <label htmlFor="minimum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {t('最小:', 'Min:')}
                 </label>
                 <NumberInput
+                  id="minimum-stars"
                   value={searchFilters.minStars}
                   onChange={(v) => setSearchFilters({ minStars: v })}
                   min={0}
@@ -1565,10 +1566,11 @@ export const SearchBar: React.FC = () => {
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <label htmlFor="maximum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {t('最大:', 'Max:')}
                 </label>
                 <NumberInput
+                  id="maximum-stars"
                   value={searchFilters.maxStars}
                   onChange={(v) => setSearchFilters({ maxStars: v })}
                   min={0}
