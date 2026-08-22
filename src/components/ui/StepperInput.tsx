@@ -9,6 +9,8 @@ interface StepperInputProps {
   max?: number;
   step?: number;
   className?: string;
+  decreaseLabel?: string;
+  increaseLabel?: string;
 }
 
 export const StepperInput: React.FC<StepperInputProps> = ({
@@ -18,6 +20,8 @@ export const StepperInput: React.FC<StepperInputProps> = ({
   max,
   step = 1,
   className = '',
+  decreaseLabel = 'Decrease',
+  increaseLabel = 'Increase',
 }) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,16 +65,15 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         type="button"
         variant="outline"
         size="icon"
-        onMouseDown={() => canDecrement && startRepeat(-step)}
+        onPointerDown={() => canDecrement && startRepeat(-step)}
         onClick={(event) => {
           if (event.detail === 0 && canDecrement) stepValue(-step);
         }}
-        onMouseUp={stopRepeat}
-        onMouseLeave={stopRepeat}
-        onTouchStart={() => canDecrement && startRepeat(-step)}
-        onTouchEnd={stopRepeat}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
         disabled={!canDecrement}
-        aria-label="Decrease"
+        aria-label={decreaseLabel}
         className="h-8 w-8 rounded-r-none"
       >
         <Minus className="h-3.5 w-3.5" />
@@ -82,16 +85,15 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         type="button"
         variant="outline"
         size="icon"
-        onMouseDown={() => canIncrement && startRepeat(step)}
+        onPointerDown={() => canIncrement && startRepeat(step)}
         onClick={(event) => {
           if (event.detail === 0 && canIncrement) stepValue(step);
         }}
-        onMouseUp={stopRepeat}
-        onMouseLeave={stopRepeat}
-        onTouchStart={() => canIncrement && startRepeat(step)}
-        onTouchEnd={stopRepeat}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
         disabled={!canIncrement}
-        aria-label="Increase"
+        aria-label={increaseLabel}
         className="h-8 w-8 rounded-l-none"
       >
         <Plus className="h-3.5 w-3.5" />

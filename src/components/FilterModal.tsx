@@ -128,9 +128,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     <Button
                       type="button"
                       variant="ghost"
+                      size="icon"
                       onClick={() => handleRemoveKeyword(index)}
                       aria-label={`删除关键词 ${keyword}`}
-                      className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
                     >
                       <X className="w-3 h-3" />
                     </Button>

@@ -6,6 +6,7 @@ import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, Arrow
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
 import { StepperInput } from '../ui/StepperInput';
 import { useDialog } from '../../hooks/useDialog';
+import { validateCategoryName } from '../../utils/categoryUtils';
 
 interface CategoryPanelProps {
   t: (zh: string, en: string) => string;
@@ -75,15 +76,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryOrder]);
 
   const handleAddCategory = () => {
-    const categoryName = newCategoryName.trim();
-    if (!categoryName) {
-      toast(t('请输入分类名称', 'Please enter category name'), 'error');
+    const validation = validateCategoryName(newCategoryName, t);
+    if (validation.error !== null) {
+      toast(validation.error, 'error');
       return;
     }
-    if (categoryName.toLowerCase() === 'none') {
-      toast(t('none 是保留名称，请使用其他分类名称', 'The name "none" is reserved. Please choose another category name.'), 'error');
-      return;
-    }
+    const categoryName = validation.value;
 
     const newCategory = {
       id: `custom-${Date.now()}`,
@@ -108,15 +106,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   };
 
   const handleSaveEdit = () => {
-    const categoryName = editName.trim();
-    if (!categoryName) {
-      toast(t('分类名称不能为空', 'Category name cannot be empty'), 'error');
+    const validation = validateCategoryName(editName, t, ['分类名称不能为空', 'Category name cannot be empty']);
+    if (validation.error !== null) {
+      toast(validation.error, 'error');
       return;
     }
-    if (categoryName.toLowerCase() === 'none') {
-      toast(t('none 是保留名称，请使用其他分类名称', 'The name "none" is reserved. Please choose another category name.'), 'error');
-      return;
-    }
+    const categoryName = validation.value;
 
     if (editingId) {
       const isDefault = allDefaultCategories.some(c => c.id === editingId);
@@ -313,6 +308,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               onChange={setCollapsedSidebarCategoryCount}
               min={1}
               step={1}
+              decreaseLabel={t('减少分类数量', 'Decrease category count')}
+              increaseLabel={t('增加分类数量', 'Increase category count')}
             />
           </div>
         </div>
@@ -423,7 +420,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <Button
               onClick={handleAddCategory}
               disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90' : 'bg-gray-300 text-muted-foreground dark:bg-accent dark:text-muted-foreground cursor-not-allowed'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
@@ -516,11 +513,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     category.isCustom
                       ? 'bg-muted dark:bg-muted/40 border-border dark:border-border dark:border-border dark:border-border'
                       : 'bg-white dark:bg-card border-border dark:border-border'
-                  } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-ring' : ''} ${
+                  } ${isEditing ? 'ring-2 ring-ring' : ''} ${
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
                     dragOverId === category.id && draggingId !== category.id
-                      ? 'border-border dark:border-border dark:border-primary ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      ? 'border-border dark:border-primary ring-2 ring-ring transform scale-[1.02]'
                       : ''
                   } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >
@@ -585,7 +582,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           <Button
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-accent dark:hover:bg-white/[0.12] dark:text-muted-foreground' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
                             aria-label={t('保存', 'Save')}
                             title={t('保存', 'Save')}
                           >
