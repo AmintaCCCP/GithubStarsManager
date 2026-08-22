@@ -78,8 +78,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
   }, [onChange, min, max, resolveFallback, isInteger]);
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    (e.target as HTMLInputElement).blur();
+    e.currentTarget.blur();
   }, []);
 
   return (

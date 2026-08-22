@@ -138,8 +138,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
-  const loadedActiveContent = activeFile ? loadedContents[activeFile.filename] : undefined;
-  const hasLoadedActiveContent = Boolean(activeFile && Object.prototype.hasOwnProperty.call(loadedContents, activeFile.filename));
+  const loadedContentKey = gist && activeFile ? `${gist.id}:${activeFile.filename}` : null;
+  const loadedActiveContent = loadedContentKey ? loadedContents[loadedContentKey] : undefined;
+  const hasLoadedActiveContent = Boolean(loadedContentKey && Object.prototype.hasOwnProperty.call(loadedContents, loadedContentKey));
   const effectiveActiveFile = activeFile && hasLoadedActiveContent
     ? { ...activeFile, content: loadedActiveContent, truncated: false }
     : activeFile;
@@ -153,8 +154,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
   const handleContentLoaded = (filename: string, content: string) => {
-    setLoadedContents(previous => ({ ...previous, [filename]: content }));
     if (!gist) return;
+    const cacheKey = `${gist.id}:${filename}`;
+    setLoadedContents(previous => ({ ...previous, [cacheKey]: content }));
     const state = useAppStore.getState();
     const latest =
       state.gists.find(item => item.id === gist.id) ||
