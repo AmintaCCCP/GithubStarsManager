@@ -66,3 +66,8 @@ Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGro
 ff639df 后最新 CodeRabbit full review 的 2 个 actionable comments 与 1 个 duplicate 已全部完成：BackupPanel 备份/恢复按钮补 `h-auto`；NetworkPanel RPC secret visibility 与 DiagnosticLogsPanel close/tabs 明确使用 ghost/icon 语义；DiscoveryView channel-switch effect 跳过 topic 自动 fetch，由 topic/platform effect 独立负责首次和组合变更请求，避免重复请求。业务逻辑、store、services、API 和同步流程保持不变。
 
 本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,790.39 kB，独立 checker 2,725.00 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。
+
+
+1a91b5d 后最新 CodeRabbit full review 的 3 个 actionable comments 与 1 个 outside-diff comment 已全部完成：DiscoveryView 在 githubToken 缺失时不再记录 topic/platform applied pair，token 初始化后可正常发起一次请求；McpSettingsPanel 的 switch 补 accessible name，refresh、visibility、token/URL/JSON copy actions 明确使用 ghost/outline variants；RepositoryList AI analysis popup 使用 React `useId`，trigger 补 `aria-expanded`/`aria-controls`，popup 补对应 id。业务逻辑、store、services、API 和同步流程保持不变。
+
+本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,790.74 kB，独立 checker 2,725.34 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。

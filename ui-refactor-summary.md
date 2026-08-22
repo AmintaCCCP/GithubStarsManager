@@ -65,3 +65,8 @@
 ff639df 后最新 CodeRabbit review 的所有 comments 已完成修复：BackupPanel 长内容操作按钮覆盖 shared Button 默认高度；NetworkPanel RPC secret visibility 与 DiagnosticLogsPanel close/tabs 使用明确的 ghost/icon 变体；DiscoveryView topic channel 跳过通用空频道自动请求，由 topic/platform 专用 effect 负责请求去重。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.39 kB，独立 checker 2,725.00 KiB，0 vulnerabilities。
+
+
+1a91b5d 后最新 CodeRabbit review 的所有 comments 已完成修复：DiscoveryView 的 topic/platform 请求去重改为 token-aware，避免未登录初始化时错误记录 applied pair；McpSettingsPanel switch 补 accessible name，refresh、visibility 与 copy actions 使用明确的 ghost/outline variants；RepositoryList AI analysis popup 使用实例唯一 id，并关联 trigger 的 `aria-expanded`/`aria-controls`。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.74 kB，独立 checker 2,725.34 KiB，0 vulnerabilities。

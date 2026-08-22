@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useId, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
@@ -55,6 +55,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const [showAISummary, setShowAISummary] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
+  const aiAnalysisActionsId = useId();
   const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   const previousCategoryRef = useRef(selectedCategory);
@@ -1041,6 +1042,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <Button
               variant="ghost"
               onClick={() => setShowDropdown(!showDropdown)}
+              aria-expanded={showDropdown}
+              aria-controls={aiAnalysisActionsId}
               disabled={isLoading}
               className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 disabled:opacity-50 text-sm font-medium"
             >
@@ -1056,7 +1059,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
             {/* Dropdown Menu */}
             {showDropdown && !isLoading && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-dialog z-10">
+              <div id={aiAnalysisActionsId} className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-card border border-border dark:border-border rounded-lg shadow-dialog z-10">
                 <Button
                   variant="ghost"
                   onClick={() => handleAIAnalyze(false)}

@@ -260,6 +260,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             aria-checked={mcpConfig.enabled}
             disabled={saving || loading}
             onClick={() => void handleToggle(!mcpConfig.enabled)}
+            aria-label={t('启用 MCP 服务', 'Enable MCP service')}
             className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
               mcpConfig.enabled ? 'bg-primary' : 'bg-accent dark:bg-accent'
             }`}
@@ -286,8 +287,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           {backendMode && (
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void refreshFromBackend()}
-              className="ml-auto p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
+              className="ml-auto h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('刷新', 'Refresh')}
             >
               <RefreshCw className="w-4 h-4 text-muted-foreground" />
@@ -352,6 +355,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           </h4>
           <Button
             type="button"
+            variant="outline"
             onClick={() => void handleResetToken()}
             disabled={saving || !mcpConfig.enabled}
             title={
@@ -380,17 +384,21 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           />
           <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setShowToken((v) => !v)}
-            className="p-2 rounded-lg hover:bg-accent dark:hover:bg-accent"
+            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent"
             aria-label={showToken ? t('隐藏', 'Hide') : t('显示', 'Show')}
           >
             {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
           <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => void copyText('token', mcpConfig.token)}
             disabled={!mcpConfig.token}
-            className="p-2 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-40"
+            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-40"
             aria-label={t('复制 Token', 'Copy token')}
           >
             {copiedKey === 'token' ? (
@@ -417,8 +425,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </code>
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void copyText('http', mcpHttpUrl)}
-              className="p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
+              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('复制 Streamable HTTP 地址', 'Copy Streamable HTTP URL')}
             >
               <Copy className="w-3.5 h-3.5" />
@@ -433,8 +443,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </code>
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void copyText('sse', mcpSseUrl)}
-              className="p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
+              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('复制 SSE 地址', 'Copy SSE URL')}
             >
               <Copy className="w-3.5 h-3.5" />
@@ -449,6 +461,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </span>
             <Button
               type="button"
+              variant="ghost"
               onClick={() => void copyText('json', agentConfigJson)}
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-foreground hover:opacity-90"
             >
@@ -470,6 +483,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </span>
             <Button
               type="button"
+              variant="outline"
               onClick={() => void copyText('sse-json', agentSseConfigJson)}
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground"
             >
