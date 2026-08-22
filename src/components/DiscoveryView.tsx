@@ -675,7 +675,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     // 取消持久化后，首次打开或切换到空频道时自动加载
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (!hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+    if (selectedDiscoveryChannel !== 'topic' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
       autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
