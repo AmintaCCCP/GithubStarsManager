@@ -143,3 +143,13 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 状态；只有后续 review 明确报告 `Actionable comments posted: 0`，才能确认审查收尾。
 
 业务逻辑、store、services、API 和同步流程保持不变。
+
+## Round-25 CodeRabbit remediation status
+
+2026-08-22 08:21:18Z 的 subsequent CodeRabbit full review 报告 3 条 inline findings，均已完成最小范围修复：ReleaseSourceSettingsModal visibility toggle 补充 `aria-pressed`；DiagnosticLogsPanel event-type options 使用 neutral `ghost` variant 与 `justify-start`；VectorSearchSettings 的 dimensions、README max chars 和 Top K blur handlers 只接受整数，同时保留原有 fallback 与范围 clamp。未改变 store、services、API、同步流程、AI 行为或数据流。
+
+本轮完整门禁通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。`npm run lint` 通过且 0 errors/0 warnings；`npx tsc -b` 通过；`npm run build` 通过，legacy 入口 2,794.18 kB，独立 bundle checker 为 2,728.70 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 报告 `found 0 vulnerabilities`。
+
+本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 状态；只有后续 review 明确报告 `Actionable comments posted: 0`，才能确认审查收尾。
+
+业务逻辑、store、services、API 和同步流程保持不变。

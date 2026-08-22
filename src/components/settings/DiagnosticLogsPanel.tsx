@@ -622,8 +622,9 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 >
                   {availableEventTypes.map(et => (
                     <Button key={et} onClick={() => toggleEventType(et)}
+                      variant="ghost"
                       aria-pressed={selectedEventTypes.has(et)}
-                      className={`w-full text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'}`}>
+                      className={`w-full justify-start text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'}`}>
                       <span>{language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}</span>
                     </Button>
                   ))}
