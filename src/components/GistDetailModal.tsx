@@ -184,7 +184,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
         ? currentFilename
         : files[0]?.filename || '';
     });
-    setLoadedContents({});
+    if (gistChanged) {
+      setLoadedContents({});
+    }
   }, [gist?.id, files]);
 
   const handleCopy = async (text: string, message: string) => {
