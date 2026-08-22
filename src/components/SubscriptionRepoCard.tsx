@@ -8,6 +8,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 
@@ -402,35 +403,59 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Description */}
           {repo.description && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="relative mb-3" tabIndex={0}>
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
-                    {repo.description}
-                  </p>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t('查看完整描述', 'View full description')}
+                      onClick={(event) => event.stopPropagation()}
+                      className="relative mb-3 block w-full cursor-text text-left"
+                    >
+                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                        {repo.description}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+                  {repo.description}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words" onClick={(event) => event.stopPropagation()}>
                 {repo.description}
-              </TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
           )}
 
           {/* AI Summary */}
           {repo.ai_summary && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="relative mb-3 flex items-start gap-1.5" tabIndex={0}>
-                  <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
-                    {repo.ai_summary}
-                  </p>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t('查看完整 AI 摘要', 'View full AI summary')}
+                      onClick={(event) => event.stopPropagation()}
+                      className="relative mb-3 flex w-full cursor-text items-start gap-1.5 text-left"
+                    >
+                      <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
+                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                        {repo.ai_summary}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+                  {repo.ai_summary}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words" onClick={(event) => event.stopPropagation()}>
                 {repo.ai_summary}
-              </TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
           )}
 
           {/* Tags */}

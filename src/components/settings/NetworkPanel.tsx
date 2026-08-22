@@ -282,10 +282,18 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
+        const body: Record<string, unknown> = {
+          enabled: newForm.enabled,
+          host: newForm.host,
+          port: newForm.port,
+        };
+        if (newForm.secret) {
+          body.secret = newForm.secret;
+        }
         const resp = await fetch(`${base}/settings/rpc-download`, {
           method: 'PUT',
           headers: authHeaders,
-          body: JSON.stringify(newForm),
+          body: JSON.stringify(body),
         });
         if (!resp.ok) {
           throw new Error(`Backend returned ${resp.status}`);
