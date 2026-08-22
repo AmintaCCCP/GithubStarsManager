@@ -26,7 +26,7 @@ export const Modal: React.FC<ModalProps> = ({
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
-      <div>{children}</div>
+      <div className="min-w-0">{children}</div>
     </DialogContent>
   </Dialog>
 );

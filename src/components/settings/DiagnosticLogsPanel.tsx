@@ -30,10 +30,17 @@ interface DiagnosticLogsPanelProps {
   t: (zh: string, en: string) => string;
 }
 
-const LEVEL_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  debug: 'outline',
-  info: 'secondary',
+const LEVEL_BADGE_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  debug: 'secondary',
+  info: 'default',
   warn: 'outline',
+  error: 'destructive',
+};
+
+const LEVEL_FILTER_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  debug: 'default',
+  info: 'secondary',
+  warn: 'secondary',
   error: 'destructive',
 };
 
@@ -96,7 +103,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         return (
           <div className="space-y-3 text-sm">
             <Row label={t('级别', 'Level')}>
-              <Badge variant={LEVEL_VARIANTS[entry.level]}>{entry.level}</Badge>
+              <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
             </Row>
             <Row label={t('来源', 'Source')}>
               <Badge variant="secondary">
@@ -187,7 +194,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border dark:border-border">
           <div className="flex items-center space-x-3 min-w-0">
-            <Badge variant={LEVEL_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
+            <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
             <span className="font-medium text-foreground dark:text-foreground truncate">{entry.message}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0 ml-2">
@@ -572,7 +579,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               <Button
                 key={level}
                 type="button"
-                variant={selectedLevels.has(level) ? LEVEL_VARIANTS[level] : 'outline'}
+                variant={selectedLevels.has(level) ? LEVEL_FILTER_VARIANTS[level] : 'outline'}
                 size="sm"
                 onClick={() => toggleLevel(level)}
                 aria-pressed={selectedLevels.has(level)}
@@ -684,7 +691,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       } : undefined}
                     >
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <Badge variant={LEVEL_VARIANTS[entry.level]}>{entry.level}</Badge>
+                        <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
                         <Badge variant="secondary">
                           {entry.source === 'frontend' ? t('前端', 'FE') : t('后端', 'BE')}
                         </Badge>

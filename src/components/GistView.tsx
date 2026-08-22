@@ -301,7 +301,7 @@ export const GistView: React.FC = () => {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setSelectedGistCategory(category.id)}
-                  className={`linear-settings-nav-item flex w-full items-center justify-between px-3 py-2 text-sm ${
+                  className={`linear-settings-nav-item group flex w-full items-center justify-between px-3 py-2 text-sm ${
                     active ? 'is-active' : ''
                   }`}
                 >
@@ -309,7 +309,7 @@ export const GistView: React.FC = () => {
                     <Icon className="h-4 w-4" />
                     {t(category.name, category.nameEn)}
                   </span>
-                  <span className={active ? 'text-white/80' : 'text-muted-foreground dark:text-muted-foreground/70'}>
+                  <span className={active ? 'text-accent-foreground' : 'text-muted-foreground dark:text-muted-foreground group-hover:text-accent-foreground'}>
                     {categoryItems[category.id].length}
                   </span>
                 </Button>

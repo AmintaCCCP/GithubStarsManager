@@ -989,9 +989,8 @@ textarea::-webkit-resizer {
 
 /* ---- 窗口级原生滚动条（仅作用于 document 滚动容器，不影响各组件 opt-in 滚动条类） ---- */
 
-/* 消灭窗口底部横向滚动条（App 根用 min-h-screen 且 body 未限横向的根因） */
-html,
-body {
+/* 消灭窗口底部横向滚动条，并为下拉菜单打开保留稳定的 viewport gutter。 */
+html {
   overflow-x: hidden;
   scrollbar-gutter: stable;
 }

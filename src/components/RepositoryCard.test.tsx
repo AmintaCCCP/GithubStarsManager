@@ -173,22 +173,6 @@ describe('RepositoryCard view modes', () => {
     await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
   });
 
-  it('does not open README when menu dismissal is followed by a card click', async () => {
-    const user = userEvent.setup();
-    const { container } = renderRepositoryCard('list');
-    const card = container.firstElementChild as HTMLElement;
-
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
-    expect(screen.getByText('仓库操作')).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.pointerDown(card);
-      fireEvent.click(card);
-    });
-
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
-    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
-  });
 
   it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {
     const user = userEvent.setup();

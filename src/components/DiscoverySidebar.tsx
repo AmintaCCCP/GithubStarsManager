@@ -92,13 +92,13 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
                 }`}
               >
-                <div className="flex items-center gap-2.5">
+                <span className="flex items-center gap-2.5">
                   {channel.icon}
                   <span className="font-medium text-sm">
                     {language === 'zh' ? channel.name : channel.nameEn}
                   </span>
-                </div>
-                <div className="flex items-center gap-2.5">
+                </span>
+                <span className="flex items-center gap-2.5">
                   {channelLoading && (
                     <Loader2 className="w-3 h-3 animate-spin text-primary" />
                   )}
@@ -107,7 +107,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                       {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
                     </span>
                   ) : null}
-                </div>
+                </span>
               </Button>
             );
           })}
