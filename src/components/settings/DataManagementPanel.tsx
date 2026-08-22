@@ -203,6 +203,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     isOpen: boolean;
     fileName: string;
   }>({ data: null, isOpen: false, fileName: '' });
+  const exportItems = [
+    { key: 'repositories', label: t('仓库数据', 'Repositories') },
+    { key: 'releases', label: t('Release数据', 'Releases') },
+    { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
+    { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
+    { key: 'customCategories', label: t('分类设置', 'Categories') },
+    { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
+    { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
+    { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
+    { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
+    { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
+    { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
+  ];
+  const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>(() => exportItems.map((item) => item.key));
 
   const addLog = useCallback((operation: string, success: boolean, details?: string) => {
     const newLog: OperationLog = {
@@ -1374,34 +1388,29 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             </div>
 
             <div className="space-y-2 mb-4">
-              {[
-                { key: 'repositories', label: t('仓库数据', 'Repositories') },
-                { key: 'releases', label: t('Release数据', 'Releases') },
-                { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
-                { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
-                { key: 'customCategories', label: t('分类设置', 'Categories') },
-                { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
-                { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
-                { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
-                { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
-                { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
-                { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
-              ].map((item) => (
+              {exportItems.map((item) => (
                 <label key={item.key} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
-                  <Checkbox defaultChecked className="export-checkbox" data-type={item.key} />
+                  <Checkbox
+                    checked={selectedExportTypes.includes(item.key)}
+                    onCheckedChange={(checked) => {
+                      setSelectedExportTypes((prev) => (
+                        checked === true
+                          ? prev.includes(item.key) ? prev : [...prev, item.key]
+                          : prev.filter((key) => key !== item.key)
+                      ));
+                    }}
+                  />
                   <span>{item.label}</span>
                 </label>
               ))}
             </div>
             <Button
               onClick={() => {
-                const checkboxes = document.querySelectorAll('.export-checkbox[data-state="checked"]');
-                const selectedTypes = Array.from(checkboxes).map((cb) => (cb as HTMLInputElement).dataset.type as string);
-                if (selectedTypes.length === 0) {
+                if (selectedExportTypes.length === 0) {
                   showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
                   return;
                 }
-                exportData(selectedTypes);
+                exportData(selectedExportTypes);
               }}
               disabled={isExporting}
               className="w-full px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
@@ -1436,10 +1445,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-2">
                 {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
               </p>
-              <Input type="file" accept=".json" onChange={handleImportFile} className="hidden" id="import-file-input" />
+              <Input type="file" accept=".json" onChange={handleImportFile} className="peer sr-only" id="import-file-input" />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block"
+                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
               >
                 {t('选择文件', 'Select File')}
               </label>

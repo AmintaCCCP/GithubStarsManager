@@ -376,6 +376,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
         </p>
         <div className="flex items-center gap-2">
           <Input
+            aria-label={t('访问 Token', 'Access Token')}
             type={showToken ? 'text' : 'password'}
             readOnly
             value={mcpConfig.token || ''}

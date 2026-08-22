@@ -415,7 +415,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div
         role="tabpanel"
         id={`settings-tabpanel-${displayTab}`}
-        aria-labelledby={`settings-tab-${displayTab}`}
+        aria-label={tabs.find((tab) => tab.id === displayTab)?.label ?? t('设置内容', 'Settings content')}
         className={`
           transition-all duration-100 ease-out
           ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}
