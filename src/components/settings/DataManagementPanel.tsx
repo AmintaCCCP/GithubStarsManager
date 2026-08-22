@@ -172,6 +172,9 @@ const UI_SETTINGS_DATA_KEYS = [
   'releaseSelectedFilters',
   'releaseSearchQuery',
   'releaseExpandedRepositories',
+  'proxyConfig',
+  'rpcDownloadConfig',
+  'backendApiSecret',
 ] as const;
 
 const IMPORT_DATA_KEYS = [
@@ -195,9 +198,6 @@ const IMPORT_DATA_KEYS = [
   'hiddenDefaultCategoryIds',
   'defaultCategoryOverrides',
   'categoryOrder',
-  'proxyConfig',
-  'rpcDownloadConfig',
-  'backendApiSecret',
 ] as const;
 const resolveImportTypes = (data: ExportData['data']): string[] => {
   const present = IMPORT_DATA_KEYS.filter((key) => data[key] !== undefined) as string[];
