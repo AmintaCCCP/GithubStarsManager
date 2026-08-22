@@ -589,15 +589,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        closeLabel={language === 'zh' ? '关闭' : 'Close'}
         showClose={false}
         aria-describedby={undefined}
-        className="w-[calc(100%-2rem)] max-w-[1130px] overflow-hidden p-0"
+        className="w-[calc(100%-2rem)] max-w-[1130px] overflow-visible p-0"
       >
-        <div
-          tabIndex={-1}
-          className="relative flex max-h-[90vh] w-full flex-col bg-card dark:bg-card"
-        >
+        <div className="relative flex max-h-[90vh] w-full flex-col bg-card dark:bg-card">
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
               <div
@@ -607,8 +603,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between p-4 border-b border-border dark:border-border flex-shrink-0">
-            <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3 border-b border-border p-4 dark:border-border">
+            <div className="flex min-w-0 flex-1 items-center space-x-3">
               <img
                 src={repository.owner.avatar_url}
                 alt={repository.owner.login}
@@ -623,7 +619,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
               {readmeVariants.length > 1 && (
                 <Select value={selectedReadmeKey} onValueChange={handleReadmeVariantChange} disabled={loading || variantsLoading}>
                   <SelectTrigger className="h-9 w-28 max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>

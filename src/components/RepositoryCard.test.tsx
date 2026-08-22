@@ -195,26 +195,20 @@ describe('RepositoryCard view modes', () => {
     renderRepositoryCard('list');
 
     const moreActions = screen.getByRole('button', { name: '更多操作' });
-    await act(async () => {
-      moreActions.focus();
-      await user.keyboard('{Enter}');
-    });
+    moreActions.focus();
+    await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     const unsubscribe = await screen.findByRole('menuitem', { name: '取消订阅 Release' });
-    await act(async () => {
-      unsubscribe.focus();
-      await user.keyboard('{Enter}');
-    });
+    unsubscribe.focus();
+    await user.keyboard('{Enter}');
     expect(storeState.toggleReleaseSubscription).toHaveBeenCalledWith(repository.id);
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消订阅 Release' })).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
-    await act(async () => {
-      editAction.focus();
-      await user.keyboard('{Enter}');
-    });
+    editAction.focus();
+    await user.keyboard('{Enter}');
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 

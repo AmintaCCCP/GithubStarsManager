@@ -259,7 +259,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'ai-summary'
-                  ? 'bg-destructive text-destructive-foreground hover:opacity-90'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
@@ -339,7 +339,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               disabled={isProcessing}
               className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
-                  ? 'bg-gray-700 text-white hover:bg-gray-800'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >

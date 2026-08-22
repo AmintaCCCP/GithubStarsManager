@@ -500,7 +500,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   >
                     {t('应用分类', 'Categories')}
                   </h3>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 pr-3">
                     <Button
                       variant="ghost"
                       onClick={handleAddCategory}
@@ -561,7 +561,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           aria-pressed={isSelected}
                           size="sm"
-                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out ${category.id === 'all' ? 'pr-3' : 'pr-14'} ${
+                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out pr-0 ${
                             isSelected
                               ? 'bg-accent text-accent-foreground font-medium'
                               : isDragTarget
@@ -583,7 +583,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                           {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
-                            className={`shrink-0 rounded-md px-2 py-0.5 text-xs transition-all duration-200 ease-out ${
+                              className={`ml-auto flex min-w-8 shrink-0 justify-center rounded-md px-2 py-0.5 text-xs transition-all duration-200 ease-out ${
                               isSelected
                                 ? 'bg-primary text-primary-foreground'
                                 : isDragTarget
@@ -597,7 +597,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                         {/* 操作按钮 - 绝对定位，hover/focus-within 时显示，不占位 */}
                         {category.id !== 'all' && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
+                          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
                             <Button
                               variant="ghost"
                               onClick={(e) => {

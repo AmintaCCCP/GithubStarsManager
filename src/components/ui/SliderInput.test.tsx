@@ -26,8 +26,8 @@ describe('SliderInput', () => {
     const user = userEvent.setup();
     render(<ControlledSlider />);
     const slider = screen.getByRole('slider', { name: 'Concurrency' });
-    const sliderRoot = slider.closest('[data-orientation="horizontal"].relative.flex.w-full') as HTMLElement;
-    expect(sliderRoot).not.toBeNull();
+    const sliderRoot = slider.parentElement?.parentElement as HTMLElement;
+    expect(sliderRoot).toHaveAttribute('data-orientation', 'horizontal');
     expect(slider).toHaveAttribute('aria-valuenow', '1');
 
     const getBoundingClientRect = vi.spyOn(sliderRoot, 'getBoundingClientRect').mockReturnValue(sliderRootRect);

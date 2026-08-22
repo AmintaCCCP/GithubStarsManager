@@ -1041,7 +1041,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
-            className={`flex-shrink-0 transition-transform duration-300 ease-in-out z-10 ${
+            className={`flex-shrink-0 pr-2 transition-transform duration-300 ease-in-out z-10 ${
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
@@ -1162,9 +1162,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     </div>
                   ) : (
                     <Button
+                      type="button"
+                      variant="default"
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 shrink-0 gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       title={t('AI分析', 'Analyze with AI')}
                     >
                       <Bot className="w-4 h-4" />

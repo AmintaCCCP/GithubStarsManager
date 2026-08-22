@@ -149,9 +149,9 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                     : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
                 title={needsSync
-                  ? t('Update branch', 'Update branch')
+                  ? t('更新分支', 'Update branch')
                   : t('已是最新版本', 'Already up to date')}
-                aria-label={t('Update branch', 'Update branch')}
+                aria-label={t('更新分支', 'Update branch')}
               >
                 {isSyncing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
