@@ -100,7 +100,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
         </div>
 
         {error && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-destructive dark:bg-destructive/10">
+          <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-destructive dark:bg-destructive/10">
             <p className="text-sm text-destructive">
               {error}
             </p>
