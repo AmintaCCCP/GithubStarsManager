@@ -556,10 +556,10 @@ export const ForkTimeline: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Fork owner selector */}
-            <div className="flex items-center space-x-2">
-              <span id="fork-owner-label" className="text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+              <span id="fork-owner-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
               <Select value={activeForkOwner} onValueChange={handleForkOwnerChange} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
-                <SelectTrigger className="ui-field h-9 min-w-36 px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="ui-field h-9 min-w-36 shrink-0 px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
                 <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -640,10 +640,10 @@ export const ForkTimeline: React.FC = () => {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             {/* Items per page selector */}
-            <div className="flex items-center space-x-2">
-              <span id="fork-page-size-label" className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+              <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-labelledby="fork-page-size-label" className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="fork-page-size-label" className="ui-field h-9 min-w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>

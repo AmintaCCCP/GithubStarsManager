@@ -1,5 +1,6 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import React, { useState, useEffect } from 'react';
 import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -229,17 +230,6 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     }
   };
 
-  const getStatusClass = () => {
-    switch (status) {
-      case 'connected':
-        return 'bg-status-green/10 text-status-green dark:bg-status-green/10';
-      case 'checking':
-        return 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground';
-      default:
-        return 'bg-destructive/10 text-destructive dark:bg-destructive/10';
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -249,10 +239,13 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             {t('后端服务器', 'Backend Server')}
           </h3>
         </div>
-        <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusClass()}`}>
+        <Badge
+          variant={status === 'connected' ? 'default' : status === 'checking' ? 'secondary' : 'destructive'}
+          className="gap-2 px-3 py-1 text-sm"
+        >
           {getStatusIcon()}
           <span>{getStatusText()}</span>
-        </span>
+        </Badge>
       </div>
 
       {health && (

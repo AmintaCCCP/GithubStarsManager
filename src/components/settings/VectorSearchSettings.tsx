@@ -1,5 +1,7 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import React, { useState, useCallback } from 'react';
 import {
@@ -479,8 +481,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
-          <Search className="w-5 h-5 text-purple-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted text-foreground">
+          <Search className="h-5 w-5" aria-hidden="true" />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
@@ -664,9 +666,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               {t('自动检测', 'Auto Detect')}
             </Button>
           </div>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-            ⚠ {t('必须与 Vectorize 索引维度一致', 'Must match Vectorize index dimensions')}
-          </p>
+          <Alert className="bg-muted/40 text-muted-foreground">
+            <AlertDescription>{t('必须与 Vectorize 索引维度一致', 'Must match Vectorize index dimensions')}</AlertDescription>
+          </Alert>
         </div>
 
         {/* Test & Save */}
@@ -681,11 +683,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </Button>
           <Button
             onClick={handleSaveEmbeddingConfig}
-            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-              embeddingSaved
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
-            }`}
+            variant={embeddingSaved ? 'default' : 'outline'}
+            className="h-9 px-4 text-sm"
           >
             {embeddingSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
           </Button>
@@ -693,18 +692,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Test Result */}
         {embeddingTestResult && (
-          <div
-            className={`flex items-center gap-2 p-3 rounded-md text-sm ${
-              embeddingTestResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-            }`}
-          >
-            {embeddingTestResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            {embeddingTestResult.success
-              ? `${t('连接成功', 'Connection successful')} — ${t('维度', 'Dimensions')}: ${embeddingTestResult.dimensions}`
-              : `${t('连接失败', 'Connection failed')}: ${embeddingTestResult.error}`}
-          </div>
+          <Alert variant={embeddingTestResult.success ? 'default' : 'destructive'}>
+            {embeddingTestResult.success ? <CheckCircle className="h-4 w-4" aria-hidden="true" /> : <XCircle className="h-4 w-4" aria-hidden="true" />}
+            <AlertDescription>
+              {embeddingTestResult.success
+                ? `${t('连接成功', 'Connection successful')} — ${t('维度', 'Dimensions')}: ${embeddingTestResult.dimensions}`
+                : `${t('连接失败', 'Connection failed')}: ${embeddingTestResult.error}`}
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -770,18 +765,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Test Result */}
         {workerTestResult && (
-          <div
-            className={`flex items-center gap-2 p-3 rounded-md text-sm ${
-              workerTestResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-            }`}
-          >
-            {workerTestResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            {workerTestResult.success
-              ? `${t('连接成功', 'Connection successful')} — ${t('向量数', 'Vectors')}: ${workerTestResult.vectorCount}, ${t('维度', 'Dimensions')}: ${workerTestResult.dimensions}`
-              : `${t('连接失败', 'Connection failed')}: ${workerTestResult.error}`}
-          </div>
+          <Alert variant={workerTestResult.success ? 'default' : 'destructive'}>
+            {workerTestResult.success ? <CheckCircle className="h-4 w-4" aria-hidden="true" /> : <XCircle className="h-4 w-4" aria-hidden="true" />}
+            <AlertDescription>
+              {workerTestResult.success
+                ? `${t('连接成功', 'Connection successful')} — ${t('向量数', 'Vectors')}: ${workerTestResult.vectorCount}, ${t('维度', 'Dimensions')}: ${workerTestResult.dimensions}`
+                : `${t('连接失败', 'Connection failed')}: ${workerTestResult.error}`}
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -795,7 +786,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             {vectorSearchStatus?.connected ? (
-              <CheckCircle className="w-4 h-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-foreground" aria-hidden="true" />
             ) : (
               <XCircle className="w-4 h-4 text-muted-foreground" />
             )}
@@ -808,7 +799,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
           {activeConfig && (
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-foreground" aria-hidden="true" />
               <span className="text-muted-foreground dark:text-muted-foreground">
                 {t('Embedding 模型', 'Embedding model')}: {activeConfig.model}
               </span>
@@ -928,11 +919,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* 保存索引配置 */}
         <Button
           onClick={handleSaveWorkerConfig}
-          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-            workerSaved
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
-          }`}
+          variant={workerSaved ? 'default' : 'outline'}
+          className="h-9 px-4 text-sm"
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存索引配置', 'Save Index Config')}
         </Button>
@@ -954,15 +942,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
             {incrementalTargetCount > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
-                {incrementalTargetCount}
-              </span>
+              <Badge className="ml-1">{incrementalTargetCount}</Badge>
             )}
           </Button>
           {isIndexing && (
             <Button
               onClick={handleAbortIndexing}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+              variant="destructive"
+              className="h-9 gap-2 px-4 text-sm"
             >
               <Square className="w-4 h-4" />
               {t('中止', 'Abort')}
@@ -995,16 +982,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Result */}
         {indexResult && (
-          <div className={`p-3 rounded-md text-sm ${
-            indexResult.errors > 0 && indexResult.indexed === 0
-              ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-              : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-          }`}>
-            {t('索引完成', 'Indexing complete')}: {indexResult.indexed} {t('已索引', 'indexed')}, {indexResult.skipped} {t('跳过', 'skipped')}, {indexResult.errors} {t('失败', 'errors')}
-            {indexResult.error && (
-              <div className="mt-1 text-xs opacity-80">{indexResult.error}</div>
-            )}
-          </div>
+          <Alert variant={indexResult.errors > 0 && indexResult.indexed === 0 ? 'destructive' : 'default'}>
+            <AlertDescription>
+              {t('索引完成', 'Indexing complete')}: {indexResult.indexed} {t('已索引', 'indexed')}, {indexResult.skipped} {t('跳过', 'skipped')}, {indexResult.errors} {t('失败', 'errors')}
+              {indexResult.error && <div className="mt-1 text-xs">{indexResult.error}</div>}
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -1100,11 +1083,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* Save */}
         <Button
           onClick={handleSaveWorkerConfig}
-          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-            workerSaved
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
-          }`}
+          variant={workerSaved ? 'default' : 'outline'}
+          className="h-9 px-4 text-sm"
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存搜索参数', 'Save Search Parameters')}
         </Button>
@@ -1229,17 +1209,19 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
 
             {/* 模型变更警告 */}
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-              <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                ⚠️ {t('更换 Embedding 模型后必须重建索引', 'Must rebuild index after changing Embedding model')}
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                {t(
-                  '不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」',
-                  'Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click "Rebuild Vector Index" below'
-                )}
-              </p>
-            </div>
+            <Alert className="bg-muted/40 text-muted-foreground">
+              <AlertDescription>
+                <p className="font-medium text-foreground">
+                  {t('更换 Embedding 模型后必须重建索引', 'Must rebuild index after changing Embedding model')}
+                </p>
+                <p className="mt-1 text-xs">
+                  {t(
+                    '不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」',
+                    'Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click "Rebuild Vector Index" below'
+                  )}
+                </p>
+              </AlertDescription>
+            </Alert>
 
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('详细部署指南请参考', 'For detailed instructions, see')}{' '}
@@ -1247,7 +1229,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 href="https://github.com/AmintaCCCP/GithubStarsManager/blob/main/cloudflare-worker/README.md"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-500 hover:underline"
+                className="text-foreground underline-offset-4 hover:underline"
               >
                 cloudflare-worker/README.md
               </a>

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { TooltipProvider } from './ui/tooltip';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryCard } from './RepositoryCard';
@@ -87,6 +88,12 @@ const storeState = {
 
 const mockUseAppStore = vi.mocked(useAppStore);
 
+const renderRepositoryCard = (viewMode: 'list' | 'grid') => render(
+  <TooltipProvider>
+    <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} />
+  </TooltipProvider>
+);
+
 beforeEach(() => {
   vi.clearAllMocks();
   storeState.releaseSubscriptions = new Set<number>([1]);
@@ -99,7 +106,7 @@ beforeEach(() => {
 describe('RepositoryCard view modes', () => {
   it('moves single-card actions into an accessible more-actions menu in list mode', async () => {
     const user = userEvent.setup();
-    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    renderRepositoryCard('list');
 
     const lastPushed = screen.getByText(/最近提交/);
     expect(lastPushed).toBeInTheDocument();
@@ -126,7 +133,7 @@ describe('RepositoryCard view modes', () => {
     const originalVectorSearchEnabled = storeState.vectorSearchConfig.enabled;
     try {
       storeState.vectorSearchConfig.enabled = false;
-      render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+      renderRepositoryCard('list');
 
       await user.click(screen.getByRole('button', { name: '更多操作' }));
       expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument();
@@ -140,7 +147,7 @@ describe('RepositoryCard view modes', () => {
 
   it('closes the list action menu from card whitespace, page whitespace, or Escape', async () => {
     const user = userEvent.setup();
-    const { container } = render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    const { container } = renderRepositoryCard('list');
     const moreActions = screen.getByRole('button', { name: '更多操作' });
     const card = container.firstElementChild as HTMLElement;
 
@@ -168,7 +175,7 @@ describe('RepositoryCard view modes', () => {
 
   it('does not open README when menu dismissal is followed by a card click', async () => {
     const user = userEvent.setup();
-    const { container } = render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    const { container } = renderRepositoryCard('list');
     const card = container.firstElementChild as HTMLElement;
 
     await user.click(screen.getByRole('button', { name: '更多操作' }));
@@ -185,7 +192,7 @@ describe('RepositoryCard view modes', () => {
 
   it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {
     const user = userEvent.setup();
-    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    renderRepositoryCard('list');
 
     const moreActions = screen.getByRole('button', { name: '更多操作' });
     await act(async () => {
@@ -212,7 +219,7 @@ describe('RepositoryCard view modes', () => {
   });
 
   it('retains the existing quick action row in grid mode', () => {
-    render(<RepositoryCard repository={repository} allCategories={[]} viewMode="grid" />);
+    renderRepositoryCard('grid');
 
     expect(screen.queryByRole('button', { name: '更多操作' })).not.toBeInTheDocument();
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();

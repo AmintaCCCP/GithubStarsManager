@@ -7,7 +7,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
-import { FloatingTooltip } from './FloatingTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 
@@ -41,51 +41,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 取消Star确认对话框状态
   const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
   const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
-  const [descTooltip, setDescTooltip] = useState(false);
-  const [aiTooltip, setAiTooltip] = useState(false);
-  const descTriggerRef = useRef<HTMLDivElement>(null);
-  const aiTriggerRef = useRef<HTMLDivElement>(null);
-  const descHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aiHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const scheduleHideDesc = useCallback(() => {
-    if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-    descHideTimerRef.current = setTimeout(() => setDescTooltip(false), 150);
-  }, []);
-
-  const cancelHideDesc = useCallback(() => {
-    if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-  }, []);
-
-  const scheduleHideAi = useCallback(() => {
-    if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
-    aiHideTimerRef.current = setTimeout(() => setAiTooltip(false), 150);
-  }, []);
-
-  const cancelHideAi = useCallback(() => {
-    if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
-  }, []);
-
-  const hideFloatingTooltips = useCallback(() => {
-    if (descHideTimerRef.current) {
-      clearTimeout(descHideTimerRef.current);
-      descHideTimerRef.current = null;
-    }
-    if (aiHideTimerRef.current) {
-      clearTimeout(aiHideTimerRef.current);
-      aiHideTimerRef.current = null;
-    }
-    setDescTooltip(false);
-    setAiTooltip(false);
-  }, []);
-
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
-      if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-      if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
     };
   }, []);
   
@@ -328,9 +288,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   // 点击卡片打开 README
   const handleCardClick = useCallback(() => {
-    hideFloatingTooltips();
     setReadmeModalOpen(true);
-  }, [hideFloatingTooltips]);
+  }, []);
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
 
@@ -443,53 +402,35 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Description */}
           {repo.description && (
-            <div
-              ref={descTriggerRef}
-              className="relative mb-3"
-              onMouseEnter={() => { cancelHideDesc(); setDescTooltip(true); }}
-              onMouseLeave={scheduleHideDesc}
-              onFocus={() => { cancelHideDesc(); setDescTooltip(true); }}
-              onBlur={scheduleHideDesc}
-              onTouchStart={() => setDescTooltip((v) => !v)}
-              tabIndex={0}
-            >
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative mb-3" tabIndex={0}>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                    {repo.description}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
                 {repo.description}
-              </p>
-              <FloatingTooltip
-                content={repo.description}
-                visible={descTooltip}
-                triggerRef={descTriggerRef}
-                onMouseEnter={cancelHideDesc}
-                onMouseLeave={scheduleHideDesc}
-              />
-            </div>
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {/* AI Summary */}
           {repo.ai_summary && (
-            <div
-              ref={aiTriggerRef}
-              className="relative flex items-start gap-1.5 mb-3"
-              onMouseEnter={() => { cancelHideAi(); setAiTooltip(true); }}
-              onMouseLeave={scheduleHideAi}
-              onFocus={() => { cancelHideAi(); setAiTooltip(true); }}
-              onBlur={scheduleHideAi}
-              onTouchStart={() => setAiTooltip((v) => !v)}
-              tabIndex={0}
-            >
-              <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative mb-3 flex items-start gap-1.5" tabIndex={0}>
+                  <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                    {repo.ai_summary}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
                 {repo.ai_summary}
-              </p>
-              <FloatingTooltip
-                content={repo.ai_summary}
-                visible={aiTooltip}
-                triggerRef={aiTriggerRef}
-                onMouseEnter={cancelHideAi}
-                onMouseLeave={scheduleHideAi}
-              />
-            </div>
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {/* Tags */}

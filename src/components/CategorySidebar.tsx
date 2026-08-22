@@ -394,10 +394,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         </div>
       ) : (
         /* 桌面端：可折叠侧栏 - sticky定位，滚动时保持可见 */
-        <div className="relative flex shrink-0 lg:sticky lg:top-24 lg:self-start z-10">
+        <div className="relative flex shrink-0 lg:sticky lg:top-16 lg:self-start z-10">
           {/* 侧栏容器 */}
           <div
-            className={`linear-sidebar relative overflow-visible transition-all duration-250 ease-out ${
+              className={`linear-sidebar relative overflow-visible transition-all duration-250 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
@@ -530,7 +530,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 <div
                   ref={categoryListRef}
                   onScroll={handleCategoryScroll}
-                  className={`space-y-1 overflow-y-auto max-h-[calc(100vh-12rem)] pr-1 category-scrollbar ${isScrolling ? 'is-scrolling' : ''}`}
+                  className={`space-y-1 overflow-y-auto max-h-[calc(100vh-12rem)] pr-3 category-scrollbar ${isScrolling ? 'is-scrolling' : ''}`}
                 >
                   {allCategories.map((category, index) => {
                     const count = getCategoryCount(category);
@@ -561,7 +561,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           aria-pressed={isSelected}
                           size="sm"
-                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out ${
+                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out ${category.id === 'all' ? 'pr-3' : 'pr-14'} ${
                             isSelected
                               ? 'bg-accent text-accent-foreground font-medium'
                               : isDragTarget

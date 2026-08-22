@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
+import { Bot, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -16,7 +16,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -1035,62 +1035,39 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       <div className="ui-toolbar flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
 
-          {/* AI Analysis Dropdown Button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                disabled={isLoading}
-                className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 disabled:opacity-50 text-sm font-medium"
-              >
-                <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="whitespace-nowrap">
-                  {isLoading
-                    ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
-                    : t('AI分析', 'AI Analysis')
-                  }
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" sideOffset={8} className="w-56 p-0">
-              <DropdownMenuItem
-                onSelect={() => void handleAIAnalyze(false)}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors border-b border-black/[0.04] dark:border-border"
-              >
-                <div className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('分析全部', 'Analyze All')}
-                </div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                  {t(`分析 ${filteredRepositories.length} 个仓库`, `Analyze ${filteredRepositories.length} repositories`)}
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => void handleAIAnalyze(true)}
-                disabled={unanalyzedCount === 0}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
-              >
-                <div className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('分析未分析的', 'Analyze Unanalyzed')}
-                </div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                  {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => void handleAIAnalyze(false, true)}
-                disabled={failedCount === 0}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('重新分析失败的', 'Re-analyze Failed')}
-                </div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                  {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* AI Analysis Select */}
+          <Select
+            value=""
+            onValueChange={(value) => {
+              if (value === 'all') void handleAIAnalyze(false);
+              if (value === 'unanalyzed') void handleAIAnalyze(true);
+              if (value === 'failed') void handleAIAnalyze(false, true);
+            }}
+            disabled={isLoading}
+          >
+            <SelectTrigger
+              aria-label={t('AI 分析操作', 'AI analysis actions')}
+              className="ui-field h-9 w-56 px-3 py-1 text-sm font-medium"
+            >
+              <Bot className="h-4 w-4 shrink-0" />
+              <SelectValue
+                placeholder={isLoading
+                  ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
+                  : t('AI分析', 'AI Analysis')}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t(`分析全部（${filteredRepositories.length}）`, `Analyze All (${filteredRepositories.length})`)}
+              </SelectItem>
+              <SelectItem value="unanalyzed" disabled={unanalyzedCount === 0}>
+                {t(`分析未分析的（${unanalyzedCount}）`, `Analyze Unanalyzed (${unanalyzedCount})`)}
+              </SelectItem>
+              <SelectItem value="failed" disabled={failedCount === 0}>
+                {t(`重新分析失败的（${failedCount}）`, `Re-analyze Failed (${failedCount})`)}
+              </SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (

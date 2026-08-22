@@ -11,7 +11,7 @@ import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
-import { FloatingTooltip } from './FloatingTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { shallow } from 'zustand/shallow';
 import { useDialog } from '../hooks/useDialog';
@@ -156,9 +156,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const descTriggerRef = useRef<HTMLDivElement>(null);
-  const tooltipHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -233,9 +230,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     return () => {
       if (dragHintTimeoutRef.current) {
         clearTimeout(dragHintTimeoutRef.current);
-      }
-      if (tooltipHideTimerRef.current) {
-        clearTimeout(tooltipHideTimerRef.current);
       }
     };
   }, []);
@@ -798,14 +792,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 ref 来跟踪是否已经处理了点击
   const isProcessingClickRef = useRef(false);
 
-  const hideDescriptionTooltip = useCallback(() => {
-    if (tooltipHideTimerRef.current) {
-      clearTimeout(tooltipHideTimerRef.current);
-      tooltipHideTimerRef.current = null;
-    }
-    setShowTooltip(false);
-  }, []);
-
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     // 防止重复处理
@@ -856,10 +842,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return;
     }
 
-    // 打开 README 模态框前隐藏描述悬浮提示，避免遮挡预览层
-    hideDescriptionTooltip();
     setReadmeModalOpen(true);
-  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip, isActionsMenuOpen]);
+  }, [selectionMode, onSelect, repository.id, isActionsMenuOpen]);
 
   // 处理鼠标按下事件，阻止焦点变化导致页面滚动
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -883,14 +867,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (selectionMode && onSelect) {
-        hideDescriptionTooltip();
         onSelect(repository.id);
       } else {
-        hideDescriptionTooltip();
         setReadmeModalOpen(true);
       }
     }
-  }, [selectionMode, onSelect, repository.id, isModalOpen, hideDescriptionTooltip]);
+  }, [selectionMode, onSelect, repository.id, isModalOpen]);
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
@@ -1153,34 +1135,24 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       </div>
       )}
 
-      {/* Description with Tooltip */}
+      {/* Description with shared Tooltip */}
       <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
-        <div
-          ref={descTriggerRef}
-          className="relative group"
-          onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
-          onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-          onFocus={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
-          onBlur={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-          onTouchStart={() => setShowTooltip((v) => !v)}
-          tabIndex={0}
-        >
-          <p
-            className={viewMode === 'list'
-              ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
-              : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
-          >
-            {highlightSearchTerm(displayContent.content, searchQuery)}
-          </p>
-          <FloatingTooltip
-            content={highlightSearchTerm(displayContent.content, searchQuery)}
-            visible={showTooltip}
-            triggerRef={descTriggerRef}
-            onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); }}
-            onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-            widthRatio={viewMode === 'list' ? 0.5 : 1}
-          />
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative" tabIndex={0}>
+              <p
+                className={viewMode === 'list'
+                  ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
+                  : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+              >
+                {highlightSearchTerm(displayContent.content, searchQuery)}
+              </p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+            {displayContent.content}
+          </TooltipContent>
+        </Tooltip>
 
         {/* 方案一：同时显示多个状态标签 */}
         {viewMode === 'grid' && (

@@ -118,17 +118,13 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
             <div className="flex items-center space-x-1 flex-shrink-0">
               {/* Workflows dropdown */}
               <Button
-                variant="ghost"
+                variant={isWorkflowsExpanded ? 'secondary' : 'ghost'}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleWorkflows();
                   onMarkAsRead();
                 }}
-                className={`h-7 flex items-center gap-0 space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
-                  isWorkflowsExpanded
-                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary'
-                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                }`}
+                className="h-8 shrink-0 gap-1 whitespace-nowrap px-2 text-xs"
                 title={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
                 aria-label={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
                 aria-expanded={isWorkflowsExpanded}
@@ -243,7 +239,8 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                           onMarkAsRead();
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
-                        className="ml-2 h-8 w-8 p-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        variant="secondary"
+                        className="ml-2 h-8 w-8 shrink-0 p-0"
                         aria-label={workflow.state === 'disabled'
                           ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
                           : `${language === 'zh' ? '运行工作流' : 'Run workflow'}: ${workflow.name}`

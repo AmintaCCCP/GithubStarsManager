@@ -1,6 +1,10 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Badge } from '../ui/badge';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Switch } from '../ui/switch';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ScrollText,
   Search,
@@ -9,8 +13,6 @@ import {
   Loader2,
   ShieldCheck,
   RefreshCw,
-  ToggleLeft,
-  ToggleRight,
   AlertTriangle,
   ChevronDown,
   ChevronRight,
@@ -28,17 +30,17 @@ interface DiagnosticLogsPanelProps {
   t: (zh: string, en: string) => string;
 }
 
-const LEVEL_COLORS: Record<LogLevel, string> = {
-  debug: 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground',
-  info: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-  warn: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-  error: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
+const LEVEL_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  debug: 'outline',
+  info: 'secondary',
+  warn: 'outline',
+  error: 'destructive',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  '2': 'text-green-600 dark:text-green-400',
-  '4': 'text-amber-600 dark:text-amber-400',
-  '5': 'text-red-600 dark:text-red-400',
+  '2': 'text-foreground',
+  '4': 'text-muted-foreground',
+  '5': 'text-destructive',
 };
 
 type ModalTab = 'general' | 'timing' | 'requestHeader' | 'requestBody' | 'responseHeader' | 'responseBody';
@@ -94,12 +96,12 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         return (
           <div className="space-y-3 text-sm">
             <Row label={t('级别', 'Level')}>
-              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
+              <Badge variant={LEVEL_VARIANTS[entry.level]}>{entry.level}</Badge>
             </Row>
             <Row label={t('来源', 'Source')}>
-              <span className={`px-2 py-0.5 text-xs rounded-full ${entry.source === 'frontend' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' : 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'}`}>
+              <Badge variant="secondary">
                 {entry.source === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
-              </span>
+              </Badge>
             </Row>
             <Row label={t('事件类型', 'Event Type')}>
               <span className="text-sm">{language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}</span>
@@ -185,7 +187,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border dark:border-border">
           <div className="flex items-center space-x-3 min-w-0">
-            <span className={`px-2 py-0.5 text-xs rounded-full font-medium shrink-0 ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
+            <Badge variant={LEVEL_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
             <span className="font-medium text-foreground dark:text-foreground truncate">{entry.message}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0 ml-2">
@@ -292,26 +294,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   const [selectedScope, setSelectedScope] = useState<'all' | 'frontend' | 'backend'>('all');
   const [selectedEventTypes, setSelectedEventTypes] = useState<Set<LogEventType>>(new Set());
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
-  const eventTypeRef = useRef<HTMLDivElement>(null);
-
-  // Close event type dropdown on outside click or Escape
-  useEffect(() => {
-    if (!showEventTypeDropdown) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (eventTypeRef.current && !eventTypeRef.current.contains(e.target as Node)) {
-        setShowEventTypeDropdown(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowEventTypeDropdown(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [showEventTypeDropdown]);
 
   // Real-time frontend log subscription
   useEffect(() => {
@@ -529,45 +511,49 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className="font-medium text-foreground dark:text-foreground">{t('前端调试', 'Frontend Debug')}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${frontendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
+                  <Badge variant={frontendDebug ? 'default' : 'secondary'}>
                     {frontendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')}
-                  </span>
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
                   {t('开启后将记录所有前端 HTTP 请求详情（方法、路径、状态码、耗时）', 'Records all frontend HTTP request details (method, path, status, duration)')}
                 </p>
               </div>
-              <Button variant="ghost" onClick={toggleFrontendDebug} className={`p-2 rounded-lg transition-colors ${frontendDebug ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground dark:text-muted-foreground'}`}>
-                {frontendDebug ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-              </Button>
+              <Switch
+                checked={frontendDebug}
+                onCheckedChange={() => toggleFrontendDebug()}
+                aria-label={t('切换前端调试', 'Toggle frontend debug')}
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('后端调试', 'Backend Debug')}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${backendDebug ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
+                  <Badge variant={backendAvailable && backendDebug ? 'default' : 'secondary'}>
                     {backendAvailable ? (backendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')) : t('后端未连接', 'Not connected')}
-                  </span>
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{t('开启后将记录所有后端 HTTP 请求详情', 'Records all backend HTTP request details')}</p>
               </div>
-              <Button variant="ghost" onClick={backendAvailable ? toggleBackendDebug : undefined} disabled={!backendAvailable}
-                className={`p-2 rounded-lg transition-colors ${!backendAvailable ? 'opacity-50 cursor-not-allowed' : ''} ${backendDebug ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground dark:text-muted-foreground'}`}>
-                {backendDebug ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-              </Button>
+              <Switch
+                checked={backendDebug}
+                onCheckedChange={() => toggleBackendDebug()}
+                disabled={!backendAvailable}
+                aria-label={t('切换后端调试', 'Toggle backend debug')}
+              />
             </div>
-            <div className="flex items-center space-x-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-2 rounded-lg">
-              <AlertTriangle className="w-4 h-4" />
-              <span>{t('调试模式会产生大量日志，仅用于排障时短暂开启', 'Debug mode produces many logs — enable briefly only for troubleshooting')}</span>
-            </div>
+            <Alert className="bg-muted/40 text-muted-foreground">
+              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              <AlertDescription>{t('调试模式会产生大量日志，仅用于排障时短暂开启', 'Debug mode produces many logs — enable briefly only for troubleshooting')}</AlertDescription>
+            </Alert>
           </div>
         </section>
 
         {/* Privacy Notice */}
-        <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3 rounded-lg">
-          <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span>{t('日志仅记录端点、模型、状态、耗时和错误摘要。所有 Token、API Key、密码、邮箱已自动脱敏为 ***格式', 'Logs store only endpoints, models, status, duration, and error summaries. All sensitive info is automatically masked as ***')}</span>
-        </div>
+        <Alert className="bg-muted/40 text-muted-foreground">
+          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          <AlertDescription>{t('日志仅记录端点、模型、状态、耗时和错误摘要。所有 Token、API Key、密码、邮箱已自动脱敏为 ***格式', 'Logs store only endpoints, models, status, duration, and error summaries. All sensitive info is automatically masked as ***')}</AlertDescription>
+        </Alert>
 
         {/* Toolbar */}
         <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-3">
@@ -583,10 +569,16 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium text-foreground dark:text-foreground">{t('级别', 'Level')}:</span>
             {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
-              <Button key={level} onClick={() => toggleLevel(level)}
+              <Button
+                key={level}
+                type="button"
+                variant={selectedLevels.has(level) ? LEVEL_VARIANTS[level] : 'outline'}
+                size="sm"
+                onClick={() => toggleLevel(level)}
                 aria-pressed={selectedLevels.has(level)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer flex items-center space-x-1 ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-border dark:border-border text-muted-foreground dark:text-muted-foreground bg-transparent'}`}>
-                {selectedLevels.has(level) && <Check className="w-3 h-3" />}
+                className="h-8 gap-1 rounded-md px-3 text-sm"
+              >
+                {selectedLevels.has(level) && <Check className="h-3 w-3" />}
                 <span>{level}</span>
               </Button>
             ))}
@@ -598,49 +590,44 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               {(['all', 'frontend', 'backend'] as const).map(scope => (
                 <Button key={scope} onClick={() => setSelectedScope(scope)} disabled={scope === 'backend' && !backendAvailable}
                   aria-pressed={selectedScope === scope}
-                  className={`px-3 py-1.5 text-sm transition-colors ${selectedScope === scope ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'} ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  variant={selectedScope === scope ? 'default' : 'outline'}
+                  size="sm"
+                  className={`h-8 rounded-none border-0 px-3 text-sm first:rounded-l-md last:rounded-r-md ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
                   {scope === 'all' ? t('全部', 'All') : scope === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
                 </Button>
               ))}
             </div>
-            <div className="relative" ref={eventTypeRef}>
-              <Button
-                onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
-                aria-expanded={showEventTypeDropdown}
-                aria-controls="diagnostic-event-type-menu"
-                className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent flex items-center space-x-1"
-              >
-                <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('类型', 'types')}` : t('事件类型', 'Event Type')}</span>
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-              {showEventTypeDropdown && (
-                <div
-                  id="diagnostic-event-type-menu"
-                  role="group"
-                  aria-label={t('事件类型过滤', 'Event type filters')}
-                  className="absolute top-full left-0 mt-1 bg-card dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]"
-                >
-                  {availableEventTypes.map(et => (
-                    <Button key={et} onClick={() => toggleEventType(et)}
-                      variant="ghost"
-                      aria-pressed={selectedEventTypes.has(et)}
-                      className={`w-full justify-start text-left px-2 py-1 text-sm rounded ${selectedEventTypes.has(et) ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary' : 'text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'}`}>
-                      <span>{language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}</span>
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DropdownMenu open={showEventTypeDropdown} onOpenChange={setShowEventTypeDropdown}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" type="button" className="h-8 gap-1 px-3 text-sm">
+                  <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('类型', 'types')}` : t('事件类型', 'Event Type')}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-48 min-w-[180px] overflow-y-auto">
+                <DropdownMenuLabel>{t('事件类型过滤', 'Event type filters')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {availableEventTypes.map(et => (
+                  <DropdownMenuCheckboxItem
+                    key={et}
+                    checked={selectedEventTypes.has(et)}
+                    onCheckedChange={() => toggleEventType(et)}
+                  >
+                    {language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="flex items-center space-x-2 ml-auto">
-              <Button variant="ghost" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
-                className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50" title={t('刷新', 'Refresh')}>
+                <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
+                className="size-9" title={t('刷新', 'Refresh')}>
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
-              <Button onClick={handleClear} className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent transition-colors flex items-center space-x-1">
+              <Button variant="secondary" onClick={handleClear} className="h-9 gap-1 px-3 text-sm font-medium">
                 <Trash2 className="w-4 h-4" /><span>{t('清空', 'Clear')}</span>
               </Button>
               <Button onClick={handleExport} disabled={isExporting}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors disabled:opacity-50 flex items-center space-x-1">
+                className="h-9 gap-1 px-3 text-sm font-medium">
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 <span>{isExporting ? t('导出中...', 'Exporting...') : t('导出', 'Export')}</span>
               </Button>
@@ -649,7 +636,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
 
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t(`显示 ${filteredEntries.length} / ${totalCount} 条`, `Showing ${filteredEntries.length} / ${totalCount} entries`)}
-            {(frontendDebug || backendDebug) && <span className="ml-2 text-amber-600 dark:text-amber-400">{t('调试模式已开启', 'Debug mode ON')}</span>}
+            {(frontendDebug || backendDebug) && <Badge variant="secondary" className="ml-2">{t('调试模式已开启', 'Debug mode ON')}</Badge>}
             {selectedScope !== 'backend' && <span className="ml-1">· {t(`前端 ${frontendCounts.total}`, `Frontend ${frontendCounts.total}`)}</span>}
             {selectedScope !== 'frontend' && backendAvailable && <span className="ml-1">· {t(`后端 ${backendLogCount}`, `Backend ${backendLogCount}`)}</span>}
           </div>
@@ -664,7 +651,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             </div>
           ) : (
             <>
-              <div className="max-h-[520px] overflow-y-auto divide-y divide-black/[0.04] dark:divide-white/[0.02]">
+              <div className="max-h-[520px] overflow-y-auto divide-y divide-border">
                 {visibleEntries.map(entry => {
                   const eventType = inferEventType(entry.module, entry.message, entry.data);
                   const entryData = entry.data as Record<string, unknown> | undefined;
@@ -697,15 +684,15 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       } : undefined}
                     >
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${entry.source === 'frontend' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' : 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'}`}>
+                        <Badge variant={LEVEL_VARIANTS[entry.level]}>{entry.level}</Badge>
+                        <Badge variant="secondary">
                           {entry.source === 'frontend' ? t('前端', 'FE') : t('后端', 'BE')}
-                        </span>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
+                        </Badge>
+                        <Badge variant="outline">
                           {language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}
-                        </span>
+                        </Badge>
                         <span className="text-xs text-muted-foreground dark:text-muted-foreground" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
-                        <span className="px-1.5 py-0.5 text-xs bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary rounded font-mono">{entry.module}</span>
+                        <Badge variant="outline" className="font-mono">{entry.module}</Badge>
                         {hasHttpDetail && <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
                       </div>
                       <p className="text-sm text-foreground dark:text-foreground mt-1 break-words">{entry.message}</p>
@@ -714,7 +701,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                           {entryData?.method != null && <span className="font-bold">{String(entryData.method)}</span>}
                           {(entryData?.endpoint != null || entryData?.path != null) && <span>{String(entryData.endpoint ?? entryData.path)}</span>}
                           {entryData?.status != null && <span className={`font-bold ${statusColor}`}>→ {String(entryData.status)}</span>}
-                          {entryData?.durationMs != null && <span className="text-blue-600 dark:text-blue-400">{String(entryData.durationMs)}ms</span>}
+                          {entryData?.durationMs != null && <span className="text-muted-foreground">{String(entryData.durationMs)}ms</span>}
                         </div>
                       )}
                     </div>
@@ -723,7 +710,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               </div>
               {/* Load more */}
               {visibleCount < filteredEntries.length && (
-                <div className="p-3 text-center border-t border-black/[0.04] dark:border-border/[0.02]">
+                <div className="border-t border-border p-3 text-center">
                   <Button variant="ghost" onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
                     className="text-sm text-primary hover:text-primary/90 transition-colors">
                     {t(`加载更多（还有 ${filteredEntries.length - visibleCount} 条）`, `Load more (${filteredEntries.length - visibleCount} remaining)`)}
