@@ -1983,11 +1983,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   )}
                 </Button>
                 <Button
+                  variant="destructive"
                   onClick={() => {
                     importData(resolveImportTypes(importPreview.data!.data), 'replace');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>

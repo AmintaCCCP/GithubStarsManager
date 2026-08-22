@@ -118,6 +118,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
             <div className="flex items-center space-x-1 flex-shrink-0">
               {/* Workflows dropdown */}
               <Button
+                variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleWorkflows();
@@ -139,6 +140,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
 
               {/* Sync Upstream button — enabled only when fork needs sync (out-of-date) */}
               <Button
+                variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
                   onSyncUpstream();
