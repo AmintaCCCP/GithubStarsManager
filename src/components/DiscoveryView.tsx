@@ -252,7 +252,9 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
         <Button
           type="button"
           variant="ghost"
-          aria-label={language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}
+          aria-label={language === 'zh'
+            ? `平台筛选：${selectedPlatform?.name ?? '全部平台'}`
+            : `Platform filter: ${selectedPlatform?.nameEn ?? 'All Platforms'}`}
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
         >
           <Filter className="h-4 w-4" />
@@ -288,6 +290,7 @@ interface CustomSelectProps {
   options: CustomSelectOption[];
   className?: string;
   dropdownClassName?: string;
+  ariaLabel?: string;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -296,6 +299,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   options,
   className = '',
   dropdownClassName = '',
+  ariaLabel,
 }) => {
   const selectedOption = options.find(o => o.value === value);
 
@@ -305,7 +309,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         <Button
           type="button"
           variant="outline"
-          aria-label={selectedOption?.label}
+          aria-label={ariaLabel ?? selectedOption?.label}
           className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
         >
           {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
@@ -1183,6 +1187,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <CustomSelect
                     value={discoverySortBy}
                     onChange={(value) => setDiscoverySortBy(value as SortBy)}
+                    ariaLabel={t('发现排序字段', 'Discovery sort field')}
                     options={[
                       { value: 'BestMatch', label: t('最佳匹配', 'Best Match') },
                       { value: 'MostStars', label: t('最多Star', 'Most Stars') },
@@ -1193,6 +1198,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <CustomSelect
                     value={discoverySortOrder}
                     onChange={(value) => setDiscoverySortOrder(value as SortOrder)}
+                    ariaLabel={t('发现排序顺序', 'Discovery sort order')}
                     options={[
                       { value: 'Descending', label: t('降序', 'Descending') },
                       { value: 'Ascending', label: t('升序', 'Ascending') },
