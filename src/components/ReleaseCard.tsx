@@ -255,11 +255,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   e.stopPropagation();
                   onToggleAssets();
                 }}
-                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
-                  isAssetsExpanded
-                    ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary'
-                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                }`}
+                variant={isAssetsExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
                 title={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}
                 aria-label={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}
                 aria-expanded={isAssetsExpanded}
@@ -276,11 +273,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   e.stopPropagation();
                   onToggleReleaseNotes();
                 }}
-                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
-                  isReleaseNotesExpanded
-                    ? 'bg-muted dark:bg-accent text-muted-foreground dark:text-muted-foreground '
-                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                }`}
+                variant={isReleaseNotesExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
                 title={isReleaseNotesExpanded ? t('隐藏更新日志', 'Hide Changelog') : t('显示更新日志', 'Show Changelog')}
                 aria-label={isReleaseNotesExpanded ? t('隐藏更新日志', 'Hide Changelog') : t('显示更新日志', 'Show Changelog')}
                 aria-expanded={isReleaseNotesExpanded}
@@ -295,11 +289,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               <Button
                 onClick={handleToggleSummary}
                 disabled={summary.status === 'loading'}
-                className={`h-auto flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap disabled:opacity-70 ${
-                  isSummaryExpanded
-                    ? 'bg-muted dark:bg-accent text-muted-foreground dark:text-muted-foreground'
-                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                }`}
+                variant={isSummaryExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap disabled:opacity-70"
                 title={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
                 aria-label={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
                 aria-expanded={isSummaryExpanded}

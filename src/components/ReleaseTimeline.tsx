@@ -1,9 +1,9 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Switch } from './ui/switch';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, CalendarDays, ChevronDown, CheckCircle, Filter, Settings } from 'lucide-react';
+import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, ChevronDown, CheckCircle, Settings } from 'lucide-react';
 import { Release } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { GitHubApiService } from '../services/githubApi';
@@ -745,18 +745,11 @@ export const ReleaseTimeline: React.FC = () => {
            <div className="mb-6 flex flex-col items-center gap-3">
              {/* Pre-release toggle */}
              <div className="flex items-center gap-2 select-none">
-               <Button
-                 type="button"
-                 role="switch"
-                 aria-checked={includePreRelease}
+               <Switch
+                 checked={includePreRelease}
+                 onCheckedChange={setIncludePreRelease}
                  aria-label={t('包含 Pre-release', 'Include Pre-release')}
-                 onClick={() => setIncludePreRelease(!includePreRelease)}
-                 className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
-               >
-                 <span
-                   className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-                 />
-               </Button>
+               />
                <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                  {t('包含 Pre-release', 'Include Pre-release')}
                </span>
@@ -861,18 +854,11 @@ export const ReleaseTimeline: React.FC = () => {
 
             {/* Pre-release toggle */}
             <div className="flex items-center gap-1.5 select-none">
-              <Button
-                type="button"
-                role="switch"
-                aria-checked={includePreRelease}
+              <Switch
+                checked={includePreRelease}
+                onCheckedChange={setIncludePreRelease}
                 aria-label={t('包含 Pre-release', 'Include Pre-release')}
-                onClick={() => setIncludePreRelease(!includePreRelease)}
-                className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${includePreRelease ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-                />
-              </Button>
+              />
               <span className="hidden text-xs text-muted-foreground dark:text-muted-foreground sm:inline">
                 {t('Pre', 'Pre')}
               </span>
@@ -940,58 +926,27 @@ export const ReleaseTimeline: React.FC = () => {
               />
             </div>
 
-            {/* View Mode Toggle Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="group ui-button flex items-center space-x-2 px-3 py-2"
-                  title={viewMode === 'timeline' ? t('按日期排序视图', 'Timeline View') : t('仓库分类视图', 'Repository View')}
-                >
-                  {viewMode === 'timeline' ? (
-                    <CalendarDays className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                  ) : (
-                    <LayoutGrid className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                  )}
-                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                    {viewMode === 'timeline' ? t('按日期', 'Timeline') : t('按仓库', 'Repository')}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setReleaseViewMode('timeline');
-                    setCurrentPage(1);
-                  }}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    viewMode === 'timeline' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <CalendarDays className={`w-4 h-4 mt-0.5 ${viewMode === 'timeline' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('按日期排序', 'Timeline View')}</div>
-                    <div className="text-xs text-muted-foreground">{t('按发布时间排序', 'Sort by publish date')}</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setReleaseViewMode('repository');
-                    setCurrentPage(1);
-                  }}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    viewMode === 'repository' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <LayoutGrid className={`w-4 h-4 mt-0.5 ${viewMode === 'repository' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('仓库分类', 'Repository View')}</div>
-                    <div className="text-xs text-muted-foreground">{t('按仓库分组折叠', 'Group by repository')}</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* View Mode Select */}
+            <Select
+              value={viewMode}
+              onValueChange={(value) => {
+                if (value === 'timeline' || value === 'repository') {
+                  setReleaseViewMode(value);
+                  setCurrentPage(1);
+                }
+              }}
+            >
+              <SelectTrigger
+                aria-label={t('视图模式', 'View mode')}
+                className="ui-field h-9 w-48 px-3 py-1 text-sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="timeline">{t('按日期排序', 'Timeline View')}</SelectItem>
+                <SelectItem value="repository">{t('仓库分类', 'Repository View')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -1038,97 +993,43 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Show Mode Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="group ui-button flex items-center space-x-2 px-3 py-2"
-                  title={releaseShowMode === 'all' ? t('显示全部', 'Show All') : t('仅显示未读', 'Show Unread Only')}
-                >
-                  <Filter className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                    {releaseShowMode === 'all' ? t('全部', 'All') : t('仅未读', 'Unread')}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => handleShowModeChange('all')}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    releaseShowMode === 'all' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <Filter className={`w-4 h-4 mt-0.5 ${releaseShowMode === 'all' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('显示全部', 'Show All')}</div>
-                    <div className="text-xs text-muted-foreground">{t('显示所有Release', 'Show all releases')}</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => handleShowModeChange('unread')}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    releaseShowMode === 'unread' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <Filter className={`w-4 h-4 mt-0.5 ${releaseShowMode === 'unread' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('仅显示未读', 'Unread Only')}</div>
-                    <div className="text-xs text-muted-foreground">{t('只显示未读的Release', 'Only show unread releases')}</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Show Mode Select */}
+            <Select value={releaseShowMode} onValueChange={(value) => {
+              if (value === 'all' || value === 'unread') handleShowModeChange(value);
+            }}>
+              <SelectTrigger
+                aria-label={t('显示范围', 'Display range')}
+                className="ui-field h-9 w-44 px-3 py-1 text-sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('显示全部', 'Show All')}</SelectItem>
+                <SelectItem value="unread">{t('仅显示未读', 'Unread Only')}</SelectItem>
+              </SelectContent>
+            </Select>
 
-            {/* Latest Mode Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="group ui-button flex items-center space-x-2 px-3 py-2"
-                  title={releaseLatestMode === 'all' ? t('显示全部', 'Show All') : t('仅显示最新', 'Latest Only')}
-                >
-                  <Package className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                    {releaseLatestMode === 'all' ? t('全部版本', 'All Versions') : t('仅最新', 'Latest')}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => handleLatestModeChange('all')}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    releaseLatestMode === 'all' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <Package className={`w-4 h-4 mt-0.5 ${releaseLatestMode === 'all' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('显示全部版本', 'Show All Versions')}</div>
-                    <div className="text-xs text-muted-foreground">{t('显示所有Release记录', 'Show all release records')}</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => handleLatestModeChange('latest')}
-                  className={`flex items-start space-x-3 px-4 py-2.5 ${
-                    releaseLatestMode === 'latest' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  <Package className={`w-4 h-4 mt-0.5 ${releaseLatestMode === 'latest' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium">{t('仅显示最新版本', 'Latest Version Only')}</div>
-                    <div className="text-xs text-muted-foreground">{t('每个仓库仅显示最新Release', 'Show only the latest release per repo')}</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Latest Mode Select */}
+            <Select value={releaseLatestMode} onValueChange={(value) => {
+              if (value === 'all' || value === 'latest') handleLatestModeChange(value);
+            }}>
+              <SelectTrigger
+                aria-label={t('版本范围', 'Version range')}
+                className="ui-field h-9 w-48 px-3 py-1 text-sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('显示全部版本', 'Show All Versions')}</SelectItem>
+                <SelectItem value="latest">{t('仅显示最新版本', 'Latest Version Only')}</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Items per page selector */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+              <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-9 min-w-20 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-9 min-w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>

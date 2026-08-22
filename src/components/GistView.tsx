@@ -1,7 +1,8 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, ChevronDown, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Search, Star, User, X } from 'lucide-react';
+import { Bot, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Search, Star, User, X } from 'lucide-react';
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
@@ -53,7 +54,6 @@ export const GistView: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
   const [detailGist, setDetailGist] = useState<Gist | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingGist, setEditingGist] = useState<Gist | null>(null);
@@ -267,8 +267,6 @@ export const GistView: React.FC = () => {
     }
   };
 
-  const selectedSort = sortOptions.find(option => option.value === gistSearchFilters.sortBy) || sortOptions[0];
-
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
       <aside className="lg:w-64 lg:flex-shrink-0">
@@ -292,7 +290,6 @@ export const GistView: React.FC = () => {
                 </div>
               </div>
             </div>
-            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{categoryItems.all.length}</span>
           </div>
           <div className="space-y-1">
             {categories.map(category => {
@@ -367,39 +364,25 @@ export const GistView: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Button
-                  type="button"
-                  onClick={() => setSortOpen(open => !open)}
-                  aria-expanded={sortOpen}
-                  className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm"
-                >
-                  {t(selectedSort.labelZh, selectedSort.labelEn)}
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-                {sortOpen && (
-                  <div className="ui-menu absolute right-0 z-30 mt-1 w-40 overflow-hidden">
-                    {sortOptions.map(option => (
-                      <Button
-                        key={option.value}
-                        variant="ghost"
-                        type="button"
-                        onClick={() => {
-                          setGistSearchFilters({ sortBy: option.value });
-                          setSortOpen(false);
-                        }}
-                        className={`block w-full justify-start px-3 py-2 text-left text-sm ${
-                          gistSearchFilters.sortBy === option.value
-                            ? 'bg-primary/10 text-primary dark:text-primary'
-                            : 'text-muted-foreground hover:bg-muted dark:text-muted-foreground dark:hover:bg-accent'
-                        }`}
-                      >
-                        {t(option.labelZh, option.labelEn)}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <Select
+                value={gistSearchFilters.sortBy}
+                onValueChange={(value) => {
+                  if (sortOptions.some((option) => option.value === value)) {
+                    setGistSearchFilters({ sortBy: value as typeof sortOptions[number]['value'] });
+                  }
+                }}
+              >
+                <SelectTrigger aria-label={t('Gist 排序方式', 'Gist sort order')} className="ui-field h-9 w-40 px-3 py-1 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {t(option.labelZh, option.labelEn)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 type="button"
                 onClick={() => setGistSearchFilters({ sortOrder: gistSearchFilters.sortOrder === 'desc' ? 'asc' : 'desc' })}

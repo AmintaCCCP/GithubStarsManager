@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
@@ -122,9 +123,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center space-x-1 px-3 py-1 bg-gray-900 text-white dark:bg-card/[0.12] dark:text-foreground font-medium rounded-lg text-sm"
+                    className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1"
                   >
-                    <span>{keyword}</span>
+                    <Badge variant="secondary" className="h-auto rounded-sm border-0 bg-transparent px-0 text-sm font-medium text-secondary-foreground">
+                      {keyword}
+                    </Badge>
                     <Button
                       type="button"
                       variant="ghost"

@@ -14,6 +14,8 @@ import {
   Info,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Switch } from '../ui/switch';
 import { HeaderMenuId } from '../../types';
 
 interface MenuManagementPanelProps {
@@ -111,15 +113,15 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       </div>
 
       {/* Info note */}
-      <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30">
-        <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+      <Alert className="bg-muted/40 text-muted-foreground">
+        <Info className="h-4 w-4" aria-hidden="true" />
+        <AlertDescription>
           {t(
             '通过开关控制顶栏菜单的显示与隐藏，拖拽或点击箭头调整顺序。「仓库」和「设置」为必显菜单，不可关闭。',
             'Toggle menu visibility and drag to reorder. "Repositories" and "Settings" are always visible and cannot be hidden.'
           )}
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
 
       {/* Menu list */}
       <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
@@ -191,27 +193,14 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 </div>
 
                 {/* Toggle switch */}
-                <Button
-                  onClick={() => handleToggle(item.id)}
+                <Switch
+                  checked={item.visible}
+                  onCheckedChange={() => handleToggle(item.id)}
                   disabled={!meta.canHide}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                    !meta.canHide
-                      ? 'bg-primary cursor-not-allowed opacity-75'
-                      : item.visible
-                        ? 'bg-primary'
-                        : 'bg-accent dark:bg-accent'
-                  }`}
                   title={!meta.canHide ? t('此菜单不可关闭', 'This menu cannot be hidden') : undefined}
-                  role="switch"
-                  aria-checked={item.visible}
                   aria-label={t(`切换${meta.labelZh}显示`, `Toggle ${meta.labelEn} visibility`)}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${
-                      item.visible ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </Button>
+                  className="shrink-0"
+                />
               </div>
             );
           })}

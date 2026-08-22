@@ -1,5 +1,6 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1710,10 +1711,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <AlertTriangle className="w-5 h-5 mr-2" />
           {t('危险区域', 'Danger Zone')}
         </h3>
-        <div className="bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg p-6">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-destructive/10 dark:bg-destructive/20 rounded-lg">
-              <FileWarning className="w-6 h-6 text-destructive" />
+        <Card className="border-destructive/30 bg-background">
+          <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="rounded-md bg-destructive/10 p-3 text-destructive">
+              <FileWarning className="h-6 w-6" aria-hidden="true" />
             </div>
             <div className="flex-1">
               <h4 className="text-lg font-semibold text-destructive">
@@ -1735,7 +1737,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </Button>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Operation Logs */}
