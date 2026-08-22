@@ -938,6 +938,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
             ));
           }
+          if (importedData.readReleases) {
+            const currentReadReleases = useAppStore.getState().readReleases;
+            useAppStore.setState({
+              readReleases: new Set([...currentReadReleases, ...importedData.readReleases]),
+            });
+          }
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
           const currentFilters = useAppStore.getState().searchFilters;

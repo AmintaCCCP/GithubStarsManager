@@ -143,15 +143,15 @@ export const SearchDemo: React.FC = () => {
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
                 }`}
               >
-                <div className="flex items-center space-x-2 mb-1">
+                <span className="flex items-center space-x-2 mb-1">
                   <Search className="w-4 h-4 text-primary" />
                   <code className="text-sm font-mono bg-muted dark:bg-muted/40 px-2 py-1 rounded">
                     {example.query}
                   </code>
-                </div>
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                </span>
+                <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
                   {example.description}
-                </p>
+                </span>
               </Button>
             ))}
         </div>
@@ -179,15 +179,15 @@ export const SearchDemo: React.FC = () => {
                     : 'border-border dark:border-border hover:border-border dark:border-border dark:hover:border-border dark:border-border'
                 }`}
               >
-                <div className="flex items-center space-x-2 mb-1">
+                <span className="flex items-center space-x-2 mb-1">
                   <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                   <code className="text-sm font-mono bg-muted dark:bg-muted/40 px-2 py-1 rounded">
                     {example.query}
                   </code>
-                </div>
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                </span>
+                <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
                   {example.description}
-                </p>
+                </span>
               </Button>
             ))}
         </div>
