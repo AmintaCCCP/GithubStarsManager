@@ -200,8 +200,26 @@ const IMPORT_DATA_KEYS = [
   'defaultCategoryOverrides',
   'categoryOrder',
 ] as const;
+
+const IMPORT_KEY_ALIASES: Record<string, string> = {
+  discoveryTotalCount: 'discoveryRepos',
+  discoveryHasMore: 'discoveryRepos',
+  discoveryNextPage: 'discoveryRepos',
+  subscriptionLastRefresh: 'subscriptionRepos',
+  subscriptionChannels: 'subscriptionRepos',
+  hiddenDefaultCategoryIds: 'customCategories',
+  defaultCategoryOverrides: 'customCategories',
+  categoryOrder: 'customCategories',
+  releaseSourceSettings: 'releaseSubscriptions',
+  readReleases: 'releaseSubscriptions',
+};
+
 const resolveImportTypes = (data: ExportData['data']): string[] => {
-  const present = IMPORT_DATA_KEYS.filter((key) => data[key] !== undefined) as string[];
+  const present = Array.from(new Set(
+    IMPORT_DATA_KEYS
+      .filter((key) => data[key] !== undefined)
+      .map((key) => IMPORT_KEY_ALIASES[key] ?? key)
+  ));
   if (UI_SETTINGS_DATA_KEYS.some((key) => data[key] !== undefined)) {
     present.push('uiSettings');
   }

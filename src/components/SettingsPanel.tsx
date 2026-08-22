@@ -195,8 +195,8 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       />
       
       {/* 左右渐变遮罩 */}
-      <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-gray-50 dark:from-gray-800 to-transparent pointer-events-none md:hidden" />
-      <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-gray-50 dark:from-gray-800 to-transparent pointer-events-none md:hidden" />
+      <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-background/95 dark:from-card/95 to-transparent pointer-events-none md:hidden" />
+      <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-background/95 dark:from-card/95 to-transparent pointer-events-none md:hidden" />
     </div>
   );
 };

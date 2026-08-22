@@ -92,9 +92,10 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                 <Button
                   type="button"
                   variant="ghost"
+                  size="icon"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
+                  className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
                   aria-label={t('上一页', 'Previous page')}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -102,9 +103,10 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                 <Button
                   type="button"
                   variant="ghost"
+                  size="icon"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="rounded-md p-1.5 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
+                  className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
                   aria-label={t('下一页', 'Next page')}
                 >
                   <ChevronRight className="h-4 w-4" />
