@@ -140,13 +140,9 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
         {!gist && (
           <div className="flex items-center gap-3 text-sm text-muted-foreground dark:text-muted-foreground">
             <Checkbox id="gist-public" aria-label={t('公开 Gist', 'Public gist')} checked={isPublic} onCheckedChange={(checked) => setIsPublic(checked === true)} />
-            <button
-              type="button"
-              className="text-left"
-              onClick={() => setIsPublic((current) => !current)}
-            >
+            <label htmlFor="gist-public" className="cursor-pointer text-left">
               {t('公开 Gist', 'Public gist')}
-            </button>
+            </label>
           </div>
         )}
 

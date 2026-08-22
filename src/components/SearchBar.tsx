@@ -1126,7 +1126,7 @@ export const SearchBar: React.FC = () => {
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end" className="w-80 max-w-xs whitespace-normal break-words text-left">
               <p className="mb-1 font-medium">{t('关于AI搜索', 'About AI Search')}</p>
-              <p className="leading-relaxed text-muted-foreground">
+              <p className="leading-relaxed text-primary-foreground/80">
                 {activeAIConfig ? t(
                   'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
                   'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant search results. Supports natural language queries and concept matching.'
@@ -1237,7 +1237,7 @@ export const SearchBar: React.FC = () => {
                       type="button"
                       disabled={isSyncingStars}
                       aria-label={t('更多同步选项', 'More sync options')}
-                      className="group inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-white/20"
+                      className="group inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-primary-foreground/20"
                       title={t('更多同步选项', 'More sync options')}
                     >
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
@@ -1276,7 +1276,7 @@ export const SearchBar: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" className="whitespace-nowrap">
                 <p className="font-medium">{t('最近更新时间', 'Last synced')}</p>
-                <p className="mt-1 text-muted-foreground">{formatLastSync(lastSync)}</p>
+                <p className="mt-1 text-primary-foreground/80">{formatLastSync(lastSync)}</p>
               </TooltipContent>
             </Tooltip>
           </div>
