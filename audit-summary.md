@@ -61,3 +61,8 @@ Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGro
 3544acf 后最新 CodeRabbit full review 的 6 个 actionable comments 与 2 个 nitpick 已全部完成：MarkdownRenderer 的 Markdown checkbox 恢复原生 `input`，非 checkbox 继续使用共享 Input；RepositoryCard selection 与 ReleaseTimeline repository header 覆盖 Button 默认尺寸；RepositoryEditModal tag 删除、RepositoryList display RadioGroup、SearchBar sort order 补齐 accessible names；McpSettingsPanel 与 NetworkPanel 自定义 switch 重置 `justify-start`/`p-0`；ScrollArea thumb 与 Separator 统一 semantic color tokens；DiscoveryView 删除重复 `isDesktopSafeMode` ternary。业务逻辑、store、services、API 和同步流程保持不变。
 
 本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,790.35 kB，独立 checker 2,724.95 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。
+
+
+ff639df 后最新 CodeRabbit full review 的 2 个 actionable comments 与 1 个 duplicate 已全部完成：BackupPanel 备份/恢复按钮补 `h-auto`；NetworkPanel RPC secret visibility 与 DiagnosticLogsPanel close/tabs 明确使用 ghost/icon 语义；DiscoveryView channel-switch effect 跳过 topic 自动 fetch，由 topic/platform effect 独立负责首次和组合变更请求，避免重复请求。业务逻辑、store、services、API 和同步流程保持不变。
+
+本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,790.39 kB，独立 checker 2,725.00 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。

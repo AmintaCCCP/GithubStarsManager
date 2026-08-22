@@ -188,7 +188,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             <span className={`px-2 py-0.5 text-xs rounded-full font-medium shrink-0 ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
             <span className="font-medium text-foreground dark:text-foreground truncate">{entry.message}</span>
           </div>
-          <Button onClick={onClose} className="p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors shrink-0 ml-2">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0 ml-2">
             <X className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
           </Button>
         </div>
@@ -198,6 +198,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
           {MODAL_TABS.map(tab => (
             <Button
               key={tab.id}
+              variant="ghost"
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id

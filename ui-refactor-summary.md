@@ -60,3 +60,8 @@
 3544acf 后最新 CodeRabbit review 的所有 comments 已完成修复：Markdown checkbox 使用原生 input；RepositoryCard selection、ReleaseTimeline repository header、MCP/Network switches 覆盖 shared Button 默认布局；RepositoryEdit tag remove、RepositoryList display mode、SearchBar sort order 补齐 accessible names；ScrollArea 与 Separator 使用 semantic theme tokens；DiscoveryView 清理冗余 ternary。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.35 kB，独立 checker 2,724.95 KiB，0 vulnerabilities。
+
+
+ff639df 后最新 CodeRabbit review 的所有 comments 已完成修复：BackupPanel 长内容操作按钮覆盖 shared Button 默认高度；NetworkPanel RPC secret visibility 与 DiagnosticLogsPanel close/tabs 使用明确的 ghost/icon 变体；DiscoveryView topic channel 跳过通用空频道自动请求，由 topic/platform 专用 effect 负责请求去重。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.39 kB，独立 checker 2,725.00 KiB，0 vulnerabilities。
