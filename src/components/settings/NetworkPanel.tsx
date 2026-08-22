@@ -1,6 +1,7 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
 import React, { useState, useEffect } from 'react';
 import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -224,8 +225,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   const rpcHasChanges = JSON.stringify(rpcForm) !== JSON.stringify(rpcDownloadConfig);
 
-  const handleRpcToggle = async () => {
-    const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
+  const handleRpcToggle = async (enabled: boolean) => {
+    const newForm = { ...rpcForm, enabled };
     setRpcForm(newForm);
     setRpcDownloadConfig(newForm);
     if (backend.isAvailable) {
@@ -256,15 +257,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               {t('网络代理', 'Network Proxy')}
             </h4>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            role="switch"
-            aria-checked={form.enabled}
-            aria-label={t('启用网络代理', 'Enable network proxy')}
-            onClick={async () => {
-              const newForm = { ...form, enabled: !form.enabled };
+          <Switch
+            checked={form.enabled}
+            onCheckedChange={async (enabled) => {
+              const newForm = { ...form, enabled };
               setForm(newForm);
               setProxyConfig(newForm);
               if (backend.isAvailable) {
@@ -284,12 +280,9 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 try { await electronProxy.setProxy(newForm); } catch { /* best effort */ }
               }
             }}
-            className={`relative inline-flex h-5 w-9 p-0 items-center rounded-full transition-colors ${form.enabled ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-            />
-          </Button>
+            aria-label={t('启用网络代理', 'Enable network proxy')}
+            className="h-5 w-9 data-[state=unchecked]:bg-muted"
+          />
         </div>
 
         {form.enabled && (
@@ -462,20 +455,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               {t('远程下载', 'Remote Download')}
             </h4>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            role="switch"
-            aria-checked={rpcForm.enabled}
+          <Switch
+            checked={rpcForm.enabled}
+            onCheckedChange={(enabled) => void handleRpcToggle(enabled)}
             aria-label={t('启用远程下载', 'Enable remote download')}
-            onClick={handleRpcToggle}
-            className={`relative inline-flex h-5 w-9 items-center justify-start rounded-full p-0 transition-colors ${rpcForm.enabled ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${rpcForm.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-            />
-          </Button>
+            className="h-5 w-9 data-[state=unchecked]:bg-muted"
+          />
         </div>
 
         {rpcForm.enabled && (

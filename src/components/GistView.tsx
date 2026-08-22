@@ -389,7 +389,7 @@ export const GistView: React.FC = () => {
                         }}
                         className={`block w-full px-3 py-2 text-left text-sm ${
                           gistSearchFilters.sortBy === option.value
-                            ? 'bg-primary/10 text-primary dark:text-primary-foreground'
+                            ? 'bg-primary/10 text-primary dark:text-primary'
                             : 'text-muted-foreground hover:bg-muted dark:text-muted-foreground dark:hover:bg-accent'
                         }`}
                       >

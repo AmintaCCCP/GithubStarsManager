@@ -144,8 +144,11 @@ const CodeBlock: React.FC<{
         </div>
         <div className="flex items-center gap-2">
           <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`h-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copyError
                 ? 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
                 : copied
@@ -625,11 +628,14 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             <div className="flex items-center gap-2 pointer-events-auto">
               {isInsideLink && parentLinkHref && (
                 <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
                     window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
                   }}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                  className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                   title={language === 'zh' ? '打开链接' : 'Open link'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -638,22 +644,28 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 </Button>
               )}
               <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDownload(e);
                 }}
                 disabled={isDownloading}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                 title={language === 'zh' ? '下载图片' : 'Download image'}
               >
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
               </Button>
               <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(prev => Math.min(5, prev + 0.5));
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '放大' : 'Zoom in'}
               >
                 +
@@ -662,28 +674,37 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 {Math.round(zoomScale * 100)}%
               </span>
               <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(prev => Math.max(0.5, prev - 0.5));
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '缩小' : 'Zoom out'}
               >
                 −
               </Button>
               <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(1);
                   setZoomPos({ x: 0, y: 0 });
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
                 title={language === 'zh' ? '重置' : 'Reset'}
               >
                 1:1
               </Button>
               <Button
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeZoom();

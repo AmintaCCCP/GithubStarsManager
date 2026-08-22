@@ -30,32 +30,34 @@ export const SliderInput: React.FC<SliderInputProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-3">
-        <Slider
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onValueChange={onChange}
-          thumbLabel={label}
-          className="flex-1"
-        />
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <Slider
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onValueChange={onChange}
+            thumbLabel={label}
+            className="w-full"
+          />
+          {showMarks && markItems.length > 0 && (
+            <div className="relative mx-[-10px] mt-1 h-4 px-[10px]">
+              {markItems.map((mark) => {
+                const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
+                return (
+                  <span key={mark} className="absolute -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground dark:text-muted-foreground" style={{ left: `${pct}%` }}>
+                    {formatValue ? formatValue(mark) : mark}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <span className="min-w-[2.5rem] text-center text-sm font-medium tabular-nums text-foreground dark:text-foreground">
           {displayValue}
         </span>
       </div>
-      {showMarks && markItems.length > 0 && (
-        <div className="relative mx-[-10px] mt-1 h-4 px-[10px]">
-          {markItems.map((mark) => {
-            const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
-            return (
-              <span key={mark} className="absolute -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground dark:text-muted-foreground" style={{ left: `${pct}%` }}>
-                {formatValue ? formatValue(mark) : mark}
-              </span>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

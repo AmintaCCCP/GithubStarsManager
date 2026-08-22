@@ -1659,12 +1659,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (!open && !isDeleting) closeConfirmation();
         }}
       >
-        <AlertDialogContent className="max-w-md">
+        {confirmation.type && (
+          <AlertDialogContent className="max-w-md">
 
           <AlertDialogHeader className="rounded-lg bg-muted p-4 dark:bg-muted/40">
             <AlertDialogTitle className="flex items-center gap-3 text-muted-foreground">
               <AlertTriangle className="h-6 w-6" />
-              {getDeleteTitle(confirmation.type!)}
+              {getDeleteTitle(confirmation.type)}
             </AlertDialogTitle>
           </AlertDialogHeader>
 
@@ -1672,7 +1673,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             <AlertDialogDescription asChild>
               <div className="flex items-start space-x-3 rounded-lg bg-muted p-4 text-muted-foreground dark:bg-muted/40">
                 <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-                <p className="text-sm">{getDeleteDescription(confirmation.type!)}</p>
+                <p className="text-sm">{getDeleteDescription(confirmation.type)}</p>
               </div>
             </AlertDialogDescription>
 
@@ -1738,7 +1739,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </AlertDialogAction>
             </AlertDialogFooter>
           </div>
-        </AlertDialogContent>
+          </AlertDialogContent>
+        )}
       </AlertDialog>
 
       {/* Import Preview Modal */}

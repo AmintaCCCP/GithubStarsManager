@@ -26,7 +26,7 @@ describe('SliderInput', () => {
     const user = userEvent.setup();
     render(<ControlledSlider />);
     const slider = screen.getByRole('slider', { name: 'Concurrency' });
-    const sliderRoot = slider.closest('[data-orientation="horizontal"].flex-1') as HTMLElement;
+    const sliderRoot = slider.closest('[data-orientation="horizontal"].relative.flex.w-full') as HTMLElement;
     expect(sliderRoot).not.toBeNull();
     expect(slider).toHaveAttribute('aria-valuenow', '1');
 

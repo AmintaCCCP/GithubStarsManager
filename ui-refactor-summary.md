@@ -19,7 +19,7 @@
 
 | 检查项 | 结果 |
 | --- | --- |
-| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,789.46 kB，独立 checker 实测 2,724.09 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,500 KiB。 |
+| `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,789.46 kB，独立 checker 实测 2,724.09 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,072 KiB。 |
 | `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |
@@ -91,3 +91,5 @@ cd5f693 后最新 CodeRabbit full review 的 5 个 inline actionable、3 个 out
 本轮验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,794.55 kB，独立 checker 2,729.06 KiB，0 vulnerabilities。
 4926cde 后最新 CodeRabbit full review 的 6 个 inline actionable、1 个 outside-diff functional finding 与 5 个 nitpick 已全部处理：SearchBar 主搜索框补持久化本地化 aria-label；CategorySidebar 两个 desktop 分类按钮补 aria-pressed；BulkCategorizeModal 错误块使用 destructive tokens；DiscoveryView topic refresh 增加 request version 与当前 topic/platform guard，阻止 stale response 更新仓库、分页、刷新时间和 loading；FilterModal 关键词删除按钮改为 compact icon；DiagnosticLogsPanel 改为带 label 的 toggle-button group；VectorSearchSettings deploy guide 将 heading 移出 Button 并补 expanded/controls 语义；StepperInput 支持本地化 labels 和 Pointer Events 长按处理；CategoryEditModal/CategoryPanel 共享 validateCategoryName；CategoryPanel、ListsPushIndicator、Toast、MCP、Network 等剩余 raw palette 统一为 semantic tokens；Toast exit animation 改为 controlled open state 并延迟卸载；alert-dialog 动画和前轮修复保持有效。业务逻辑、store、services、API 和同步流程保持不变。
 本轮验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,794.70 kB，独立 checker 2,729.20 KiB，0 vulnerabilities。
+b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 已全部处理：DataManagementPanel confirmation content 增加 `confirmation.type` guard；NetworkPanel 两个手写开关迁移到共享 Radix Switch；VectorSearchSettings 剩余 gray border/text/focus/surface utilities 统一为 semantic tokens；MarkdownRenderer code-copy 与 zoom overlay controls 明确 Button type/variant/size/compact dimensions；GistCard/GistView 修正 dark primary text；BackendPanel status icons 继承 pill 状态色；SubscriptionRepoCard GitHub 外链阻止父卡片点击冒泡；SliderInput 让 slider 与 marks 共用 flex-1 轨道列；StepperInput 使用 Pointer Events 并限制主鼠标键、支持本地化 labels；ui-refactor-summary.md 的 Vite warning threshold 修正为 3,072 KiB。业务逻辑、store、services、API 和同步流程保持不变。
+最终验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,793.88 kB，独立 checker 2,728.40 KiB，0 vulnerabilities。

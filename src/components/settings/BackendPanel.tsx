@@ -210,11 +210,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusIcon = () => {
     switch (status) {
       case 'connected':
-        return <CheckCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />;
+        return <CheckCircle className="w-5 h-5" />;
       case 'checking':
-        return <RefreshCw className="w-5 h-5 text-muted-foreground dark:text-muted-foreground animate-spin" />;
+        return <RefreshCw className="w-5 h-5 animate-spin" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />;
+        return <AlertCircle className="w-5 h-5" />;
     }
   };
 
