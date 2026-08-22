@@ -150,7 +150,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
                   needsSync
                     ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                    : 'bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
+                    : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
                 title={needsSync
                   ? t('Update branch', 'Update branch')

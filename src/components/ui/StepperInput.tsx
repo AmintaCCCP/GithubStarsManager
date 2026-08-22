@@ -29,7 +29,7 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 
   useLayoutEffect(() => {
     valueRef.current = value;
-  }, [value, onChange]);
+  }, [value]);
 
   const clamp = useCallback((nextValue: number) => {
     let result = nextValue;

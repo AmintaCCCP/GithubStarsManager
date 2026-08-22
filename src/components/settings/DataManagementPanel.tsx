@@ -1706,20 +1706,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Delete All Data */}
       <section>
-        <h3 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center">
           <AlertTriangle className="w-5 h-5 mr-2" />
           {t('危险区域', 'Danger Zone')}
         </h3>
         <div className="bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg p-6">
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-destructive/10 dark:bg-destructive/20 rounded-lg">
-              <FileWarning className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
+              <FileWarning className="w-6 h-6 text-destructive" />
             </div>
             <div className="flex-1">
-              <h4 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground ">
+              <h4 className="text-lg font-semibold text-destructive">
                 {t('删除所有数据', 'Delete All Data')}
               </h4>
-              <p className="mt-2 text-muted-foreground dark:text-muted-foreground ">
+              <p className="mt-2 text-destructive">
                 {t(
                   '此操作将永久删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。应用程序将重置为初始状态。此操作不可恢复！',
                   'This will permanently delete ALL application data, including all user data, GitHub tokens, configuration files, etc. The application will be reset to its initial state. This action cannot be undone!'

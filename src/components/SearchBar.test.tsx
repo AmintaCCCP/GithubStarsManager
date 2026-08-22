@@ -253,6 +253,7 @@ describe('SearchBar', () => {
       const input = screen.getByRole('textbox');
       fireEvent.focus(input);
       const historyItem = screen.getByRole('button', { name: 'react' });
+      setSearchResults.mockClear();
 
       fireEvent.blur(input);
       fireEvent.click(historyItem);

@@ -910,7 +910,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       className={cardClassName}
       onClick={handleCardClick}
       onPointerDown={() => {
-        menuDismissedByPointerDownRef.current = false;
+        if (!isActionsMenuOpen) {
+          menuDismissedByPointerDownRef.current = false;
+        }
       }}
       onMouseDown={handleMouseDown}
       onKeyDown={handleCardKeyDown}
