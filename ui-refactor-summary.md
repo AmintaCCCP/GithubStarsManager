@@ -127,3 +127,11 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本轮定向及全量测试均通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,794.05 kB，独立 checker 2,728.57 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
+
+## Round-24 CodeRabbit remediation status
+
+2026-08-22 08:06:26Z 的 subsequent CodeRabbit full review 报告 2 条 inline findings，均已完成最小范围修复：DiscoveryView 对 stale topic load-more 请求始终清除该请求建立的 `discoveryIsLoadingMore` 标志，同时保留 current-request guard 保护 stale data writes；SearchBar AI search Button 增加本地化 `aria-label`，确保窄屏隐藏文字时仍有 accessible name。未改变 store、services、API、同步流程、AI 行为或数据流。
+
+本轮完整门禁通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,794.13 kB，独立 checker 2,728.65 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
+
+本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
