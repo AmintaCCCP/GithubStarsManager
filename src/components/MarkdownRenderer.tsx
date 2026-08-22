@@ -152,7 +152,7 @@ const CodeBlock: React.FC<{
               copyError
                 ? 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
                 : copied
-                  ? 'bg-green-600 text-white border border-green-600'
+                  ? 'bg-green-600 text-white border border-green-600 hover:bg-green-700 hover:text-white hover:border-green-700'
                   : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}

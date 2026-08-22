@@ -14,6 +14,7 @@ import { isReservedCategoryName } from '../utils/categoryUtils';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -992,7 +993,8 @@ export const SearchBar: React.FC = () => {
   });
 
   return (
-    <div className="ui-toolbar p-4 sm:p-5 mb-5">
+    <TooltipProvider>
+      <div className="ui-toolbar p-4 sm:p-5 mb-5">
       {/* Search Input */}
       <div className="relative z-40 mb-4">
         <div className="flex min-w-0 items-center gap-2">
@@ -1110,24 +1112,31 @@ export const SearchBar: React.FC = () => {
               {searchPhase}
             </span>
           )}
-          <div className="group relative shrink-0">
-            <AlertCircle className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70 cursor-help" />
-            <div className="invisible absolute right-0 top-full z-[9999] mt-2 w-80 max-w-xs rounded-md border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100 whitespace-normal break-words">
-              <p className="mb-1 font-medium text-popover-foreground">
-                {t('关于AI搜索', 'About AI Search')}
-              </p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t('关于 AI 搜索', 'About AI Search')}
+                className="h-8 w-8 shrink-0 text-muted-foreground"
+              >
+                <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end" className="w-80 max-w-xs whitespace-normal break-words text-left">
+              <p className="mb-1 font-medium">{t('关于AI搜索', 'About AI Search')}</p>
               <p className="leading-relaxed text-muted-foreground">
                 {activeAIConfig ? t(
                   'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
-                  'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant results. Supports natural language queries and concept matching.'
+                  'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant search results. Supports natural language queries and concept matching.'
                 ) : t(
                   '回退模式：基础文本搜索与默认排序。当未配置AI服务时，系统将使用基础文本匹配进行搜索（支持名称、描述、标签、语言等字段），并应用标准的排序和过滤控制。此为轻量级搜索方案，无语义理解能力。',
                   'Fallback mode: Basic text search with default sorting. When no AI service is configured, the system uses basic text matching for search (supports name, description, tags, language, etc.) and applies standard sort and filter controls. This is a lightweight search solution without semantic understanding capabilities.'
                 )}
               </p>
-              <div className="absolute bottom-full right-4 h-2 w-2 rotate-45 border-l border-t border-border bg-popover"></div>
-            </div>
-          </div>
+            </TooltipContent>
+          </Tooltip>
           </div>
         </div>
       </div>
@@ -1253,18 +1262,23 @@ export const SearchBar: React.FC = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="group relative">
-              <Clock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70 cursor-help" />
-              <div className="absolute right-0 top-full mt-2 w-max p-2 bg-card dark:bg-card border border-border dark:border-border text-foreground dark:text-foreground text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-nowrap">
-                <p className="font-medium">
-                  {t('最近更新时间', 'Last synced')}
-                </p>
-                <p className="text-muted-foreground dark:text-muted-foreground mt-1">
-                  {formatLastSync(lastSync)}
-                </p>
-                <div className="absolute bottom-full right-1 w-2 h-2 bg-card dark:bg-card border-l border-t border-border dark:border-border transform rotate-45"></div>
-              </div>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('最近更新时间', 'Last synced')}
+                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                >
+                  <Clock className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end" className="whitespace-nowrap">
+                <p className="font-medium">{t('最近更新时间', 'Last synced')}</p>
+                <p className="mt-1 text-muted-foreground">{formatLastSync(lastSync)}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -1616,6 +1630,7 @@ export const SearchBar: React.FC = () => {
       )}
 
 
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };

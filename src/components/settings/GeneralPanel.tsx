@@ -33,16 +33,16 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         <CardContent>
           <RadioGroup aria-labelledby="language-settings-title" value={language} onValueChange={(value) => setLanguage(value as 'zh' | 'en')} className="grid max-w-md grid-cols-2 gap-4">
             <Label htmlFor="language-zh" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
-              <RadioGroupItem value="zh" id="language-zh" />
+              <RadioGroupItem value="zh" id="language-zh" aria-labelledby="language-zh-label" />
               <span>
-                <span className="block text-base font-medium text-foreground dark:text-foreground">中文</span>
+                <span id="language-zh-label" className="block text-base font-medium text-foreground dark:text-foreground">中文</span>
                 <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">Simplified Chinese</span>
               </span>
             </Label>
             <Label htmlFor="language-en" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
-              <RadioGroupItem value="en" id="language-en" />
+              <RadioGroupItem value="en" id="language-en" aria-labelledby="language-en-label" />
               <span>
-                <span className="block text-base font-medium text-foreground dark:text-foreground">English</span>
+                <span id="language-en-label" className="block text-base font-medium text-foreground dark:text-foreground">English</span>
                 <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">US English</span>
               </span>
             </Label>
