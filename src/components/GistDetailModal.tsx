@@ -180,7 +180,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             <span className="mx-2">·</span>
             <span>{gist.public ? t('公开', 'Public') : t('私有', 'Secret')}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               onClick={() => handleCopy(gist.html_url, t('链接已复制', 'Link copied'))}

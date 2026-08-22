@@ -253,6 +253,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    * 确保保存后的数据与UI显示逻辑一致
    */
   const handleSave = async () => {
+    // Initialization maps the legacy “none” value to an empty category, and save validation rejects it.
     if (!repository || formData.category.trim().toLowerCase() === 'none') return;
 
     // 构建更新对象
@@ -597,9 +598,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   // Unified card styles with enhanced light mode optimization
   const sectionClass = "p-5 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm";
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
+  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-white/[0.08] text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
-  const buttonSecondaryClass = "flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
+  const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
   const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-gray-50 to-white dark:from-white/[0.02] dark:to-white/[0.04] border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
   const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";

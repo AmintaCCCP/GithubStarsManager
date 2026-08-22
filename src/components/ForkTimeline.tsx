@@ -554,12 +554,12 @@ export const ForkTimeline: React.FC = () => {
               {t(`管理 ${currentOwnerLabel} 的 ${ownerForks.length} 个Fork仓库`, `Manage ${ownerForks.length} forked repositories for ${currentOwnerLabel}`)}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:max-w-full lg:justify-end">
             {/* Fork owner selector */}
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span id="fork-owner-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
+            <div className="flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap">
+              <span id="fork-owner-label" className="shrink-0 whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
               <Select value={activeForkOwner} onValueChange={handleForkOwnerChange} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
-                <SelectTrigger className="ui-field h-9 min-w-36 shrink-0 px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="ui-field h-9 w-48 max-w-[calc(100vw-8rem)] shrink px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
                 <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -582,7 +582,7 @@ export const ForkTimeline: React.FC = () => {
             <Button
               onClick={handleRefresh}
               disabled={forkIsRefreshing}
-              className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button-primary flex h-auto shrink-0 items-center space-x-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{forkIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
@@ -623,7 +623,7 @@ export const ForkTimeline: React.FC = () => {
         </div>
 
         {/* Results Info and Pagination Controls */}
-        <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex w-full flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t(
@@ -638,7 +638,7 @@ export const ForkTimeline: React.FC = () => {
             )}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex w-full justify-end gap-3 sm:w-auto sm:items-center sm:gap-4">
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
               <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
@@ -861,9 +861,9 @@ export const ForkTimeline: React.FC = () => {
           </p>
 
           <div className="flex flex-col space-y-2">
-            <label id="fork-target-branch-label" className="text-sm font-medium text-foreground dark:text-muted-foreground">
+            <span id="fork-target-branch-label" className="text-sm font-medium text-foreground dark:text-muted-foreground">
               {language === 'zh' ? '目标分支 (Target Branch)' : 'Target Branch'}
-            </label>
+            </span>
             {isFetchingBranches ? (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-muted-foreground py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />

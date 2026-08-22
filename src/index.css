@@ -993,6 +993,7 @@ textarea::-webkit-resizer {
 html,
 body {
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 /* 重绘窗口右侧竖向原生滚动条：thin、半透明灰、dark 适配，hover 变深 */

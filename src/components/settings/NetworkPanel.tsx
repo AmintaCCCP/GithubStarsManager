@@ -162,6 +162,42 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   const hasChanges = JSON.stringify(form) !== JSON.stringify(proxyConfig);
 
+  const handleProxyToggle = async (enabled: boolean) => {
+    const previousForm = form;
+    const newForm = { ...form, enabled };
+    setForm(newForm);
+    setTestResult(null);
+
+    try {
+      if (isElectron()) {
+        await electronProxy.setProxy(newForm);
+      }
+
+      if (backend.isAvailable) {
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        const resp = await fetch('/api/settings/proxy', {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify(newForm),
+        });
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
+        }
+      }
+
+      setProxyConfig(newForm);
+    } catch (e) {
+      if (isElectron()) {
+        try { await electronProxy.setProxy(previousForm); } catch { /* best effort */ }
+      }
+      setForm(previousForm);
+      setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
+    }
+  };
+
   // --- RPC Download handlers ---
 
   const isRpcFormValid = !rpcForm.enabled || (rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
@@ -226,22 +262,32 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const rpcHasChanges = JSON.stringify(rpcForm) !== JSON.stringify(rpcDownloadConfig);
 
   const handleRpcToggle = async (enabled: boolean) => {
+    const previousForm = rpcForm;
     const newForm = { ...rpcForm, enabled };
     setRpcForm(newForm);
-    setRpcDownloadConfig(newForm);
-    if (backend.isAvailable) {
-      try {
+    setRpcTestResult(null);
+
+    try {
+      if (backend.isAvailable) {
         const base = await getRpcBaseUrl();
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        await fetch(`${base}/settings/rpc-download`, {
+        const resp = await fetch(`${base}/settings/rpc-download`, {
           method: 'PUT',
           headers: authHeaders,
           body: JSON.stringify(newForm),
         });
-      } catch { /* best effort */ }
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
+        }
+      }
+
+      setRpcDownloadConfig(newForm);
+    } catch (e) {
+      setRpcForm(previousForm);
+      setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
     }
   };
 
@@ -259,29 +305,9 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           </div>
           <Switch
             checked={form.enabled}
-            onCheckedChange={async (enabled) => {
-              const newForm = { ...form, enabled };
-              setForm(newForm);
-              setProxyConfig(newForm);
-              if (backend.isAvailable) {
-                try {
-                  const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-                  if (backendApiSecret) {
-                    authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-                  }
-                  await fetch('/api/settings/proxy', {
-                    method: 'PUT',
-                    headers: authHeaders,
-                    body: JSON.stringify(newForm),
-                  });
-                } catch { /* best effort */ }
-              }
-              if (isElectron()) {
-                try { await electronProxy.setProxy(newForm); } catch { /* best effort */ }
-              }
-            }}
+            onCheckedChange={handleProxyToggle}
             aria-label={t('启用网络代理', 'Enable network proxy')}
-            className="h-5 w-9 data-[state=unchecked]:bg-muted"
+            className="shrink-0"
           />
         </div>
 
@@ -459,7 +485,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             checked={rpcForm.enabled}
             onCheckedChange={(enabled) => void handleRpcToggle(enabled)}
             aria-label={t('启用远程下载', 'Enable remote download')}
-            className="h-5 w-9 data-[state=unchecked]:bg-muted"
+            className="shrink-0"
           />
         </div>
 

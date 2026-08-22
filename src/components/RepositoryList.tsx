@@ -16,7 +16,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -1036,38 +1036,33 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
 
           {/* AI Analysis Select */}
-          <Select
-            value=""
-            onValueChange={(value) => {
-              if (value === 'all') void handleAIAnalyze(false);
-              if (value === 'unanalyzed') void handleAIAnalyze(true);
-              if (value === 'failed') void handleAIAnalyze(false, true);
-            }}
-            disabled={isLoading}
-          >
-            <SelectTrigger
-              aria-label={t('AI 分析操作', 'AI analysis actions')}
-              className="ui-field h-9 w-56 px-3 py-1 text-sm font-medium"
-            >
-              <Bot className="h-4 w-4 shrink-0" />
-              <SelectValue
-                placeholder={isLoading
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={isLoading}
+                aria-label={t('AI 分析操作', 'AI analysis actions')}
+                className="ui-field h-9 w-auto min-w-28 justify-start gap-2 px-3 py-1 text-sm font-medium"
+              >
+                <Bot className="h-4 w-4 shrink-0" />
+                {isLoading
                   ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
                   : t('AI分析', 'AI Analysis')}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onSelect={() => void handleAIAnalyze(false)}>
                 {t(`分析全部（${filteredRepositories.length}）`, `Analyze All (${filteredRepositories.length})`)}
-              </SelectItem>
-              <SelectItem value="unanalyzed" disabled={unanalyzedCount === 0}>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={unanalyzedCount === 0} onSelect={() => void handleAIAnalyze(true)}>
                 {t(`分析未分析的（${unanalyzedCount}）`, `Analyze Unanalyzed (${unanalyzedCount})`)}
-              </SelectItem>
-              <SelectItem value="failed" disabled={failedCount === 0}>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={failedCount === 0} onSelect={() => void handleAIAnalyze(false, true)}>
                 {t(`重新分析失败的（${failedCount}）`, `Re-analyze Failed (${failedCount})`)}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (

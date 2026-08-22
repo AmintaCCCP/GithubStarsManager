@@ -80,7 +80,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
                 variant="ghost"
                 aria-pressed={selectedCategory === category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
+                className={`h-auto w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
                     ? 'border-primary bg-muted dark:bg-primary/10'
                     : 'border-border dark:hover:border-white/20'
