@@ -614,7 +614,7 @@ export const ForkTimeline: React.FC = () => {
                   setCurrentPage(1);
                 }}
                 aria-label={t('清除搜索', 'Clear search')}
-                className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
+                className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
               >
                 <X className="w-4 h-4" />
               </Button>

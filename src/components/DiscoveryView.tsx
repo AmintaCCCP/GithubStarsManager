@@ -56,27 +56,27 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
   trending: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-white" />,
+    largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   rocket: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-white" />,
+    largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   star: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-white" />,
+    largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   tag: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-white" />,
+    largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   search: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-white" />,
+    largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
 };
 
@@ -204,7 +204,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
               ${selectedChannel === channel.id
                 ? 'text-muted-foreground dark:text-muted-foreground '
-                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-gray-200 hover:bg-muted dark:hover:bg-accent'
+                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
               }
             `}
           >
@@ -272,7 +272,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
       </Button>
 
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
           {platforms.map((p) => (
             <Button
               key={p.id}
@@ -340,7 +340,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         variant="outline"
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
       >
         {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
         <span>{selectedOption?.label}</span>
@@ -348,7 +348,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       </Button>
 
       {isOpen && (
-        <div className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
+        <div className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
           {options.map((option) => (
             <Button
               key={option.value}
@@ -395,9 +395,9 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
     return (
       <div className="flex flex-col items-center gap-2 py-8">
         <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
-          <div className="w-8 h-px bg-gray-300 dark:bg-muted/40" />
+          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
           <span className="text-sm">{t('已加载全部', 'All loaded')}</span>
-          <div className="w-8 h-px bg-gray-300 dark:bg-muted/40" />
+          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
         </div>
         <span className="text-xs text-muted-foreground dark:text-muted-foreground">
           {t(`共 ${totalCount} 个项目`, `Total ${totalCount} items`)}
@@ -684,7 +684,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       if (append) {
         setDiscoveryLoadingMore(channelId, false);
-      } else if (isCurrentTopicRequest()) {
+      } else {
         setDiscoveryLoading(channelId, false);
       }
     }
@@ -1171,7 +1171,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           {/* 内容区域 */}
           <div 
             ref={scrollContainerRef}
-            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-card' : ''}`}
+            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-card dark:bg-card' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode

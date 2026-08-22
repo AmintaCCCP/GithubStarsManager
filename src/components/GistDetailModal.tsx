@@ -184,7 +184,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             <Button
               type="button"
               onClick={() => handleCopy(gist.html_url, t('链接已复制', 'Link copied'))}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
             >
               <Copy className="h-4 w-4" />
               {t('复制链接', 'Copy link')}
@@ -217,7 +217,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                 activeFile?.filename === file.filename
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-white text-muted-foreground hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent'
               }`}
             >
               {file.filename}
@@ -238,7 +238,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               <Button
                 type="button"
                 onClick={() => handleCopy(activeFile.content || '', t('文件内容已复制', 'File copied'))}
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
                 <Copy className="h-4 w-4" />
                 {t('复制文件', 'Copy file')}

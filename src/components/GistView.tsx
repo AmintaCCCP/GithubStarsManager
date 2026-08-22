@@ -278,8 +278,8 @@ export const GistView: React.FC = () => {
               <h2 className="text-lg font-semibold text-foreground dark:text-foreground">Gist</h2>
               <div className="group relative">
                 <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground dark:text-muted-foreground/70" />
-                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-gray-200 bg-white p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-gray-700 dark:bg-card dark:text-gray-300">
-                  <p className="mb-1 font-medium text-foreground dark:text-white">
+                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
+                  <p className="mb-1 font-medium text-foreground dark:text-foreground">
                     {t('访问 Gist 需要 gist 权限', 'Gist access requires the gist scope')}
                   </p>
                   <p className="leading-relaxed">
@@ -288,7 +288,7 @@ export const GistView: React.FC = () => {
                       'If your private gists are missing, or you cannot create/edit/delete gists, go to GitHub → Settings → Developer settings → Personal access tokens and make sure the gist scope is checked for your current token. Re-login with the updated token after changing scopes.'
                     )}
                   </p>
-                  <div className="absolute bottom-full left-3 -mb-px h-2 w-2 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-card"></div>
+                  <div className="absolute bottom-full left-3 -mb-px h-2 w-2 rotate-45 border-l border-t border-border bg-card dark:border-border dark:bg-card"></div>
                 </div>
               </div>
             </div>
@@ -388,7 +388,7 @@ export const GistView: React.FC = () => {
                           setGistSearchFilters({ sortBy: option.value });
                           setSortOpen(false);
                         }}
-                        className={`block w-full px-3 py-2 text-left text-sm ${
+                        className={`block w-full justify-start px-3 py-2 text-left text-sm ${
                           gistSearchFilters.sortBy === option.value
                             ? 'bg-primary/10 text-primary dark:text-primary'
                             : 'text-muted-foreground hover:bg-muted dark:text-muted-foreground dark:hover:bg-accent'

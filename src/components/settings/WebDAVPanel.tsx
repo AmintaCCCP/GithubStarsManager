@@ -150,7 +150,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('例如: 坚果云', 'e.g., Nutstore')}
               />
             </div>
@@ -164,7 +164,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 type="url"
                 value={form.url}
                 onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder="https://dav.jianguoyun.com/dav/"
               />
             </div>
@@ -178,7 +178,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('WebDAV用户名', 'WebDAV username')}
               />
             </div>
@@ -192,7 +192,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('WebDAV密码', 'WebDAV password')}
               />
             </div>
@@ -206,7 +206,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 type="text"
                 value={form.path}
                 onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-white dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder="/github-stars-manager/"
               />
             </div>
@@ -242,7 +242,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeWebDAVConfig
-                ? 'border-gray-300 bg-accent/50 dark:border-white/[0.12] dark:bg-accent/60'
+                ? 'border-border bg-accent/50 dark:border-border/[0.12] dark:bg-accent/60'
                 : 'border-border dark:border-border hover:border-border dark:hover:border-white/[0.08]'
             }`}
           >

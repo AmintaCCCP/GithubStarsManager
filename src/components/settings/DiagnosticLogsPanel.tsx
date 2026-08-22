@@ -179,7 +179,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-3xl max-h-[80vh] bg-white dark:bg-card rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-3xl max-h-[80vh] bg-card dark:bg-card rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -524,7 +524,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <ScrollText className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
             {t('调试模式', 'Debug Mode')}
           </h3>
-          <div className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
@@ -570,7 +570,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         </div>
 
         {/* Toolbar */}
-        <section className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-3">
+        <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             <Input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -585,7 +585,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
               <Button key={level} onClick={() => toggleLevel(level)}
                 aria-pressed={selectedLevels.has(level)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer flex items-center space-x-1 ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-gray-200 dark:border-border text-muted-foreground dark:text-muted-foreground bg-transparent'}`}>
+                className={`px-3 py-1 text-sm rounded-full transition-colors border cursor-pointer flex items-center space-x-1 ${selectedLevels.has(level) ? LEVEL_COLORS[level] : 'border-border dark:border-border text-muted-foreground dark:text-muted-foreground bg-transparent'}`}>
                 {selectedLevels.has(level) && <Check className="w-3 h-3" />}
                 <span>{level}</span>
               </Button>
@@ -618,7 +618,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                   id="diagnostic-event-type-menu"
                   role="group"
                   aria-label={t('事件类型过滤', 'Event type filters')}
-                  className="absolute top-full left-0 mt-1 bg-white dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]"
+                  className="absolute top-full left-0 mt-1 bg-card dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]"
                 >
                   {availableEventTypes.map(et => (
                     <Button key={et} onClick={() => toggleEventType(et)}
@@ -656,7 +656,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         </section>
 
         {/* Log Entry List */}
-        <section className="bg-white dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
+        <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
           {filteredEntries.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground dark:text-muted-foreground/70">
               <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -682,9 +682,20 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                     entryData?.responseBody != null;
 
                   return (
-                    <div key={entry.id}
-                      className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'hover:bg-muted dark:hover:bg-white/[0.02] cursor-pointer' : ''}`}
-                      onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}>
+                    <div
+                      key={entry.id}
+                      role={hasHttpDetail ? 'button' : undefined}
+                      tabIndex={hasHttpDetail ? 0 : undefined}
+                      aria-label={hasHttpDetail ? t('查看 HTTP 详情', 'View HTTP details') : undefined}
+                      className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset' : ''}`}
+                      onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
+                      onKeyDown={hasHttpDetail ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setDetailEntry(entry);
+                        }
+                      } : undefined}
+                    >
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${LEVEL_COLORS[entry.level]}`}>{entry.level}</span>
                         <span className={`px-2 py-0.5 text-xs rounded-full ${entry.source === 'frontend' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' : 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'}`}>
@@ -712,7 +723,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               </div>
               {/* Load more */}
               {visibleCount < filteredEntries.length && (
-                <div className="p-3 text-center border-t border-black/[0.04] dark:border-white/[0.02]">
+                <div className="p-3 text-center border-t border-black/[0.04] dark:border-border/[0.02]">
                   <Button variant="ghost" onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
                     className="text-sm text-primary hover:text-primary/90 transition-colors">
                     {t(`加载更多（还有 ${filteredEntries.length - visibleCount} 条）`, `Load more (${filteredEntries.length - visibleCount} remaining)`)}

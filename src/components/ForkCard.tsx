@@ -42,7 +42,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`bg-white dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
+      className={`bg-card dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isWorkflowsExpanded
           ? 'border-primary/20 shadow-lg ring-1 ring-ring/30'
           : 'border-border dark:border-border hover:shadow-md hover:border-black/10 dark:hover:border-white/10'
@@ -148,7 +148,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
                   needsSync
                     ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-                    : 'bg-muted text-gray-300 dark:text-muted-foreground cursor-not-allowed'
+                    : 'bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
                 title={needsSync
                   ? t('Update branch', 'Update branch')

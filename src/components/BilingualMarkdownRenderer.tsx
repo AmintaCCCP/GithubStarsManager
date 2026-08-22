@@ -345,7 +345,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       <style>{BILINGUAL_MODE_CSS}</style>
 
       {!isControlled && (
-        <div className="flex items-center justify-end gap-1 mb-3 pb-2 border-b border-gray-100 dark:border-border">
+        <div className="flex items-center justify-end gap-1 mb-3 pb-2 border-b border-border dark:border-border">
           {[
             {
               mode: 'original' as DisplayMode,
@@ -377,8 +377,8 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
                   active
                     ? 'bg-primary/20 text-primary dark:bg-primary/10'
                     : disabled
-                      ? 'text-gray-300 dark:text-muted-foreground/70 cursor-not-allowed'
-                      : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300 hover:bg-muted dark:hover:bg-white/5'
+                      ? 'text-muted-foreground dark:text-muted-foreground/70 cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card'
                 }`}
                 title={label}
               >

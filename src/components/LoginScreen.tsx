@@ -75,21 +75,21 @@ export const LoginScreen: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <div className="linear-login-shell flex min-h-screen items-center justify-center p-4 transition-colors duration-300">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground transition-colors duration-300">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
-        <div className="linear-login-toggle flex items-center overflow-hidden">
-          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} aria-pressed={language === 'zh'} className="w-16 rounded-none px-3 py-2">
+        <div className="flex items-center overflow-hidden rounded-md border border-border bg-card">
+          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} aria-pressed={language === 'zh'} className="w-16 rounded-none">
             中文
           </Button>
-          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} className="w-16 rounded-none px-3 py-2">
+          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} className="w-16 rounded-none">
             EN
           </Button>
         </div>
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="linear-login-theme" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('切换主题', 'Toggle theme')}>
-              {theme === 'light' ? <Moon className="h-5 w-5 text-foreground dark:text-foreground" /> : <Sun className="h-5 w-5 text-gray-300" />}
+            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('切换主题', 'Toggle theme')}>
+              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('切换主题', 'Toggle theme')}</TooltipContent>
@@ -98,27 +98,27 @@ export const LoginScreen: React.FC = () => {
 
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="linear-login-mark mx-auto mb-4 flex h-14 w-14 items-center justify-center overflow-hidden">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-border bg-card shadow-sm">
             <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />
           </div>
-          <h1 className="mb-2 text-3xl font-bold text-foreground dark:text-foreground">GitHub Stars Manager</h1>
-          <p className="text-lg text-muted-foreground dark:text-muted-foreground">{t('AI驱动的仓库管理工具', 'AI-powered repository management')}</p>
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">GitHub Stars Manager</h1>
+          <p className="text-sm text-muted-foreground">{t('AI驱动的仓库管理工具', 'AI-powered repository management')}</p>
         </div>
 
-        <Card className="linear-login-card border-0 p-6 sm:p-7">
+        <Card className="border-border bg-card p-6 shadow-sm sm:p-7">
           <div className="mb-6 text-center">
-            <Github className="mx-auto mb-3 h-10 w-10 text-foreground dark:text-muted-foreground" />
-            <h2 className="mb-2 text-xl font-semibold text-foreground dark:text-foreground">{t('连接GitHub', 'Connect with GitHub')}</h2>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}</p>
+            <Github className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">{t('连接GitHub', 'Connect with GitHub')}</h2>
+            <p className="text-sm text-muted-foreground">{t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')}</p>
           </div>
 
           {repositories.length > 0 && lastSync && (
-            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/30">
-              <div className="flex items-center space-x-2 text-green-800 dark:text-green-200">
-                <div className="h-2 w-2 rounded-full bg-green-600" />
+            <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
                 <span className="text-sm font-medium">{t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}</span>
               </div>
-              <p className="mt-1 text-xs text-green-700 dark:text-green-300">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
+              <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
             </div>
           )}
 
@@ -138,22 +138,22 @@ export const LoginScreen: React.FC = () => {
                   }}
                   onKeyDown={handleKeyPress}
                   disabled={isLoading}
-                  className="ui-field h-11 pl-10 pr-4 text-foreground dark:text-foreground"
+                  className="pl-10"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center space-x-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40">
-                <AlertCircle className="h-5 w-5 shrink-0 text-muted-foreground dark:text-muted-foreground" />
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p>
+              <div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <p className="text-sm">{error}</p>
               </div>
             )}
 
-            <Button type="button" onClick={handleConnect} disabled={isLoading || !token.trim()} className="ui-button-primary h-11 w-full font-medium">
+            <Button type="button" onClick={handleConnect} disabled={isLoading || !token.trim()} className="w-full">
               {isLoading ? (
                 <>
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                   <span>{t('连接中...', 'Connecting...')}</span>
                 </>
               ) : (
@@ -165,9 +165,9 @@ export const LoginScreen: React.FC = () => {
             </Button>
           </div>
 
-          <div className="linear-login-help mt-6 rounded-lg p-4">
-            <h3 className="mb-2 text-sm font-medium text-foreground dark:text-foreground">{t('如何创建GitHub token:', 'How to create a GitHub token:')}</h3>
-            <ol className="space-y-1 text-xs text-muted-foreground dark:text-muted-foreground">
+          <div className="mt-6 rounded-md border border-border bg-muted/50 p-4">
+            <h3 className="mb-2 text-sm font-medium text-foreground">{t('如何创建GitHub token:', 'How to create a GitHub token:')}</h3>
+            <ol className="space-y-1 text-xs leading-5 text-muted-foreground">
               <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
               <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
               <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong>、<strong>user</strong> {t('和', 'and')} <strong>gist</strong></li>

@@ -1056,7 +1056,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <DropdownMenuContent align="start" sideOffset={8} className="w-56 p-0">
               <DropdownMenuItem
                 onSelect={() => void handleAIAnalyze(false)}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-border"
+                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors border-b border-black/[0.04] dark:border-border"
               >
                 <div className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('分析全部', 'Analyze All')}
@@ -1068,7 +1068,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <DropdownMenuItem
                 onSelect={() => void handleAIAnalyze(true)}
                 disabled={unanalyzedCount === 0}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
+                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-border"
               >
                 <div className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('分析未分析的', 'Analyze Unanalyzed')}
@@ -1080,7 +1080,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <DropdownMenuItem
                 onSelect={() => void handleAIAnalyze(false, true)}
                 disabled={failedCount === 0}
-                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-auto w-full flex-col items-start justify-start px-4 py-3 text-left hover:bg-background dark:hover:bg-card transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('重新分析失败的', 'Re-analyze Failed')}
@@ -1188,7 +1188,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -1200,7 +1200,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />

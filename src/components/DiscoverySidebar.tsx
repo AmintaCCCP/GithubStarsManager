@@ -56,7 +56,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
 
   return (
     <div className="w-full lg:w-64 shrink-0">
-      <div className="bg-white dark:bg-card rounded-xl border border-border dark:border-border p-4">
+      <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('发现频道', 'Discovery Channels')}

@@ -1385,7 +1385,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {dataStats.map((stat) => (
             <div
               key={stat.key}
-              className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4"
+              className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -1413,13 +1413,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         </h3>
 
         {/* Include Keys Toggle - Independent Container */}
-        <div className="mb-4 p-6 bg-white dark:bg-card rounded-lg border border-border dark:border-border">
+        <div className="mb-4 p-6 bg-card dark:bg-card rounded-lg border border-border dark:border-border">
           <IncludeKeysToggle t={t} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Export */}
-          <div className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
             <div className="flex items-center space-x-3 mb-4">
               <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Download className="w-5 h-5" />
@@ -1474,7 +1474,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           </div>
 
           {/* Import */}
-          <div className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
             <div className="flex items-center space-x-3 mb-4">
               <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Upload className="w-5 h-5" />
@@ -1517,7 +1517,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-accent transition-colors"
+                className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-accent transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
@@ -1555,7 +1555,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <Trash2 className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
           {t('选择性删除数据', 'Selective Data Deletion')}
         </h3>
-        <div className="bg-white dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
+        <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
           <div className="divide-y divide-black/[0.06] dark:divide-gray-700">
             {dataStats.map((stat) => (
               <div
@@ -1631,7 +1631,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4">
             {t('操作日志', 'Operation Logs')}
           </h3>
-          <div className="bg-white dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="bg-background dark:bg-muted/40 sticky top-0">

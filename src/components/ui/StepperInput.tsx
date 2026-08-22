@@ -87,7 +87,7 @@ export const StepperInput: React.FC<StepperInputProps> = ({
       >
         <Minus className="h-3.5 w-3.5" />
       </Button>
-      <span className="flex h-8 min-w-[2.5rem] select-none items-center justify-center border-y border-input bg-white px-2 text-sm font-medium tabular-nums text-foreground dark:border-input dark:bg-muted/40 dark:text-foreground">
+      <span className="flex h-8 min-w-[2.5rem] select-none items-center justify-center border-y border-input bg-card px-2 text-sm font-medium tabular-nums text-card-foreground">
         {value}
       </span>
       <Button

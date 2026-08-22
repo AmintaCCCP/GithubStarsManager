@@ -317,15 +317,16 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     <>
       {/* 移动端：始终显示完整侧栏 */}
       {isMobile ? (
-        <div className="w-full bg-white dark:bg-card rounded-xl border border-border dark:border-border p-3 sm:p-4 overflow-hidden">
+        <div className="w-full overflow-hidden rounded-md border border-border bg-card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
+            <h3 className="text-base font-semibold text-card-foreground">
               {t('应用分类', 'Categories')}
             </h3>
             <Button
               variant="ghost"
               onClick={handleAddCategory}
-              className="linear-icon-button p-1.5"
+              size="icon"
+              className="h-8 w-8"
               title={t('添加分类', 'Add Category')}
               aria-label={t('添加分类', 'Add Category')}
             >
@@ -358,12 +359,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   <Button
                     variant="ghost"
                     onClick={() => handleCategoryClick(category.id)}
-                    className={`relative flex min-w-[140px] items-center justify-between px-3 py-2 rounded-lg text-left transition-colors ${
+                    size="sm"
+                    className={`relative flex min-w-[140px] items-center justify-between rounded-md text-left transition-colors ${
                       isSelected
-                        ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
+                        ? 'bg-accent text-accent-foreground font-medium'
                         : isDragTarget
                           ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }`}
                     title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                     aria-pressed={isSelected}
@@ -374,12 +376,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       <span className="text-sm font-medium truncate">{category.name}</span>
                     </div>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full shrink-0 ${
+                      className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${
                         isSelected
-                          ? 'bg-accent text-foreground dark:bg-accent dark:text-foreground'
+                          ? 'bg-primary text-primary-foreground'
                           : isDragTarget
                             ? 'bg-muted dark:bg-muted/40 text-green-600 dark:bg-green-600/30 dark:text-green-600'
-                            : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
+                            : 'bg-secondary text-secondary-foreground'
                       }`}
                     >
                       {count}
@@ -420,7 +422,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   <ChevronRight className="w-4 h-4" />
                 </Button>
 
-                <div className="w-full h-px bg-accent dark:bg-white/5" />
+                <div className="h-px w-full bg-border" />
 
                 {/* 折叠状态下的分类图标列表 */}
                 <div className="flex flex-col items-center space-y-2">
@@ -456,12 +458,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             variant="ghost"
                             onClick={() => handleCategoryClick(category.id)}
                             aria-pressed={isSelected}
-                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
+                            size="icon"
+                            className={`h-8 w-8 rounded-md text-lg transition-all duration-200 ${
                               isSelected
-                                ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
+                                ? 'bg-accent text-accent-foreground font-medium'
                                 : isDragTarget
                                   ? 'bg-muted dark:bg-muted/40 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
-                                  : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                             }`}
                             title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : category.name}
                             aria-label={category.name}
@@ -491,7 +494,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 {/* 头部 - 包含折叠按钮 */}
                 <div className="flex items-center justify-between mb-4">
                   <h3
-                    className={`text-lg font-semibold text-foreground dark:text-foreground transition-all duration-200 ease-out ${
+                      className={`text-base font-semibold text-card-foreground transition-all duration-200 ease-out ${
                       showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                     }`}
                   >
@@ -501,7 +504,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleAddCategory}
-                      className="linear-icon-button p-1.5"
+                      size="icon"
+              className="h-8 w-8"
                       title={t('添加分类', 'Add Category')}
                       aria-label={t('添加分类', 'Add Category')}
                     >
@@ -510,8 +514,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     {/* 折叠按钮 - 放在标题栏右侧 */}
                     <Button
                       variant="ghost"
+                      size="icon"
                       onClick={toggleSidebar}
-                      className="p-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="h-8 w-8 rounded-md bg-muted text-muted-foreground transition-all duration-200"
                       title={t('折叠侧栏 (Ctrl/Cmd+B)', 'Collapse Sidebar (Ctrl/Cmd+B)')}
                       aria-label={t('折叠侧栏', 'Collapse Sidebar')}
                       aria-expanded="true"
@@ -555,12 +560,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           variant="ghost"
                           onClick={() => handleCategoryClick(category.id)}
                           aria-pressed={isSelected}
-                          className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ease-out ${
+                          size="sm"
+                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out ${
                             isSelected
-                              ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
+                              ? 'bg-accent text-accent-foreground font-medium'
                               : isDragTarget
                                 ? 'bg-green-50 text-green-600 ring-1 ring-green-600 dark:bg-green-600/10 dark:text-green-600 dark:ring-green-600/30'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                           } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
                           title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : undefined}
                         >
@@ -577,12 +583,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                           {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
-                            className={`text-xs px-2 py-1 rounded-full shrink-0 transition-all duration-200 ease-out ${
+                            className={`shrink-0 rounded-md px-2 py-0.5 text-xs transition-all duration-200 ease-out ${
                               isSelected
-                                ? 'bg-accent text-foreground dark:bg-accent dark:text-foreground'
+                                ? 'bg-primary text-primary-foreground'
                                 : isDragTarget
                                   ? 'bg-green-600/20 text-green-600 dark:bg-green-600/30 dark:text-green-600'
-                                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
+                                  : 'bg-secondary text-secondary-foreground'
                             } ${showText ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
@@ -598,7 +604,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 e.stopPropagation();
                                 handleEditCategory(category);
                               }}
-                              className="p-1 rounded-md hover:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
+                              size="icon"
+                              className="h-7 w-7"
                               title={t('编辑分类', 'Edit category')}
                               aria-label={t('编辑分类', 'Edit category')}
                             >
@@ -611,7 +618,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   void handleDeleteCategory(category);
                                 }}
                                 variant="ghost"
-                                className="p-1 rounded-md text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground"
                                 title={t('删除分类', 'Delete category')}
                                 aria-label={t('删除分类', 'Delete category')}
                               >
@@ -624,7 +632,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   void handleHideDefaultCategory(category);
                                 }}
                                 variant="ghost"
-                                className="p-1 rounded-md text-muted-foreground hover:bg-accent dark:text-muted-foreground dark:hover:bg-accent"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground"
                                 title={t('隐藏默认分类', 'Hide default category')}
                                 aria-label={t('隐藏默认分类', 'Hide default category')}
                               >

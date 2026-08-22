@@ -173,3 +173,13 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 状态；只有后续 review 明确报告 `Actionable comments posted: 0`，才能确认审查收尾。
 
 业务逻辑、store、services、API 和同步流程保持不变。
+
+## Round-29 shadcn visual parity remediation status
+
+本轮针对用户反馈的“组件样式与官方 shadcn/ui 不符、字体字号线条不一致、颜色对比度异常”进行了 presentation-only 收敛。依据官方 shadcn/ui Button/Card 源码与主题文档 [1] [2]，全局 canvas、panel、menu、card、field、chip、filter、modal、empty-state 和 navigation helper 统一到 `background`、`foreground`、`card`、`popover`、`muted`、`secondary`、`accent`、`border`、`ring` 等 semantic tokens；移除入口 body 的 legacy surface 色；将系统字体栈改为稳定的系统 sans/mono 栈；Button variants 对齐官方 h-9/h-8/h-10/icon 尺寸、3px focus ring、SVG 尺寸和状态样式；Card 对齐官方 `rounded-xl`、`gap-6`、`py-6`、`text-card-foreground` 与标题/内容层级。
+
+页面级修复覆盖 LoginScreen、Header、CategorySidebar、SearchBar、RepositoryCard、SettingsPanel、GistView、DiagnosticLogsPanel、VectorSearchSettings、IncludeKeysToggle、MarkdownRenderer 及相关 shared primitives。主要调整为标准 `h-8/h-9/h-10` 控件密度、`rounded-md` 控件线条、popover/card surfaces、semantic active/hover/focus states、可读的 light/dark foreground pairing，以及 HTTP detail 行的键盘可操作语义；未修改 store、services、API、同步流程、AI 行为或数据流。批量颜色迁移仅针对普通中性色 class，Markdown 图片查看器的专用白色 overlay 保持不变。
+
+本地生产预览已验证：开发服务器空白是旧入口运行时观察，生产构建预览可正常挂载；light/dark 登录页均完成实际截图检查。定向回归 4 个测试文件、17 个测试全部通过，日志无 React/Radix `Warning`、`act`、`Unhandled` 或错误标记。完整门禁通过：31 个测试文件、332 个测试全部通过；ESLint 0 errors/0 warnings；`npx tsc -b` 无诊断；生产 build 通过；legacy 入口 `index-legacy-BpAWmd9K.js` 为 2,791.81 kB，独立 bundle checker 为 2,726.38 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。
+
+本节记录的是已完成本地验证、尚待整理提交、推送并触发 CodeRabbit full review 的 draft；不能以本节作为 CodeRabbit actionable zero 的证据，只有针对最终推送 commit 的完成报告明确写出 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。

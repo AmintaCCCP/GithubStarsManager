@@ -453,7 +453,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               onTouchStart={() => setDescTooltip((v) => !v)}
               tabIndex={0}
             >
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
                 {repo.description}
               </p>
               <FloatingTooltip
@@ -479,7 +479,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               tabIndex={0}
             >
               <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
                 {repo.ai_summary}
               </p>
               <FloatingTooltip

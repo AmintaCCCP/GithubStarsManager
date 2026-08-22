@@ -122,7 +122,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       </div>
 
       {/* Menu list */}
-      <div className="p-6 bg-white dark:bg-card rounded-xl border border-border dark:border-border">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="space-y-2">
           {sortedConfig.map((item, index) => {
             const meta = MENU_META[item.id];
@@ -143,7 +143,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     ? 'opacity-50 border-primary/30 bg-primary/5'
                     : isDragOver
                       ? 'border-primary/50 bg-primary/5 scale-[1.01]'
-                      : 'border-border dark:border-border hover:bg-background dark:hover:bg-white/[0.03]'
+                      : 'border-border dark:border-border hover:bg-background dark:hover:bg-card/[0.03]'
                 }`}
               >
                 {/* Drag handle */}
@@ -207,7 +207,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                   aria-label={t(`切换${meta.labelZh}显示`, `Toggle ${meta.labelEn} visibility`)}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${
                       item.visible ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
