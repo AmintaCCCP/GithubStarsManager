@@ -165,7 +165,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!name.trim() || keywords.length === 0}
-            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-accent dark:bg-muted/40 dark:bg-green-600/80 dark:hover:bg-green-600 dark:bg-green-600/80 dark:hover:bg-green-600'}`}
+            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-gray-300 text-muted-foreground dark:bg-white/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-green-600/80 dark:hover:bg-green-600'}`}
           >
             {filter ? '保存' : '创建'}
           </Button>

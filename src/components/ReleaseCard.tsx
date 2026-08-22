@@ -375,6 +375,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                     return (
                       <Button
                         key={index}
+                        variant="ghost"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (link.assetId !== undefined) onMarkAssetAsRead(link.assetId);
