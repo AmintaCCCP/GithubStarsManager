@@ -1178,7 +1178,7 @@ textarea:focus-visible,
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .ui-toolbar {
@@ -1186,7 +1186,7 @@ textarea:focus-visible,
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .ui-card {
@@ -1194,7 +1194,7 @@ textarea:focus-visible,
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .ui-card:hover {
@@ -1365,7 +1365,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .linear-sidebar button:focus-visible {
@@ -1415,7 +1415,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   color: hsl(var(--popover-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
-  box-shadow: 0 10px 30px hsl(var(--foreground) / 0.12);
+  box-shadow: var(--ui-shadow-float);
 }
 
 .ui-menu-item {
@@ -1483,7 +1483,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 
 /* Floating layers use one elevated surface across settings, forms and details. */
 .linear-modal-backdrop {
-  background: hsl(var(--foreground) / 0.5);
+  background: rgb(0 0 0 / 0.5);
   backdrop-filter: blur(2px);
 }
 
@@ -1492,7 +1492,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  box-shadow: 0 10px 30px hsl(var(--foreground) / 0.15);
+  box-shadow: var(--ui-shadow-float);
 }
 
 

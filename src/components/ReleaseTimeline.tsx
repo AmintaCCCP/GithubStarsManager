@@ -1245,24 +1245,24 @@ export const ReleaseTimeline: React.FC = () => {
                   aria-controls={`release-group-${repository.id}`}
                   className="h-auto w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-center space-x-2">
+                  <span className="flex items-center space-x-2">
                     {hasUnread && (
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse"></div>
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse"></span>
                     )}
-                    <div className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
+                    <span className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
                       <LayoutGrid className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div className="text-left">
+                    </span>
+                    <span className="text-left">
                       <span className="block font-semibold text-sm text-foreground dark:text-foreground">
                         {repository.name}
                       </span>
                       <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
                         {repository.full_name}
                       </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 min-w-0 ml-2">
-                    <div className="text-right min-w-0">
+                    </span>
+                  </span>
+                  <span className="flex items-center space-x-2 min-w-0 ml-2">
+                    <span className="text-right min-w-0">
                       <span className="block text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
                         {releases.length} {t('个版本', 'releases')}
                       </span>
@@ -1283,11 +1283,11 @@ export const ReleaseTimeline: React.FC = () => {
                           )}
                         </>
                       )}
-                    </div>
-                    <div className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                    </span>
+                    <span className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
                       <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
-                    </div>
-                  </div>
+                    </span>
+                  </span>
                 </Button>
 
                 {/* Repository Releases (Collapsible) */}

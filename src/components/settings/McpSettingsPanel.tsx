@@ -101,6 +101,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     return JSON.stringify(config, null, 2);
   }, [mcpSseUrl, mcpConfig.token]);
 
+  const maskToken = useCallback((json: string) => (
+    showToken || !mcpConfig.token ? json : json.replace(mcpConfig.token, '••••••••')
+  ), [mcpConfig.token, showToken]);
+
   const refreshFromBackend = useCallback(async () => {
     if (!backend.isAvailable) {
       setBackendMode(false);
@@ -481,7 +485,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </Button>
           </div>
           <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
-            {agentConfigJson}
+            {maskToken(agentConfigJson)}
           </pre>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
             {language === 'zh'
@@ -503,7 +507,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </Button>
           </div>
           <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
-            {agentSseConfigJson}
+            {maskToken(agentSseConfigJson)}
           </pre>
         </div>
       </div>
