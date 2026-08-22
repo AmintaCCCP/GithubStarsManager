@@ -1126,20 +1126,27 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 7: Deploy Guide */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <Button
-          variant="ghost"
-          onClick={() => setShowDeployGuide(!showDeployGuide)}
-          className="h-auto w-full flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors"
-        >
+        <div className="flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors">
           <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
             <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
             {t('部署指南', 'Deploy Guide')}
           </h3>
-          {showDeployGuide ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDeployGuide(!showDeployGuide)}
+            aria-expanded={showDeployGuide}
+            aria-controls="vector-deploy-guide"
+            aria-label={t('切换部署指南', 'Toggle deploy guide')}
+            className="h-8 w-8 p-0"
+          >
+            {showDeployGuide ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          </Button>
+        </div>
 
         {showDeployGuide && (
-          <div className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
+          <div id="vector-deploy-guide" className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
             {/* 首次部署 */}
             <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
               <p className="font-medium text-foreground dark:text-gray-100 mb-2">

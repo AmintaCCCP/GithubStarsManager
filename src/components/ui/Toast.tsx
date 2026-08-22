@@ -19,14 +19,31 @@ const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: st
   info: { icon: Info, className: 'border-border bg-accent/50 text-muted-foreground dark:bg-muted/40' },
 };
 
+const TOAST_EXIT_DURATION_MS = 150;
+
 export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000 }) => {
   const { icon: Icon, className } = TOAST_META[type];
+  const [open, setOpen] = React.useState(true);
+  const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+  }, []);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      closeTimeoutRef.current = setTimeout(onClose, TOAST_EXIT_DURATION_MS);
+    }
+  };
 
   return (
-      <ToastPrimitive.Root
-        open
+    <ToastPrimitive.Root
+        open={open}
         duration={duration}
-        onOpenChange={(open) => !open && onClose()}
+        onOpenChange={handleOpenChange}
         className={cn('pointer-events-auto flex w-[min(420px,calc(100vw-2rem))] items-center gap-3 rounded-lg border px-4 py-3 shadow-lg outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in', className)}
       >
         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />

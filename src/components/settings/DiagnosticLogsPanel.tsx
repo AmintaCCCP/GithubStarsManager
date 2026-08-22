@@ -605,7 +605,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <div className="relative" ref={eventTypeRef}>
               <Button
                 onClick={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
-                aria-haspopup="menu"
                 aria-expanded={showEventTypeDropdown}
                 aria-controls="diagnostic-event-type-menu"
                 className="px-3 py-1.5 text-sm rounded-lg border border-border dark:border-border bg-transparent text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent flex items-center space-x-1"
@@ -616,7 +615,8 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               {showEventTypeDropdown && (
                 <div
                   id="diagnostic-event-type-menu"
-                  role="menu"
+                  role="group"
+                  aria-label={t('事件类型过滤', 'Event type filters')}
                   className="absolute top-full left-0 mt-1 bg-white dark:bg-card rounded-lg border border-border dark:border-border shadow-lg z-10 p-2 max-h-48 overflow-y-auto min-w-[160px]"
                 >
                   {availableEventTypes.map(et => (

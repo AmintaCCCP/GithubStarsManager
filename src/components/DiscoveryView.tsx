@@ -518,6 +518,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 用于记录最近一次自动拉取的频道，防止空频道无限循环拉取
   const autoFetchChannelRef = useRef<string | null>(null);
   const appliedTopicRef = useRef<{ topic: string | null; platform: DiscoveryPlatform } | null>(null);
+  const topicRequestVersionRef = useRef(0);
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const isDesktopSafeMode = useMemo(() => {
@@ -550,6 +551,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
+    const topicRequestVersion = channelId === 'topic' ? ++topicRequestVersionRef.current : null;
+    const topicRequestSelection = channelId === 'topic'
+      ? { topic: discoverySelectedTopic, platform: discoveryPlatform }
+      : null;
+    const isCurrentTopicRequest = () => {
+      if (topicRequestVersion === null) return true;
+      const currentStore = useAppStore.getState();
+      return topicRequestVersionRef.current === topicRequestVersion
+        && currentStore.discoverySelectedTopic === topicRequestSelection?.topic
+        && currentStore.discoveryPlatform === topicRequestSelection?.platform;
+    };
+
     if (!githubToken) {
       toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
@@ -600,10 +613,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
 
+      if (!isCurrentTopicRequest()) return;
+
       const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
 
       const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
       const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
+      if (!isCurrentTopicRequest()) return;
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
         const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
@@ -655,6 +671,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         });
       }
     } catch (error) {
+      if (!isCurrentTopicRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) {
         setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
@@ -662,10 +679,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
         toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
       }
     } finally {
-      if (append) {
-        setDiscoveryLoadingMore(channelId, false);
-      } else {
-        setDiscoveryLoading(channelId, false);
+      if (isCurrentTopicRequest()) {
+        if (append) {
+          setDiscoveryLoadingMore(channelId, false);
+        } else {
+          setDiscoveryLoading(channelId, false);
+        }
       }
     }
   }, [githubToken, t, toast, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);

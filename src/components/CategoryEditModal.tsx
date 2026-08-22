@@ -6,6 +6,7 @@ import { Modal } from './Modal';
 import { Category } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
+import { validateCategoryName } from '../utils/categoryUtils';
 
 // Complete emoji collection for categories
 const availableIcons = [
@@ -800,6 +801,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore();
 
   const { toast } = useDialog();
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const originalDefaultCategories = getAllCategories([], language, [], {});
   const isDefaultCategoryModified = category && !category.isCustom && category.id in defaultCategoryOverrides;
@@ -844,15 +846,12 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   }, [category, isCreating, isOpen]);
 
   const handleSave = () => {
-    const categoryName = formData.name.trim();
-    if (!categoryName) {
-      toast(language === 'zh' ? '请输入分类名称' : 'Please enter category name', 'error');
+    const validation = validateCategoryName(formData.name, t);
+    if (validation.error !== null) {
+      toast(validation.error, 'error');
       return;
     }
-    if (categoryName.toLowerCase() === 'none') {
-      toast(language === 'zh' ? 'none 是保留名称，请使用其他分类名称' : 'The name "none" is reserved. Please choose another category name.', 'error');
-      return;
-    }
+    const categoryName = validation.value;
 
     if (isCreating) {
       const categoryData: Category = {
@@ -928,8 +927,6 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
     setShowCustomInput(false);
     onClose();
   };
-
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
     <Modal

@@ -1000,6 +1000,7 @@ export const SearchBar: React.FC = () => {
         <Input
           ref={searchInputRef}
           type="text"
+          aria-label={t('搜索仓库', 'Search repositories')}
           placeholder={t(
             "输入关键词实时搜索，或使用AI搜索进行语义理解",
             "Type keywords for real-time search, or use AI search for semantic understanding"

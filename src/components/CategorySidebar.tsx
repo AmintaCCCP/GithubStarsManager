@@ -455,6 +455,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           <Button
                             variant="ghost"
                             onClick={() => handleCategoryClick(category.id)}
+                            aria-pressed={isSelected}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all duration-200 ${
                               isSelected
                                 ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
@@ -553,6 +554,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                         <Button
                           variant="ghost"
                           onClick={() => handleCategoryClick(category.id)}
+                          aria-pressed={isSelected}
                           className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ease-out ${
                             isSelected
                               ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
