@@ -580,17 +580,19 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
                           />
                           <Button
+                            size="icon"
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
+                            className={`h-8 w-8 p-0 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
                             aria-label={t('保存', 'Save')}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="icon"
                             onClick={handleCancelEdit}
-                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                            className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                             aria-label={t('取消', 'Cancel')}
                             title={t('取消', 'Cancel')}
                           >
@@ -609,7 +611,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditIcon(originalCategory.icon);
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                               >
                                 {t('名字/图标', 'Name/Icon')}
                               </Button>
@@ -622,7 +624,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditKeywords(originalCategory.keywords?.join(', ') || '');
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                               >
                                 {t('关键词', 'Keywords')}
                               </Button>
@@ -662,6 +664,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                       {isReordering ? (
                         <div className="flex items-center space-x-1">
                           <Button
+                            size="icon"
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -671,6 +674,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             <ArrowUpToLine className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="icon"
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -680,6 +684,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             <ArrowUp className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="icon"
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -689,6 +694,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             <ArrowDown className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="icon"
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
                             className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -703,16 +709,18 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           {category.isCustom ? (
                             <>
                               <Button
+                                size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                                 aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </Button>
                               <Button
+                                size="icon"
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                                 aria-label={t('删除', 'Delete')}
                                 title={t('删除', 'Delete')}
                               >
@@ -722,16 +730,18 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           ) : (
                             <>
                               <Button
+                                size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                                 aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </Button>
                               <Button
+                                size="icon"
                                 onClick={() => hideDefaultCategory(category.id)}
-                                className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                                 aria-label={t('隐藏', 'Hide')}
                                 title={t('隐藏', 'Hide')}
                               >

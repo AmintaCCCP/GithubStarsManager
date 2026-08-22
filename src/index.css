@@ -1450,7 +1450,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 }
 
 .repository-card .status,
-.repository-card [class*="text-green-600"] {
+.repository-card [class~="text-green-600"] {
   color: var(--ui-success);
 }
 
