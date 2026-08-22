@@ -1000,17 +1000,19 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3">
             {iconGrid}
           </div>
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-            {t('当前选择:', 'Selected:')} {formData.icon}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
+            <span className="whitespace-nowrap">{t('当前选择:', 'Selected:')} {formData.icon}</span>
             <Button
+              type="button"
               onClick={() => setShowCustomInput(true)}
               variant="ghost"
-              className="ml-3 text-primary dark:text-primary hover:underline"
+              size="sm"
+              className="h-8 gap-1 px-2 py-1 text-sm text-primary dark:text-primary hover:underline"
             >
-              <Plus className="w-3 h-3 inline mr-1" />
+              <Plus className="h-3 w-3" />
               {t('自定义emoji', 'Custom emoji')}
             </Button>
-          </p>
+          </div>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
             {t(
               '包含所有常用emoji分类：笑脸、人物、手势、动物、食物、交通、符号等',

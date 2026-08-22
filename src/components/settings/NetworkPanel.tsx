@@ -24,6 +24,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isProxyToggling, setIsProxyToggling] = useState(false);
 
   // --- RPC Download state ---
   const [rpcForm, setRpcForm] = useState<RpcDownloadConfig>(rpcDownloadConfig);
@@ -32,6 +33,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [rpcTesting, setRpcTesting] = useState(false);
   const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
   const [rpcSaving, setRpcSaving] = useState(false);
+  const [isRpcToggling, setIsRpcToggling] = useState(false);
 
   // Ensure backend is initialized, then return base URL
   const getRpcBaseUrl = async (): Promise<string> => {
@@ -163,7 +165,9 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const hasChanges = JSON.stringify(form) !== JSON.stringify(proxyConfig);
 
   const handleProxyToggle = async (enabled: boolean) => {
+    if (isProxyToggling) return;
     const previousForm = form;
+    setIsProxyToggling(true);
     const newForm = { ...form, enabled };
     setForm(newForm);
     setTestResult(null);
@@ -195,6 +199,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
       }
       setForm(previousForm);
       setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
+    } finally {
+      setIsProxyToggling(false);
     }
   };
 
@@ -262,7 +268,9 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const rpcHasChanges = JSON.stringify(rpcForm) !== JSON.stringify(rpcDownloadConfig);
 
   const handleRpcToggle = async (enabled: boolean) => {
+    if (isRpcToggling) return;
     const previousForm = rpcForm;
+    setIsRpcToggling(true);
     const newForm = { ...rpcForm, enabled };
     setRpcForm(newForm);
     setRpcTestResult(null);
@@ -288,6 +296,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     } catch (e) {
       setRpcForm(previousForm);
       setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
+    } finally {
+      setIsRpcToggling(false);
     }
   };
 
@@ -306,6 +316,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           <Switch
             checked={form.enabled}
             onCheckedChange={handleProxyToggle}
+            disabled={isProxyToggling}
             aria-label={t('启用网络代理', 'Enable network proxy')}
             className="shrink-0"
           />
@@ -484,6 +495,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           <Switch
             checked={rpcForm.enabled}
             onCheckedChange={(enabled) => void handleRpcToggle(enabled)}
+            disabled={isRpcToggling}
             aria-label={t('启用远程下载', 'Enable remote download')}
             className="shrink-0"
           />

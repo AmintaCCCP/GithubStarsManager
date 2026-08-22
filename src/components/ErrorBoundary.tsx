@@ -84,7 +84,7 @@ export class ErrorBoundary extends Component<Props, State> {
       const { error, errorInfo, showDetails } = this.state;
 
       return (
-        <div className="min-h-screen bg-background dark:bg-card flex items-center justify-center p-4">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-lg w-full bg-card dark:bg-card rounded-lg shadow-lg p-6">
             <div className="text-center">
               <div className="text-5xl mb-4">😵</div>

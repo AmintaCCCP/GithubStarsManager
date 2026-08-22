@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Bot, LayoutGrid, List, Pause, Play } from 'lucide-react';
+import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -1040,15 +1040,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 disabled={isLoading}
                 aria-label={t('AI 分析操作', 'AI analysis actions')}
-                className="ui-field h-9 w-auto min-w-28 justify-start gap-2 px-3 py-1 text-sm font-medium"
+                className="ui-field h-9 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-sm font-medium"
               >
                 <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
                   ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
                   : t('AI分析', 'AI Analysis')}
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">

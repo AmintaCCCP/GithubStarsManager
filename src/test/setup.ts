@@ -31,9 +31,7 @@ Object.defineProperty(window, 'ResizeObserver', {
 
 window.fetch = vi.fn();
 
-// Radix pointer interactions call the Pointer Capture API, which jsdom does not
-// implement. Keep these no-op methods test-only so user-event can exercise the
-// same trigger path as the browser without changing production behavior.
+// jsdom does not implement scrollIntoView. Keep this no-op test-only.
 if (!Element.prototype.scrollIntoView) {
   Object.defineProperty(Element.prototype, 'scrollIntoView', {
     configurable: true,
@@ -41,15 +39,22 @@ if (!Element.prototype.scrollIntoView) {
   });
 }
 
+// Radix pointer interactions call the Pointer Capture API, which jsdom does not
+// implement. Keep these no-op methods test-only so user-event can exercise the
+// same trigger path as the browser without changing production behavior.
 if (!Element.prototype.hasPointerCapture) {
   Object.defineProperty(Element.prototype, 'hasPointerCapture', {
     configurable: true,
     value: () => false,
   });
+}
+if (!Element.prototype.setPointerCapture) {
   Object.defineProperty(Element.prototype, 'setPointerCapture', {
     configurable: true,
     value: () => undefined,
   });
+}
+if (!Element.prototype.releasePointerCapture) {
   Object.defineProperty(Element.prototype, 'releasePointerCapture', {
     configurable: true,
     value: () => undefined,

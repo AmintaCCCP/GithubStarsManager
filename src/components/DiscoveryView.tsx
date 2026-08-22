@@ -1,5 +1,5 @@
 import { Button } from './ui/button';
-import React, { useId, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   RefreshCw,
   TrendingUp,
@@ -32,6 +32,7 @@ import { ScrollToBottom } from './ScrollToBottom';
 import { useDialog } from '../hooks/useDialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import type {
   DiscoveryChannelId,
   DiscoveryChannelIcon,
@@ -235,9 +236,6 @@ interface PlatformFilterProps {
 }
 
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const platforms: { id: DiscoveryPlatform; name: string; nameEn: string; icon: React.ReactNode }[] = [
     { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="w-4 h-4" /> },
     { id: 'Android', name: 'Android', nameEn: 'Android', icon: <Smartphone className="w-4 h-4" /> },
@@ -246,59 +244,35 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
     { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <Terminal className="w-4 h-4" /> },
   ];
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const selectedPlatform = platforms.find(p => p.id === platform);
-  const menuId = 'discovery-platform-filter-menu';
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        variant="ghost"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-controls={menuId}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
-      >
-        <Filter className="w-4 h-4" />
-        <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </Button>
-
-      {isOpen && (
-        <div id={menuId} role="menu" className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
-          {platforms.map((p) => (
-            <Button
-              key={p.id}
-              onClick={() => {
-                onPlatformChange(p.id);
-                setIsOpen(false);
-              }}
-              variant="ghost"
-              role="menuitem"
-              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                platform === p.id
-                  ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
-                  : 'text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent'
-              }`}
-            >
-              {p.icon}
-              {language === 'zh' ? p.name : p.nameEn}
-            </Button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}
+          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        {platforms.map((p) => (
+          <DropdownMenuItem
+            key={p.id}
+            onSelect={() => onPlatformChange(p.id)}
+            className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
+          >
+            {p.icon}
+            <span>{language === 'zh' ? p.name : p.nameEn}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -323,65 +297,35 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   className = '',
   dropdownClassName = '',
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const menuIdSuffix = useId();
-  const menuId = `discovery-custom-select-${menuIdSuffix}`;
-
   const selectedOption = options.find(o => o.value === value);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      <Button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        variant="outline"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-controls={menuId}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
-      >
-        {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
-        <span>{selectedOption?.label}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </Button>
-
-      {isOpen && (
-        <div id={menuId} role="menu" className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
-          {options.map((option) => (
-            <Button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-              variant="ghost"
-              role="menuitem"
-              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                value === option.value
-                  ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
-                  : 'text-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-accent'
-              }`}
-            >
-              {option.icon && <span className="w-4 h-4">{option.icon}</span>}
-              {option.label}
-            </Button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          aria-label={selectedOption?.label}
+          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
+        >
+          {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
+          <span>{selectedOption?.label}</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className={`w-48 ${dropdownClassName}`}>
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.value}
+            onSelect={() => onChange(option.value)}
+            className={value === option.value ? 'bg-accent text-accent-foreground' : ''}
+          >
+            {option.icon && <span className="h-4 w-4">{option.icon}</span>}
+            <span>{option.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -693,12 +637,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
         toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
       }
     } finally {
-      if (isCurrentTopicRequest()) {
-        if (append) {
-          setDiscoveryLoadingMore(channelId, false);
-        } else {
-          setDiscoveryLoading(channelId, false);
-        }
+      if (append) {
+        setDiscoveryLoadingMore(channelId, false);
+      } else if (isCurrentTopicRequest()) {
+        setDiscoveryLoading(channelId, false);
       }
     }
   }, [githubToken, t, toast, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);

@@ -623,7 +623,7 @@ export const ForkTimeline: React.FC = () => {
         </div>
 
         {/* Results Info and Pagination Controls */}
-        <div className="flex w-full flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex w-full min-w-0 flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t(
@@ -638,7 +638,7 @@ export const ForkTimeline: React.FC = () => {
             )}
           </div>
 
-          <div className="flex w-full justify-end gap-3 sm:w-auto sm:items-center sm:gap-4">
+          <div className="flex w-full min-w-0 justify-end gap-3 sm:w-auto sm:items-center sm:gap-4 lg:ml-auto">
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
               <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>

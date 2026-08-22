@@ -99,7 +99,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               type="text"
               value={newKeyword}
               onChange={(e) => setNewKeyword(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               placeholder="输入关键词，如: mac, dmg"
               className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
             />

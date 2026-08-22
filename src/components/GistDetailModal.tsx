@@ -171,7 +171,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={getGistTitle(gist)} maxWidth="max-w-5xl">
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 text-sm text-muted-foreground dark:text-muted-foreground">
             <span>{gist.owner?.login || t('未知创建者', 'Unknown owner')}</span>
@@ -214,7 +214,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               type="button"
               aria-pressed={activeFile?.filename === file.filename}
               onClick={() => setActiveFilename(file.filename)}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                className={`min-w-0 max-w-full break-all rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${
                 activeFile?.filename === file.filename
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent'
@@ -226,7 +226,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
         </div>
 
         {activeFile ? (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-medium text-foreground dark:text-foreground">{activeFile.filename}</div>
