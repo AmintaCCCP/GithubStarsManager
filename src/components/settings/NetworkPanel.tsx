@@ -468,7 +468,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             aria-checked={rpcForm.enabled}
             aria-label={t('启用远程下载', 'Enable remote download')}
             onClick={handleRpcToggle}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${rpcForm.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
+            className={`relative inline-flex h-5 w-9 items-center justify-start rounded-full p-0 transition-colors ${rpcForm.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-accent'}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${rpcForm.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}

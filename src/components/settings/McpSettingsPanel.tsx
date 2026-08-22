@@ -260,7 +260,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             aria-checked={mcpConfig.enabled}
             disabled={saving || loading}
             onClick={() => void handleToggle(!mcpConfig.enabled)}
-            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
               mcpConfig.enabled ? 'bg-primary' : 'bg-accent dark:bg-accent'
             }`}
           >
