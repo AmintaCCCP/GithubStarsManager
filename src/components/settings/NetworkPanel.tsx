@@ -323,7 +323,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           </div>
           <Switch
             checked={form.enabled}
-            onCheckedChange={handleProxyToggle}
+            onCheckedChange={(checked) => { void handleProxyToggle(checked); }}
             disabled={isProxyToggling}
             aria-label={t('启用网络代理', 'Enable network proxy')}
             className="shrink-0"

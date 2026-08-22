@@ -1139,15 +1139,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="relative" tabIndex={0}>
-              <p
-                className={viewMode === 'list'
-                  ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
-                  : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
-              >
-                {highlightSearchTerm(displayContent.content, searchQuery)}
-              </p>
-            </div>
+            <p
+              className={viewMode === 'list'
+                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
+                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+            >
+              {highlightSearchTerm(displayContent.content, searchQuery)}
+            </p>
           </TooltipTrigger>
           <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
             {displayContent.content}

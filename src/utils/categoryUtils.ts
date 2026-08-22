@@ -6,6 +6,8 @@ export type CategoryNameValidation =
   | { value: string; error: null }
   | { value: null; error: string };
 
+export const isReservedCategoryName = (name: string): boolean => name.trim().toLowerCase() === 'none';
+
 export const validateCategoryName = (
   name: string,
   t: CategoryNameTranslator,
@@ -15,7 +17,7 @@ export const validateCategoryName = (
   if (!trimmedName) {
     return { value: null, error: t(emptyMessage[0], emptyMessage[1]) };
   }
-  if (trimmedName.toLowerCase() === 'none') {
+  if (isReservedCategoryName(trimmedName)) {
     return {
       value: null,
       error: t(

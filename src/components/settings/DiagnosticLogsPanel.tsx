@@ -1,7 +1,6 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -550,18 +549,18 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 aria-label={t('切换后端调试', 'Toggle backend debug')}
               />
             </div>
-            <Alert className="bg-muted/40 text-muted-foreground">
-              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-              <AlertDescription>{t('调试模式会产生大量日志，仅用于排障时短暂开启', 'Debug mode produces many logs — enable briefly only for troubleshooting')}</AlertDescription>
-            </Alert>
+            <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{t('调试模式会产生大量日志，仅用于排障时短暂开启', 'Debug mode produces many logs — enable briefly only for troubleshooting')}</span>
+            </p>
           </div>
         </section>
 
         {/* Privacy Notice */}
-        <Alert className="bg-muted/40 text-muted-foreground">
-          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-          <AlertDescription>{t('日志仅记录端点、模型、状态、耗时和错误摘要。所有 Token、API Key、密码、邮箱已自动脱敏为 ***格式', 'Logs store only endpoints, models, status, duration, and error summaries. All sensitive info is automatically masked as ***')}</AlertDescription>
-        </Alert>
+        <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{t('日志仅记录端点、模型、状态、耗时和错误摘要。所有 Token、API Key、密码、邮箱已自动脱敏为 ***格式', 'Logs store only endpoints, models, status, duration, and error summaries. All sensitive info is automatically masked as ***')}</span>
+        </p>
 
         {/* Toolbar */}
         <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-3">
