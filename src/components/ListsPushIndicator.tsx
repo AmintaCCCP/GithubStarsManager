@@ -36,7 +36,7 @@ export const ListsPushIndicator: React.FC = () => {
     : 0;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] w-80 max-w-[calc(100vw-2rem)] bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg p-4">
+    <div className="fixed bottom-4 right-4 z-[9999] w-80 max-w-[calc(100vw_-_2rem)] bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg p-4">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-sm font-medium text-foreground dark:text-foreground">
           {t('同步分类到 GitHub list', 'Pushing categories to lists')}

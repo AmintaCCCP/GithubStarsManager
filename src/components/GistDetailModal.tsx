@@ -137,6 +137,18 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
+  const loadedActiveContent = activeFile ? loadedContents[activeFile.filename] : undefined;
+  const requiresLoadedContent = Boolean(activeFile && (
+    activeFile.truncated || (!activeFile.content && activeFile.raw_url)
+  ));
+  const canCopyActiveFile = Boolean(activeFile) && (
+    !requiresLoadedContent || loadedActiveContent !== undefined
+  );
+  const activeCopyContent = activeFile
+    ? requiresLoadedContent
+      ? loadedActiveContent ?? ''
+      : activeFile.content ?? loadedActiveContent ?? ''
+    : '';
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
   const handleContentLoaded = (filename: string, content: string) => {
@@ -240,7 +252,8 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               </div>
               <Button
                 type="button"
-                onClick={() => handleCopy(loadedContents[activeFile.filename] ?? activeFile.content ?? '', t('文件内容已复制', 'File copied'))}
+                disabled={!canCopyActiveFile}
+                onClick={() => handleCopy(activeCopyContent, t('文件内容已复制', 'File copied'))}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
                 <Copy className="h-4 w-4" />
