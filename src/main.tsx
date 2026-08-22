@@ -7,6 +7,7 @@ import App from './App.tsx';
 import './index.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { DialogProvider } from './hooks/useDialog';
+import { TooltipProvider } from './components/ui/tooltip';
 import { logger } from './services/logger';
 
 logger.info('app', 'Main.tsx loading');
@@ -24,7 +25,9 @@ try {
     <StrictMode>
       <ErrorBoundary>
         <DialogProvider>
-          <App />
+          <TooltipProvider delayDuration={300}>
+            <App />
+          </TooltipProvider>
         </DialogProvider>
       </ErrorBoundary>
     </StrictMode>

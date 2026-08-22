@@ -1,3 +1,5 @@
+import { Input } from './ui/input';
+import { Button } from './ui/button';
 import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
@@ -103,14 +105,14 @@ const CodeBlock: React.FC<{
   return (
     <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
       isBashLike
-        ? 'border-black/[0.06] dark:border-white/[0.04]'
+        ? 'border-border dark:border-border'
         : isPowerShell
-          ? 'border-brand-violet/30 dark:border-brand-violet/30'
+          ? 'border-primary/30 dark:border-primary/30'
           : isCmdLike
             ? 'border-cyan-500/30 dark:border-cyan-400/30'
-            : 'border-black/[0.06] dark:border-white/[0.04]'
+            : 'border-border dark:border-border'
     }`}>
-      <div className="flex items-center justify-between px-4 py-2.5 bg-light-surface dark:bg-panel-dark/90 border-b border-black/[0.06] dark:border-white/[0.04]">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-muted dark:bg-card/90 border-b border-border dark:border-border">
         <div className="flex items-center gap-2.5">
           <div className="flex gap-1.5">
             <span className="w-3 h-3 rounded-full bg-[#ff5f56] dark:bg-[#ff5f56]/90 shadow-sm" />
@@ -120,18 +122,18 @@ const CodeBlock: React.FC<{
           {language && (
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
               isBashLike
-                ? 'bg-status-emerald/20 text-status-emerald border border-status-emerald/30 dark:bg-status-emerald/20 dark:text-status-emerald dark:border-status-emerald/30'
+                ? 'bg-green-600/20 text-green-600 border border-green-600/30 dark:bg-green-600/20 dark:text-green-600 dark:border-green-600/30'
                 : isPowerShell
-                  ? 'bg-brand-indigo/20 dark:bg-brand-indigo/30 text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]'
+                  ? 'bg-primary/20 dark:bg-primary/30 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
                   : isCmdLike
                     ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
-                    : 'bg-gray-200 dark:bg-white/[0.04] text-gray-700 dark:text-text-tertiary border border-black/[0.06] dark:border-white/[0.04]'
+                    : 'bg-accent dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
             }`}>
               {isBashLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-status-emerald animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-green-600 animate-pulse" />
               )}
               {isPowerShell && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-brand-violet animate-pulse" />
+                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
               )}
               {isCmdLike && (
                 <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
@@ -141,14 +143,17 @@ const CodeBlock: React.FC<{
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`h-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copyError
-                ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]'
+                ? 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
                 : copied
-                  ? 'bg-status-emerald text-white border border-status-emerald'
-                  : 'bg-white dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-gray-600 border border-black/[0.06] dark:border-white/[0.04]'
+                  ? 'bg-green-600 text-white border border-green-600'
+                  : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border'
             }`}
             title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
           >
@@ -165,11 +170,11 @@ const CodeBlock: React.FC<{
                 {uiLanguage === 'zh' ? '复制' : 'Copy'}
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-black/[0.06] dark:border-white/[0.04]">
+        <div className="absolute top-14 right-4 max-w-xs bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-border dark:border-border">
           {copyError}
         </div>
       )}
@@ -180,20 +185,20 @@ const CodeBlock: React.FC<{
             ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-[#0d1117] dark:to-[#161b22]'
             : isCmdLike
               ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-[#0d1117] dark:to-[#161b22]'
-              : 'bg-light-bg dark:bg-[#0d1117]'
+              : 'bg-background dark:bg-[#0d1117]'
       }`}>
         <div className={`p-4 overflow-x-auto ${className || ''}`}>
           <pre className={showLineNumbers ? 'flex items-start' : undefined}>
             {showLineNumbers && (
               <span className="select-none pr-4 text-right flex-shrink-0" aria-hidden="true">
                 {codeLines.map((_, index) => (
-                  <span key={index} className="block text-gray-400 text-sm font-mono leading-6">
+                  <span key={index} className="block text-muted-foreground text-sm font-mono leading-6">
                     {index + 1}
                   </span>
                 ))}
               </span>
             )}
-            <code ref={codeRef} className={`text-sm font-mono leading-6 text-gray-800 dark:text-[#e6edf3] ${showLineNumbers ? 'block min-w-0 flex-1' : ''} ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
+            <code ref={codeRef} className={`text-sm font-mono leading-6 text-foreground dark:text-[#e6edf3] ${showLineNumbers ? 'block min-w-0 flex-1' : ''} ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
               {codeText}
             </code>
           </pre>
@@ -263,7 +268,7 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
       href={resolvedHref}
       target={isHashLink || isSpecialLink ? undefined : "_blank"}
       rel={isHashLink || isSpecialLink ? undefined : "noopener noreferrer"}
-      className="text-brand-violet dark:text-brand-violet hover:text-gray-700 dark:hover:text-text-secondary underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
+      className="text-primary dark:text-primary hover:text-muted-foreground dark:hover:text-muted-foreground underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
       onClick={handleAnchorClick}
     >
       {children}
@@ -476,20 +481,21 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   if (hasError) {
     return (
-      <span className="my-2 px-3 py-2 bg-gray-100 dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] flex items-center gap-2 text-xs">
-        <svg className="w-4 h-4 text-gray-500 dark:text-text-tertiary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span className="my-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded border border-border dark:border-border flex items-center gap-2 text-xs">
+        <svg className="w-4 h-4 text-muted-foreground dark:text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <span className="text-gray-500 dark:text-text-tertiary">
+        <span className="text-muted-foreground dark:text-muted-foreground">
           {language === 'zh' ? '图片加载失败' : 'Image failed'}
         </span>
-        {alt && <span className="text-gray-400 dark:text-text-quaternary truncate max-w-[120px]">{alt}</span>}
-        <button
+        {alt && <span className="text-muted-foreground dark:text-muted-foreground/70 truncate max-w-[120px]">{alt}</span>}
+        <Button
+          variant="ghost"
           onClick={handleRetry}
-          className="ml-auto px-2 py-0.5 text-xs text-brand-violet hover:text-brand-violet/80 transition-colors flex-shrink-0"
+          className="ml-auto px-2 py-0.5 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
         >
           {language === 'zh' ? '重试' : 'Retry'}
-        </button>
+        </Button>
       </span>
     );
   }
@@ -499,7 +505,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       {isSmallImage ? (
         <span className="inline-flex items-center my-1">
           {isLoading && (
-            <span className="w-20 h-7 bg-light-surface dark:bg-white/[0.04] rounded animate-pulse inline-block" />
+            <span className="w-20 h-7 bg-muted dark:bg-muted/40 rounded animate-pulse inline-block" />
           )}
           <span className="relative inline-block">
             <img
@@ -529,11 +535,11 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       ) : (
         <span className="my-4 flex flex-col items-center group/img">
           {isLoading && (
-            <span className="w-full max-w-md h-16 bg-light-surface dark:bg-panel-dark rounded-lg flex items-center justify-center animate-pulse gap-2">
-              <svg className="w-5 h-5 text-gray-300 dark:text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="w-full max-w-md h-16 bg-muted dark:bg-card rounded-lg flex items-center justify-center animate-pulse gap-2">
+              <svg className="w-5 h-5 text-gray-300 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-xs text-gray-400 dark:text-text-quaternary">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
             </span>
           )}
 
@@ -563,7 +569,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </span>
 
           {!isLoading && !hasError && (
-            <span data-translate="false" className="text-center mt-2 text-xs text-gray-400 dark:text-text-tertiary opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
+            <span data-translate="false" className="text-center mt-2 text-xs text-muted-foreground dark:text-muted-foreground opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
               <span>
                 {isInsideLink
                   ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')
@@ -571,7 +577,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 }
               </span>
               {naturalWidth > 0 && (
-                <span className="text-gray-300 dark:text-text-secondary">|</span>
+                <span className="text-gray-300 dark:text-muted-foreground">|</span>
               )}
               {naturalWidth > 0 && (
                 <span>{naturalWidth} × {naturalHeight}</span>
@@ -582,7 +588,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           {!isLoading && !hasError && isInsideLink && parentLinkHref && (
             <span
               data-translate="false"
-              className="text-center mt-1 text-xs text-brand-violet dark:text-brand-violet opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
+              className="text-center mt-1 text-xs text-primary dark:text-primary opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -621,66 +627,84 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
               {isInsideLink && parentLinkHref && (
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
                     window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
                   }}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                  className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                   title={language === 'zh' ? '打开链接' : 'Open link'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDownload(e);
                 }}
                 disabled={isDownloading}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                 title={language === 'zh' ? '下载图片' : 'Download image'}
               >
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(prev => Math.min(5, prev + 0.5));
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '放大' : 'Zoom in'}
               >
                 +
-              </button>
+              </Button>
               <span className="text-white/60 text-xs min-w-[3rem] text-center">
                 {Math.round(zoomScale * 100)}%
               </span>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(prev => Math.max(0.5, prev - 0.5));
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '缩小' : 'Zoom out'}
               >
                 −
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setZoomScale(1);
                   setZoomPos({ x: 0, y: 0 });
                 }}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
                 title={language === 'zh' ? '重置' : 'Reset'}
               >
                 1:1
-              </button>
-              <button
-                className="p-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeZoom();
@@ -690,7 +714,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -813,27 +837,27 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
     h1: ({ children }) => {
       const id = getHeadingId(children);
-      return <h1 id={id} className="text-lg font-bold text-gray-900 dark:text-text-primary mt-4 mb-2">{children}</h1>;
+      return <h1 id={id} className="text-lg font-bold text-foreground dark:text-foreground mt-4 mb-2">{children}</h1>;
     },
     h2: ({ children }) => {
       const id = getHeadingId(children);
-      return <h2 id={id} className="text-base font-semibold text-gray-900 dark:text-gray-200 mt-3 mb-2">{children}</h2>;
+      return <h2 id={id} className="text-base font-semibold text-foreground dark:text-gray-200 mt-3 mb-2">{children}</h2>;
     },
     h3: ({ children }) => {
       const id = getHeadingId(children);
-      return <h3 id={id} className="text-sm font-medium text-gray-900 dark:text-text-secondary mt-2 mb-1">{children}</h3>;
+      return <h3 id={id} className="text-sm font-medium text-foreground dark:text-muted-foreground mt-2 mb-1">{children}</h3>;
     },
     h4: ({ children }) => {
       const id = getHeadingId(children);
-      return <h4 id={id} className="text-sm font-medium text-gray-900 dark:text-text-secondary mt-2 mb-1">{children}</h4>;
+      return <h4 id={id} className="text-sm font-medium text-foreground dark:text-muted-foreground mt-2 mb-1">{children}</h4>;
     },
     h5: ({ children }) => {
       const id = getHeadingId(children);
-      return <h5 id={id} className="text-sm font-medium text-gray-500 dark:text-text-tertiary mt-1 mb-1">{children}</h5>;
+      return <h5 id={id} className="text-sm font-medium text-muted-foreground dark:text-muted-foreground mt-1 mb-1">{children}</h5>;
     },
     h6: ({ children }) => {
       const id = getHeadingId(children);
-      return <h6 id={id} className="text-sm font-medium text-gray-500 dark:text-text-tertiary mt-1 mb-1">{children}</h6>;
+      return <h6 id={id} className="text-sm font-medium text-muted-foreground dark:text-muted-foreground mt-1 mb-1">{children}</h6>;
     },
     p: ({ children }) => {
       const childArray = React.Children.toArray(children);
@@ -849,7 +873,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       );
 
       return (
-        <p className={`text-gray-900 dark:text-text-secondary mb-2 leading-relaxed ${
+        <p className={`text-foreground dark:text-muted-foreground mb-2 leading-relaxed ${
           hasImagesOnly
             ? 'flex flex-wrap items-center justify-center gap-3'
             : ''
@@ -858,21 +882,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
         </p>
       );
     },
-    ul: ({ children }) => <ul className="list-disc list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ul>,
-    ol: ({ children }) => <ol className="list-decimal list-inside text-gray-900 dark:text-text-secondary mb-2 space-y-1">{children}</ol>,
+    ul: ({ children }) => <ul className="list-disc list-inside text-foreground dark:text-muted-foreground mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-inside text-foreground dark:text-muted-foreground mb-2 space-y-1">{children}</ol>,
     li: ({ children, className, ...props }) => (
       <li className={`ml-2 ${className || ''}`} {...props}>
         {children}
       </li>
     ),
     strong: ({ children }) => (
-      <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+      <strong className="font-semibold text-foreground dark:text-gray-100">{children}</strong>
     ),
     em: ({ children }) => (
-      <em className="italic text-gray-900 dark:text-text-secondary">{children}</em>
+      <em className="italic text-foreground dark:text-muted-foreground">{children}</em>
     ),
     del: ({ children }) => (
-      <del className="line-through text-gray-500 dark:text-text-tertiary">{children}</del>
+      <del className="line-through text-muted-foreground dark:text-muted-foreground">{children}</del>
     ),
     code: ({ className, children, ...props }) => {
       // 检查 props 中是否有 'data-code-block' 标记（由 pre 组件添加）
@@ -882,7 +906,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       const language = match ? match[1] : '';
 
       return isInline ? (
-        <code className="px-1.5 py-0.5 bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-gray-200 rounded text-xs font-mono" {...props}>
+        <code className="px-1.5 py-0.5 bg-muted dark:bg-muted/40 text-foreground dark:text-gray-200 rounded text-xs font-mono" {...props}>
           {children}
         </code>
       ) : (
@@ -901,27 +925,27 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       return <pre>{children}</pre>;
     },
     blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-black/[0.06] dark:border-white/[0.04] pl-4 py-1 my-2 text-gray-700 dark:text-text-tertiary italic bg-light-bg dark:bg-panel-dark/50 rounded-r">
+      <blockquote className="border-l-4 border-border dark:border-border pl-4 py-1 my-2 text-muted-foreground dark:text-muted-foreground italic bg-background dark:bg-card/50 rounded-r">
         {children}
       </blockquote>
     ),
-    hr: () => <hr className="my-4 border-black/[0.06] dark:border-white/[0.04]" />,
+    hr: () => <hr className="my-4 border-border dark:border-border" />,
     table: ({ children }) => (
       <div className="overflow-x-auto my-3">
-        <table className="min-w-full border-collapse border border-black/[0.06] dark:border-white/[0.04] text-sm">
+        <table className="min-w-full border-collapse border border-border dark:border-border text-sm">
           {children}
         </table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-light-surface dark:bg-panel-dark">{children}</thead>,
-    tbody: ({ children }) => <tbody className="text-gray-900 dark:text-text-secondary">{children}</tbody>,
+    thead: ({ children }) => <thead className="bg-muted dark:bg-card">{children}</thead>,
+    tbody: ({ children }) => <tbody className="text-foreground dark:text-muted-foreground">{children}</tbody>,
     th: ({ children }) => (
-      <th className="border border-black/[0.06] dark:border-white/[0.04] px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-200">
+      <th className="border border-border dark:border-border px-3 py-2 text-left font-semibold text-foreground dark:text-gray-200">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="border border-black/[0.06] dark:border-white/[0.04] px-3 py-2 text-gray-900 dark:text-text-secondary">
+      <td className="border border-border dark:border-border px-3 py-2 text-foreground dark:text-muted-foreground">
         {children}
       </td>
     ),
@@ -931,16 +955,16 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
           <input
             {...props}
             readOnly
-            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-brand-violet focus:ring-brand-violet dark:border-white/[0.08] dark:bg-white/[0.04]"
+            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-ring dark:border-border dark:bg-muted/40"
           />
         );
       }
-      return <input {...props} />;
+      return <Input {...props} />;
     },
   }), [baseUrl, headingIds, getHeadingId]);
 
   if (!shouldRender) {
-    return <div className="h-32 flex items-center justify-center text-gray-400 dark:text-text-quaternary">Loading...</div>;
+    return <div className="h-32 flex items-center justify-center text-muted-foreground dark:text-muted-foreground/70">Loading...</div>;
   }
 
   return (

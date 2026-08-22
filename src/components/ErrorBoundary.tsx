@@ -1,3 +1,4 @@
+import { Button } from './ui/button';
 import React, { Component, ReactNode } from 'react';
 import { PROJECT_ISSUES_URL } from '../constants/project';
 import { logger } from '../services/logger';
@@ -83,32 +84,32 @@ export class ErrorBoundary extends Component<Props, State> {
       const { error, errorInfo, showDetails } = this.state;
 
       return (
-        <div className="min-h-screen bg-light-bg dark:bg-panel-dark flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white dark:bg-panel-dark rounded-lg shadow-lg p-6">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-card dark:bg-card rounded-lg shadow-lg p-6">
             <div className="text-center">
               <div className="text-5xl mb-4">😵</div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-text-primary mb-2">
+              <h1 className="text-xl font-bold text-foreground dark:text-foreground mb-2">
                 {strings.title}
               </h1>
-              <p className="text-gray-700 dark:text-text-tertiary mb-4">
+              <p className="text-muted-foreground dark:text-muted-foreground mb-4">
                 {strings.description}
               </p>
               
               {/* 错误信息显示 */}
               {error && (
-                <div className="mb-4 p-3 bg-gray-100 dark:bg-white/[0.04] rounded text-left">
+                <div className="mb-4 p-3 bg-muted dark:bg-muted/40 rounded text-left">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-text-secondary ">
+                    <span className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground ">
                       {strings.errorDetails}
                     </span>
-                    <button
+                    <Button
                       onClick={this.handleCopyError}
-                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary rounded hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
+                      className="text-xs px-2 py-1 bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground rounded hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent dark:bg-muted/40 transition-colors"
                     >
                       {strings.copyError}
-                    </button>
+                    </Button>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-text-secondary font-mono break-words">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground font-mono break-words">
                     {error?.message || error?.toString() || String(error)}
                   </p>
                 </div>
@@ -116,26 +117,28 @@ export class ErrorBoundary extends Component<Props, State> {
 
               {/* 详细信息折叠面板 */}
               <div className="mb-4">
-                <button
+                <Button
                   onClick={this.handleToggleDetails}
-                  className="text-sm text-brand-violet dark:text-brand-violet hover:text-gray-700 dark:text-text-secondary dark:hover:text-gray-700 dark:text-text-secondary underline"
+                  aria-expanded={showDetails}
+                  variant="ghost"
+                  className="text-sm text-primary dark:text-primary hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground dark:text-muted-foreground underline"
                 >
                   {strings.toggleDetails}
-                </button>
+                </Button>
                 {showDetails && errorInfo && (
-                  <div className="mt-2 p-3 bg-light-surface dark:bg-white/[0.04] rounded text-left overflow-auto max-h-64">
-                    <p className="text-xs font-semibold text-gray-900 dark:text-text-secondary mb-2">
+                  <div className="mt-2 p-3 bg-muted dark:bg-muted/40 rounded text-left overflow-auto max-h-64">
+                    <p className="text-xs font-semibold text-foreground dark:text-muted-foreground mb-2">
                       {strings.stackTrace}:
                     </p>
-                    <pre className="text-xs text-gray-700 dark:text-text-tertiary font-mono whitespace-pre-wrap">
+                    <pre className="text-xs text-muted-foreground dark:text-muted-foreground font-mono whitespace-pre-wrap">
                       {error?.stack || 'No stack trace available'}
                     </pre>
                     {errorInfo?.componentStack && (
                       <>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-text-secondary mt-3 mb-2">
+                        <p className="text-xs font-semibold text-foreground dark:text-muted-foreground mt-3 mb-2">
                           Component Stack:
                         </p>
-                        <pre className="text-xs text-gray-700 dark:text-text-tertiary font-mono whitespace-pre-wrap">
+                        <pre className="text-xs text-muted-foreground dark:text-muted-foreground font-mono whitespace-pre-wrap">
                           {errorInfo.componentStack}
                         </pre>
                       </>
@@ -146,22 +149,23 @@ export class ErrorBoundary extends Component<Props, State> {
 
               {/* 操作按钮 */}
               <div className="space-y-2">
-                <button
+                <Button
                   onClick={this.handleReload}
-                  className="w-full px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
+                  className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   {strings.reload}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={this.handleReportIssue}
-                  className="w-full px-4 py-2 bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  variant="ghost"
+                  className="w-full px-4 py-2 bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   {strings.reportIssue}
-                </button>
+                </Button>
               </div>
 
               {/* 浏览器提示 */}
-              <div className="mt-4 text-xs text-gray-500 dark:text-text-tertiary">
+              <div className="mt-4 text-xs text-muted-foreground dark:text-muted-foreground">
                 <p>{strings.browserHint}</p>
                 <p>Chrome 80+ / Firefox 75+ / Safari 13+ / Edge 80+</p>
               </div>

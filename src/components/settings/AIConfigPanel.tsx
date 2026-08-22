@@ -1,3 +1,9 @@
+import { Textarea } from '../ui/textarea';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Checkbox } from '../ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan } from '../../types';
@@ -407,73 +413,61 @@ Repository information:
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Bot className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <Bot className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('AI服务配置', 'AI Service Configuration')}
           </h3>
         </div>
-        <button
+        <Button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加AI配置', 'Add AI Config')}</span>
-        </button>
+        </Button>
       </div>
 
       {showForm && (
-        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
-          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
+        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
+          <h4 className="font-medium text-foreground dark:text-foreground mb-4">
             {editingId ? t('编辑AI配置', 'Edit AI Configuration') : t('添加AI配置', 'Add AI Configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="ai-config-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('配置名称', 'Configuration Name')} *
               </label>
-              <input
+              <Input
+                id="ai-config-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label id="ai-api-type-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('接口格式', 'API Format')} *
               </label>
-              <select
-                value={form.apiType}
-                onChange={(e) => setForm(prev => ({ ...prev, apiType: e.target.value as AIApiType }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
-              >
-                <option value="openai">OpenAI (Chat Completions)</option>
-                <option value="openai-responses">OpenAI (Responses)</option>
-                <option value="claude">Claude</option>
-                <option value="gemini">Gemini</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="mimo">Xiaomi MiMo</option>
-                <option value="openai-compatible">OpenAI Compatible (Custom Endpoint)</option>
-              </select>
+              <Select value={form.apiType} onValueChange={(value) => setForm(prev => ({ ...prev, apiType: value as AIApiType }))}>
+                <SelectTrigger aria-labelledby="ai-api-type-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="openai">OpenAI (Chat Completions)</SelectItem><SelectItem value="openai-responses">OpenAI (Responses)</SelectItem><SelectItem value="claude">Claude</SelectItem><SelectItem value="gemini">Gemini</SelectItem><SelectItem value="deepseek">DeepSeek</SelectItem><SelectItem value="mimo">Xiaomi MiMo</SelectItem><SelectItem value="openai-compatible">OpenAI Compatible (Custom Endpoint)</SelectItem></SelectContent>
+              </Select>
             </div>
 
             {form.apiType === 'mimo' && (
               <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+                <label id="ai-mimo-plan-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                   {t('MiMo 渠道', 'MiMo Channel')} *
                 </label>
-                <select
-                  value={form.mimoPlan}
-                  onChange={(e) => setForm(prev => ({ ...prev, mimoPlan: e.target.value as MiMoPlan }))}
-                  className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
-                >
-                  <option value="api">{t('API（按量付费）', 'API (Pay-as-you-go)')}</option>
-                  <option value="token-plan">{t('Token Plan（订阅制）', 'Token Plan (Subscription)')}</option>
-                </select>
-                <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+                <Select value={form.mimoPlan} onValueChange={(value) => setForm(prev => ({ ...prev, mimoPlan: value as MiMoPlan }))}>
+                  <SelectTrigger aria-labelledby="ai-mimo-plan-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="api">{t('API（按量付费）', 'API (Pay-as-you-go)')}</SelectItem><SelectItem value="token-plan">{t('Token Plan（订阅制）', 'Token Plan (Subscription)')}</SelectItem></SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                   {form.mimoPlan === 'api'
                     ? t('API Key 以 sk- 开头，端点 api.xiaomimimo.com', 'API Key starts with sk-, endpoint api.xiaomimimo.com')
                     : t('API Key 以 tp- 开头，端点 token-plan-cn.xiaomimimo.com', 'API Key starts with tp-, endpoint token-plan-cn.xiaomimimo.com')}
@@ -482,21 +476,22 @@ Repository information:
             )}
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="ai-base-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('API端点', 'API Endpoint')} *
               </label>
-              <input
+              <Input
+                id="ai-base-url"
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={getEndpointPlaceholder(form.apiType, form.mimoPlan)}
               />
-              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {getEndpointHelpText(form.apiType, t)}
               </p>
               {form.baseUrl && (
-                <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                   {t('最终请求地址: ', 'Final request URL: ')}
                   <span className="font-mono break-all">
                     {buildFinalApiUrl(form.baseUrl, form.apiType)}
@@ -506,64 +501,59 @@ Repository information:
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="ai-api-key" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('API密钥', 'API Key')} *
               </label>
-              <input
+              <Input
+                id="ai-api-key"
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('输入API密钥', 'Enter API key')}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="ai-model-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('模型名称', 'Model Name')} *
               </label>
-              <input
+              <Input
+                id="ai-model-name"
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder="gpt-4"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label id="ai-concurrency-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('并发数', 'Concurrency')}
               </label>
               <SliderInput
                 value={form.concurrency}
+                label={t('并发数', 'Concurrency')}
                 onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
                 min={1}
                 max={10}
                 showMarks={false}
               />
-              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label id="ai-reasoning-effort-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('推理强度', 'Reasoning Effort')}
               </label>
-              <select
-                value={form.reasoningEffort}
-                onChange={(e) => setForm(prev => ({ ...prev, reasoningEffort: e.target.value as '' | AIReasoningEffort }))}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
-              >
-                <option value="">{t('默认 / 不传', 'Default / Do not send')}</option>
-                <option value="none">{t('none — 不推理', 'none — No reasoning')}</option>
-                <option value="low">{t('low — 快速响应', 'low — Quick response')}</option>
-                <option value="medium">{t('medium — 均衡模式', 'medium — Balanced')}</option>
-                <option value="high">{t('high — 深度推理', 'high — Deep reasoning')}</option>
-                <option value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</option>
-              </select>
-              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+              <Select value={form.reasoningEffort || 'default'} onValueChange={(value) => setForm(prev => ({ ...prev, reasoningEffort: value === 'default' ? '' : value as AIReasoningEffort }))}>
+                <SelectTrigger aria-labelledby="ai-reasoning-effort-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="default">{t('默认 / 不传', 'Default / Do not send')}</SelectItem><SelectItem value="none">{t('none — 不推理', 'none — No reasoning')}</SelectItem><SelectItem value="low">{t('low — 快速响应', 'low — Quick response')}</SelectItem><SelectItem value="medium">{t('medium — 均衡模式', 'medium — Balanced')}</SelectItem><SelectItem value="high">{t('high — 深度推理', 'high — Deep reasoning')}</SelectItem><SelectItem value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</SelectItem></SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {t(
                   '仅对 OpenAI 兼容接口生效。留空时保持旧模式兼容，不额外传 reasoning。',
                   'Only applies to OpenAI-compatible APIs. Leave empty to preserve legacy behavior and omit reasoning.'
@@ -574,64 +564,65 @@ Repository information:
 
           <div className="mb-4">
             {notification && (
-              <div 
-                className={`mb-3 p-3 rounded-lg flex items-center space-x-2 ${
-                  notification.type === 'success' 
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary' 
+              <div
+                className={`mb-3 flex items-center space-x-2 rounded-lg p-3 ${
+                  notification.type === 'success'
+                    ? 'bg-status-green/10 text-status-green dark:bg-status-green/10'
                     : notification.type === 'error'
-                      ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
-                      : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
+                      ? 'bg-destructive/10 text-destructive dark:bg-destructive/10'
+                      : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
                 }`}
               >
-                {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
+                {notification.type === 'error' && <AlertCircle className="h-4 w-4" />}
                 <span className="text-sm">{notification.message}</span>
               </div>
             )}
-            
+
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="ai-use-custom-prompt"
                     checked={form.useCustomPrompt}
-                    onChange={(e) => handleUseCustomPromptChange(e.target.checked)}
-                    className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] rounded focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+                    onCheckedChange={(checked) => handleUseCustomPromptChange(checked === true)}
                   />
-                  <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                  <label htmlFor="ai-use-custom-prompt" className="text-sm font-medium text-foreground dark:text-muted-foreground">
                     {t('使用自定义提示词', 'Use Custom Prompt')}
-                  </span>
-                </label>
-                <button
+                  </label>
+                </div>
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleToggleDefaultPrompt}
                   disabled={showCustomPrompt}
                   className={`flex items-center space-x-1 text-sm ${
-                    showCustomPrompt 
-                      ? 'text-gray-400 dark:text-text-tertiarycursor-not-allowed' 
-                      : 'text-gray-700hover:text-gray-900 dark:text-text-tertiary dark:hover:text-gray-300'
+                    showCustomPrompt
+                      ? 'text-muted-foreground cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'
                   }`}
                 >
                   {showDefaultPrompt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   <span>{showDefaultPrompt ? t('隐藏默认提示词', 'Hide Default Prompt') : t('查看默认提示词', 'View Default Prompt')}</span>
-                </button>
+                </Button>
               </div>
               {form.useCustomPrompt && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleRestoreDefaultPrompt}
-                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-text-tertiary dark:hover:text-text-secondary"
+                  className="text-sm text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
                 >
                   {t('恢复默认提示词', 'Restore Default Prompt')}
-                </button>
+                </Button>
               )}
             </div>
             
             {showDefaultPrompt && !showCustomPrompt && (
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary mb-1">
+                <label className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('默认提示词（只读）', 'Default Prompt (Read-only)')}
                 </label>
-                <pre className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-light-bg dark:bg-panel-dark text-gray-900 dark:text-text-secondary font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                <pre className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-background dark:bg-card text-foreground dark:text-muted-foreground font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
                   {defaultPrompt}
                 </pre>
               </div>
@@ -640,28 +631,29 @@ Repository information:
             {showCustomPrompt && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-gray-500 dark:text-text-tertiary">
+                  <label htmlFor="ai-custom-prompt" className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                     {t('自定义提示词', 'Custom Prompt')}
                     {isCustomPromptModified && (
-                      <span className="ml-2 text-gray-700 dark:text-text-secondary ">
+                      <span className="ml-2 text-muted-foreground dark:text-muted-foreground ">
                         ({t('已修改', 'Modified')})
                       </span>
                     )}
                     {isCustomPromptSameAsDefault && (
-                      <span className="ml-2 text-gray-500 dark:text-text-tertiary">
+                      <span className="ml-2 text-muted-foreground dark:text-muted-foreground">
                         ({t('默认值', 'Default')})
                       </span>
                     )}
                   </label>
-                  <span className="text-xs text-gray-400 dark:text-text-quaternary">
+                  <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">
                     {form.customPrompt.length} {t('字符', 'characters')}
                   </span>
                 </div>
-                <textarea
+                <Textarea
+                  id="ai-custom-prompt"
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary font-mono text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
                 />
               </div>
@@ -669,17 +661,17 @@ Repository information:
           </div>
 
           <div className="flex space-x-3">
-            <button
+            <Button
               onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleTestForm}
               disabled={testingForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white dark:bg-brand-indigo dark:text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
+              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {testingForm ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -687,53 +679,54 @@ Repository information:
                 <TestTube className="w-4 h-4" />
               )}
               <span>{t('测试连接', 'Test Connection')}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={resetForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-black/[0.06] dark:border-white/[0.04] transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('取消', 'Cancel')}</span>
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <div className="space-y-3">
+      <h4 id="active-ai-config-heading" className="mb-3 text-sm font-medium text-foreground">
+        {t('当前 AI 配置', 'Active AI configuration')}
+      </h4>
+      <RadioGroup aria-labelledby="active-ai-config-heading" value={activeAIConfig || ''} onValueChange={setActiveAIConfig} className="space-y-3">
         {aiConfigs.map(config => (
           <div
             key={config.id}
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeAIConfig
-                ? 'border-gray-300 bg-gray-50 dark:border-white/[0.12] dark:bg-white/[0.06]'
-                : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:hover:border-white/[0.08]'
+                ? 'border-border bg-accent/50 dark:border-border/[0.12] dark:bg-accent/60'
+                : 'border-border dark:border-border hover:border-border dark:hover:border-white/[0.08]'
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <input
-                  type="radio"
-                  name="activeAI"
-                  checked={config.id === activeAIConfig}
-                  onChange={() => setActiveAIConfig(config.id)}
-                  className="w-4 h-4 text-gray-700 dark:text-text-secondary bg-light-surface border-black/[0.06] focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
+                <RadioGroupItem
+                  value={config.id}
+                  id={`active-ai-${config.id}`}
+                  aria-label={config.name || t('AI配置', 'AI configuration')}
                 />
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
+                  <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
                     {config.name}
                     {config.useCustomPrompt && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
                         <MessageSquare className="w-3 h-3 mr-1" />
                         {t('自定义提示词', 'Custom Prompt')}
                       </span>
                     )}
                   </h4>
-                  <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                     {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
                   {(config.apiKeyStatus === 'decrypt_failed' || config.apiKeyStatus === 'empty') && (
-                    <p className="mt-1 text-sm text-gray-700 dark:text-text-secondary ">
+                    <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground ">
                       {t(
                         '存储的 API Key 无法解密或为空，请重新输入并保存该配置。',
                         'The stored API key could not be decrypted or is empty. Please re-enter and save this configuration.'
@@ -744,10 +737,11 @@ Repository information:
               </div>
               
               <div className="flex items-center space-x-2">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -755,15 +749,17 @@ Repository information:
                   ) : (
                     <TestTube className="w-4 h-4" />
                   )}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => handleEdit(config)}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={async () => {
                     const confirmed = await confirm(
                       t('确定要删除这个AI配置吗？', 'Delete AI Configuration?'),
@@ -778,24 +774,23 @@ Repository information:
                       }
                     }
                   }}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary hover:bg-gray-200 dark:hover:bg-white/[0.12] border border-transparent dark:border-white/[0.04] transition-colors"
+                  className="p-2 rounded-lg bg-muted text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         ))}
-        
+      </RadioGroup>
         {aiConfigs.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-text-tertiary">
+          <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('还没有配置AI服务', 'No AI services configured yet')}</p>
             <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>
           </div>
         )}
-      </div>
     </div>
   );
 };

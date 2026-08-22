@@ -35,7 +35,7 @@ jobs:
       run: npm run build
       # env:
       #   VITE_BASE_PATH: './'
-      
+
     - name: Verify and fix web build
       shell: bash
       run: |
@@ -226,8 +226,8 @@ jobs:
         packageJson.scripts = packageJson.scripts || {};
         
         // 确保构建脚本使用正确的基础路径
-        packageJson.scripts.build = 'vite build --base=./';
-        packageJson.scripts['build:electron'] = 'vite build --base=./ && electron-builder';
+        packageJson.scripts.build = 'vite build --base=./ && npm run check:bundle-size';
+        packageJson.scripts['build:electron'] = 'vite build --base=./ && npm run check:bundle-size && electron-builder';
         packageJson.scripts.dist = 'electron-builder --publish=never';
         
         // Ensure proper base path for Electron
@@ -237,7 +237,7 @@ jobs:
         };
         packageJson.scripts.electron = 'electron .';
         packageJson.scripts['electron-dev'] = 'NODE_ENV=development electron .';
-        packageJson.scripts.dist = 'electron-builder';
+        packageJson.scripts.dist = 'npm run check:bundle-size && electron-builder';
         
         packageJson.build = {
           appId: 'com.github-stars-manager.app',

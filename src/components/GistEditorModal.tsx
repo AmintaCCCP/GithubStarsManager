@@ -1,3 +1,7 @@
+import { Textarea } from './ui/textarea';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from './Modal';
@@ -121,71 +125,72 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
     >
       <div className="space-y-5">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-900 dark:text-text-primary">
+          <label htmlFor="gist-description" className="text-sm font-medium text-foreground dark:text-foreground">
             {t('描述', 'Description')}
           </label>
-          <input
+          <Input
+            id="gist-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-gray-900 outline-none transition-colors focus:border-brand-indigo dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-primary"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground outline-none transition-colors focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
             placeholder={t('这个 gist 是做什么的？', 'What is this gist for?')}
           />
         </div>
 
         {!gist && (
-          <label className="flex items-center gap-3 text-sm text-gray-700 dark:text-text-secondary">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={(event) => setIsPublic(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-indigo focus:ring-brand-indigo"
-            />
+          <label htmlFor="gist-public" className="flex items-center gap-3 text-sm text-muted-foreground dark:text-muted-foreground">
+            <Checkbox id="gist-public" aria-label={t('公开 Gist', 'Public gist')} checked={isPublic} onCheckedChange={(checked) => setIsPublic(checked === true)} />
             {t('公开 Gist', 'Public gist')}
           </label>
         )}
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-gray-900 dark:text-text-primary">{t('文件', 'Files')}</div>
+            <div className="text-sm font-medium text-foreground dark:text-foreground">{t('文件', 'Files')}</div>
             {hasDuplicateFilenames && (
               <div className="text-xs text-red-600 dark:text-red-300">
                 {t('文件名不能重复', 'Filenames must be unique')}
               </div>
             )}
-            <button
+            <Button
               type="button"
               onClick={() => setFiles(prev => [...prev, createEmptyFile()])}
-              className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
             >
               <Plus className="h-4 w-4" />
               {t('添加文件', 'Add file')}
-            </button>
+            </Button>
           </div>
 
           {visibleFiles.map((file, index) => (
-            <div key={file.id} className="space-y-2 rounded-lg border border-black/[0.06] bg-light-surface p-3 dark:border-white/[0.04] dark:bg-white/[0.03]">
+            <div key={file.id} className="space-y-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-card/[0.03]">
               <div className="flex items-center gap-2">
-                <input
+                <Input
+                  id={`gist-file-name-${file.id}`}
+                  aria-label={t(`文件名 ${index + 1}`, `Filename ${index + 1}`)}
                   value={file.filename}
                   onChange={(event) => updateFile(file.id, { filename: event.target.value })}
-                  className="min-w-0 flex-1 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-brand-indigo dark:border-white/[0.04] dark:bg-black/20 dark:text-text-primary"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
                   placeholder={`file-${index + 1}.txt`}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => removeFile(file.id)}
                   disabled={visibleFiles.length === 1}
-                  className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-text-tertiary dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
                   title={t('删除文件', 'Delete file')}
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
-              <textarea
+              <Textarea
+                id={`gist-file-content-${file.id}`}
+                aria-label={t(`文件内容 ${index + 1}`, `File content ${index + 1}`)}
                 value={file.content}
                 onChange={(event) => updateFile(file.id, { content: event.target.value })}
                 rows={8}
-                className="w-full resize-y rounded-lg border border-black/[0.06] bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none focus:border-brand-indigo dark:border-white/[0.04] dark:bg-black/20 dark:text-text-primary"
+                className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
                 placeholder={t('输入文件内容', 'Enter file content')}
               />
             </div>
@@ -193,21 +198,21 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
         </div>
 
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-black/[0.06] bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
           >
             {t('取消', 'Cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit || isSaving}
-            className="rounded-lg bg-brand-indigo px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? t('保存中...', 'Saving...') : t('保存', 'Save')}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

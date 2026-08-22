@@ -1,3 +1,7 @@
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
 import React, { useState, useEffect } from 'react';
 import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -20,6 +24,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isProxyToggling, setIsProxyToggling] = useState(false);
 
   // --- RPC Download state ---
   const [rpcForm, setRpcForm] = useState<RpcDownloadConfig>(rpcDownloadConfig);
@@ -28,6 +33,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [rpcTesting, setRpcTesting] = useState(false);
   const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
   const [rpcSaving, setRpcSaving] = useState(false);
+  const [isRpcToggling, setIsRpcToggling] = useState(false);
 
   // Ensure backend is initialized, then return base URL
   const getRpcBaseUrl = async (): Promise<string> => {
@@ -158,6 +164,46 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   const hasChanges = JSON.stringify(form) !== JSON.stringify(proxyConfig);
 
+  const handleProxyToggle = async (enabled: boolean) => {
+    if (isProxyToggling) return;
+    const previousForm = form;
+    setIsProxyToggling(true);
+    const newForm = { ...form, enabled };
+    setForm(newForm);
+    setTestResult(null);
+
+    try {
+      if (isElectron()) {
+        await electronProxy.setProxy(newForm);
+      }
+
+      if (backend.isAvailable) {
+        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (backendApiSecret) {
+          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
+        }
+        const resp = await fetch('/api/settings/proxy', {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify(newForm),
+        });
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
+        }
+      }
+
+      setProxyConfig(newForm);
+    } catch (e) {
+      if (isElectron()) {
+        try { await electronProxy.setProxy(previousForm); } catch { /* best effort */ }
+      }
+      setForm(previousForm);
+      setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
+    } finally {
+      setIsProxyToggling(false);
+    }
+  };
+
   // --- RPC Download handlers ---
 
   const isRpcFormValid = !rpcForm.enabled || (rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
@@ -221,23 +267,45 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
   const rpcHasChanges = JSON.stringify(rpcForm) !== JSON.stringify(rpcDownloadConfig);
 
-  const handleRpcToggle = async () => {
-    const newForm = { ...rpcForm, enabled: !rpcForm.enabled };
+  const handleRpcToggle = async (enabled: boolean) => {
+    if (isRpcToggling) return;
+    const previousForm = rpcForm;
+    setIsRpcToggling(true);
+    const newForm = { ...rpcForm, enabled };
     setRpcForm(newForm);
-    setRpcDownloadConfig(newForm);
-    if (backend.isAvailable) {
-      try {
+    setRpcTestResult(null);
+
+    try {
+      if (backend.isAvailable) {
         const base = await getRpcBaseUrl();
         const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (backendApiSecret) {
           authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
         }
-        await fetch(`${base}/settings/rpc-download`, {
+        const body: Record<string, unknown> = {
+          enabled: newForm.enabled,
+          host: newForm.host,
+          port: newForm.port,
+        };
+        if (newForm.secret) {
+          body.secret = newForm.secret;
+        }
+        const resp = await fetch(`${base}/settings/rpc-download`, {
           method: 'PUT',
           headers: authHeaders,
-          body: JSON.stringify(newForm),
+          body: JSON.stringify(body),
         });
-      } catch { /* best effort */ }
+        if (!resp.ok) {
+          throw new Error(`Backend returned ${resp.status}`);
+        }
+      }
+
+      setRpcDownloadConfig(newForm);
+    } catch (e) {
+      setRpcForm(previousForm);
+      setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
+    } finally {
+      setIsRpcToggling(false);
     }
   };
 
@@ -245,155 +313,121 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     <div className="space-y-4">
       {/* Network Proxy Card — only available with backend or Electron */}
       {canUseProxy && (
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
-            <Wifi className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-            <h4 className="font-medium text-gray-900 dark:text-text-primary">
+            <Wifi className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
+            <h4 className="font-medium text-foreground dark:text-foreground">
               {t('网络代理', 'Network Proxy')}
             </h4>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.enabled}
+          <Switch
+            checked={form.enabled}
+            onCheckedChange={handleProxyToggle}
+            disabled={isProxyToggling}
             aria-label={t('启用网络代理', 'Enable network proxy')}
-            onClick={async () => {
-              const newForm = { ...form, enabled: !form.enabled };
-              setForm(newForm);
-              setProxyConfig(newForm);
-              if (backend.isAvailable) {
-                try {
-                  const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-                  if (backendApiSecret) {
-                    authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-                  }
-                  await fetch('/api/settings/proxy', {
-                    method: 'PUT',
-                    headers: authHeaders,
-                    body: JSON.stringify(newForm),
-                  });
-                } catch { /* best effort */ }
-              }
-              if (isElectron()) {
-                try { await electronProxy.setProxy(newForm); } catch { /* best effort */ }
-              }
-            }}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.enabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-            />
-          </button>
+            className="shrink-0"
+          />
         </div>
 
         {form.enabled && (
           <div className="space-y-4">
             {/* Proxy Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
+              <label id="proxy-type-label" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                 {t('代理类型', 'Proxy Type')}
               </label>
-              <div className="grid grid-cols-2 gap-3 max-w-md">
+              <RadioGroup aria-labelledby="proxy-type-label" value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ProxyType })} className="grid max-w-md grid-cols-2 gap-3">
                 {(['http', 'socks5'] as ProxyType[]).map((type) => (
-                  <label
-                    key={type}
-                    className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg border transition-colors ${
-                      form.type === type
-                        ? 'border-brand-indigo bg-brand-indigo/5 dark:bg-brand-indigo/10'
-                        : 'border-black/[0.06] dark:border-white/[0.04] hover:bg-light-bg dark:hover:bg-white/10'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="proxyType"
-                      value={type}
-                      checked={form.type === type}
-                      onChange={() => setForm({ ...form, type })}
-                      className="w-4 h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-white/[0.04] dark:border-white/[0.04]"
-                    />
-                    <span className="text-sm font-medium text-gray-900 dark:text-text-primary uppercase">
-                      {type}
-                    </span>
+                  <label key={type} onClick={() => setForm({ ...form, type })} className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors ${form.type === type ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border hover:bg-background dark:border-border dark:hover:bg-accent'}`}>
+                    <RadioGroupItem value={type} id={`proxy-type-${type}`} aria-label={type.toUpperCase()} />
+                    <span className="text-sm font-medium uppercase text-foreground dark:text-foreground">{type}</span>
                   </label>
                 ))}
-              </div>
+              </RadioGroup>
             </div>
 
             {/* Host and Port */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                <label htmlFor="proxy-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('主机地址', 'Host')}
                 </label>
-                <input
+                <Input
+                  id="proxy-host"
                   type="text"
                   value={form.host}
                   onChange={(e) => setForm({ ...form, host: e.target.value })}
                   placeholder="127.0.0.1"
-                  className="w-full px-3 py-2 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                <label htmlFor="proxy-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
-                <input
+                <Input
+                  id="proxy-port"
                   type="number"
                   value={form.port || ''}
                   onChange={(e) => setForm({ ...form, port: parseInt(e.target.value) || 0 })}
                   placeholder="7890"
                   min={1}
                   max={65535}
-                  className="w-full px-3 py-2 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
               </div>
             </div>
 
             {/* Authentication (collapsible) */}
             <div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setShowAuth(!showAuth)}
-                className="text-sm text-gray-500 dark:text-text-tertiary hover:text-gray-700 dark:hover:text-text-secondary transition-colors"
+                className="h-auto p-0 text-sm text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
               >
                 {showAuth ? t('隐藏认证', 'Hide Authentication') : t('需要认证（可选）', 'Authentication (optional)')}
-              </button>
+              </Button>
 
               {showAuth && (
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                    <label htmlFor="proxy-username" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                       {t('用户名', 'Username')}
                     </label>
-                    <input
+                    <Input
+                      id="proxy-username"
                       type="text"
                       value={form.username || ''}
                       onChange={(e) => setForm({ ...form, username: e.target.value || undefined })}
                       placeholder={t('可选', 'Optional')}
-                      className="w-full px-3 py-2 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                      className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                    <label htmlFor="proxy-password" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                       {t('密码', 'Password')}
                     </label>
                     <div className="relative">
-                      <input
+                      <Input
+                        id="proxy-password"
                         type={showPassword ? 'text' : 'password'}
                         value={form.password || ''}
                         onChange={(e) => setForm({ ...form, password: e.target.value || undefined })}
                         placeholder={t('可选', 'Optional')}
-                        className="w-full px-3 py-2 pr-10 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                        className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-text-secondary"
+                        className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -402,10 +436,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
             {/* Actions */}
             <div className="flex items-center space-x-3 pt-2">
-              <button
+              <Button
                 onClick={handleTest}
                 disabled={testing || !form.host || !form.port}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {testing ? (
                   <span className="flex items-center space-x-2">
@@ -415,12 +449,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 ) : (
                   t('测试连接', 'Test Connection')
                 )}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleSave}
                 disabled={saving || !hasChanges || !isFormValid}
-                className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? (
                   <span className="flex items-center space-x-2">
@@ -430,7 +464,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 ) : (
                   t('保存', 'Save')
                 )}
-              </button>
+              </Button>
             </div>
 
             {/* Test Result */}
@@ -458,26 +492,21 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
       )}
 
       {/* RPC Download Card */}
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04]">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
-            <Download className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-            <h4 className="font-medium text-gray-900 dark:text-text-primary">
+            <Download className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
+            <h4 className="font-medium text-foreground dark:text-foreground">
               {t('远程下载', 'Remote Download')}
             </h4>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={rpcForm.enabled}
+          <Switch
+            checked={rpcForm.enabled}
+            onCheckedChange={(enabled) => void handleRpcToggle(enabled)}
+            disabled={isRpcToggling}
             aria-label={t('启用远程下载', 'Enable remote download')}
-            onClick={handleRpcToggle}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${rpcForm.enabled ? 'bg-brand-indigo' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${rpcForm.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-            />
-          </button>
+            className="shrink-0"
+          />
         </div>
 
         {rpcForm.enabled && (
@@ -485,40 +514,43 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {/* Host and Port */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                <label htmlFor="rpc-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('主机地址', 'Host')}
                 </label>
-                <input
+                <Input
+                  id="rpc-host"
                   type="text"
                   value={rpcForm.host}
                   onChange={(e) => setRpcForm({ ...rpcForm, host: e.target.value })}
                   placeholder="127.0.0.1"
-                  className="w-full px-3 py-2 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+                <label htmlFor="rpc-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
-                <input
+                <Input
+                  id="rpc-port"
                   type="number"
                   value={rpcForm.port || ''}
                   onChange={(e) => setRpcForm({ ...rpcForm, port: parseInt(e.target.value) || 0 })}
                   placeholder="6800"
                   min={1}
                   max={65535}
-                  className="w-full px-3 py-2 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
               </div>
             </div>
 
             {/* Secret */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">
+              <label htmlFor="rpc-secret" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                 {t('密钥', 'Secret')}
               </label>
               <div className="relative">
-                <input
+                <Input
+                  id="rpc-secret"
                   type={showSecret ? 'text' : 'password'}
                   value={rpcForm.secret || ''}
                   onChange={(e) => {
@@ -528,21 +560,23 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   placeholder={hasStoredSecret
                     ? t('已保存密钥，留空则保留', 'Secret saved, leave blank to keep')
                     : t('可选，对应 aria2 的 --rpc-secret', 'Optional, aria2 --rpc-secret')}
-                  className="w-full px-3 py-2 pr-10 bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg text-gray-900 dark:text-text-primary text-sm focus:ring-2 focus:ring-brand-violet focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   aria-label={showSecret ? t('隐藏密钥', 'Hide secret') : t('显示密钥', 'Show secret')}
                   onClick={() => setShowSecret(!showSecret)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-text-secondary"
+                  className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                 >
                   {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                </Button>
               </div>
             </div>
 
             {/* Hint */}
-            <p className="text-xs text-gray-500 dark:text-text-tertiary">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t(
                 '需要运行 aria2 并启用 RPC（aria2c --enable-rpc --rpc-listen-port=6800）',
                 'Requires aria2 with RPC enabled (aria2c --enable-rpc --rpc-listen-port=6800)'
@@ -551,10 +585,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
             {/* Actions */}
             <div className="flex items-center space-x-3 pt-2">
-              <button
+              <Button
                 onClick={handleRpcTest}
                 disabled={rpcTesting || !rpcForm.host || !rpcForm.port}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {rpcTesting ? (
                   <span className="flex items-center space-x-2">
@@ -564,12 +598,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 ) : (
                   t('测试连接', 'Test Connection')
                 )}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleRpcSave}
                 disabled={rpcSaving || !rpcHasChanges || !isRpcFormValid}
-                className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {rpcSaving ? (
                   <span className="flex items-center space-x-2">
@@ -579,7 +613,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 ) : (
                   t('保存', 'Save')
                 )}
-              </button>
+              </Button>
             </div>
 
             {/* Test Result */}

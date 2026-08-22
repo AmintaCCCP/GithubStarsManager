@@ -1,3 +1,4 @@
+import { Button } from './ui/button';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   RefreshCw,
@@ -29,6 +30,9 @@ import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
 import { useDialog } from '../hooks/useDialog';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import type {
   DiscoveryChannelId,
   DiscoveryChannelIcon,
@@ -42,38 +46,38 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  rocket: <Rocket className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  star: <Crown className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  tag: <Tag className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  search: <Search className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  trending: <TrendingUp className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  rocket: <Rocket className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  star: <Crown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  tag: <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  search: <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
 };
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
   trending: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <TrendingUp className="w-9 h-9 text-gray-700 dark:text-white" />,
+    largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   rocket: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Rocket className="w-9 h-9 text-gray-700 dark:text-white" />,
+    largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   star: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Crown className="w-9 h-9 text-gray-700 dark:text-white" />,
+    largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   tag: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Tag className="w-9 h-9 text-gray-700 dark:text-white" />,
+    largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   search: {
     gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
     shadow: 'shadow-black/[0.08]',
-    largeIcon: <Search className="w-9 h-9 text-gray-700 dark:text-white" />,
+    largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
 };
 
@@ -168,7 +172,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 
   return (
     <div 
-      className="relative w-full border-b border-black/[0.06] dark:border-white/[0.04] bg-light-bg95 dark:bg-panel-dark/95 backdrop-blur-sm lg:hidden"
+      className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm lg:hidden"
     >
       <div
         ref={scrollContainerRef}
@@ -182,21 +186,26 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
         }}
       >
         {channels.map((channel) => (
-          <button
+          <Button
             key={channel.id}
             ref={(el) => {
-              if (el) tabRefs.current.set(channel.id, el);
+              if (el) {
+                tabRefs.current.set(channel.id, el);
+              } else {
+                tabRefs.current.delete(channel.id);
+              }
             }}
             onClick={() => onChannelSelect(channel.id)}
+            variant="ghost"
             role="tab"
             aria-selected={selectedChannel === channel.id}
             className={`
               relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
               transition-all duration-200 ease-out
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet focus-visible:ring-offset-2
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
               ${selectedChannel === channel.id
-                ? 'text-gray-700 dark:text-text-secondary '
-                : 'text-gray-700 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-gray-200 hover:bg-light-surface dark:hover:bg-white/10'
+                ? 'text-foreground dark:text-foreground '
+                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
               }
             `}
           >
@@ -204,13 +213,13 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               {channel.icon}
               {language === 'zh' ? channel.name : channel.nameEn}
             </span>
-          </button>
+          </Button>
         ))}
       </div>
       
       {/* Active indicator */}
       <div
-        className="absolute bottom-0 h-0.5 bg-brand-violet rounded-full transition-transform duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
         style={{
           width: indicatorStyle.width,
           transform: `translateX(${indicatorStyle.translateX}px)`,
@@ -227,9 +236,6 @@ interface PlatformFilterProps {
 }
 
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const platforms: { id: DiscoveryPlatform; name: string; nameEn: string; icon: React.ReactNode }[] = [
     { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="w-4 h-4" /> },
     { id: 'Android', name: 'Android', nameEn: 'Android', icon: <Smartphone className="w-4 h-4" /> },
@@ -238,52 +244,35 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
     { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <Terminal className="w-4 h-4" /> },
   ];
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const selectedPlatform = platforms.find(p => p.id === platform);
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-light-surface text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
-      >
-        <Filter className="w-4 h-4" />
-        <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
-          {platforms.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                onPlatformChange(p.id);
-                setIsOpen(false);
-              }}
-                className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                platform === p.id
-                  ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
-                  : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
-              }`}
-            >
-              {p.icon}
-              {language === 'zh' ? p.name : p.nameEn}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}
+          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        {platforms.map((p) => (
+          <DropdownMenuItem
+            key={p.id}
+            onSelect={() => onPlatformChange(p.id)}
+            className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
+          >
+            {p.icon}
+            <span>{language === 'zh' ? p.name : p.nameEn}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -308,57 +297,35 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   className = '',
   dropdownClassName = '',
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const selectedOption = options.find(o => o.value === value);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] text-gray-900 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors ${className}`}
-      >
-        {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
-        <span>{selectedOption?.label}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-              className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                value === option.value
-                  ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
-                  : 'text-gray-900 dark:text-text-secondary hover:bg-light-bg dark:hover:bg-white/10'
-              }`}
-            >
-              {option.icon && <span className="w-4 h-4">{option.icon}</span>}
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          aria-label={selectedOption?.label}
+          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
+        >
+          {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
+          <span>{selectedOption?.label}</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className={`w-48 ${dropdownClassName}`}>
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.value}
+            onSelect={() => onChange(option.value)}
+            className={value === option.value ? 'bg-accent text-accent-foreground' : ''}
+          >
+            {option.icon && <span className="h-4 w-4">{option.icon}</span>}
+            <span>{option.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -382,12 +349,12 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   if (!hasMore) {
     return (
       <div className="flex flex-col items-center gap-2 py-8">
-        <div className="flex items-center gap-2 text-gray-500 dark:text-text-tertiary">
-          <div className="w-8 h-px bg-gray-300 dark:bg-white/[0.04]" />
+        <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
+          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
           <span className="text-sm">{t('已加载全部', 'All loaded')}</span>
-          <div className="w-8 h-px bg-gray-300 dark:bg-white/[0.04]" />
+          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
         </div>
-        <span className="text-xs text-gray-400 dark:text-text-tertiary">
+        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
           {t(`共 ${totalCount} 个项目`, `Total ${totalCount} items`)}
         </span>
       </div>
@@ -396,23 +363,23 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
 
   return (
     <div className="flex flex-col items-stretch pt-2 pb-6">
-      <button
+      <Button
         onClick={onLoadMore}
         disabled={isLoading}
-        className="w-full py-3.5 rounded-xl font-medium bg-gray-100 dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/[0.06] text-gray-900 dark:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
+        className="w-full py-3.5 rounded-xl font-medium bg-muted dark:bg-muted/20 border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
       >
         {isLoading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-brand-violet" />
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
             <span>{t('加载中...', 'Loading...')}</span>
           </>
         ) : (
           <>
-            <RefreshCw className="w-4 h-4 text-gray-500 dark:text-text-tertiary" />
+            <RefreshCw className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             <span>{t('加载更多', 'Load More')}</span>
           </>
         )}
-      </button>
+      </Button>
     </div>
   );
 };
@@ -428,12 +395,12 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, languag
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-text-tertiary">
-      <div className="w-1.5 h-1.5 rounded-full bg-brand-violet" />
+    <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
+      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
       <span>
-        {t('共', 'Total')} <strong className="text-gray-900 dark:text-text-primary">{currentCount}</strong> {t('个项目', 'items')}
+        {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{currentCount}</strong> {t('个项目', 'items')}
         {totalCount > 0 && currentCount < totalCount && (
-          <span className="text-gray-400 dark:text-text-tertiary">
+          <span className="text-muted-foreground dark:text-muted-foreground">
             {' '}{t('（总计', '(total')} {totalCount} {t('个）', 'items)')}
           </span>
         )}
@@ -505,6 +472,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const discoveryScrollPositionsRef = useRef<Record<string, number>>({});
   // 用于记录最近一次自动拉取的频道，防止空频道无限循环拉取
   const autoFetchChannelRef = useRef<string | null>(null);
+  const appliedTopicRef = useRef<{ topic: string | null; platform: DiscoveryPlatform } | null>(null);
+  const topicRequestVersionRef = useRef(0);
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const isDesktopSafeMode = useMemo(() => {
@@ -537,6 +506,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
+    const topicRequestVersion = channelId === 'topic' ? ++topicRequestVersionRef.current : null;
+    const topicRequestSelection = channelId === 'topic'
+      ? { topic: discoverySelectedTopic, platform: discoveryPlatform }
+      : null;
+    const isCurrentTopicRequest = () => {
+      if (topicRequestVersion === null) return true;
+      const currentStore = useAppStore.getState();
+      return topicRequestVersionRef.current === topicRequestVersion
+        && currentStore.discoverySelectedTopic === topicRequestSelection?.topic
+        && currentStore.discoveryPlatform === topicRequestSelection?.platform;
+    };
+
     if (!githubToken) {
       toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
@@ -587,10 +568,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
 
+      if (!isCurrentTopicRequest()) return;
+
       const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
 
       const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
       const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
+      if (!isCurrentTopicRequest()) return;
       const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
         const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
         if (existingRepo && existingRepo.analyzed_at) {
@@ -642,6 +626,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
         });
       }
     } catch (error) {
+      if (!isCurrentTopicRequest()) return;
+      if (channelId === 'topic') {
+        appliedTopicRef.current = null;
+      }
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) {
         setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
@@ -651,7 +639,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     } finally {
       if (append) {
         setDiscoveryLoadingMore(channelId, false);
-      } else {
+      } else if (isCurrentTopicRequest()) {
         setDiscoveryLoading(channelId, false);
       }
     }
@@ -666,7 +654,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     // 取消持久化后，首次打开或切换到空频道时自动加载
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (!hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+    if (selectedDiscoveryChannel !== 'topic' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
       autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
@@ -681,10 +669,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   // 主题改变时刷新数据
   useEffect(() => {
-    if (selectedDiscoveryChannel === 'topic' && discoverySelectedTopic) {
-      refreshChannel('topic', 1, false);
-    }
-  }, [discoverySelectedTopic, selectedDiscoveryChannel, refreshChannel]);
+    if (selectedDiscoveryChannel !== 'topic' || !githubToken) return;
+    const applied = appliedTopicRef.current;
+    if (applied?.topic === discoverySelectedTopic && applied.platform === discoveryPlatform) return;
+    appliedTopicRef.current = { topic: discoverySelectedTopic, platform: discoveryPlatform };
+    refreshChannel('topic', 1, false);
+  }, [githubToken, discoverySelectedTopic, discoveryPlatform, selectedDiscoveryChannel, refreshChannel]);
 
   const formatLastRefresh = useCallback((timestamp: string | null) => {
     if (!timestamp) return '';
@@ -993,7 +983,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
-            className={`flex-shrink-0 transition-transform duration-300 ease-in-out z-10 ${
+            className={`flex-shrink-0 pr-2 transition-transform duration-300 ease-in-out z-10 ${
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
@@ -1005,33 +995,35 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     {currentChannelIconNode}
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-text-primary truncate leading-tight">
+                    <h2 className="text-base sm:text-lg font-bold text-foreground dark:text-foreground truncate leading-tight">
                       {language === 'zh'
                         ? currentChannel?.name
                         : currentChannel?.nameEn}
                     </h2>
                     {currentLastRefresh && (
-                      <p className="hidden sm:block text-[11px] text-gray-400 dark:text-text-tertiary">
+                      <p className="hidden sm:block text-[11px] text-muted-foreground dark:text-muted-foreground">
                         {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="relative group/refresh shrink-0">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
-                    className="linear-icon-button p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('刷新', 'Refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
-                  </button>
+                  </Button>
                   {selectedDiscoveryChannel === 'hot-release' && (
                     <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
-                      <div className="bg-gray-900 dark:bg-white/[0.04] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                      <div className="bg-gray-900 dark:bg-muted/40 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                         {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
                       </div>
-                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 dark:bg-white/[0.04] rotate-45" />
+                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 dark:bg-muted/40 rotate-45" />
                     </div>
                   )}
                 </div>
@@ -1041,34 +1033,32 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
-              <select
-                value={trendingTimeRange}
-                onChange={(e) => setTrendingTimeRange(e.target.value as TrendingTimeRange)}
-                className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
-              >
-                <option value="daily">{t('今日', 'Today')}</option>
-                <option value="weekly">{t('本周', 'This Week')}</option>
-                <option value="monthly">{t('本月', 'This Month')}</option>
-              </select>
+              <Calendar className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
+                <SelectTrigger aria-label={t('时间范围', 'Time range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">{t('今日', 'Today')}</SelectItem>
+                  <SelectItem value="weekly">{t('本周', 'This Week')}</SelectItem>
+                  <SelectItem value="monthly">{t('本月', 'This Month')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
         {selectedDiscoveryChannel === 'topic' && (
-                  <select
-                    value={discoverySelectedTopic || ''}
-                    onChange={(e) => setDiscoverySelectedTopic(e.target.value as TopicCategory | null)}
-                    className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
-                  >
-                    <option value="">{t('主题', 'Topic')}</option>
-                    <option value="ai">{t('人工智能', 'AI')}</option>
-                    <option value="ml">{t('机器学习', 'ML')}</option>
-                    <option value="database">{t('数据库', 'DB')}</option>
-                    <option value="web">{t('Web开发', 'Web')}</option>
-                    <option value="mobile">{t('移动开发', 'Mobile')}</option>
-                    <option value="devtools">{t('开发工具', 'DevTools')}</option>
-                    <option value="security">{t('安全', 'Security')}</option>
-                    <option value="game">{t('游戏', 'Game')}</option>
-                  </select>
+                  <Select value={discoverySelectedTopic || 'all'} onValueChange={(value) => setDiscoverySelectedTopic(value === 'all' ? null : value as TopicCategory)}>
+                    <SelectTrigger aria-label={t('主题筛选', 'Topic filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('主题', 'Topic')}</SelectItem>
+                      <SelectItem value="ai">{t('人工智能', 'AI')}</SelectItem>
+                      <SelectItem value="ml">{t('机器学习', 'ML')}</SelectItem>
+                      <SelectItem value="database">{t('数据库', 'DB')}</SelectItem>
+                      <SelectItem value="web">{t('Web开发', 'Web')}</SelectItem>
+                      <SelectItem value="mobile">{t('移动开发', 'Mobile')}</SelectItem>
+                      <SelectItem value="devtools">{t('开发工具', 'DevTools')}</SelectItem>
+                      <SelectItem value="security">{t('安全', 'Security')}</SelectItem>
+                      <SelectItem value="game">{t('游戏', 'Game')}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <PlatformFilter 
@@ -1083,7 +1073,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   {isAnalyzingThisChannel ? (
                     <div className="flex items-center gap-1">
                       <div className="relative">
-                        <div className="px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary flex items-center gap-1.5 overflow-hidden">
+                        <div className="px-2 py-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground flex items-center gap-1.5 overflow-hidden">
                           <div 
                             className="absolute left-0 top-0 h-full bg-gradient-to-r from-purple-300/70 via-purple-400/70 to-purple-300/70 dark:from-purple-700/70 dark:via-purple-600/70 dark:to-purple-700/70 transition-all duration-400 ease-out"
                             style={{
@@ -1100,24 +1090,30 @@ export const DiscoveryView: React.FC = React.memo(() => {
                           </div>
                         </div>
                       </div>
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={handleAbortAnalysis}
-                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors"
+                        aria-label={t('停止分析', 'Stop analysis')}
                         title={t('停止', 'Stop')}
+                        className="h-8 w-8"
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <button
+                    <Button
+                      type="button"
+                      variant="default"
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 shrink-0 gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       title={t('AI分析', 'Analyze with AI')}
                     >
                       <Bot className="w-4 h-4" />
                       <span className="hidden sm:inline">{t('AI分析', 'AI Analyze')}</span>
-                    </button>
+                    </Button>
                   )}
                   <DataStats
                     currentCount={allRepos.length}
@@ -1132,7 +1128,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           {/* 内容区域 */}
           <div 
             ref={scrollContainerRef}
-            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-white dark:bg-panel-dark' : ''}`}
+            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-card dark:bg-card' : ''}`}
           >
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode
@@ -1140,49 +1136,46 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 : 'ui-toolbar p-5 space-y-4'}>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-tertiary" />
-                    <input
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                    <Input
                       type="text"
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       placeholder={t('搜索仓库...', 'Search repositories...')}
-                      className="ui-field w-full pl-10 pr-4 py-2.5 text-gray-900 dark:text-text-primary" />
+                      className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
                   </div>
-                  <button
+                  <Button
                     onClick={handleSearch}
                     disabled={!searchInput.trim() || currentIsLoading}
-                    className={isDesktopSafeMode
-                      ? 'ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium'
-                      : 'ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium'}
+                    className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
-                  </button>
+                  </Button>
                 </div>
                 
                 <div className="flex flex-wrap gap-2.5">
-                  <select
-                    value={discoveryLanguage}
-                    onChange={(e) => setDiscoveryLanguage(e.target.value as ProgrammingLanguage)}
-                    className="ui-field px-3 py-1.5 text-sm font-medium text-gray-900 dark:text-text-primary"
-                  >
-                    <option value="All">{t('所有语言', 'All Languages')}</option>
-                    <option value="JavaScript">JavaScript</option>
-                    <option value="TypeScript">TypeScript</option>
-                    <option value="Python">Python</option>
-                    <option value="Java">Java</option>
-                    <option value="Kotlin">Kotlin</option>
-                    <option value="Go">Go</option>
-                    <option value="Rust">Rust</option>
-                    <option value="CSharp">C#</option>
-                    <option value="CPlusPlus">C++</option>
-                    <option value="C">C</option>
-                    <option value="Swift">Swift</option>
-                    <option value="Dart">Dart</option>
-                    <option value="Ruby">Ruby</option>
-                    <option value="PHP">PHP</option>
-                  </select>
+                  <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
+                    <SelectTrigger aria-label={t('编程语言', 'Programming language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">{t('所有语言', 'All Languages')}</SelectItem>
+                      <SelectItem value="JavaScript">JavaScript</SelectItem>
+                      <SelectItem value="TypeScript">TypeScript</SelectItem>
+                      <SelectItem value="Python">Python</SelectItem>
+                      <SelectItem value="Java">Java</SelectItem>
+                      <SelectItem value="Kotlin">Kotlin</SelectItem>
+                      <SelectItem value="Go">Go</SelectItem>
+                      <SelectItem value="Rust">Rust</SelectItem>
+                      <SelectItem value="CSharp">C#</SelectItem>
+                      <SelectItem value="CPlusPlus">C++</SelectItem>
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="Swift">Swift</SelectItem>
+                      <SelectItem value="Dart">Dart</SelectItem>
+                      <SelectItem value="Ruby">Ruby</SelectItem>
+                      <SelectItem value="PHP">PHP</SelectItem>
+                    </SelectContent>
+                  </Select>
                   
                   <CustomSelect
                     value={discoverySortBy}
@@ -1210,15 +1203,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <div className="flex flex-col items-center justify-center py-16 gap-4">
                 <div className="relative">
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-                    <Loader2 className="w-7 h-7 animate-spin text-brand-violet" />
+                    <Loader2 className="w-7 h-7 animate-spin text-primary" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-emerald0 rounded-full animate-ping opacity-75" />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-green rounded-full animate-ping opacity-75" />
                 </div>
                 <div className="text-center space-y-1.5">
-                  <p className="text-gray-900 dark:text-text-secondary font-medium text-sm">
+                  <p className="text-foreground dark:text-muted-foreground font-medium text-sm">
                     {t('正在获取数据...', 'Fetching data...')}
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-text-tertiary">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     {t('GitHub API 响应中', 'Waiting for GitHub API response')}
                   </p>
                 </div>
@@ -1230,7 +1223,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 {selectedDiscoveryChannel === 'search' ? (
                   <>
                     {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-light-surface dark:bg-panel-dark flex items-center justify-center text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]">
+                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
                         {currentChannelIconNode}
                       </div>
                     ) : (
@@ -1239,10 +1232,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       </div>
                     )}
                     <div className="space-y-2 max-w-xs">
-                      <p className="text-gray-700 dark:text-text-tertiary font-medium text-base">
+                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
                         {t('搜索发现', 'Search & Discover')}
                       </p>
-                      <p className="text-sm text-gray-400 dark:text-text-tertiaryleading-relaxed">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
                       </p>
                     </div>
@@ -1250,7 +1243,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 ) : (
                   <>
                     {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-light-surface dark:bg-panel-dark flex items-center justify-center text-gray-700 dark:text-text-secondary border border-black/[0.06] dark:border-white/[0.04]">
+                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
                         {currentChannelIconNode}
                       </div>
                     ) : (
@@ -1259,23 +1252,24 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       </div>
                     )}
                     <div className="space-y-2 max-w-xs">
-                      <p className="text-gray-700 dark:text-text-tertiary font-medium text-base">
+                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
                         {t('暂无数据', 'No data yet')}
                       </p>
-                      <p className="text-sm text-gray-400 dark:text-text-tertiaryleading-relaxed">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="default"
                       onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                       disabled={currentIsLoading}
                       className={isDesktopSafeMode
-                        ? 'px-6 py-2.5 rounded-lg bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04] dark:bg-status-emerald/80 dark:hover:bg-status-emerald transition-colors flex items-center gap-2 text-sm font-medium'
-                        : 'px-6 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium'}
+                        ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
+                        : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                     >
                       <RefreshCw className="w-4 h-4" />
                       {t('立即刷新', 'Refresh Now')}
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -1293,41 +1287,41 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {currentIsLoadingMore && (
               <div className="flex items-center justify-center py-6 gap-3">
-                <Loader2 className="w-5 h-5 animate-spin text-brand-violet" />
-                <span className="text-sm text-gray-500 dark:text-text-tertiary">{t('正在加载更多...', 'Loading more...')}</span>
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载更多...', 'Loading more...')}</span>
               </div>
             )}
 
             {currentLoadMoreError && (
               <div className="flex flex-col items-center gap-3 py-4">
-                <div className="flex items-center gap-2 text-gray-700 dark:text-text-secondary ">
+                <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground ">
                   <X className="w-4 h-4" />
                   <span className="text-sm">{currentLoadMoreError}</span>
                 </div>
-                <button
+                <Button
                   onClick={() => {
                     const nextPage = discoveryNextPage[selectedDiscoveryChannel];
                     if (nextPage) {
                       refreshChannel(selectedDiscoveryChannel, nextPage, true);
                     }
                   }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   {t('重试', 'Retry')}
-                </button>
+                </Button>
               </div>
             )}
 
             {/* Page Info */}
             {!currentIsLoading && allRepos.length > 0 && (
               <div className={isDesktopSafeMode
-                ? 'flex items-center justify-between py-3.5 px-5 bg-light-bg dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] text-sm'
-                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-black/[0.04] dark:border-white/[0.04]/50 text-sm'}>
-                <div className="flex items-center gap-2 text-gray-700 dark:text-text-tertiary">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-violet" />
+                ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
+                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-black/[0.04] dark:border-border/50 text-sm'}>
+                <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>
-                    {t('共', 'Total')} <strong className="text-gray-900 dark:text-text-primary">{allRepos.length}</strong> {t('个项目', 'items')}
+                    {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('个项目', 'items')}
                   </span>
                 </div>
 

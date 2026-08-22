@@ -7,8 +7,10 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { GitHubApiService } from '../services/githubApi';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
-import { FloatingTooltip } from './FloatingTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useDialog } from '../hooks/useDialog';
+import { Button } from './ui/button';
 
 interface SubscriptionRepoCardProps {
   repo: DiscoveryRepo;
@@ -40,51 +42,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 取消Star确认对话框状态
   const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
   const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
-  const [descTooltip, setDescTooltip] = useState(false);
-  const [aiTooltip, setAiTooltip] = useState(false);
-  const descTriggerRef = useRef<HTMLDivElement>(null);
-  const aiTriggerRef = useRef<HTMLDivElement>(null);
-  const descHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aiHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const scheduleHideDesc = useCallback(() => {
-    if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-    descHideTimerRef.current = setTimeout(() => setDescTooltip(false), 150);
-  }, []);
-
-  const cancelHideDesc = useCallback(() => {
-    if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-  }, []);
-
-  const scheduleHideAi = useCallback(() => {
-    if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
-    aiHideTimerRef.current = setTimeout(() => setAiTooltip(false), 150);
-  }, []);
-
-  const cancelHideAi = useCallback(() => {
-    if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
-  }, []);
-
-  const hideFloatingTooltips = useCallback(() => {
-    if (descHideTimerRef.current) {
-      clearTimeout(descHideTimerRef.current);
-      descHideTimerRef.current = null;
-    }
-    if (aiHideTimerRef.current) {
-      clearTimeout(aiHideTimerRef.current);
-      aiHideTimerRef.current = null;
-    }
-    setDescTooltip(false);
-    setAiTooltip(false);
-  }, []);
-
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
-      if (descHideTimerRef.current) clearTimeout(descHideTimerRef.current);
-      if (aiHideTimerRef.current) clearTimeout(aiHideTimerRef.current);
     };
   }, []);
   
@@ -115,7 +77,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   };
 
   const rankBadgeClass = useMemo(() => {
-    return 'bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary';
+    return 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground';
   }, []);
 
   const platformIconMap = useMemo(() => ({
@@ -327,9 +289,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   // 点击卡片打开 README
   const handleCardClick = useCallback(() => {
-    hideFloatingTooltips();
     setReadmeModalOpen(true);
-  }, [hideFloatingTooltips]);
+  }, []);
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
 
@@ -337,10 +298,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <>
     <div 
       onClick={handleCardClick}
-      className={`bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] p-5 transition-all duration-200 ${
+      className={`bg-card border border-border p-5 transition-all duration-200 ${
         desktopSafeMode
-          ? 'rounded-lg hover:shadow-md hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
-          : 'rounded-xl hover:shadow-lg hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-black/[0.06] dark:border-white/[0.04] hover:-translate-y-0.5 cursor-pointer'
+          ? 'rounded-lg hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
+          : 'rounded-xl hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
       }`}
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
@@ -365,7 +326,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   className="w-6 h-6 rounded-full flex-shrink-0"
                 />
               )}
-              <span className="font-semibold text-gray-900 dark:text-text-primary truncate">
+              <span className="font-semibold text-foreground dark:text-foreground truncate">
                 {cardTitle}
               </span>
             </div>
@@ -373,16 +334,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
             {/* Action buttons */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               {/* AI Analyze button */}
-              <button
+              <Button
+                size="icon"
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
-                className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isAnalyzed
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-                    : isFailed
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-                    : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-                }`}
+                className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
                 title={
                   isAnalyzed 
                     ? t('重新分析', 'Re-analyze') 
@@ -398,36 +354,39 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 ) : (
                   <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
-              </button>
+              </Button>
 
               {/* ZRead button - hidden on small screens */}
-              <button
+              <Button
+                size="icon"
                 onClick={handleOpenInZRead}
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                 title={t('在ZRead打开', 'Open in ZRead')}
               >
                 <BookOpen className="w-4 h-4" />
-              </button>
+              </Button>
 
               {/* GitHub button - hidden on small screens */}
               <a
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+                onClick={(event) => event.stopPropagation()}
+                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                 title={t('在GitHub打开', 'Open on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
               </a>
 
               {/* Star button */}
-              <button
+              <Button
+                size="icon"
                 onClick={handleStar}
                 disabled={!githubToken || isStarring}
                 className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
-                    ? 'bg-brand-indigo text-white shadow-sm dark:bg-brand-indigo/80 dark:text-white'
-                    : 'bg-light-surface text-gray-500 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-white/[0.08] hover:text-gray-700 dark:hover:text-text-secondary'
+                    ? 'bg-primary text-primary-foreground shadow-sm dark:bg-primary/80 dark:text-primary-foreground'
+                    : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground dark:hover:text-muted-foreground'
                 }`}
                 title={isStarred ? t('取消Star', 'Unstar') : t('添加Star', 'Add Star')}
               >
@@ -438,59 +397,65 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 ) : (
                   <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Description */}
           {repo.description && (
-            <div
-              ref={descTriggerRef}
-              className="relative mb-3"
-              onMouseEnter={() => { cancelHideDesc(); setDescTooltip(true); }}
-              onMouseLeave={scheduleHideDesc}
-              onFocus={() => { cancelHideDesc(); setDescTooltip(true); }}
-              onBlur={scheduleHideDesc}
-              onTouchStart={() => setDescTooltip((v) => !v)}
-              tabIndex={0}
-            >
-              <p className="text-sm text-gray-700 dark:text-text-tertiary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t('查看完整描述', 'View full description')}
+                      onClick={(event) => event.stopPropagation()}
+                      className="relative mb-3 block w-full cursor-text text-left"
+                    >
+                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                        {repo.description}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+                  {repo.description}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words" onClick={(event) => event.stopPropagation()}>
                 {repo.description}
-              </p>
-              <FloatingTooltip
-                content={repo.description}
-                visible={descTooltip}
-                triggerRef={descTriggerRef}
-                onMouseEnter={cancelHideDesc}
-                onMouseLeave={scheduleHideDesc}
-              />
-            </div>
+              </PopoverContent>
+            </Popover>
           )}
 
           {/* AI Summary */}
           {repo.ai_summary && (
-            <div
-              ref={aiTriggerRef}
-              className="relative flex items-start gap-1.5 mb-3"
-              onMouseEnter={() => { cancelHideAi(); setAiTooltip(true); }}
-              onMouseLeave={scheduleHideAi}
-              onFocus={() => { cancelHideAi(); setAiTooltip(true); }}
-              onBlur={scheduleHideAi}
-              onTouchStart={() => setAiTooltip((v) => !v)}
-              tabIndex={0}
-            >
-              <Bot className="w-4 h-4 text-gray-700 dark:text-text-secondary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-700 dark:text-text-secondary line-clamp-2 rounded px-1 -mx-1 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t('查看完整 AI 摘要', 'View full AI summary')}
+                      onClick={(event) => event.stopPropagation()}
+                      className="relative mb-3 flex w-full cursor-text items-start gap-1.5 text-left"
+                    >
+                      <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
+                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                        {repo.ai_summary}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+                  {repo.ai_summary}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words" onClick={(event) => event.stopPropagation()}>
                 {repo.ai_summary}
-              </p>
-              <FloatingTooltip
-                content={repo.ai_summary}
-                visible={aiTooltip}
-                triggerRef={aiTriggerRef}
-                onMouseEnter={cancelHideAi}
-                onMouseLeave={scheduleHideAi}
-              />
-            </div>
+              </PopoverContent>
+            </Popover>
           )}
 
           {/* Tags */}
@@ -499,7 +464,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20/30 "
+                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground dark:bg-primary/20"
                 >
                   {tag}
                 </span>
@@ -510,12 +475,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           {/* Platform icons */}
           {repo.ai_platforms && repo.ai_platforms.length > 0 && (
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-gray-400 dark:text-text-tertiary">
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                 {t('平台:', 'Platforms:')}
               </span>
               <div className="flex items-center gap-1">
                 {repo.ai_platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="text-gray-500 dark:text-text-tertiary" title={platform}>
+                  <span key={platform} className="text-muted-foreground dark:text-muted-foreground" title={platform}>
                     {getPlatformIcon(platform)}
                   </span>
                 ))}
@@ -524,7 +489,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-text-tertiary">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-muted-foreground">
             {repo.language && (
               <div className="flex items-center gap-1">
                 <div
@@ -558,35 +523,38 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       maxWidth="max-w-sm"
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-3 text-gray-700 dark:text-text-secondary ">
+        <div className="flex items-center gap-3 text-muted-foreground dark:text-muted-foreground ">
           <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <p className="text-sm text-gray-700 dark:text-text-tertiary">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             {language === 'zh' 
               ? `确定要取消 Star "${repo.full_name}" 吗？这将会从您的 GitHub 收藏中移除该仓库。`
               : `Are you sure you want to unstar "${repo.full_name}"? This will remove the repository from your GitHub stars.`}
           </p>
         </div>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={() => {
               setUnstarConfirmOpen(false);
               setPendingUnstarAction(null);
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 transition-colors"
+            variant="ghost"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
           >
             {t('取消', 'Cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
             onClick={() => {
               setUnstarConfirmOpen(false);
               if (pendingUnstarAction) {
                 pendingUnstarAction();
               }
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-white/[0.04] text-white hover:bg-gray-100 dark:bg-white/[0.04] transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium"
           >
             {t('确认取消', 'Confirm Unstar')}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

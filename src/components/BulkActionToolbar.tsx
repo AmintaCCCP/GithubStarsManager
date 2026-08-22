@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock, RotateCcw } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { Button } from './ui/button';
 
 interface BulkActionToolbarProps {
   selectedCount: number;
@@ -167,7 +168,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-panel-dark border-t border-black/[0.06] dark:border-white/[0.04] shadow-lg z-50 ${
+      className={`fixed bottom-0 left-0 right-0 bg-card dark:bg-card border-t border-border dark:border-border shadow-lg z-50 ${
         isClosing ? 'animate-slide-down' : 'animate-slide-up'
       } ${isShaking ? 'animate-shake' : ''}`}
       onClick={handleToolbarClick}
@@ -177,43 +178,49 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           {/* Selection Info */}
           <div className="flex items-center justify-between sm:justify-start space-x-2 sm:space-x-4">
             <div className="flex items-center space-x-2">
-              <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-text-primary">
+              <span className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground">
                 {t(`已选择 ${selectedCount} 个`, `Selected ${selectedCount}`)}
               </span>
             </div>
 
             {/* Quick Actions */}
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <button
+              <Button
+                variant="ghost"
                 onClick={onSelectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-gray-700 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('全选当前页面', 'Select all on page')}
               >
                 <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>{t('全选', 'Select All')}</span>
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={handleDeselectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-gray-700 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('取消选择所有', 'Deselect all')}
               >
                 <Square className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>{t('不全选', 'Deselect All')}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between sm:justify-start space-x-1 sm:space-x-2 overflow-x-auto pb-1 sm:pb-0 -mx-2 px-2 sm:mx-0 sm:px-0">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('取消 Star', 'Unstar selected repositories')}
               onClick={(e) => handleAction('unstar', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unstar'
-                  ? 'bg-status-red text-white hover:opacity-90'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-destructive text-destructive-foreground hover:opacity-90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unstar' ? (
@@ -221,15 +228,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <Star className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('分类', 'Categorize selected repositories')}
               onClick={(e) => handleAction('categorize', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'categorize'
-                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'categorize' ? (
@@ -237,15 +248,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('AI总结', 'Generate AI summaries')}
               onClick={(e) => handleAction('ai-summary', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'ai-summary'
-                  ? 'bg-status-red text-white hover:opacity-90'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'ai-summary' ? (
@@ -253,15 +268,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('订阅 Release', 'Subscribe to releases')}
               onClick={(e) => handleAction('subscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'subscribe'
-                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'subscribe' ? (
@@ -269,15 +288,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
               onClick={(e) => handleAction('unsubscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unsubscribe'
-                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unsubscribe' ? (
@@ -285,15 +308,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('锁定分类', 'Lock categories')}
               onClick={(e) => handleAction('lock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'lock-category'
-                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'lock-category' ? (
@@ -301,15 +328,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('解锁分类', 'Unlock categories')}
               onClick={(e) => handleAction('unlock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
-                  ? 'bg-gray-700 text-white hover:bg-gray-800'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isProcessing && showConfirm === 'unlock-category' ? (
@@ -317,15 +348,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <Unlock className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('批量还原', 'Bulk Restore')}
               onClick={(e) => handleAction('restore', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'restore'
-                  ? 'bg-brand-indigo text-white hover:bg-brand-hover'
-                  : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={t('批量还原', 'Bulk Restore')}
             >
@@ -334,18 +369,19 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               ) : (
                 <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
-            </button>
+            </Button>
 
-            <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2"></div>
+            <div className="hidden sm:block w-px h-6 bg-muted dark:bg-accent mx-2"></div>
 
-            <button
+            <Button
+              variant="ghost"
               onClick={handleClose}
               disabled={isProcessing}
-              className="flex-shrink-0 p-2 text-gray-500 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+              className="flex-shrink-0 p-2 text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
               title={t('关闭工具栏', 'Close toolbar')}
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -353,7 +389,9 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
       {/* 弱气泡提示 */}
       {tooltip && (
         <div
-          className="fixed z-[60] px-3 py-1.5 text-xs text-white bg-gray-800 dark:bg-white/[0.04] rounded-lg shadow-lg pointer-events-none animate-fade-in"
+          role="status"
+          aria-live="polite"
+          className="fixed z-[60] px-3 py-1.5 text-xs text-white bg-gray-800 dark:bg-muted/40 rounded-lg shadow-lg pointer-events-none animate-fade-in"
           style={{
             left: tooltip.x,
             top: tooltip.y,
@@ -361,7 +399,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           }}
         >
           {tooltip.message}
-          <div className="absolute left-1/2 -bottom-1 w-2 h-2 bg-gray-800 dark:bg-white/[0.04] transform -translate-x-1/2 rotate-45"></div>
+          <div className="absolute left-1/2 -bottom-1 w-2 h-2 bg-gray-800 dark:bg-muted/40 transform -translate-x-1/2 rotate-45"></div>
         </div>
       )}
     </div>

@@ -16,10 +16,8 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    // The app intentionally ships as a single-screen SPA with legacy browser support.
-    // Keep the warning threshold aligned with the current split chunks so Vite still
-    // reports genuinely outsized future bundles without flagging the expected entry.
-    chunkSizeWarningLimit: 2500,
+    // Warn before the 3,000 KiB hard budget enforced by check:bundle-size.
+    chunkSizeWarningLimit: 3072,
     rolldownOptions: {
       checks: {
         // The legacy plugin dominates production build time by design; this diagnostic

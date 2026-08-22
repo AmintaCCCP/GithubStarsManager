@@ -11,6 +11,7 @@ import {
   effectiveReleaseTime,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
+import { Button } from './ui/button';
 
 type SummaryState = {
   status: 'idle' | 'loading' | 'done' | 'error';
@@ -200,38 +201,38 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
             {isUnread && (
-              <div className="w-1.5 h-1.5 bg-brand-violet rounded-full flex-shrink-0 animate-pulse mr-2"></div>
+              <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
             )}
             <div className="linear-platform-icon flex items-center justify-center w-8 h-8 flex-shrink-0">
-              <GitBranch className="w-4 h-4 text-gray-500 dark:text-text-tertiary" />
+              <GitBranch className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1 ml-3">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                  <h4 className="font-semibold text-gray-900 dark:text-text-primary text-sm truncate">
+                  <h4 className="font-semibold text-foreground dark:text-foreground text-sm truncate">
                     {release.repository.name}
                   </h4>
                   <span className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0">
                     {release.tag_name}
                   </span>
                   {release.name && release.name !== release.tag_name && (
-                    <span className="text-xs text-gray-500 dark:text-text-tertiary truncate max-w-[200px]">
+                    <span className="text-xs text-muted-foreground dark:text-muted-foreground truncate max-w-[200px]">
                       {release.name}
                     </span>
                   )}
               </div>
-              <p className="text-xs text-gray-500 dark:text-text-quaternary truncate mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-1">
                 {release.repository.full_name}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-4 flex-shrink-0 self-stretch">
-            <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-gray-500 dark:text-text-tertiary">
+            <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDistanceToNow(new Date(effectiveTime), { addSuffix: true })}</span>
                 {showAssetsUpdatedIndicator && (
-                  <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium">
+                  <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
                     {t('资产已更新', 'Assets updated')}
                   </span>
                 )}
@@ -249,16 +250,13 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             </div>
             <div className="flex items-center space-x-1 flex-shrink-0">
             {downloadLinks.length > 0 && (
-              <button
+              <Button
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleAssets();
                 }}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
-                  isAssetsExpanded
-                    ? 'bg-brand-indigo/15 text-brand-indigo dark:bg-brand-indigo/20 dark:text-white'
-                    : 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/[0.08]'
-                }`}
+                variant={isAssetsExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
                 title={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}
                 aria-label={isAssetsExpanded ? t('隐藏下载资产', 'Hide Assets') : t('显示下载资产', 'Show Assets')}
                 aria-expanded={isAssetsExpanded}
@@ -266,20 +264,17 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 {isAssetsExpanded ? <FolderOpen className="w-3.5 h-3.5" /> : <Folder className="w-3.5 h-3.5" />}
                 <span className="text-xs font-medium">{isAssetsExpanded ? t('隐藏', 'Hide') : t('资产', 'Assets')}</span>
                 {isAssetsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
+              </Button>
             )}
 
             {release.body && (
-              <button
+              <Button
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleReleaseNotes();
                 }}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap ${
-                  isReleaseNotesExpanded
-                    ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-text-secondary '
-                    : 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/[0.08]'
-                }`}
+                variant={isReleaseNotesExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
                 title={isReleaseNotesExpanded ? t('隐藏更新日志', 'Hide Changelog') : t('显示更新日志', 'Show Changelog')}
                 aria-label={isReleaseNotesExpanded ? t('隐藏更新日志', 'Hide Changelog') : t('显示更新日志', 'Show Changelog')}
                 aria-expanded={isReleaseNotesExpanded}
@@ -287,18 +282,15 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 <BookOpen className="w-3.5 h-3.5" />
                 <span className="text-xs font-medium">{isReleaseNotesExpanded ? t('隐藏', 'Hide') : t('日志', 'Notes')}</span>
                 {isReleaseNotesExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
+              </Button>
             )}
 
             {release.body?.trim() && (
-              <button
+              <Button
                 onClick={handleToggleSummary}
                 disabled={summary.status === 'loading'}
-                className={`flex items-center space-x-0.5 px-1.5 py-1 rounded transition-all duration-200 whitespace-nowrap disabled:opacity-70 ${
-                  isSummaryExpanded
-                    ? 'bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-text-secondary'
-                    : 'bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-white/[0.08]'
-                }`}
+                variant={isSummaryExpanded ? 'secondary' : 'ghost'}
+                className="h-8 gap-1 px-2 text-xs whitespace-nowrap disabled:opacity-70"
                 title={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
                 aria-label={isSummaryExpanded ? t('隐藏 AI 总结', 'Hide AI Summary') : (summary.status === 'error' ? t('重试 AI 总结', 'Retry AI summary') : t('AI 总结本次更新', 'AI Summary of this update'))}
                 aria-expanded={isSummaryExpanded}
@@ -310,25 +302,25 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 )}
                 <span className="text-xs font-medium">{t('总结', 'Summary')}</span>
                 {summary.status !== 'loading' && (isSummaryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-              </button>
+              </Button>
             )}
 
-            <button
+            <Button
               onClick={(e) => {
                 e.stopPropagation();
                 onUnsubscribe();
               }}
-              className="p-1 rounded bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
               title={t('取消订阅 Release', 'Unsubscribe from releases')}
               aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
             >
               <BellOff className="w-3.5 h-3.5" />
-            </button>
+            </Button>
             <a
               href={release.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded bg-light-surface text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors"
+              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
               title={t('在GitHub上查看', 'View on GitHub')}
               aria-label={t('在GitHub上查看', 'View on GitHub')}
               onClick={(e) => {
@@ -349,20 +341,20 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded || isSummaryExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-black/[0.06] dark:border-white/[0.04]">
+          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-border dark:border-border">
           {isAssetsExpanded && downloadLinks.length > 0 && (
             <div className="py-2">
               <div className="flex items-center space-x-2 mb-3">
-                <FileArchive className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
-                <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
+                <FileArchive className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
                   {t('下载文件', 'Download Files')}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-text-tertiary">
+                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                   ({downloadLinks.length})
                 </span>
               </div>
 
-              <div className="bg-gray-50 dark:bg-[#121314] rounded border border-black/[0.06] dark:border-white/[0.04] max-h-72 overflow-y-auto">
+              <div className="bg-muted rounded-md border border-border max-h-72 overflow-y-auto">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
@@ -372,35 +364,36 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
 
                   if (isRpcEnabled) {
                     return (
-                      <button
+                      <Button
                         key={index}
+                        variant="ghost"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (link.assetId !== undefined) onMarkAssetAsRead(link.assetId);
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
-                        className={`flex items-center justify-between px-4 py-3 w-full text-left hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 disabled:opacity-60 ${
-                          link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
+                        className={`h-auto flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 disabled:opacity-60 ${
+                          link.isSourceCode ? 'bg-accent/60' : ''
                         }`}
                       >
                         <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                           {isDownloaded ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                           ) : isDownloading ? (
-                            <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin flex-shrink-0" />
+                            <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin flex-shrink-0" />
                           ) : link.isSourceCode ? (
-                            <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
+                            <Code2 className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
                           ) : (
-                            <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
+                            <Download className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground/70 flex-shrink-0" />
                           )}
-                          <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                          <span className={`text-sm truncate ${link.isSourceCode ? 'text-muted-foreground dark:text-muted-foreground font-medium' : 'text-foreground dark:text-muted-foreground'}`}>
                             {link.name}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                        <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                           {isAssetUpdated && (
-                            <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium whitespace-nowrap">
+                            <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                               {t('资产已更新', 'Asset updated')}
                             </span>
                           )}
@@ -411,7 +404,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                             <span>{link.downloadCount.toLocaleString()} {t('下载', 'downloads')}</span>
                           )}
                         </div>
-                      </button>
+                      </Button>
                     );
                   }
 
@@ -421,8 +414,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center justify-between px-4 py-3 hover:bg-light-surface dark:hover:bg-white/[0.06] transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 ${
-                        link.isSourceCode ? 'bg-gray-100 dark:bg-white/[0.04]' : ''
+                      className={`flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 ${
+                        link.isSourceCode ? 'bg-accent/60' : ''
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -431,17 +424,17 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                     >
                       <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                         {link.isSourceCode ? (
-                          <Code2 className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary flex-shrink-0" />
+                          <Code2 className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
                         ) : (
-                          <Download className="w-3.5 h-3.5 text-gray-400 dark:text-text-quaternary flex-shrink-0" />
+                          <Download className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground/70 flex-shrink-0" />
                         )}
-                        <span className={`text-sm truncate ${link.isSourceCode ? 'text-gray-700 dark:text-text-secondary font-medium' : 'text-gray-900 dark:text-text-secondary'}`}>
+                        <span className={`text-sm truncate ${link.isSourceCode ? 'text-muted-foreground dark:text-muted-foreground font-medium' : 'text-foreground dark:text-muted-foreground'}`}>
                           {link.name}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-text-tertiary flex-shrink-0">
+                      <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                         {isAssetUpdated && (
-                          <span className="text-[10px] px-1 py-px rounded bg-brand-violet/10 text-brand-violet font-medium whitespace-nowrap">
+                          <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                             {t('资产已更新', 'Asset updated')}
                           </span>
                         )}
@@ -462,8 +455,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           {isReleaseNotesExpanded && release.body && (
             <div className="py-2">
               <div className="flex items-center space-x-2 mb-3">
-                <BookOpen className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
-                <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
+                <BookOpen className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
                   {t('Release 说明', 'Release Notes')}
                 </span>
               </div>
@@ -476,21 +469,22 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
 
                 {(release.body || '').length > truncatedBody.length && (
                   <div className="mt-3 flex items-center justify-center space-x-2">
-                    <button
+                    <Button
+                      variant="default"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleFullContent(e);
                       }}
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-brand-indigo text-white rounded hover:bg-gray-100 dark:bg-white/[0.04] active:bg-gray-100 dark:bg-white/[0.04] transition-all duration-200 text-xs font-medium min-w-[120px]"
+                      className="h-auto flex items-center justify-center space-x-1 px-3 py-1.5 rounded hover:bg-primary/90 active:bg-primary/80 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:active:bg-primary/80 transition-all duration-200 text-xs font-medium min-w-[120px]"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>{isFullContent ? t('收起', 'Collapse') : t('查看完整', 'View Full')}</span>
-                    </button>
+                    </Button>
                     <a
                       href={release.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-light-surface text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary rounded hover:bg-gray-200 dark:hover:bg-white/[0.08] active:bg-gray-300 dark:active:bg-gray-500 transition-all duration-200 text-xs font-medium whitespace-nowrap"
+                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-muted text-foreground rounded hover:bg-accent hover:text-accent-foreground active:bg-accent/80 dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground dark:active:bg-accent/80 transition-all duration-200 text-xs font-medium whitespace-nowrap"
                       onClick={(e) => {
                         e.stopPropagation();
                         onMarkAsRead();
@@ -507,15 +501,15 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           {isSummaryExpanded && release.body?.trim() && (
             <div className="py-2">
               <div className="flex items-center space-x-2 mb-3">
-                <Sparkles className="w-3.5 h-3.5 text-gray-700 dark:text-text-secondary" />
-                <span className="text-xs font-medium text-gray-900 dark:text-text-secondary">
+                <Sparkles className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
                   {t('AI 总结', 'AI Summary')}
                 </span>
               </div>
 
               <div className="relative">
                 {summary.status === 'loading' && (
-                  <div className="flex items-center justify-center space-x-2 py-6 text-xs text-gray-500 dark:text-text-tertiary">
+                  <div className="flex items-center justify-center space-x-2 py-6 text-xs text-muted-foreground dark:text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>{t('正在分析更新内容…', 'Analyzing update…')}</span>
                   </div>

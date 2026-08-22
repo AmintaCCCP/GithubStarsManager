@@ -11,11 +11,13 @@ import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ReadmeModal } from './ReadmeModal';
-import { FloatingTooltip } from './FloatingTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { shallow } from 'zustand/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { logger } from '../services/logger';
+import { Button } from './ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 // Selection-aware button component to centralize selectionMode disable logic
 interface SelectionAwareButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -33,15 +35,15 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   onClick,
   ...props
 }) => {
-  const baseClasses = 'p-2 rounded-lg transition-colors disabled:opacity-50';
+  const baseClasses = 'h-8 w-8 p-0 rounded-md transition-colors disabled:opacity-50';
   const selectionClasses = selectionMode ? 'pointer-events-none' : '';
 
   const variantClasses = {
     default: '',
     ai: '', // AI variant uses dynamic classes based on state
     subscribe: '', // Subscribe variant uses dynamic classes based on state
-    edit: 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary',
-    unstar: 'flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:cursor-not-allowed',
+    edit: 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
+    unstar: 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed',
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -51,14 +53,15 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   };
 
   return (
-    <button
+    <Button
+      size="icon"
       {...props}
       onClick={handleClick}
       disabled={disabled || selectionMode}
       className={`${baseClasses} ${variantClasses[variant]} ${selectionClasses} ${className}`}
     >
       {children}
-    </button>
+    </Button>
   );
 };
 
@@ -153,9 +156,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const descTriggerRef = useRef<HTMLDivElement>(null);
-  const tooltipHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,35 +182,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const actionsMenuRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const menuDismissedByPointerDownRef = useRef(false);
 
   useEffect(() => {
     if (viewMode !== 'list' || selectionMode) {
       setIsActionsMenuOpen(false);
     }
   }, [viewMode, selectionMode]);
-
-  useEffect(() => {
-    if (!isActionsMenuOpen) return;
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      if (!actionsMenuRef.current?.contains(event.target as Node)) {
-        setIsActionsMenuOpen(false);
-      }
-    };
-    const handleDocumentKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsActionsMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('click', handleDocumentClick);
-    document.addEventListener('keydown', handleDocumentKeyDown);
-    return () => {
-      document.removeEventListener('click', handleDocumentClick);
-      document.removeEventListener('keydown', handleDocumentKeyDown);
-    };
-  }, [isActionsMenuOpen]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -229,7 +208,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         return (
           <mark
             key={index}
-            className="bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary px-1 rounded"
+            className="bg-primary/15 text-foreground px-1 rounded"
           >
             {part}
           </mark>
@@ -251,9 +230,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     return () => {
       if (dragHintTimeoutRef.current) {
         clearTimeout(dragHintTimeoutRef.current);
-      }
-      if (tooltipHideTimerRef.current) {
-        clearTimeout(tooltipHideTimerRef.current);
       }
     };
   }, []);
@@ -816,14 +792,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 ref 来跟踪是否已经处理了点击
   const isProcessingClickRef = useRef(false);
 
-  const hideDescriptionTooltip = useCallback(() => {
-    if (tooltipHideTimerRef.current) {
-      clearTimeout(tooltipHideTimerRef.current);
-      tooltipHideTimerRef.current = null;
-    }
-    setShowTooltip(false);
-  }, []);
-
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     // 防止重复处理
@@ -839,6 +807,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       event.stopPropagation();
       return;
     }
+
+    const dismissedByPointerDown = menuDismissedByPointerDownRef.current;
+    menuDismissedByPointerDownRef.current = false;
+    if (dismissedByPointerDown) return;
 
     // 检查点击目标是否是交互元素或其子元素
     const target = event.target as HTMLElement;
@@ -870,10 +842,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return;
     }
 
-    // 打开 README 模态框前隐藏描述悬浮提示，避免遮挡预览层
-    hideDescriptionTooltip();
     setReadmeModalOpen(true);
-  }, [selectionMode, onSelect, repository.id, hideDescriptionTooltip, isActionsMenuOpen]);
+  }, [selectionMode, onSelect, repository.id, isActionsMenuOpen]);
 
   // 处理鼠标按下事件，阻止焦点变化导致页面滚动
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -897,14 +867,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (selectionMode && onSelect) {
-        hideDescriptionTooltip();
         onSelect(repository.id);
       } else {
-        hideDescriptionTooltip();
         setReadmeModalOpen(true);
       }
     }
-  }, [selectionMode, onSelect, repository.id, isModalOpen, hideDescriptionTooltip]);
+  }, [selectionMode, onSelect, repository.id, isModalOpen]);
 
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
@@ -920,8 +888,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       className={cardClassName}
       onClick={handleCardClick}
+      onPointerDown={() => {
+        if (!isActionsMenuOpen) {
+          menuDismissedByPointerDownRef.current = false;
+        }
+      }}
       onMouseDown={handleMouseDown}
       onKeyDown={handleCardKeyDown}
       tabIndex={isModalOpen ? -1 : 0}
@@ -938,10 +912,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
         />
         <div className="min-w-0 flex-1">
-          <h3 className={`${viewMode === 'list' ? 'text-base' : ''} font-semibold text-gray-900 dark:text-text-primary truncate`}>
+          <h3 className={`${viewMode === 'list' ? 'text-base' : ''} font-semibold text-foreground dark:text-foreground truncate`}>
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-text-secondary truncate">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
             {repository.owner.login}
           </p>
         </div>
@@ -950,135 +924,106 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         {viewMode === 'list' && (
           <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
             {displayContent.isAnalysisFailed ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-status-red/10 text-status-red">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive">
                 <Bot className="w-3 h-3" />
                 {language === 'zh' ? '分析失败' : 'Analysis failed'}
               </span>
             ) : displayContent.isAnalyzed ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-brand-indigo/10 dark:bg-brand-indigo/20 text-brand-violet">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary/20 text-primary">
                 <Sparkles className="w-3 h-3" />
                 {language === 'zh' ? '已分析' : 'Analyzed'}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-text-secondary">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Bot className="w-3 h-3" />
                 {language === 'zh' ? '待分析' : 'Not analyzed'}
               </span>
             )}
             {!selectionMode && (
-              <button
+              <Button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   setEditModalOpen(true);
                 }}
-                className="linear-icon-button flex h-8 w-8 items-center justify-center text-status-amber"
+                variant="ghost"
+                size="icon"
+                className="text-primary"
                 title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
                 aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
               >
                 <Edit3 className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
         )}
 
         {viewMode === 'list' && !selectionMode && (
-          <div ref={actionsMenuRef} className="relative flex-shrink-0">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsActionsMenuOpen((open) => !open);
-              }}
-              className={`linear-icon-button flex items-center justify-center w-8 h-8 ${isActionsMenuOpen ? 'bg-light-surface dark:bg-white/[0.08]' : ''}`}
-              title={language === 'zh' ? '更多操作' : 'More actions'}
-              aria-label={language === 'zh' ? '更多操作' : 'More actions'}
-              aria-expanded={isActionsMenuOpen}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-            {isActionsMenuOpen && (
-              <div
-                className="ui-menu absolute z-30 right-0 top-9 w-48 p-1.5"
+          <DropdownMenu open={isActionsMenuOpen} onOpenChange={setIsActionsMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title={language === 'zh' ? '更多操作' : 'More actions'}
+                aria-label={language === 'zh' ? '更多操作' : 'More actions'}
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="px-2 py-1.5 text-[11px] text-gray-500 dark:text-text-tertiary">
-                  {language === 'zh' ? '仓库操作' : 'Repository actions'}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsActionsMenuOpen(false);
-                    void handleAIAnalyze();
-                  }}
-                  disabled={isAnalyzing}
-                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
-                >
-                  {isAnalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
-                  {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsActionsMenuOpen(false);
-                    toggleReleaseSubscription(repository.id);
-                  }}
-                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
-                >
-                  {isSubscribed ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
-                  {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
-                </button>
-                {vectorSearchAvailable && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsActionsMenuOpen(false);
-                      handleFindSimilar();
-                    }}
-                    disabled={isFindingSimilar}
-                    className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
-                  >
-                    {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                    {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
-                  </button>
-                )}
-                <div className="my-1 border-t ui-divider" />
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-52"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDownOutside={(event) => {
+                if (cardRef.current?.contains(event.target as Node)) {
+                  menuDismissedByPointerDownRef.current = true;
+                }
+              }}
+            >
+              <DropdownMenuLabel>{language === 'zh' ? '仓库操作' : 'Repository actions'}</DropdownMenuLabel>
+              <DropdownMenuItem
+                disabled={isAnalyzing}
+                onSelect={() => void handleAIAnalyze()}
+              >
+                {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
+                {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => toggleReleaseSubscription(repository.id)}>
+                {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
+                {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
+              </DropdownMenuItem>
+              {vectorSearchAvailable && (
+                <DropdownMenuItem disabled={isFindingSimilar} onSelect={() => handleFindSimilar()}>
+                  {isFindingSimilar ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-2 h-3.5 w-3.5" />}
+                  {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
                 <a
                   href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => setIsActionsMenuOpen(false)}
-                  className="ui-menu-item flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
                 >
-                  <BookOpen className="w-3.5 h-3.5" />
+                  <BookOpen className="mr-2 h-3.5 w-3.5" />
                   {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
                 </a>
-                <a
-                  href={repository.html_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setIsActionsMenuOpen(false)}
-                  className="ui-menu-item flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
                   {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
                 </a>
-                <div className="my-1 border-t ui-divider" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsActionsMenuOpen(false);
-                    void handleUnstar();
-                  }}
-                  disabled={unstarring}
-                  className="ui-menu-item w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-status-red disabled:opacity-50"
-                >
-                  <StarOff className={`w-3.5 h-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
-                  {language === 'zh' ? '取消 Star' : 'Unstar'}
-                </button>
-              </div>
-            )}
-          </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
+                <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
+                {language === 'zh' ? '取消 Star' : 'Unstar'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {viewMode === 'grid' && !selectionMode && (
@@ -1110,10 +1055,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
-              <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-gray-800 dark:bg-surface-3 text-white dark:text-text-primary text-xs rounded-lg shadow-dialog dark:border dark:border-white/[0.04] whitespace-nowrap z-50 animate-fade-in">
+              <div className="absolute top-full right-0 z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-dialog animate-fade-in">
                 {language === 'zh' ? '拖拽我到左侧分类栏' : 'Drag me to left sidebar'}
                 {/* 气泡箭头 */}
-                <div className="absolute bottom-full right-3 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-800 dark:border-b-surface-3"></div>
+                <div className="absolute bottom-full right-3 h-0 w-0 border-x-4 border-b-4 border-l-transparent border-r-transparent border-b-popover"></div>
               </div>
             )}
           </div>
@@ -1129,13 +1074,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={handleAIAnalyze}
             disabled={isAnalyzing}
             selectionMode={selectionMode}
-            className={`${
-              repository.analysis_failed
-              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-              : repository.analyzed_at
-                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
-            }`}
+            className="bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground"
             title={aiButtonTitle}
           >
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
@@ -1144,8 +1083,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={() => toggleReleaseSubscription(repository.id)}
             selectionMode={selectionMode}
             className={`${isSubscribed
-              ? 'bg-brand-indigo text-white shadow-sm dark:bg-brand-indigo/80 dark:text-white'
-              : 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
             }`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
@@ -1168,7 +1107,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-brand-indigo/20 dark:text-brand-violet hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-brand-indigo/30 transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -1178,7 +1117,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />
@@ -1196,63 +1135,53 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       </div>
       )}
 
-      {/* Description with Tooltip */}
+      {/* Description with shared Tooltip */}
       <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
-        <div
-          ref={descTriggerRef}
-          className="relative group"
-          onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
-          onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-          onFocus={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); setShowTooltip(true); }}
-          onBlur={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-          onTouchStart={() => setShowTooltip((v) => !v)}
-          tabIndex={0}
-        >
-          <p
-            className={viewMode === 'list'
-              ? 'text-sm leading-6 text-gray-700 dark:text-text-secondary line-clamp-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary'
-              : 'text-gray-800 dark:text-text-secondary text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-gray-900 dark:hover:text-text-primary rounded-md px-1 -mx-1 hover:bg-light-surface dark:hover:bg-white/[0.02]'}
-          >
-            {highlightSearchTerm(displayContent.content, searchQuery)}
-          </p>
-          <FloatingTooltip
-            content={highlightSearchTerm(displayContent.content, searchQuery)}
-            visible={showTooltip}
-            triggerRef={descTriggerRef}
-            onMouseEnter={() => { if (tooltipHideTimerRef.current) clearTimeout(tooltipHideTimerRef.current); }}
-            onMouseLeave={() => { tooltipHideTimerRef.current = setTimeout(() => setShowTooltip(false), 150); }}
-            widthRatio={viewMode === 'list' ? 0.5 : 1}
-          />
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative" tabIndex={0}>
+              <p
+                className={viewMode === 'list'
+                  ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
+                  : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+              >
+                {highlightSearchTerm(displayContent.content, searchQuery)}
+              </p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
+            {displayContent.content}
+          </TooltipContent>
+        </Tooltip>
 
         {/* 方案一：同时显示多个状态标签 */}
         {viewMode === 'grid' && (
         <div className="flex items-center space-x-2 flex-wrap gap-y-1">
           {/* 已自定义标签 - 与筛选器逻辑一致 */}
           {displayContent.isCustomized && (
-            <div className="flex items-center space-x-1 text-xs text-gray-700 dark:text-text-secondary" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground dark:text-muted-foreground" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
               <Edit3 className="w-3 h-3" />
               <span>{language === 'zh' ? '已自定义' : 'Customized'}</span>
             </div>
           )}
           {/* AI 分析状态标签 (合并展示) */}
           {displayContent.isAnalysisFailed ? (
-            <div className="flex items-center space-x-1 text-xs text-status-red dark:text-status-red" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
+            <div className="flex items-center space-x-1 text-xs text-destructive dark:text-destructive" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
               <div className="group relative">
-                <HelpCircle className="w-3 h-3 text-status-red/70 dark:text-status-red/70 cursor-help" />
-                <div className="absolute left-0 top-full mt-2 w-72 max-w-xs p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] whitespace-normal break-words">
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
+                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-normal break-words shadow-lg">
+                  <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
                     {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
                   </p>
-                  <div className="absolute top-[-4px] left-3 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 transform rotate-45"></div>
+                  <div className="absolute top-[-4px] left-3 h-2 w-2 rotate-45 transform border-l border-t border-border bg-popover"></div>
                 </div>
               </div>
             </div>
           ) : displayContent.isAnalyzed ? (
-            <div 
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-brand-indigo/10 to-brand-violet/10 text-brand-violet dark:from-brand-indigo/20 dark:to-brand-violet/20 dark:text-brand-violet border border-brand-violet/20 dark:border-brand-violet/20" 
+            <div
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-primary/10 to-primary/10 text-primary dark:from-primary/20 dark:to-primary/20 dark:text-primary border border-primary/20 dark:border-primary/20"
               title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
             >
               <Sparkles className="w-3 h-3" />
@@ -1282,7 +1211,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Platform Icons */}
       {viewMode === 'grid' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
         <div className="flex items-center space-x-2 mb-4">
-          <span className="text-xs text-gray-700 dark:text-text-secondary">
+          <span className="text-xs text-muted-foreground dark:text-muted-foreground">
             {language === 'zh' ? '支持平台:' : 'Platforms:'}
           </span>
           <div className="flex space-x-1">
@@ -1307,7 +1236,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* Stats */}
       <div className={viewMode === 'list' ? 'contents' : 'space-y-3 mt-auto'}>
         {/* Language and Stars */}
-        <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-gray-700 dark:text-text-secondary`}>
+        <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-muted-foreground dark:text-muted-foreground`}>
           {repository.language && (
             <div className="flex items-center space-x-1 min-w-0">
               <div
@@ -1342,7 +1271,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
         {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
         <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
-        <div className={`flex items-center justify-between text-gray-700 dark:text-text-secondary border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
+        <div className={`flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
@@ -1350,39 +1279,41 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </span>
 
             {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (
-              <button
+              <Button
+                variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className="absolute inset-y-0 left-0 flex items-center space-x-1 text-brand-violet dark:text-brand-violet font-medium opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                className="absolute inset-y-0 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
                 title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 <span>{language === 'zh' ? '查找相似仓库' : 'Find similar'}</span>
-              </button>
+              </Button>
             )}
           </div>
 
 
           {/* 选择按钮 */}
           {onSelect && (
-            <button
+            <Button
+              variant="ghost"
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+              className={`flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
                 isSelected
-                  ? 'bg-gray-200 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary'
-                  : 'text-gray-400 dark:text-text-tertiary hover:bg-light-surface dark:hover:bg-white/10'
+                  ? 'bg-accent text-foreground dark:bg-accent dark:text-foreground'
+                  : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
               }`}
               title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
             >
               {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
-            </button>
+            </Button>
           )}
         </div>
         </div>

@@ -1,8 +1,12 @@
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
 import { StepperInput } from '../ui/StepperInput';
 import { useDialog } from '../../hooks/useDialog';
+import { validateCategoryName } from '../../utils/categoryUtils';
 
 interface CategoryPanelProps {
   t: (zh: string, en: string) => string;
@@ -72,14 +76,16 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryOrder]);
 
   const handleAddCategory = () => {
-    if (!newCategoryName.trim()) {
-      toast(t('请输入分类名称', 'Please enter category name'), 'error');
+    const validation = validateCategoryName(newCategoryName, t);
+    if (validation.error !== null) {
+      toast(validation.error, 'error');
       return;
     }
+    const categoryName = validation.value;
 
     const newCategory = {
       id: `custom-${Date.now()}`,
-      name: newCategoryName.trim(),
+      name: categoryName,
       icon: newCategoryIcon,
       isCustom: true,
       keywords: newCategoryKeywords.split(',').map(k => k.trim()).filter(k => k),
@@ -100,22 +106,24 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   };
 
   const handleSaveEdit = () => {
-    if (!editName.trim()) {
-      toast(t('分类名称不能为空', 'Category name cannot be empty'), 'error');
+    const validation = validateCategoryName(editName, t, ['分类名称不能为空', 'Category name cannot be empty']);
+    if (validation.error !== null) {
+      toast(validation.error, 'error');
       return;
     }
+    const categoryName = validation.value;
 
     if (editingId) {
       const isDefault = allDefaultCategories.some(c => c.id === editingId);
       if (isDefault) {
         updateDefaultCategory(editingId, {
-          name: editName.trim(),
+          name: categoryName,
           icon: editIcon,
           keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
         });
       } else {
         updateCustomCategory(editingId, {
-          name: editName.trim(),
+          name: categoryName,
           icon: editIcon,
           keywords: editKeywords.split(',').map(k => k.trim()).filter(k => k),
         });
@@ -260,33 +268,33 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Package className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <Package className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('分类管理', 'Category Management')}
           </h3>
         </div>
-        <button
+        <Button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>{t('添加分类', 'Add Category')}</span>
-        </button>
+        </Button>
       </div>
 
       {/* 折叠侧边栏显示设置 */}
-      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
+      <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <LayoutGrid className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
+            <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-text-primary">
+              <h4 className="font-medium text-foreground dark:text-foreground">
                 {t('折叠侧边栏显示设置', 'Collapsed Sidebar Display')}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-text-tertiary">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('设置折叠状态下显示的分类个数', 'Set the number of categories to display when collapsed')}
               </p>
-              <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 {t(
                   '提示：折叠侧边栏仅影响显示，所有分类仍可在展开状态下查看。只显示分类顺序前N个分类。',
                   'Tip: The collapsed sidebar only affects display; all categories remain accessible when expanded. Only the first N categories in the order are displayed.'
@@ -300,92 +308,84 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               onChange={setCollapsedSidebarCategoryCount}
               min={1}
               step={1}
+              decreaseLabel={t('减少分类数量', 'Decrease category count')}
+              increaseLabel={t('增加分类数量', 'Increase category count')}
             />
           </div>
         </div>
       </div>
 
       {/* 分类匹配模式设置 */}
-      <div className="p-4 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
+      <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <div className="flex items-center space-x-3 mb-2">
-          <LayoutGrid className="w-5 h-5 text-gray-700 dark:text-text-secondary" />
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
+          <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
+          <h4 id="category-match-mode-label" className="font-medium text-foreground dark:text-foreground">
             {t('仓库归类方式', 'Repository Categorization')}
           </h4>
         </div>
-        <p className="text-sm text-gray-500 dark:text-text-tertiary mb-3">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3">
           {t(
             '选择仓库如何被归入侧边栏的分类中。切换后侧边栏的仓库数量会相应变化。你手动设置的分类归属始终保留，不会被 AI 分析覆盖。',
             'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts. Categories you assign manually are always kept and will not be overridden by AI analysis.'
           )}
         </p>
-        <div className="space-y-3">
-          <label className="flex items-start space-x-3 cursor-pointer">
-            <input
-              type="radio"
-              name="categoryMatchMode"
-              checked={categoryMatchMode === 'effective'}
-              onChange={() => setCategoryMatchMode('effective')}
-              className="mt-1 w-4 h-4 text-brand-indigo focus:ring-brand-violet"
-            />
+        <RadioGroup aria-labelledby="category-match-mode-label" value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
+          <div className="flex items-start space-x-3">
+            <RadioGroupItem value="effective" id="category-match-effective" className="mt-1" />
             <div>
-              <span className="block text-sm font-medium text-gray-900 dark:text-text-primary">
+              <label htmlFor="category-match-effective" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
                 {t('按卡片显示的分类标签归类（推荐）', 'Match by tags shown on cards (Recommended)')}
-              </span>
-              <span className="block text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+              </label>
+              <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                 {t(
                   '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先。',
                   'Repositories are grouped by the tags actually shown on their cards; your custom tags take priority.'
                 )}
               </span>
             </div>
-          </label>
-          <label className="flex items-start space-x-3 cursor-pointer">
-            <input
-              type="radio"
-              name="categoryMatchMode"
-              checked={categoryMatchMode === 'legacy'}
-              onChange={() => setCategoryMatchMode('legacy')}
-              className="mt-1 w-4 h-4 text-brand-indigo focus:ring-brand-violet"
-            />
+          </div>
+          <div className="flex items-start space-x-3">
+            <RadioGroupItem value="legacy" id="category-match-legacy" className="mt-1" />
             <div>
-              <span className="block text-sm font-medium text-gray-900 dark:text-text-primary">
+              <label htmlFor="category-match-legacy" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
                 {t('仅按 AI 生成标签归类（旧版）', 'Match by AI-generated tags only (Legacy)')}
-              </span>
-              <span className="block text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
+              </label>
+              <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                 {t(
                   '使用早期版本逻辑，仅根据 AI 生成的标签归类，适合习惯旧版分类方式的用户。',
                   'Uses the legacy logic that categorizes only by AI-generated tags, for users who prefer the old behavior.'
                 )}
               </span>
             </div>
-          </label>
-        </div>
+          </div>
+        </RadioGroup>
       </div>
 
       {showAddForm && (
-        <div className="p-4 bg-light-bg dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
-          <h4 className="font-medium text-gray-900 dark:text-text-primary mb-4">
+        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
+          <h4 className="font-medium text-foreground dark:text-foreground mb-4">
             {t('添加自定义分类', 'Add Custom Category')}
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="category-panel-new-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('分类名称', 'Category Name')} *
               </label>
-              <input
+              <Input
+                id="category-panel-new-name"
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder={t('例如: 我的项目', 'e.g., My Projects')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+              <label htmlFor="category-panel-new-icon" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('图标', 'Icon')}
               </label>
-              <input
+              <Input
+                id="category-panel-new-icon"
                 type="text"
                 value={newCategoryIcon}
                 onChange={(e) => {
@@ -395,94 +395,95 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     setNewCategoryIcon(value);
                   }
                 }}
-                className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                 placeholder="📁"
               />
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary mb-1">
+            <label htmlFor="category-panel-new-keywords" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
               {t('关键词', 'Keywords')}
             </label>
-            <input
+            <Input
+              id="category-panel-new-keywords"
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg bg-white dark:bg-panel-dark text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+              className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
               placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
             />
-            <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
             </p>
           </div>
           <div className="flex space-x-3">
-            <button
+            <Button
               onClick={handleAddCategory}
               disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-brand-indigo text-white hover:bg-gray-100 dark:bg-white/[0.04]' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-text-tertiary cursor-not-allowed'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
               <span>{t('保存', 'Save')}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setShowAddForm(false);
                 setNewCategoryName('');
                 setNewCategoryIcon('📁');
                 setNewCategoryKeywords('');
               }}
-              className="flex items-center space-x-2 px-4 py-2 bg-light-surface hover:bg-gray-200 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-gray-900 dark:text-text-primary rounded-lg border border-black/[0.06] dark:border-white/[0.04] transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
             >
               <X className="w-4 h-4" />
               <span>{t('取消', 'Cancel')}</span>
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       <div className="space-y-4">
         {/* 分类排序区域 */}
-        <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
+        <div className="border-t border-border dark:border-border pt-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-gray-900 dark:text-text-primary flex items-center">
+            <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
               <GripVertical className="w-4 h-4 mr-2" />
               {t('分类排序', 'Category Order')}
-              <span className="ml-2 text-sm text-gray-500 dark:text-text-tertiary">
+              <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
                 ({allVisibleCategories.length})
               </span>
             </h4>
             <div className="flex items-center space-x-2">
-              <button
+              <Button
                 onClick={() => setIsReordering(!isReordering)}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   isReordering
-                    ? 'bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary'
-                    : 'bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600'
+                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
+                    : 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
                 {isReordering ? t('完成', 'Done') : t('调整顺序', 'Reorder')}
-              </button>
+              </Button>
               {categoryOrder.length > 0 && (
-                <button
+                <Button
                   onClick={handleResetOrder}
-                  className="px-3 py-1.5 rounded-lg text-sm bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   {t('重置', 'Reset')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
 
           {isReordering && (
-            <div className="mb-3 p-3 bg-light-surface dark:bg-white/[0.04] rounded-lg border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
-              <p className="text-sm text-gray-700 dark:text-text-secondary ">
+            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
                 {t('提示：拖拽分类可快速调整顺序，或使用按钮进行置顶/置底操作', 'Tip: Drag categories to quickly reorder, or use buttons to move to top/bottom')}
               </p>
             </div>
           )}
 
           {allVisibleCategories.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-text-tertiary py-4">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground py-4">
               {t('暂无可见分类', 'No visible categories')}
             </p>
           ) : (
@@ -510,32 +511,32 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   onDrop={(e) => handleDrop(e, index)}
                   className={`flex flex-col p-3 rounded-lg border transition-all ${
                     category.isCustom
-                      ? 'bg-light-surface dark:bg-white/[0.04] border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]'
-                      : 'bg-white dark:bg-panel-dark border-black/[0.06] dark:border-white/[0.04]'
-                  } ${isEditing ? 'ring-2 ring-blue-400 dark:ring-brand-violet' : ''} ${
+                      ? 'bg-muted dark:bg-muted/40 border-border dark:border-border dark:border-border dark:border-border'
+                      : 'bg-card dark:bg-card border-border dark:border-border'
+                  } ${isEditing ? 'ring-2 ring-ring' : ''} ${
                     draggingId === category.id ? 'opacity-50' : ''
                   } ${
                     dragOverId === category.id && draggingId !== category.id
-                      ? 'border-black/[0.06] dark:border-white/[0.04] dark:border-brand-violet ring-2 ring-blue-200 dark:ring-blue-800 transform scale-[1.02]'
+                      ? 'border-border dark:border-primary ring-2 ring-ring transform scale-[1.02]'
                       : ''
                   } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
                 >
                   {isEditing ? (
                     <>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-text-secondary">
+                        <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                           {t('编辑分类', 'Edit Category')}
                         </span>
                         {isDefault && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
                             {t('默认分类', 'Default Category')}
                           </span>
                         )}
                       </div>
                       
                       {isDefault && isModified && originalCategory && (
-                        <div className="mb-2 p-2 bg-light-surface dark:bg-white/[0.04] rounded border border-black/[0.06] dark:border-white/[0.04] dark:border-black/[0.06] dark:border-white/[0.04]">
-                          <p className="text-xs text-gray-700 dark:text-text-secondary ">
+                        <div className="mb-2 p-2 bg-muted dark:bg-muted/40 rounded border border-border dark:border-border dark:border-border dark:border-border">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground ">
                             {t(
                               `已修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
                               `Modified. Original: ${originalCategory.icon} ${originalCategory.name}`
@@ -546,8 +547,9 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                       
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
-                          <input
+                          <Input
                             type="text"
+                            aria-label={t('编辑分类图标', 'Edit category icon')}
                             value={editIcon}
                             onChange={(e) => {
                               const value = e.target.value;
@@ -556,46 +558,52 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-center text-lg text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                            className="w-14 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-center text-lg text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                             placeholder="📁"
                           />
-                          <input
+                          <Input
                             type="text"
+                            aria-label={t('编辑分类名称', 'Edit category name')}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                             placeholder={t('分类名称', 'Category name')}
                           />
                         </div>
                         <div className="flex items-center space-x-2">
-                          <input
+                          <Input
                             type="text"
+                            aria-label={t('编辑分类关键词', 'Edit category keywords')}
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-black/[0.06] dark:border-white/[0.04] rounded bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-text-primary focus:ring-2 focus:ring-brand-violet focus:border-transparent focus:outline-none"
+                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
                             placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
                           />
-                          <button
+                          <Button
+                            size="icon"
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`p-1.5 rounded ${hasChanges ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] dark:text-text-secondary' : 'bg-light-surface text-gray-400 dark:bg-white/[0.04] dark:text-text-tertiary cursor-not-allowed'}`}
+                            className={`h-8 w-8 p-0 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
+                            aria-label={t('保存', 'Save')}
                             title={t('保存', 'Save')}
                           >
                             <Save className="w-4 h-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="icon"
                             onClick={handleCancelEdit}
-                            className="p-1.5 rounded bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
+                            className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                            aria-label={t('取消', 'Cancel')}
                             title={t('取消', 'Cancel')}
                           >
                             <X className="w-4 h-4" />
-                          </button>
+                          </Button>
                         </div>
                         {isDefault && isModified && (
                           <div className="flex items-center space-x-2 pt-1">
-                            <span className="text-xs text-gray-500 dark:text-text-tertiary">{t('还原:', 'Reset:')}</span>
+                            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('还原:', 'Reset:')}</span>
                             {hasNameIconModified(category.id) && (
-                              <button
+                              <Button
                                 onClick={() => {
                                   resetDefaultCategoryNameIcon(category.id);
                                   if (originalCategory) {
@@ -603,30 +611,30 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditIcon(originalCategory.icon);
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                               >
                                 {t('名字/图标', 'Name/Icon')}
-                              </button>
+                              </Button>
                             )}
                             {hasKeywordsModified(category.id) && (
-                              <button
+                              <Button
                                 onClick={() => {
                                   resetDefaultCategoryKeywords(category.id);
                                   if (originalCategory) {
                                     setEditKeywords(originalCategory.keywords?.join(', ') || '');
                                   }
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                               >
                                 {t('关键词', 'Keywords')}
-                              </button>
+                              </Button>
                             )}
-                            <button
+                            <Button
                               onClick={() => handleResetDefault(category.id, originalCategory)}
-                              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                              className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                             >
                               {t('全部', 'All')}
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -635,19 +643,19 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         {isReordering && (
-                          <GripVertical className="w-4 h-4 text-gray-400 dark:text-text-tertiary" />
+                          <GripVertical className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                         )}
                         <span className="text-base w-6 text-center inline-block">{category.icon}</span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-text-primary">
+                        <span className="text-sm font-medium text-foreground dark:text-foreground">
                           {category.name}
                         </span>
                         {category.isCustom && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
                             {t('自定义', 'Custom')}
                           </span>
                         )}
                         {!category.isCustom && isModified && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
                             {t('已修改', 'Modified')}
                           </span>
                         )}
@@ -655,74 +663,90 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
                       {isReordering ? (
                         <div className="flex items-center space-x-1">
-                          <button
+                          <Button
+                            size="icon"
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('置顶', 'Move to top')}
                             title={t('置顶', 'Move to top')}
                           >
                             <ArrowUpToLine className="w-4 h-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="icon"
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('上移', 'Move up')}
                             title={t('上移', 'Move up')}
                           >
                             <ArrowUp className="w-4 h-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="icon"
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('下移', 'Move down')}
                             title={t('下移', 'Move down')}
                           >
                             <ArrowDown className="w-4 h-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="icon"
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label={t('置底', 'Move to bottom')}
                             title={t('置底', 'Move to bottom')}
                           >
                             <ArrowDownToLine className="w-4 h-4" />
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-1">
                           {category.isCustom ? (
                             <>
-                              <button
+                              <Button
+                                size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                size="icon"
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('删除', 'Delete')}
                                 title={t('删除', 'Delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
-                              </button>
+                              </Button>
                             </>
                           ) : (
                             <>
-                              <button
+                              <Button
+                                size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="p-1.5 rounded bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                size="icon"
                                 onClick={() => hideDefaultCategory(category.id)}
-                                className="p-1.5 rounded bg-light-surfacetext-gray-700 dark:bg-white/[0.04] dark:text-text-tertiary hover:bg-gray-200 dark:hover:bg-gray-600"
+                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+                                aria-label={t('隐藏', 'Hide')}
                                 title={t('隐藏', 'Hide')}
                               >
                                 <EyeOff className="w-4 h-4" />
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>
@@ -737,25 +761,25 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
         {/* 隐藏的默认分类 */}
         {hiddenDefaultCategories.length > 0 && (
-          <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
-            <h4 className="font-medium text-gray-900 dark:text-text-primary mb-3 flex items-center">
+          <div className="border-t border-border dark:border-border pt-4">
+            <h4 className="font-medium text-foreground dark:text-foreground mb-3 flex items-center">
               <EyeOff className="w-4 h-4 mr-2" />
               {t('隐藏的默认分类', 'Hidden Default Categories')}
-              <span className="ml-2 text-sm text-gray-500 dark:text-text-tertiary">
+              <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
                 ({hiddenDefaultCategories.length})
               </span>
             </h4>
             <div className="flex flex-wrap gap-2">
               {hiddenDefaultCategories.map((category) => (
-                <button
+                <Button
                   key={category.id}
                   onClick={() => showDefaultCategory(category.id)}
-                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-light-surfacetext-gray-900 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="w-5 text-center inline-block">{category.icon}</span>
                   <span>{category.name}</span>
-                </button>
+                </Button>
               ))}
             </div>
           </div>
