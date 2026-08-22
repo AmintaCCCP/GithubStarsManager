@@ -10,7 +10,7 @@ CodeRabbit 首轮报告中的共享 Button 变体、粘连 Tailwind token、重�
 
 全局主题使用 shadcn 默认语义变量：`background`、`foreground`、`card`、`popover`、`primary`、`secondary`、`muted`、`accent`、`destructive`、`border`、`input`、`ring` 和 `radius`。主操作使用 `primary/primary-foreground`，中性工具栏和 icon-only 控件使用 `ghost`，次级预设使用 `outline`；空状态刷新按钮、缓存状态和深色模式文本均已检查实际背景下的对比度。
 
-Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGroup、Checkbox、Switch、Tabs 和 Popover 均使用共享封装。ReadmeModal 与 ForkTimeline 的 native select 仅作为既有 DOM/change 兼容层并从辅助技术树隐藏，用户可见控件由 Radix 渲染；测试已改为验证真实的 combobox/option 用户路径。RepositoryCard 的菜单测试已改用 `menuitem` 语义，并以 userEvent 验证 pointer、keyboard、card whitespace、outside pointer 和 Escape 行为。
+Radix Dialog、AlertDialog、Select、DropdownMenu、Tooltip、Slider、RadioGroup、Checkbox、Switch、Tabs 和 Popover 均使用共享封装。ReadmeModal 与 ForkTimeline 的用户可见选择控件均由共享 Radix Select 渲染；测试已改为验证真实的 combobox/option 用户路径。RepositoryCard 的菜单测试已改用 `menuitem` 语义，并以 userEvent 验证 pointer、keyboard、card whitespace、outside pointer 和 Escape 行为。
 
 ## 安全审计
 
