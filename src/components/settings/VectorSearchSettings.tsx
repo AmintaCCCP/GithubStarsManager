@@ -479,7 +479,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Search className="w-5 h-5 text-purple-500" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-foreground dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('向量语义搜索', 'Vector Semantic Search')}
           </h2>
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
@@ -494,7 +494,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       {/* Toggle */}
       <div className="flex items-center justify-between p-4 bg-accent/50 dark:bg-card/50 rounded-lg">
         <div>
-          <div className="font-medium text-foreground dark:text-gray-100">
+          <div className="font-medium text-foreground dark:text-foreground">
             {t('启用向量搜索', 'Enable Vector Search')}
           </div>
           <div className="text-sm text-muted-foreground dark:text-muted-foreground">
@@ -509,15 +509,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 1: Embedding Model Config */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">①</span>
           {t('Embedding 模型配置', 'Embedding Model Configuration')}
         </h3>
 
         {/* API Type */}
         <div>
-          <h4 id="embedding-model-source-label" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <h4 id="embedding-model-source-label" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
             {t('模型来源', 'Model Source')}
           </h4>
           <div role="group" aria-labelledby="embedding-model-source-label" className="flex flex-wrap gap-2">
@@ -532,7 +532,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                   formApiType === type.value
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted dark:bg-card text-muted-foreground dark:text-gray-300 hover:bg-accent dark:hover:bg-accent'
+                    : 'bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
                 {t(type.label, type.labelEn)}
@@ -543,7 +543,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Base URL */}
         <div>
-          <label htmlFor="embedding-api-url" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-api-url" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('API 地址', 'API URL')}
           </label>
           <Input
@@ -564,13 +564,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'http://localhost:11434'
                 : 'https://api.example.com/v1/embeddings'
             }
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
         {/* API Key */}
         <div>
-          <label htmlFor="embedding-api-key" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-api-key" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             API Key
           </label>
           <div className="relative">
@@ -580,14 +580,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formApiKey}
               onChange={(e) => setFormApiKey(e.target.value)}
               placeholder={formApiType === 'ollama' ? t('可留空', 'Optional') : 'sk-xxx'}
-              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               type="button"
               variant="ghost"
               aria-label={showApiKey ? t('隐藏 API Key', 'Hide API key') : t('显示 API Key', 'Show API key')}
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
             >
               {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -601,7 +601,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Model Name */}
         <div>
-          <label htmlFor="embedding-model" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-model" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('模型名称', 'Model Name')}
           </label>
           <Input
@@ -618,13 +618,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'nomic-embed-text'
                 : 'model-name'
             }
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
         {/* Dimensions */}
         <div>
-          <label htmlFor="embedding-dimensions" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="embedding-dimensions" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('向量维度', 'Vector Dimensions')}
           </label>
           <div className="flex gap-2">
@@ -634,7 +634,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               type="number"
               value={formDimensions}
               onChange={(e) => setFormDimensions(parseInt(e.target.value) || 1536)}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               onClick={() => {
@@ -644,7 +644,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 dimensionsInputRef.current?.focus();
                 dimensionsInputRef.current?.select();
               }}
-              className="px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-gray-300 rounded-md hover:bg-accent dark:hover:bg-accent"
+              className="px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-accent dark:hover:bg-accent"
             >
               {t('自动检测', 'Auto Detect')}
             </Button>
@@ -669,7 +669,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             className={`px-4 py-2 text-sm rounded-md transition-colors ${
               embeddingSaved
                 ? 'bg-green-500 text-white'
-                : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
+                : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
             }`}
           >
             {embeddingSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
@@ -694,15 +694,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 2: Cloudflare Vectorize Connection */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">②</span>
           {t('Cloudflare Vectorize 连接', 'Cloudflare Vectorize Connection')}
         </h3>
 
         {/* Worker URL */}
         <div>
-          <label htmlFor="vectorize-worker-url" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="vectorize-worker-url" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('Worker 地址', 'Worker URL')}
           </label>
           <Input
@@ -711,13 +711,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             value={formWorkerUrl}
             onChange={(e) => setFormWorkerUrl(e.target.value)}
             placeholder="https://github-stars-vectorize.your-name.workers.dev"
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
         {/* Auth Token */}
         <div>
-          <label htmlFor="vectorize-auth-token" className="block text-sm font-medium text-muted-foreground dark:text-gray-300 mb-1.5">
+          <label htmlFor="vectorize-auth-token" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('认证 Token', 'Auth Token')}
           </label>
           <div className="relative">
@@ -727,14 +727,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formAuthToken}
               onChange={(e) => setFormAuthToken(e.target.value)}
               placeholder={t('Worker 认证令牌', 'Worker authentication token')}
-              className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               type="button"
               variant="ghost"
               aria-label={showAuthToken ? t('隐藏认证 Token', 'Hide auth token') : t('显示认证 Token', 'Show auth token')}
               onClick={() => setShowAuthToken(!showAuthToken)}
-              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
             >
               {showAuthToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -771,8 +771,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 3: Status */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-3">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">③</span>
           {t('状态', 'Status')}
         </h3>
@@ -784,7 +784,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             ) : (
               <XCircle className="w-4 h-4 text-muted-foreground" />
             )}
-            <span className="text-muted-foreground dark:text-gray-300">
+            <span className="text-muted-foreground dark:text-muted-foreground">
               {vectorSearchStatus?.connected
                 ? t('Worker 已连接', 'Worker connected')
                 : t('Worker 未连接', 'Worker not connected')}
@@ -794,7 +794,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {activeConfig && (
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <span className="text-muted-foreground dark:text-gray-300">
+              <span className="text-muted-foreground dark:text-muted-foreground">
                 {t('Embedding 模型', 'Embedding model')}: {activeConfig.model}
               </span>
             </div>
@@ -803,7 +803,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {vectorSearchStatus?.vectorCount !== undefined && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">📊</span>
-              <span className="text-muted-foreground dark:text-gray-300">
+              <span className="text-muted-foreground dark:text-muted-foreground">
                 {t('索引向量数', 'Indexed vectors')}: {vectorSearchStatus.vectorCount.toLocaleString()}
               </span>
             </div>
@@ -812,7 +812,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {vectorSearchStatus?.dimensions !== undefined && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">📐</span>
-              <span className="text-muted-foreground dark:text-gray-300">
+              <span className="text-muted-foreground dark:text-muted-foreground">
                 {t('向量维度', 'Vector dimensions')}: {vectorSearchStatus.dimensions.toLocaleString()}
               </span>
             </div>
@@ -821,7 +821,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           {vectorSearchStatus?.lastSyncAt && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">🕐</span>
-              <span className="text-muted-foreground dark:text-gray-300">
+              <span className="text-muted-foreground dark:text-muted-foreground">
                 {t('最后同步', 'Last sync')}: {new Date(vectorSearchStatus.lastSyncAt).toLocaleString()}
               </span>
             </div>
@@ -830,15 +830,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 4: Actions */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">④</span>
           {t('索引管理', 'Index Management')}
         </h3>
 
         {/* 索引内容选择 */}
         <div className="space-y-2">
-          <h4 id="embedding-index-content-label" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <h4 id="embedding-index-content-label" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
             {t('索引内容', 'Index Content')}
           </h4>
           <div role="group" aria-labelledby="embedding-index-content-label" className="grid grid-cols-2 gap-2">
@@ -849,10 +849,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               className={`h-auto flex-col items-start whitespace-normal p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  : 'border-border hover:border-input'
               }`}
             >
-              <div className="font-medium text-foreground dark:text-gray-100">
+              <div className="font-medium text-foreground dark:text-foreground">
                 {t('仓库描述', 'Description')}
               </div>
               <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -866,10 +866,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               className={`h-auto flex-col items-start whitespace-normal p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  : 'border-border hover:border-input'
               }`}
             >
-              <div className="font-medium text-foreground dark:text-gray-100">
+              <div className="font-medium text-foreground dark:text-foreground">
                 {t('README 内容', 'README Content')}
               </div>
               <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -882,7 +882,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* README 字符数设置 */}
         {formIndexMode === 'readme' && (
           <div className="space-y-1">
-            <label htmlFor="readme-max-characters" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+            <label htmlFor="readme-max-characters" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('README 截取字符数', 'README Max Characters')}
             </label>
             <Input
@@ -893,7 +893,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               min={500}
               max={20000}
               step={1000}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('建议 4000-8000，越长精度越高但索引越慢', 'Recommended 4000-8000. Longer = higher precision but slower indexing')}
@@ -907,7 +907,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
               ? 'bg-green-500 text-white'
-              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
+              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
           }`}
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存索引配置', 'Save Index Config')}
@@ -925,7 +925,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Button
             onClick={handleIncrementalIndex}
             disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
@@ -985,15 +985,15 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 5: Search Parameters */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑤</span>
           {t('搜索参数', 'Search Parameters')}
         </h3>
 
         {/* Similarity Threshold */}
         <div className="space-y-1">
-          <div className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <div className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
             {t('相似度阈值', 'Similarity Threshold')}
           </div>
           <SliderInput
@@ -1013,7 +1013,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
         {/* Top K */}
         <div className="space-y-1">
-          <label htmlFor="search-topk" className="block text-sm font-medium text-muted-foreground dark:text-gray-300">
+          <label htmlFor="search-topk" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
             {t('返回结果数 (Top K)', 'Results Count (Top K)')}
           </label>
           <Input
@@ -1023,7 +1023,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             onChange={(e) => setFormSearchTopK(Math.max(5, Math.min(50, parseInt(e.target.value) || 30)))}
             min={5}
             max={50}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-card text-foreground dark:text-gray-100 focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
           <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('向量检索返回的最大结果数，越多召回越广但 LLM 重排序成本越高', 'Max results from vector search. More = wider recall but higher LLM reranking cost')}
@@ -1033,7 +1033,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* HyDE Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-muted-foreground dark:text-gray-300">
+            <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
             </div>
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
@@ -1050,7 +1050,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* Reranking Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-muted-foreground dark:text-gray-300">
+            <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('LLM 语义重排序', 'LLM Semantic Reranking')}
             </div>
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
@@ -1070,7 +1070,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             workerSaved
               ? 'bg-green-500 text-white'
-              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-accent'
+              : 'bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
           }`}
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存搜索参数', 'Save Search Parameters')}
@@ -1078,8 +1078,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 6: Delete Index */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-        <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg p-4 space-y-3">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑥</span>
           {t('删除索引', 'Delete Index')}
         </h3>
@@ -1100,7 +1100,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制删除命令失败', 'Failed to copy delete command'), 'error');
               }
             }}
-            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
+            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-muted dark:hover:bg-accent"
           >
             {t('复制删除命令', 'Copy Delete Command')}
           </Button>
@@ -1114,7 +1114,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制创建命令失败', 'Failed to copy create command'), 'error');
               }
             }}
-            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-accent"
+            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-muted dark:hover:bg-accent"
           >
             {t('复制创建命令', 'Copy Create Command')}
           </Button>
@@ -1125,9 +1125,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Section 7: Deploy Guide */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-gray-800/50 transition-colors">
-          <h3 className="font-medium text-foreground dark:text-gray-100 flex items-center gap-2">
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between p-4 hover:bg-accent dark:hover:bg-accent transition-colors">
+          <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
             <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
             {t('部署指南', 'Deploy Guide')}
           </h3>
@@ -1149,7 +1149,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <div id="vector-deploy-guide" className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
             {/* 首次部署 */}
             <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
-              <p className="font-medium text-foreground dark:text-gray-100 mb-2">
+              <p className="font-medium text-foreground dark:text-foreground mb-2">
                 {t('首次部署', 'Initial Deployment')}
               </p>
               <ol className="list-decimal list-inside space-y-1.5">
@@ -1177,7 +1177,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
             {/* 更新部署 */}
             <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
-              <p className="font-medium text-foreground dark:text-gray-100 mb-2">
+              <p className="font-medium text-foreground dark:text-foreground mb-2">
                 {t('更新部署（代码变更后）', 'Redeploy (after code changes)')}
               </p>
               <ol className="list-decimal list-inside space-y-1.5">
