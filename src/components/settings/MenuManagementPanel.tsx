@@ -14,7 +14,6 @@ import {
   Info,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import { HeaderMenuId } from '../../types';
 
@@ -113,15 +112,15 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       </div>
 
       {/* Info note */}
-      <Alert className="bg-muted/40 text-muted-foreground">
-        <Info className="h-4 w-4" aria-hidden="true" />
-        <AlertDescription>
+      <div className="flex items-start gap-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p>
           {t(
             '通过开关控制顶栏菜单的显示与隐藏，拖拽或点击箭头调整顺序。「仓库」和「设置」为必显菜单，不可关闭。',
             'Toggle menu visibility and drag to reorder. "Repositories" and "Settings" are always visible and cannot be hidden.'
           )}
-        </AlertDescription>
-      </Alert>
+        </p>
+      </div>
 
       {/* Menu list */}
       <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">

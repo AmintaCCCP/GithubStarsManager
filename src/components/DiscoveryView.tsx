@@ -1144,6 +1144,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       type="text"
+                      aria-label={t('搜索仓库', 'Search repositories')}
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -1152,6 +1153,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </div>
                   <Button
                     onClick={handleSearch}
+                    aria-label={t('搜索', 'Search')}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
                   >

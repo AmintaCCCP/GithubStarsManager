@@ -133,6 +133,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
   const [loadedContents, setLoadedContents] = useState<Record<string, string>>({});
+  const previousGistIdRef = useRef<Gist['id'] | null>(null);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
@@ -172,7 +173,14 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   };
 
   useEffect(() => {
-    setActiveFilename(files[0]?.filename || '');
+    const gistChanged = previousGistIdRef.current !== gist?.id;
+    previousGistIdRef.current = gist?.id ?? null;
+    setActiveFilename((currentFilename) => {
+      if (gistChanged) return files[0]?.filename || '';
+      return currentFilename && files.some((file) => file.filename === currentFilename)
+        ? currentFilename
+        : files[0]?.filename || '';
+    });
     setLoadedContents({});
   }, [gist?.id, files]);
 
