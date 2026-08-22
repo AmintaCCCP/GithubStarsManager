@@ -591,9 +591,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       <DialogContent
         showClose={false}
         aria-describedby={undefined}
-        className="w-[calc(100%-2rem)] max-w-[1130px] overflow-visible p-0"
+        className="w-[calc(100%_-_2rem)] max-w-[1130px] min-w-0 overflow-hidden p-0"
       >
-        <div className="relative flex max-h-[90vh] w-full flex-col bg-card dark:bg-card">
+        <div className="relative flex max-h-[90vh] min-w-0 max-w-full w-full flex-col overflow-hidden bg-card dark:bg-card">
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
               <div
@@ -765,7 +765,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             {showToc && tocItems.length > 0 && (
               <>
                 <div
@@ -807,7 +807,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
             <div
               ref={contentRef}
-              className={`flex-1 overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
+              className={`min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
               onScroll={handleScroll}
             >
             {loading ? (

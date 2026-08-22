@@ -1002,6 +1002,12 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Radix Select/Dialog uses react-remove-scroll and otherwise adds a body margin
+   to compensate for a scrollbar that html already reserves permanently. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 /* 重绘窗口右侧竖向原生滚动条：thin、半透明灰、dark 适配，hover 变深 */
 html {
   scrollbar-width: thin;
