@@ -459,7 +459,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       id={`settings-tab-${tab.id}`}
                       aria-selected={activeTab === tab.id}
                       aria-controls={`settings-tabpanel-${tab.id}`}
-                      className="w-full justify-start gap-3 px-4 py-3 text-left"
+                      className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                     >
                       {tab.icon}
                       <span className="font-medium">{tab.label}</span>
@@ -507,7 +507,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   id={`settings-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
                   aria-controls={`settings-tabpanel-${tab.id}`}
-                  className="w-full justify-start gap-3 px-4 py-3 text-left"
+                  className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                 >
                   {tab.icon}
                   <span className="font-medium">{tab.label}</span>

@@ -320,7 +320,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <Button
               onClick={handleSyncToBackend}
               disabled={isSyncingToBackend}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncingToBackend ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
@@ -346,7 +346,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             <Button
               onClick={handleSyncFromBackend}
               disabled={isSyncingFromBackend}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncingFromBackend ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />

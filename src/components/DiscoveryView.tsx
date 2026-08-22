@@ -188,7 +188,11 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
           <Button
             key={channel.id}
             ref={(el) => {
-              if (el) tabRefs.current.set(channel.id, el);
+              if (el) {
+                tabRefs.current.set(channel.id, el);
+              } else {
+                tabRefs.current.delete(channel.id);
+              }
             }}
             onClick={() => onChannelSelect(channel.id)}
             variant="ghost"

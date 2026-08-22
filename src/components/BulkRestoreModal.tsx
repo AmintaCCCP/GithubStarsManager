@@ -166,14 +166,14 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           {config.description.enabled && (
             <RadioGroup value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="original" id="desc-target-original" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300">
+                <RadioGroupItem value="original" id="desc-target-original" aria-labelledby="desc-target-original-label" />
+                <span id="desc-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
                   {t('默认（GitHub原始）', 'Default (GitHub Original)')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="ai" id="desc-target-ai" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <RadioGroupItem value="ai" id="desc-target-ai" aria-labelledby="desc-target-ai-label" />
+                <span id="desc-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI总结', 'AI Summary')}</span>
                 </span>
@@ -202,14 +202,14 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           {config.tags.enabled && (
             <RadioGroup value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="original" id="tags-target-original" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300">
+                <RadioGroupItem value="original" id="tags-target-original" aria-labelledby="tags-target-original-label" />
+                <span id="tags-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
                   {t('默认（Topics）', 'Default (Topics)')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="ai" id="tags-target-ai" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <RadioGroupItem value="ai" id="tags-target-ai" aria-labelledby="tags-target-ai-label" />
+                <span id="tags-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI标签', 'AI Tags')}</span>
                 </span>
@@ -238,14 +238,14 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           {config.category.enabled && (
             <RadioGroup value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="original" id="cat-target-original" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300">
+                <RadioGroupItem value="original" id="cat-target-original" aria-labelledby="cat-target-original-label" />
+                <span id="cat-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
                   {t('默认分类', 'Default Category')}
                 </span>
               </label>
               <label className="flex cursor-pointer items-center space-x-2">
-                <RadioGroupItem value="ai" id="cat-target-ai" />
-                <span className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
+                <RadioGroupItem value="ai" id="cat-target-ai" aria-labelledby="cat-target-ai-label" />
+                <span id="cat-target-ai-label" className="text-sm text-muted-foreground dark:text-gray-300 flex items-center space-x-1">
                   <Bot className="w-3.5 h-3.5" />
                   <span>{t('AI分类', 'AI Category')}</span>
                 </span>
