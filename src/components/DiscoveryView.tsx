@@ -682,12 +682,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
         toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
       }
     } finally {
-      if (isCurrentTopicRequest()) {
-        if (append) {
-          setDiscoveryLoadingMore(channelId, false);
-        } else {
-          setDiscoveryLoading(channelId, false);
-        }
+      if (append) {
+        setDiscoveryLoadingMore(channelId, false);
+      } else if (isCurrentTopicRequest()) {
+        setDiscoveryLoading(channelId, false);
       }
     }
   }, [githubToken, t, toast, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);

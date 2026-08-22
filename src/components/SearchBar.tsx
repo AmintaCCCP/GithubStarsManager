@@ -1093,6 +1093,7 @@ export const SearchBar: React.FC = () => {
           <Button
             onClick={handleAISearch}
             variant="default"
+            aria-label={isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}
             disabled={isSearching || !searchQuery.trim()}
             className="ui-button-primary flex shrink-0 items-center space-x-1 px-2.5 py-1.5 text-sm font-medium disabled:opacity-50 sm:px-4"
             title={activeAIConfig
