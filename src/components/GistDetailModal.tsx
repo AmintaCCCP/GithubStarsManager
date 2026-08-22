@@ -139,11 +139,12 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
   const loadedActiveContent = activeFile ? loadedContents[activeFile.filename] : undefined;
-  const effectiveActiveFile = activeFile && loadedActiveContent !== undefined
+  const hasLoadedActiveContent = Boolean(activeFile && Object.prototype.hasOwnProperty.call(loadedContents, activeFile.filename));
+  const effectiveActiveFile = activeFile && hasLoadedActiveContent
     ? { ...activeFile, content: loadedActiveContent, truncated: false }
     : activeFile;
-  const requiresLoadedContent = Boolean(effectiveActiveFile && (
-    effectiveActiveFile.truncated || (!effectiveActiveFile.content && effectiveActiveFile.raw_url)
+  const requiresLoadedContent = Boolean(activeFile && !hasLoadedActiveContent && (
+    activeFile.truncated || (!activeFile.content && activeFile.raw_url)
   ));
   const canCopyActiveFile = Boolean(effectiveActiveFile) && !requiresLoadedContent;
   const activeCopyContent = effectiveActiveFile

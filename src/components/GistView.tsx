@@ -330,7 +330,7 @@ export const GistView: React.FC = () => {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') basicSearch();
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) basicSearch();
                   }}
                   aria-label={t('搜索 gist、文件名或摘要', 'Search gists, filenames, or summaries')}
                   className="ui-field w-full py-2 pl-9 pr-9 text-sm text-foreground dark:text-foreground"

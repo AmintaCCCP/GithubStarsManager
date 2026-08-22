@@ -32,7 +32,7 @@ import { ScrollToBottom } from './ScrollToBottom';
 import { useDialog } from '../hooks/useDialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import type {
   DiscoveryChannelId,
   DiscoveryChannelIcon,
@@ -261,16 +261,18 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        {platforms.map((p) => (
-          <DropdownMenuItem
-            key={p.id}
-            onSelect={() => onPlatformChange(p.id)}
-            className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
-          >
-            {p.icon}
-            <span>{language === 'zh' ? p.name : p.nameEn}</span>
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuRadioGroup value={platform} onValueChange={(value) => onPlatformChange(value as DiscoveryPlatform)}>
+          {platforms.map((p) => (
+            <DropdownMenuRadioItem
+              key={p.id}
+              value={p.id}
+              className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
+            >
+              {p.icon}
+              <span>{language === 'zh' ? p.name : p.nameEn}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -316,16 +318,18 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={`w-48 ${dropdownClassName}`}>
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => onChange(option.value)}
-            className={value === option.value ? 'bg-accent text-accent-foreground' : ''}
-          >
-            {option.icon && <span className="h-4 w-4">{option.icon}</span>}
-            <span>{option.label}</span>
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.value}
+              value={option.value}
+              className={value === option.value ? 'bg-accent text-accent-foreground' : ''}
+            >
+              {option.icon && <span className="h-4 w-4">{option.icon}</span>}
+              <span>{option.label}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
