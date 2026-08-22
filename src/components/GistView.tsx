@@ -386,6 +386,7 @@ export const GistView: React.FC = () => {
               </Select>
               <Button
                 type="button"
+                variant="outline"
                 onClick={() => setGistSearchFilters({ sortOrder: gistSearchFilters.sortOrder === 'desc' ? 'asc' : 'desc' })}
                 className="ui-button px-3 py-2 text-sm"
               >
@@ -393,6 +394,7 @@ export const GistView: React.FC = () => {
               </Button>
               <Button
                 type="button"
+                variant="outline"
                 onClick={analyzeVisibleGists}
                 disabled={isAnalyzingAll || gistSearchResults.length === 0}
                 className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
@@ -402,6 +404,7 @@ export const GistView: React.FC = () => {
               </Button>
               <Button
                 type="button"
+                variant="outline"
                 onClick={refreshGists}
                 disabled={isRefreshing}
                 className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
