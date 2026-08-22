@@ -713,12 +713,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   // 主题改变时刷新数据
   useEffect(() => {
-    if (selectedDiscoveryChannel !== 'topic') return;
+    if (selectedDiscoveryChannel !== 'topic' || !githubToken) return;
     const applied = appliedTopicRef.current;
     if (applied?.topic === discoverySelectedTopic && applied.platform === discoveryPlatform) return;
     appliedTopicRef.current = { topic: discoverySelectedTopic, platform: discoveryPlatform };
     refreshChannel('topic', 1, false);
-  }, [discoverySelectedTopic, discoveryPlatform, selectedDiscoveryChannel, refreshChannel]);
+  }, [githubToken, discoverySelectedTopic, discoveryPlatform, selectedDiscoveryChannel, refreshChannel]);
 
   const formatLastRefresh = useCallback((timestamp: string | null) => {
     if (!timestamp) return '';

@@ -26,6 +26,7 @@ export const SyncModeChoiceModal: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const isOpen = !syncModeConfigured;
   const firstActionRef = useRef<HTMLButtonElement>(null);
+  const optionClassName = 'h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-card p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-card dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent';
 
   const handleChooseSyncMode = (mode: 'stars' | 'stars-and-lists') => {
     setSyncMode(mode);
@@ -52,7 +53,7 @@ export const SyncModeChoiceModal: React.FC = () => {
           <AlertDialogAction
             ref={firstActionRef}
             onClick={() => handleChooseSyncMode('stars')}
-            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
+            className={optionClassName}
           >
             <Star className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>
@@ -64,7 +65,7 @@ export const SyncModeChoiceModal: React.FC = () => {
           </AlertDialogAction>
           <AlertDialogAction
             onClick={() => handleChooseSyncMode('stars-and-lists')}
-            className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-white p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-white dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent"
+            className={optionClassName}
           >
             <ListChecks className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>

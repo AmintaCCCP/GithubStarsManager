@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryCard } from './RepositoryCard';
@@ -146,17 +146,41 @@ describe('RepositoryCard view modes', () => {
 
     await user.click(moreActions);
     expect(screen.getByText('仓库操作')).toBeInTheDocument();
-    fireEvent.click(card);
+    await act(async () => {
+      fireEvent.pointerDown(card);
+      fireEvent.click(card);
+    });
     await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     await user.click(moreActions);
-    fireEvent.pointerDown(document.body);
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+    });
     await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
 
     await user.click(moreActions);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
     await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+  });
+
+  it('does not open README when menu dismissal is followed by a card click', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    expect(screen.getByText('仓库操作')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.pointerDown(card);
+      fireEvent.click(card);
+    });
+
+    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
   });
 
   it('does not let the card keyboard handler intercept list menu or direct edit activation', async () => {
@@ -164,20 +188,26 @@ describe('RepositoryCard view modes', () => {
     render(<RepositoryCard repository={repository} allCategories={[]} viewMode="list" />);
 
     const moreActions = screen.getByRole('button', { name: '更多操作' });
-    moreActions.focus();
-    await user.keyboard('{Enter}');
+    await act(async () => {
+      moreActions.focus();
+      await user.keyboard('{Enter}');
+    });
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     const unsubscribe = await screen.findByRole('menuitem', { name: '取消订阅 Release' });
-    unsubscribe.focus();
-    await user.keyboard('{Enter}');
+    await act(async () => {
+      unsubscribe.focus();
+      await user.keyboard('{Enter}');
+    });
     expect(storeState.toggleReleaseSubscription).toHaveBeenCalledWith(repository.id);
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消订阅 Release' })).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
-    editAction.focus();
-    await user.keyboard('{Enter}');
+    await act(async () => {
+      editAction.focus();
+      await user.keyboard('{Enter}');
+    });
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 

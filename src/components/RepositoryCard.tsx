@@ -184,7 +184,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, [embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus]);
 
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
-    const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const menuDismissedByPointerDownRef = useRef(false);
 
   useEffect(() => {
     if (viewMode !== 'list' || selectionMode) {
@@ -820,6 +822,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return;
     }
 
+    const dismissedByPointerDown = menuDismissedByPointerDownRef.current;
+    menuDismissedByPointerDownRef.current = false;
+    if (dismissedByPointerDown) return;
+
     // 检查点击目标是否是交互元素或其子元素
     const target = event.target as HTMLElement;
     // 排除卡片本身的 role="button"，只检查子元素的交互元素
@@ -900,6 +906,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       className={cardClassName}
       onClick={handleCardClick}
       onMouseDown={handleMouseDown}
@@ -978,7 +985,16 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuContent
+              align="end"
+              className="w-52"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDownOutside={(event) => {
+                if (cardRef.current?.contains(event.target as Node)) {
+                  menuDismissedByPointerDownRef.current = true;
+                }
+              }}
+            >
               <DropdownMenuLabel>{language === 'zh' ? '仓库操作' : 'Repository actions'}</DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={isAnalyzing}

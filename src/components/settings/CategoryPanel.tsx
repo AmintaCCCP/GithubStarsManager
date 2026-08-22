@@ -330,12 +330,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           )}
         </p>
         <RadioGroup aria-labelledby="category-match-mode-label" value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
-          <label className="flex cursor-pointer items-start space-x-3">
+          <div className="flex items-start space-x-3">
             <RadioGroupItem value="effective" id="category-match-effective" className="mt-1" />
             <div>
-              <span className="block text-sm font-medium text-foreground dark:text-foreground">
+              <label htmlFor="category-match-effective" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
                 {t('按卡片显示的分类标签归类（推荐）', 'Match by tags shown on cards (Recommended)')}
-              </span>
+              </label>
               <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                 {t(
                   '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先。',
@@ -343,13 +343,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 )}
               </span>
             </div>
-          </label>
-          <label className="flex cursor-pointer items-start space-x-3">
+          </div>
+          <div className="flex items-start space-x-3">
             <RadioGroupItem value="legacy" id="category-match-legacy" className="mt-1" />
             <div>
-              <span className="block text-sm font-medium text-foreground dark:text-foreground">
+              <label htmlFor="category-match-legacy" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
                 {t('仅按 AI 生成标签归类（旧版）', 'Match by AI-generated tags only (Legacy)')}
-              </span>
+              </label>
               <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
                 {t(
                   '使用早期版本逻辑，仅根据 AI 生成的标签归类，适合习惯旧版分类方式的用户。',
@@ -357,7 +357,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 )}
               </span>
             </div>
-          </label>
+          </div>
         </RadioGroup>
       </div>
 

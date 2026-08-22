@@ -175,7 +175,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             role="tab"
             id={`settings-tab-mobile-${tab.id}`}
             aria-selected={activeTab === tab.id}
-            aria-controls={`settings-tabpanel-${tab.id}`}
+            aria-controls={activeTab === tab.id ? `settings-tabpanel-${tab.id}` : undefined}
             className="min-h-[36px] shrink-0 snap-center rounded-full touch-manipulation"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
@@ -458,7 +458,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       role="tab"
                       id={`settings-tab-${tab.id}`}
                       aria-selected={activeTab === tab.id}
-                      aria-controls={`settings-tabpanel-${tab.id}`}
+                      aria-controls={activeTab === tab.id ? `settings-tabpanel-${tab.id}` : undefined}
                       className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                     >
                       {tab.icon}
@@ -506,7 +506,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   role="tab"
                   id={`settings-tab-${tab.id}`}
                   aria-selected={activeTab === tab.id}
-                  aria-controls={`settings-tabpanel-${tab.id}`}
+                  aria-controls={activeTab === tab.id ? `settings-tabpanel-${tab.id}` : undefined}
                   className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                 >
                   {tab.icon}
