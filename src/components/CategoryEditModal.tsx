@@ -1052,6 +1052,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               <span className="text-xs text-amber-600">{t('还原:', 'Reset:')}</span>
               {hasNameIconModified && (
                 <Button
+                  size="sm"
                   onClick={() => {
                     resetDefaultCategoryNameIcon(category.id);
                     setFormData(prev => ({
@@ -1067,6 +1068,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               )}
               {hasKeywordsModified && (
                 <Button
+                  size="sm"
                   onClick={() => {
                     resetDefaultCategoryKeywords(category.id);
                     setFormData(prev => ({
@@ -1080,6 +1082,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                 </Button>
               )}
               <Button
+                size="sm"
                 onClick={() => {
                   resetDefaultCategory(category.id);
                   setFormData({

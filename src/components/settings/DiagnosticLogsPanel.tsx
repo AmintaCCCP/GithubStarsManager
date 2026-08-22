@@ -628,7 +628,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             </DropdownMenu>
             <div className="flex items-center space-x-2 ml-auto">
                 <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
-                className="size-9" title={t('刷新', 'Refresh')}>
+                aria-label={t('刷新', 'Refresh')} className="size-9" title={t('刷新', 'Refresh')}>
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
               <Button variant="secondary" onClick={handleClear} className="h-9 gap-1 px-3 text-sm font-medium">

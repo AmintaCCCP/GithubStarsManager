@@ -1602,8 +1602,9 @@ export const SearchBar: React.FC = () => {
                   key={preset.label}
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => setSearchFilters({ minStars: preset.value })}
-                  className="rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
+                  className="h-7 rounded px-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
                 >
                   ≥{preset.label}
                 </Button>

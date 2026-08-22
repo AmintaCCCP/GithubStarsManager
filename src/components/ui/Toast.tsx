@@ -45,7 +45,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration =
         open={open}
         duration={duration}
         onOpenChange={handleOpenChange}
-        className={cn('pointer-events-auto flex w-[min(420px,calc(100vw-2rem))] items-center gap-3 rounded-lg border px-4 py-3 shadow-lg outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in', className)}
+        className={cn('pointer-events-auto flex w-[min(420px,calc(100vw_-_2rem))] items-center gap-3 rounded-lg border px-4 py-3 shadow-lg outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in', className)}
       >
         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
         <ToastPrimitive.Description className="flex-1 whitespace-pre-line text-sm text-foreground dark:text-foreground">
