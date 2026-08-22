@@ -642,7 +642,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               onChange={(e) => setFormDimensionsInput(e.target.value)}
               onBlur={() => {
                 const parsed = Number(formDimensionsInput);
-                const dimensions = Number.isFinite(parsed) && parsed > 0
+                const dimensions = Number.isInteger(parsed) && parsed > 0
                   ? parsed
                   : DEFAULT_DIMENSIONS[formApiType];
                 setFormDimensions(dimensions);
@@ -907,7 +907,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               onChange={(e) => setFormReadmeMaxCharsInput(e.target.value)}
               onBlur={() => {
                 const parsed = Number(formReadmeMaxCharsInput);
-                const maxChars = Number.isFinite(parsed)
+                const maxChars = Number.isInteger(parsed)
                   ? Math.min(20000, Math.max(500, parsed))
                   : 6000;
                 setFormReadmeMaxChars(maxChars);
@@ -1046,7 +1046,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             onChange={(e) => setFormSearchTopKInput(e.target.value)}
             onBlur={() => {
               const parsed = Number(formSearchTopKInput);
-              const topK = Number.isFinite(parsed)
+              const topK = Number.isInteger(parsed)
                 ? Math.min(50, Math.max(5, parsed))
                 : 30;
               setFormSearchTopK(topK);
