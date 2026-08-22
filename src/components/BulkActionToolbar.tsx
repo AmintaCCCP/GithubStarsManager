@@ -212,10 +212,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           <div className="flex items-center justify-between sm:justify-start space-x-1 sm:space-x-2 overflow-x-auto pb-1 sm:pb-0 -mx-2 px-2 sm:mx-0 sm:px-0">
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('取消 Star', 'Unstar selected repositories')}
               onClick={(e) => handleAction('unstar', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unstar'
                   ? 'bg-destructive text-destructive-foreground hover:opacity-90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -230,10 +232,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('分类', 'Categorize selected repositories')}
               onClick={(e) => handleAction('categorize', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'categorize'
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -248,10 +252,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('AI总结', 'Generate AI summaries')}
               onClick={(e) => handleAction('ai-summary', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'ai-summary'
                   ? 'bg-destructive text-destructive-foreground hover:opacity-90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -266,10 +272,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('订阅 Release', 'Subscribe to releases')}
               onClick={(e) => handleAction('subscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'subscribe'
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -284,10 +292,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('取消订阅 Release', 'Unsubscribe from releases')}
               onClick={(e) => handleAction('unsubscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unsubscribe'
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -302,10 +312,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('锁定分类', 'Lock categories')}
               onClick={(e) => handleAction('lock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'lock-category'
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -320,10 +332,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('解锁分类', 'Unlock categories')}
               onClick={(e) => handleAction('unlock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'unlock-category'
                   ? 'bg-gray-700 text-white hover:bg-gray-800'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
@@ -338,10 +352,12 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
             <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={t('恢复 Star', 'Restore stars')}
               onClick={(e) => handleAction('restore', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-colors ${
+              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
                 showConfirm === 'restore'
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'

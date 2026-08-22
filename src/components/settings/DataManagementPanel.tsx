@@ -1560,7 +1560,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </p>
               <Button
                 onClick={() => openConfirmation('all')}
-                className="mt-4 px-6 py-3 bg-destructive hover:bg-red-600 dark:hover:bg-red-700 text-destructive-foreground font-semibold rounded-lg transition-colors flex items-center space-x-2"
+                className="mt-4 h-auto px-6 py-3 bg-destructive hover:bg-red-600 dark:hover:bg-red-700 text-destructive-foreground font-semibold rounded-lg transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="w-5 h-5" />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>

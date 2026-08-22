@@ -841,7 +841,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               variant="outline"
               onClick={() => setFormIndexMode('description')}
               aria-pressed={formIndexMode === 'description'}
-              className={`p-3 text-left text-sm rounded-lg border transition-colors ${
+              className={`h-auto p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -858,7 +858,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               variant="outline"
               onClick={() => setFormIndexMode('readme')}
               aria-pressed={formIndexMode === 'readme'}
-              className={`p-3 text-left text-sm rounded-lg border transition-colors ${
+              className={`h-auto p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'

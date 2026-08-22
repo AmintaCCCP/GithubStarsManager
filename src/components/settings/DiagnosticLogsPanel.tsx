@@ -536,7 +536,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                   {t('开启后将记录所有前端 HTTP 请求详情（方法、路径、状态码、耗时）', 'Records all frontend HTTP request details (method, path, status, duration)')}
                 </p>
               </div>
-              <Button onClick={toggleFrontendDebug} className={`p-2 rounded-lg transition-colors ${frontendDebug ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground dark:text-muted-foreground'}`}>
+              <Button variant="ghost" onClick={toggleFrontendDebug} className={`p-2 rounded-lg transition-colors ${frontendDebug ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground dark:text-muted-foreground'}`}>
                 {frontendDebug ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </Button>
             </div>
@@ -550,7 +550,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{t('开启后将记录所有后端 HTTP 请求详情', 'Records all backend HTTP request details')}</p>
               </div>
-              <Button onClick={backendAvailable ? toggleBackendDebug : undefined} disabled={!backendAvailable}
+              <Button variant="ghost" onClick={backendAvailable ? toggleBackendDebug : undefined} disabled={!backendAvailable}
                 className={`p-2 rounded-lg transition-colors ${!backendAvailable ? 'opacity-50 cursor-not-allowed' : ''} ${backendDebug ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground dark:text-muted-foreground'}`}>
                 {backendDebug ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
               </Button>
@@ -618,7 +618,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               )}
             </div>
             <div className="flex items-center space-x-2 ml-auto">
-              <Button onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
+              <Button variant="ghost" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
                 className="p-2 rounded-lg text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50" title={t('刷新', 'Refresh')}>
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
@@ -699,7 +699,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               {/* Load more */}
               {visibleCount < filteredEntries.length && (
                 <div className="p-3 text-center border-t border-black/[0.04] dark:border-white/[0.02]">
-                  <Button onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                  <Button variant="ghost" onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
                     className="text-sm text-primary hover:text-primary/90 transition-colors">
                     {t(`加载更多（还有 ${filteredEntries.length - visibleCount} 条）`, `Load more (${filteredEntries.length - visibleCount} remaining)`)}
                   </Button>

@@ -1011,7 +1011,7 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="ui-field w-full pl-10 pr-3 py-3 text-foreground dark:text-foreground"
+          className="ui-field h-12 w-full pl-10 pr-3 py-3 text-foreground dark:text-foreground"
         />
 
         {/* Search History Dropdown */}

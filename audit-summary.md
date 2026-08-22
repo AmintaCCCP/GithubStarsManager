@@ -71,3 +71,8 @@ ff639df 后最新 CodeRabbit full review 的 2 个 actionable comments 与 1 个
 1a91b5d 后最新 CodeRabbit full review 的 3 个 actionable comments 与 1 个 outside-diff comment 已全部完成：DiscoveryView 在 githubToken 缺失时不再记录 topic/platform applied pair，token 初始化后可正常发起一次请求；McpSettingsPanel 的 switch 补 accessible name，refresh、visibility、token/URL/JSON copy actions 明确使用 ghost/outline variants；RepositoryList AI analysis popup 使用 React `useId`，trigger 补 `aria-expanded`/`aria-controls`，popup 补对应 id。业务逻辑、store、services、API 和同步流程保持不变。
 
 本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,790.74 kB，独立 checker 2,725.34 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。
+
+
+57ee771 后最新 CodeRabbit full review 的 6 个 actionable comments 已全部完成：BulkRestoreModal 与 RepositoryList 的 RadioGroupItem 补齐 option text id/aria-labelledby；DiscoveryView tab ref 在卸载时删除 stale entry；ForkTimeline 底部分页与上部分页统一处理 ellipsis、ghost variant、type 和 aria-current；DiagnosticLogsPanel debug/refresh/load-more 使用 ghost；BulkActionToolbar 固定尺寸 actions 使用 ghost/icon size 与 p-0；SearchBar 输入调整为 h-12；MenuManagement switch 加入 justify-start；VectorSearchSettings、SettingsPanel、BackendPanel 和 DataManagementPanel 长内容 Button 加入 h-auto。业务逻辑、store、services、API 和同步流程保持不变。
+
+本轮门禁结果：lint 0 errors/0 warnings；TypeScript 无诊断；31 个测试文件、329 个测试全部通过；生产构建与 bundle budget 通过，legacy 入口 2,791.81 kB，独立 checker 2,726.38 KiB，低于 3,000 KiB hard budget；`git diff --check` 通过；`npm audit --omit=dev --audit-level=high` 为 0 vulnerabilities。

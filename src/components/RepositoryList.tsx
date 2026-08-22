@@ -1140,12 +1140,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               </span>
               <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
                 <label className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
-                  <RadioGroupItem value="ai" id="display-content-ai" disabled={!hasAnalyzedRepos} />
-                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
+                  <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
+                  <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
                 </label>
                 <label className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
-                  <RadioGroupItem value="original" id="display-content-original" />
-                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
+                  <RadioGroupItem value="original" id="display-content-original" aria-labelledby="display-content-original-label" />
+                  <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
                 </label>
               </RadioGroup>
             </div>

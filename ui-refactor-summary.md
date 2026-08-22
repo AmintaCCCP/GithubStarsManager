@@ -70,3 +70,8 @@ ff639df 后最新 CodeRabbit review 的所有 comments 已完成修复：BackupP
 1a91b5d 后最新 CodeRabbit review 的所有 comments 已完成修复：DiscoveryView 的 topic/platform 请求去重改为 token-aware，避免未登录初始化时错误记录 applied pair；McpSettingsPanel switch 补 accessible name，refresh、visibility 与 copy actions 使用明确的 ghost/outline variants；RepositoryList AI analysis popup 使用实例唯一 id，并关联 trigger 的 `aria-expanded`/`aria-controls`。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,790.74 kB，独立 checker 2,725.34 KiB，0 vulnerabilities。
+
+
+57ee771 后最新 CodeRabbit review 的全部 comments 已完成修复：BulkRestore/RepositoryList radio options 补齐 accessible names；DiscoveryView 清理卸载 tab refs；ForkTimeline 底部分页与 DiagnosticLogs/BulkAction controls 统一 shared variants 和 compact sizing；SearchBar 输入高度调整；MenuManagement switch 修正 knob 对齐；VectorSearch、Settings、Backend、DataManagement 长内容按钮增加 h-auto。未改变任何业务逻辑、store、services、API 或同步流程。
+
+本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,791.81 kB，独立 checker 2,726.38 KiB，0 vulnerabilities。
