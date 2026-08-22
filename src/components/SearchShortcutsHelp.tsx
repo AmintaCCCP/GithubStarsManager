@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { HelpCircle, Keyboard, X } from 'lucide-react';
+import { HelpCircle, Keyboard } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { searchShortcuts } from '../hooks/useSearchShortcuts';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 
 export const SearchShortcutsHelp: React.FC = () => {
   const [showHelp, setShowHelp] = useState(false);
@@ -12,12 +12,14 @@ export const SearchShortcutsHelp: React.FC = () => {
 
   return (
     <Dialog open={showHelp} onOpenChange={setShowHelp}>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setShowHelp(true)} className="h-7 gap-1 px-2 text-xs text-muted-foreground dark:text-muted-foreground" aria-label={t('查看搜索快捷键', 'View search shortcuts')}>
-        <Keyboard className="h-3 w-3" /><span>{t('快捷键', 'Shortcuts')}</span>
-      </Button>
-      <DialogContent showClose={false} className="max-w-md">
+      <DialogTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-muted-foreground dark:text-muted-foreground" aria-label={t('查看搜索快捷键', 'View search shortcuts')}>
+          <Keyboard className="h-3 w-3" /><span>{t('快捷键', 'Shortcuts')}</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Keyboard className="h-5 w-5 text-primary" /><DialogTitle>{t('搜索快捷键', 'Search Shortcuts')}</DialogTitle></div><Button type="button" variant="ghost" size="icon" onClick={() => setShowHelp(false)} aria-label={t('关闭', 'Close')}><X className="h-5 w-5" /></Button></div>
+          <div className="flex items-center gap-2"><Keyboard className="h-5 w-5 text-primary" /><DialogTitle>{t('搜索快捷键', 'Search Shortcuts')}</DialogTitle></div>
           <DialogDescription>{t('查看可用的搜索键盘快捷键。', 'View the available keyboard shortcuts for search.')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

@@ -336,7 +336,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
                 min={1}
                 max={65535}
                 value={mcpConfig.port}
-                onChange={(e) => setMcpConfig({ port: Number(e.target.value) || 3927 })}
+                onChange={(e) => {
+                const parsed = Number(e.target.value);
+                const port = Number.isFinite(parsed) && parsed >= 1 && parsed <= 65535
+                  ? parsed
+                  : MCP_DEFAULT_PORT;
+                setMcpConfig({ port });
+              }}
                 className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
               />
             </label>
@@ -462,9 +468,9 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </span>
             <Button
               type="button"
-              variant="ghost"
+              size="sm"
               onClick={() => void copyText('json', agentConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg"
             >
               <Copy className="w-3.5 h-3.5" />
               {copiedKey === 'json' ? t('已复制', 'Copied') : t('复制 JSON', 'Copy JSON')}

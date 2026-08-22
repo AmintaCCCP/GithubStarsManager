@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from './button';
 
@@ -25,6 +25,8 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 }) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   const clamp = useCallback((nextValue: number) => {
     let result = nextValue;
@@ -34,8 +36,10 @@ export const StepperInput: React.FC<StepperInputProps> = ({
   }, [min, max]);
 
   const stepValue = useCallback((delta: number) => {
-    onChange(clamp(value + delta));
-  }, [value, onChange, clamp]);
+    const nextValue = clamp(valueRef.current + delta);
+    valueRef.current = nextValue;
+    onChange(nextValue);
+  }, [onChange, clamp]);
 
   const stopRepeat = useCallback(() => {
     if (timeoutRef.current) {
@@ -55,6 +59,8 @@ export const StepperInput: React.FC<StepperInputProps> = ({
       intervalRef.current = setInterval(() => stepValue(delta), 120);
     }, 400);
   }, [stepValue, stopRepeat]);
+
+  useEffect(() => stopRepeat, [stopRepeat]);
 
   const canDecrement = min === undefined || value > min;
   const canIncrement = max === undefined || value < max;

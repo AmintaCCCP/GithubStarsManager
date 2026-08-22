@@ -164,7 +164,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.description.enabled && (
-            <RadioGroup value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
+            <RadioGroup aria-labelledby="bulk-restore-description-heading" value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="desc-target-original" aria-labelledby="desc-target-original-label" />
                 <span id="desc-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
@@ -200,7 +200,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.tags.enabled && (
-            <RadioGroup value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
+            <RadioGroup aria-labelledby="bulk-restore-tags-heading" value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="tags-target-original" aria-labelledby="tags-target-original-label" />
                 <span id="tags-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">
@@ -236,7 +236,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.category.enabled && (
-            <RadioGroup value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
+            <RadioGroup aria-labelledby="bulk-restore-category-heading" value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
               <label className="flex cursor-pointer items-center space-x-2">
                 <RadioGroupItem value="original" id="cat-target-original" aria-labelledby="cat-target-original-label" />
                 <span id="cat-target-original-label" className="text-sm text-muted-foreground dark:text-gray-300">

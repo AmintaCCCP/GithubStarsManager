@@ -174,10 +174,33 @@ const UI_SETTINGS_DATA_KEYS = [
   'releaseExpandedRepositories',
 ] as const;
 
+const IMPORT_DATA_KEYS = [
+  'repositories',
+  'releases',
+  'aiConfigs',
+  'webdavConfigs',
+  'customCategories',
+  'assetFilters',
+  'discoveryRepos',
+  'discoveryTotalCount',
+  'discoveryHasMore',
+  'discoveryNextPage',
+  'subscriptionRepos',
+  'subscriptionLastRefresh',
+  'subscriptionChannels',
+  'releaseSubscriptions',
+  'releaseSourceSettings',
+  'readReleases',
+  'searchFilters',
+  'hiddenDefaultCategoryIds',
+  'defaultCategoryOverrides',
+  'categoryOrder',
+  'proxyConfig',
+  'rpcDownloadConfig',
+  'backendApiSecret',
+] as const;
 const resolveImportTypes = (data: ExportData['data']): string[] => {
-  const present = Object.keys(data).filter(
-    (key) => data[key as keyof ExportData['data']] !== undefined
-  );
+  const present = IMPORT_DATA_KEYS.filter((key) => data[key] !== undefined) as string[];
   if (UI_SETTINGS_DATA_KEYS.some((key) => present.includes(key))) {
     present.push('uiSettings');
   }
@@ -1822,9 +1845,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
               <DialogFooter className="pt-4">
                 <Button
+                  variant="outline"
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 text-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
                 </Button>

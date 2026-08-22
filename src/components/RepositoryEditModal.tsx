@@ -253,7 +253,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    * 确保保存后的数据与UI显示逻辑一致
    */
   const handleSave = async () => {
-    if (!repository) return;
+    if (!repository || formData.category.trim().toLowerCase() === 'none') return;
 
     // 构建更新对象
     const updatedRepo = { ...repository };
@@ -613,7 +613,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     >
       <div className="space-y-5">
         {/* Repository Info Header */}
-        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-border dark:border-primary/20">
+        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-primary/20">
           <img
             src={repository.owner.avatar_url}
             alt={repository.owner.login}
@@ -845,6 +845,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           </div>
 
           <Select value={formData.category || 'none'} onValueChange={(newCategory) => {
+            if (newCategory !== 'none' && newCategory.trim().toLowerCase() === 'none') return;
             const nextCategory = newCategory === 'none' ? '' : newCategory;
             setFormData(prev => ({ ...prev, category: nextCategory, categoryLocked: nextCategory ? prev.categoryLocked : false }));
             setEditIntent(prev => ({ ...prev, category: 'keep-custom' }));
@@ -966,7 +967,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Category Lock - Enhanced */}
-          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-gray-200/80 dark:border-border dark:border-amber-600/20 shadow-sm">
+          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-gray-200/80 dark:border-amber-600/20 shadow-sm">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
@@ -1141,7 +1142,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               type="text"
               value={newTag}
               onChange={(e) => setNewTag(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className={inputClass}
               placeholder={t('添加自定义标签...', 'Add custom tag...')}
             />

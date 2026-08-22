@@ -20,13 +20,13 @@
 | 检查项 | 结果 |
 | --- | --- |
 | `npm run build` | 通过；Vite 生产构建完成且无 chunk warning。当前 legacy 入口为 2,789.46 kB，独立 checker 实测 2,724.09 KiB，低于 3,000 KiB hard budget；Vite warning threshold 独立为 3,072 KiB。 |
-| `npm run test:run` | 通过；31 个测试文件、329 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
+| `npm run test:run` | 通过；31 个测试文件、332 个测试全部通过，无 React/Radix act、Unhandled 或 Warning 输出。 |
 | ReadmeModal/ForkTimeline 定向回归 | ReadmeModal 与 ForkTimeline 既有回归通过；另完成 ReadmeModal + RepositoryCard Radix 交互定向回归，13/13 通过且无 warning。 |
 | `npx tsc -b` | 通过；在依赖完整安装状态下无 TypeScript 诊断。 |
 | `git diff --check` | 通过。 |
 | 生产预览 | 通过；登录壳层、语言切换、主题切换、token 输入、连接入口和 GitHub 外链正常渲染，控制台无 React/Radix/资源加载错误。 |
 
-说明：早期 release evidence 曾记录 29 个测试文件、326 个测试，这是迁移前基线。当前提交新增的回归测试已纳入最终门禁，因此最终准确总数为 31 个测试文件、329 个测试，后续记录均以此为准。
+说明：早期 release evidence 曾记录 29 个测试文件、326 个测试，这是迁移前基线。当前提交新增的回归测试已纳入最终门禁，因此最终准确总数为 31 个测试文件、332 个测试，后续记录均以此为准。
 
 最新 CodeRabbit full review 的 9 个 findings 已完成修复：所有受影响的 compact Button controls 均明确使用 ghost/icon sizing；SearchBar sort menu 已迁移到 Radix radio menu semantics；SortAlgorithmTooltip 使用受控 Popover 支持触摸设备；ReleaseTimeline、ReleaseSourceSettingsModal、NetworkPanel、WebDAVPanel、AIConfigPanel、GeneralPanel 和 MenuManagementPanel 的 accessible names、group associations、padding 和变体已补齐；Discovery topic/platform 请求 key、BulkAction live region、semantic color tokens、duplicate utilities 和 Settings tab ref stability 已同步修正。
 
@@ -93,3 +93,5 @@ cd5f693 后最新 CodeRabbit full review 的 5 个 inline actionable、3 个 out
 本轮验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,794.70 kB，独立 checker 2,729.20 KiB，0 vulnerabilities。
 b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 已全部处理：DataManagementPanel confirmation content 增加 `confirmation.type` guard；NetworkPanel 两个手写开关迁移到共享 Radix Switch；VectorSearchSettings 剩余 gray border/text/focus/surface utilities 统一为 semantic tokens；MarkdownRenderer code-copy 与 zoom overlay controls 明确 Button type/variant/size/compact dimensions；GistCard/GistView 修正 dark primary text；BackendPanel status icons 继承 pill 状态色；SubscriptionRepoCard GitHub 外链阻止父卡片点击冒泡；SliderInput 让 slider 与 marks 共用 flex-1 轨道列；StepperInput 使用 Pointer Events 并限制主鼠标键、支持本地化 labels；ui-refactor-summary.md 的 Vite warning threshold 修正为 3,072 KiB。业务逻辑、store、services、API 和同步流程保持不变。
 最终验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,793.88 kB，独立 checker 2,728.40 KiB，0 vulnerabilities。
+38302c1 后 round-19 CodeRabbit full review 的 6 个 actionable、3 个 outside-diff、2 个 duplicate 与 9 个 nitpick 已全部处理：RepositoryList AI action popup 迁移到共享 DropdownMenu；RepositoryCard 以 ref 记录卡片内 outside-dismiss pointerdown 并新增 pointerdown→click 回归测试；StepperInput 使用 render-time latest value ref、主鼠标键过滤和 unmount cleanup；SearchShortcutsHelp 使用 DialogTrigger 与内置 close；DiscoveryView 在无 token 时不记录 applied topic；MCP port 使用 MCP_DEFAULT_PORT 并校验 1–65535；DataManagementPanel 导入类型过滤 bookkeeping keys、取消按钮使用 outline、confirmation content 增加 type guard；BulkRestore 三组 RadioGroup 关联 section headings；SettingsPanel inactive tabs 移除无效 aria-controls；RepositoryEditModal 拒绝真实 `none` 分类、使用 onKeyDown 并清理冲突 dark borders；CategoryPanel RadioGroup 标题使用 label/htmlFor；SyncModeChoiceModal 抽取共享 option class；共享 alert-dialog/dialog 复用 buttonVariants 并补齐 fade/zoom；MarkdownRenderer 控件统一 ghost/icon compact API；GistCard/GistView、BackendPanel、SubscriptionRepoCard、SliderInput 与 UI 走查证据同步修正。业务逻辑、store、services、API 和同步流程保持不变。
+最终验证通过：31 个测试文件、332 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,794.15 kB，独立 checker 2,728.67 KiB，0 vulnerabilities。
