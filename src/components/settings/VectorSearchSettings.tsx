@@ -858,12 +858,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   : 'border-border hover:border-input'
               }`}
             >
-              <div className="font-medium text-foreground dark:text-foreground">
+              <span className="block font-medium text-foreground dark:text-foreground">
                 {t('仓库描述', 'Description')}
-              </div>
-              <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">
                 {t('⚡ 速度快，精度较低', '⚡ Fast, lower precision')}
-              </div>
+              </span>
             </Button>
             <Button
               variant="outline"
@@ -875,12 +875,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   : 'border-border hover:border-input'
               }`}
             >
-              <div className="font-medium text-foreground dark:text-foreground">
+              <span className="block font-medium text-foreground dark:text-foreground">
                 {t('README 内容', 'README Content')}
-              </div>
-              <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">
                 {t('🎯 精度高，速度较慢', '🎯 High precision, slower')}
-              </div>
+              </span>
             </Button>
           </div>
         </div>
