@@ -583,12 +583,18 @@ Repository information:
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="ai-use-custom-prompt"
+                    aria-labelledby="ai-use-custom-prompt-label"
                     checked={form.useCustomPrompt}
                     onCheckedChange={(checked) => handleUseCustomPromptChange(checked === true)}
                   />
-                  <label htmlFor="ai-use-custom-prompt" className="text-sm font-medium text-foreground dark:text-muted-foreground">
+                  <button
+                    type="button"
+                    id="ai-use-custom-prompt-label"
+                    className="text-left text-sm font-medium text-foreground dark:text-muted-foreground"
+                    onClick={() => handleUseCustomPromptChange(!form.useCustomPrompt)}
+                  >
                     {t('使用自定义提示词', 'Use Custom Prompt')}
-                  </label>
+                  </button>
                 </div>
                 <Button
                   type="button"

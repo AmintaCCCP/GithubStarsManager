@@ -666,9 +666,9 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               {t('自动检测', 'Auto Detect')}
             </Button>
           </div>
-          <Alert className="bg-muted/40 text-muted-foreground">
-            <AlertDescription>{t('必须与 Vectorize 索引维度一致', 'Must match Vectorize index dimensions')}</AlertDescription>
-          </Alert>
+          <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+            {t('必须与 Vectorize 索引维度一致', 'Must match Vectorize index dimensions')}
+          </p>
         </div>
 
         {/* Test & Save */}
@@ -1209,19 +1209,17 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
 
             {/* 模型变更警告 */}
-            <Alert className="bg-muted/40 text-muted-foreground">
-              <AlertDescription>
-                <p className="font-medium text-foreground">
-                  {t('更换 Embedding 模型后必须重建索引', 'Must rebuild index after changing Embedding model')}
-                </p>
-                <p className="mt-1 text-xs">
-                  {t(
-                    '不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」',
-                    'Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click "Rebuild Vector Index" below'
-                  )}
-                </p>
-              </AlertDescription>
-            </Alert>
+            <div className="rounded-lg border border-border bg-muted/40 p-4 text-muted-foreground">
+              <p className="font-medium text-foreground">
+                {t('更换 Embedding 模型后必须重建索引', 'Must rebuild index after changing Embedding model')}
+              </p>
+              <p className="mt-1 text-xs">
+                {t(
+                  '不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」',
+                  'Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click "Rebuild Vector Index" below'
+                )}
+              </p>
+            </div>
 
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('详细部署指南请参考', 'For detailed instructions, see')}{' '}
