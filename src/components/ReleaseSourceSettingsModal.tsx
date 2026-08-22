@@ -358,23 +358,23 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                     : 'border-border bg-card hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-card/[0.05]'
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
+                <span className="flex items-start gap-3">
+                  <span className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-foreground dark:text-foreground">{source.title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{source.description}</div>
-                  </div>
-                </div>
-                <div className="flex flex-shrink-0 items-center gap-3">
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground dark:text-foreground">{source.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">{source.description}</span>
+                  </span>
+                </span>
+                <span className="flex flex-shrink-0 items-center gap-3">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
                     {source.count}
                   </span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
                   </span>
-                </div>
+                </span>
               </Button>
             );
           })}
