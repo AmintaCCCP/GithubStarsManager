@@ -74,13 +74,21 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           if (data.hasSecret) {
             setHasStoredSecret(true);
           }
-          // Merge backend state into store (enabled/host/port)
+          // Hydrate backend state into the store and form without overwriting local draft edits.
           if (data.enabled !== undefined || data.host || data.port) {
-            setRpcDownloadConfig({
-              enabled: data.enabled ?? rpcDownloadConfig.enabled,
-              host: data.host || rpcDownloadConfig.host,
-              port: data.port || rpcDownloadConfig.port,
-            });
+            const currentStoreConfig = useAppStore.getState().rpcDownloadConfig;
+            const hydratedConfig = {
+              ...currentStoreConfig,
+              enabled: data.enabled ?? currentStoreConfig.enabled,
+              host: data.host || currentStoreConfig.host,
+              port: data.port || currentStoreConfig.port,
+            };
+            setRpcForm((currentForm) => (
+              JSON.stringify(currentForm) === JSON.stringify(currentStoreConfig)
+                ? hydratedConfig
+                : currentForm
+            ));
+            setRpcDownloadConfig(hydratedConfig);
           }
         }
       } catch { /* best effort */ }
