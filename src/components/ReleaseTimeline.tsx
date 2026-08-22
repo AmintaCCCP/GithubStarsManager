@@ -757,10 +757,7 @@ export const ReleaseTimeline: React.FC = () => {
                    className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                  />
                </Button>
-               <span
-                 className="cursor-pointer text-sm text-muted-foreground dark:text-muted-foreground"
-                 onClick={() => setIncludePreRelease(!includePreRelease)}
-               >
+               <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                  {t('包含 Pre-release', 'Include Pre-release')}
                </span>
              </div>
@@ -876,10 +873,7 @@ export const ReleaseTimeline: React.FC = () => {
                   className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${includePreRelease ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
                 />
               </Button>
-              <span
-                className="hidden cursor-pointer text-xs text-muted-foreground dark:text-muted-foreground sm:inline"
-                onClick={() => setIncludePreRelease(!includePreRelease)}
-              >
+              <span className="hidden text-xs text-muted-foreground dark:text-muted-foreground sm:inline">
                 {t('Pre', 'Pre')}
               </span>
             </div>

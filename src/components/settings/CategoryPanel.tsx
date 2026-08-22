@@ -631,7 +631,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             )}
                             <Button
                               onClick={() => handleResetDefault(category.id, originalCategory)}
-                              className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                              className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
                             >
                               {t('全部', 'All')}
                             </Button>
