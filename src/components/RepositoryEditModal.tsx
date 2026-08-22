@@ -971,7 +971,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
-                  <Lock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground dark:text-amber-600" />
+                  <Lock className="w-4 h-4 text-muted-foreground dark:text-amber-600" />
                 ) : (
                   <Unlock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                 )}

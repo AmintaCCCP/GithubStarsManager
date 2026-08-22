@@ -1,5 +1,5 @@
 import { Button } from './ui/button';
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useId, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   RefreshCw,
   TrendingUp,
@@ -203,8 +203,8 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               transition-all duration-200 ease-out
               focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
               ${selectedChannel === channel.id
-                ? 'text-muted-foreground dark:text-muted-foreground '
-                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
+                ? 'text-foreground dark:text-foreground '
+                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
               }
             `}
           >
@@ -258,12 +258,16 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
   }, []);
 
   const selectedPlatform = platforms.find(p => p.id === platform);
+  const menuId = 'discovery-platform-filter-menu';
 
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
         variant="ghost"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
       >
         <Filter className="w-4 h-4" />
@@ -272,7 +276,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
       </Button>
 
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
+        <div id={menuId} role="menu" className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)]">
           {platforms.map((p) => (
             <Button
               key={p.id}
@@ -281,6 +285,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
                 setIsOpen(false);
               }}
               variant="ghost"
+              role="menuitem"
               className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 platform === p.id
                   ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'
@@ -320,6 +325,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuIdSuffix = useId();
+  const menuId = `discovery-custom-select-${menuIdSuffix}`;
 
   const selectedOption = options.find(o => o.value === value);
 
@@ -340,6 +347,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         variant="outline"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
       >
         {selectedOption?.icon && <span className="w-4 h-4">{selectedOption.icon}</span>}
@@ -348,7 +358,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       </Button>
 
       {isOpen && (
-        <div className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
+        <div id={menuId} role="menu" className={`absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-48 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg py-1 z-50 max-w-[calc(100vw-2rem)] ${dropdownClassName}`}>
           {options.map((option) => (
             <Button
               key={option.value}
@@ -358,6 +368,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                 setIsOpen(false);
               }}
               variant="ghost"
+              role="menuitem"
               className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 value === option.value
                   ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-foreground'

@@ -972,7 +972,6 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('输入任意emoji...', 'Enter any emoji...')}
                   className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground text-center text-lg"
-                  maxLength={4}
                   autoFocus
                 />
                 <Button
