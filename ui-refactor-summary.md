@@ -82,3 +82,6 @@ ff639df 后最新 CodeRabbit review 的所有 comments 已完成修复：BackupP
 a5175b9 后最新 CodeRabbit review 的 comments 已处理：FilterModal 保存按钮使用 primary-derived hover surface；ReleaseCard RPC 资产行使用 ghost variant；测试证据说明明确区分迁移前 29/326 历史基线与当前新增回归测试后的最终 31/329 总数。未改变任何业务逻辑、store、services、API 或同步流程。
 
 本轮验证通过：31 个测试文件、329 个测试全部通过，lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,791.76 kB，独立 checker 2,726.34 KiB，0 vulnerabilities。
+
+debbaa4 后本轮 CodeRabbit 遗留问题已处理：SettingsPanel tabpanel 直接使用当前 `displayTab` 的本地化 `aria-label`，避免移动端引用 CSS-hidden 的 desktop tab id；DataManagementPanel 导出选项改为受控 React state，导入文件控件使用 `peer sr-only` 并保留 focus-visible ring；VectorSearchSettings Auto Detect 改用实例 ref，index-mode buttons 支持纵向布局和长文本换行；GistView、DiagnosticLogsPanel、McpSettingsPanel 补齐输入 accessible names；ReleaseTimeline 清除按钮与搜索输入完成 compact spacing；SearchBar 新增 history/suggestion dropdown blur/click 交互测试。业务逻辑、store、services、API 和同步流程保持不变。
+本轮验证通过：31 个测试文件、331 个测试全部通过；lint、TypeScript、生产构建、3,000 KiB bundle budget、diff check 和生产依赖安全审计均通过；legacy 入口 2,792.90 kB，独立 checker 2,727.45 KiB，0 vulnerabilities。

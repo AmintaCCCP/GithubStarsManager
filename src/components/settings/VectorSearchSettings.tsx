@@ -78,6 +78,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [formApiKey, setFormApiKey] = useState(activeConfig?.apiKey || '');
   const [formModel, setFormModel] = useState(activeConfig?.model || '');
   const [formDimensions, setFormDimensions] = useState(activeConfig?.dimensions || 1536);
+  const dimensionsInputRef = React.useRef<HTMLInputElement>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
   // Worker form state
@@ -626,6 +627,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <div className="flex gap-2">
             <Input
               id="embedding-dimensions"
+              ref={dimensionsInputRef}
               type="number"
               value={formDimensions}
               onChange={(e) => setFormDimensions(parseInt(e.target.value) || 1536)}
@@ -636,8 +638,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 const dim = DEFAULT_DIMENSIONS[formApiType];
                 setFormDimensions(dim);
                 // 临时高亮显示已设置的维度
-                const input = document.querySelector(`input[type="number"]`) as HTMLInputElement;
-                if (input) { input.focus(); input.select(); }
+                dimensionsInputRef.current?.focus();
+                dimensionsInputRef.current?.select();
               }}
               className="px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-gray-300 rounded-md hover:bg-accent dark:hover:bg-accent"
             >
@@ -841,7 +843,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               variant="outline"
               onClick={() => setFormIndexMode('description')}
               aria-pressed={formIndexMode === 'description'}
-              className={`h-auto p-3 text-left text-sm rounded-lg border transition-colors ${
+              className={`h-auto flex-col items-start whitespace-normal p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'description'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -858,7 +860,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               variant="outline"
               onClick={() => setFormIndexMode('readme')}
               aria-pressed={formIndexMode === 'readme'}
-              className={`h-auto p-3 text-left text-sm rounded-lg border transition-colors ${
+              className={`h-auto flex-col items-start whitespace-normal p-3 text-left text-sm rounded-lg border transition-colors ${
                 formIndexMode === 'readme'
                   ? 'border-primary bg-primary/5 dark:bg-primary/10'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'

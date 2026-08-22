@@ -918,7 +918,7 @@ export const ReleaseTimeline: React.FC = () => {
                 setReleaseSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ui-field w-full pl-10 pr-10 py-2 text-foreground dark:text-foreground"
+              className="ui-field w-full pl-10 pr-12 py-2 text-foreground dark:text-foreground"
             />
             {searchQuery && (
               <Button
@@ -929,7 +929,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setCurrentPage(1);
                 }}
                 aria-label={t('清除搜索', 'Clear search')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
+                className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-gray-300"
               >
                 <X className="w-4 h-4" />
               </Button>
