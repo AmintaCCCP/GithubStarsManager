@@ -1,5 +1,6 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Cable,
@@ -49,8 +50,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     messages: '/messages',
   });
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [portInput, setPortInput] = useState(String(mcpConfig.port || MCP_DEFAULT_PORT));
 
   const isElectronApp = isElectron();
+
+  useEffect(() => {
+    setPortInput(String(mcpConfig.port || MCP_DEFAULT_PORT));
+  }, [mcpConfig.port]);
 
   const baseUrl = useMemo(() => {
     // Electron local MCP always listens on loopback (shared host normalizer)
@@ -254,23 +260,12 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
                   : t('需要后端连接', 'Requires backend connection')}
             </p>
           </div>
-          <Button
-            type="button"
-            role="switch"
-            aria-checked={mcpConfig.enabled}
+          <Switch
+            checked={mcpConfig.enabled}
             disabled={saving || loading}
-            onClick={() => void handleToggle(!mcpConfig.enabled)}
+            onCheckedChange={(checked) => void handleToggle(checked)}
             aria-label={t('启用 MCP 服务', 'Enable MCP service')}
-            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer justify-start rounded-full border-2 border-transparent p-0 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background ${
-              mcpConfig.enabled ? 'bg-primary' : 'bg-accent dark:bg-accent'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                mcpConfig.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </Button>
+          />
         </div>
 
         <div className="flex items-center gap-2 text-sm">
@@ -335,14 +330,23 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
                 type="number"
                 min={1}
                 max={65535}
-                value={mcpConfig.port}
+                value={portInput}
                 onChange={(e) => {
-                const parsed = Number(e.target.value);
-                const port = Number.isFinite(parsed) && parsed >= 1 && parsed <= 65535
-                  ? parsed
-                  : MCP_DEFAULT_PORT;
-                setMcpConfig({ port });
-              }}
+                  const value = e.target.value;
+                  setPortInput(value);
+                  const parsed = Number(value);
+                  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+                    setMcpConfig({ port: parsed });
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(portInput);
+                  const port = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535
+                    ? parsed
+                    : MCP_DEFAULT_PORT;
+                  setPortInput(String(port));
+                  setMcpConfig({ port });
+                }}
                 className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
               />
             </label>

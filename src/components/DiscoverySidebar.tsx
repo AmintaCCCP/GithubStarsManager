@@ -62,10 +62,14 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
             {t('发现频道', 'Discovery Channels')}
           </h3>
           <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            className="p-1.5 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={t('刷新全部', 'Refresh All')}
             title={t('刷新全部', 'Refresh All')}
+            className="h-8 w-8"
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
           </Button>

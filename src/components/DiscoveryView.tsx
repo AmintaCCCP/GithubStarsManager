@@ -672,6 +672,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
       }
     } catch (error) {
       if (!isCurrentTopicRequest()) return;
+      if (channelId === 'topic') {
+        appliedTopicRef.current = null;
+      }
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) {
         setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
@@ -1135,9 +1138,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         </div>
                       </div>
                       <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={handleAbortAnalysis}
-                        className="p-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+                        aria-label={t('停止分析', 'Stop analysis')}
                         title={t('停止', 'Stop')}
+                        className="h-8 w-8"
                       >
                         <X className="w-4 h-4" />
                       </Button>
