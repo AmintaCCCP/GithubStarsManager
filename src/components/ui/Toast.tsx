@@ -10,6 +10,7 @@ interface ToastProps {
   type: ToastType;
   onClose: () => void;
   duration?: number;
+  closeLabel?: string;
 }
 
 const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
@@ -21,7 +22,7 @@ const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: st
 
 const TOAST_EXIT_DURATION_MS = 150;
 
-export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000 }) => {
+export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000, closeLabel = 'Close' }) => {
   const { icon: Icon, className } = TOAST_META[type];
   const [open, setOpen] = React.useState(true);
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,7 +54,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration =
         <ToastPrimitive.Close asChild>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={closeLabel}
             className="rounded p-1 opacity-70 transition-opacity hover:bg-black/5 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring/30 dark:hover:bg-accent"
           >
             <X className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />

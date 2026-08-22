@@ -686,7 +686,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       key={entry.id}
                       role={hasHttpDetail ? 'button' : undefined}
                       tabIndex={hasHttpDetail ? 0 : undefined}
-                      aria-label={hasHttpDetail ? t('查看 HTTP 详情', 'View HTTP details') : undefined}
+                      aria-label={hasHttpDetail ? t(`查看 HTTP 详情：${entry.module} ${entry.message}`, `View HTTP details: ${entry.module} ${entry.message}`) : undefined}
                       className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset' : ''}`}
                       onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
                       onKeyDown={hasHttpDetail ? (event) => {
