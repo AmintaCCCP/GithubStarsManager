@@ -1,4 +1,5 @@
 import { GitBranch, ListChecks, Loader2, Star } from 'lucide-react';
+import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useDialog } from '../../hooks/useDialog';
 import { createGitHubListsApiService } from '../../services/githubApiFactory';

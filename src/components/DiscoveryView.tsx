@@ -1082,7 +1082,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             <div className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
               <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
-                <SelectTrigger className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('时间范围', 'Time range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">{t('今日', 'Today')}</SelectItem>
                   <SelectItem value="weekly">{t('本周', 'This Week')}</SelectItem>
@@ -1093,7 +1093,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           )}
         {selectedDiscoveryChannel === 'topic' && (
                   <Select value={discoverySelectedTopic || 'all'} onValueChange={(value) => setDiscoverySelectedTopic(value === 'all' ? null : value as TopicCategory)}>
-                    <SelectTrigger className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
+                    <SelectTrigger aria-label={t('主题筛选', 'Topic filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('主题', 'Topic')}</SelectItem>
                       <SelectItem value="ai">{t('人工智能', 'AI')}</SelectItem>
@@ -1202,7 +1202,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 
                 <div className="flex flex-wrap gap-2.5">
                   <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
-                    <SelectTrigger className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={t('编程语言', 'Programming language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">{t('所有语言', 'All Languages')}</SelectItem>
                       <SelectItem value="JavaScript">JavaScript</SelectItem>
