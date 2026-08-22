@@ -238,7 +238,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       const initialData = {
         description: effectiveDescription,
         tags: effectiveTags,
-        category: currentCategory,
+        category: currentCategory.trim().toLowerCase() === 'none' ? '' : currentCategory,
         categoryLocked: !!repository.category_locked
       };
 

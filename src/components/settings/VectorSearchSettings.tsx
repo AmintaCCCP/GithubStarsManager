@@ -529,8 +529,10 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               <Button
                 key={type.value}
                 onClick={() => {
+                  const dimensions = DEFAULT_DIMENSIONS[type.value];
                   setFormApiType(type.value);
-                  setFormDimensions(DEFAULT_DIMENSIONS[type.value]);
+                  setFormDimensions(dimensions);
+                  setFormDimensionsInput(String(dimensions));
                 }}
                 aria-pressed={formApiType === type.value}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${

@@ -200,6 +200,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
               key={tab.id}
               variant="ghost"
               onClick={() => setActiveTab(tab.id)}
+              aria-pressed={activeTab === tab.id}
               className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-primary text-primary dark:text-primary'

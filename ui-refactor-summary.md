@@ -103,3 +103,11 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 本轮定向回归为 6 个测试文件/21 个测试全部通过；完整质量门禁为 31 个测试文件/332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,793.82 kB，独立 checker 2,728.35 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
 
 本记录对应的代码修复尚待提交推送及后续 CodeRabbit full review；只有 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
+
+## Round-21 CodeRabbit remediation status
+
+2026-08-22 07:19:18Z 的 subsequent CodeRabbit full review 报告 6 条 inline findings，均已完成最小范围修复：GistView sort trigger 增加 `aria-expanded`；RepositoryEditModal 将 legacy `custom_category="none"` 归一化为空分类；DiagnosticLogsPanel 详情视图按钮补充 `aria-pressed`；VectorSearchSettings 切换 embedding source 时同步 displayed dimensions draft；DropdownMenuContent/SubContent 使用 `bg-popover` 与 `text-popover-foreground`；发布状态记录修正为与实际 commit 和 review 状态一致。未改变 store、services、API、同步流程、AI 行为或数据流。
+
+本轮定向回归为 6 个测试文件/21 个测试全部通过；全量质量门禁为 31 个测试文件/332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记。lint 通过且 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过，legacy 入口 2,793.84 kB，独立 checker 2,728.36 KiB；`git diff --check` 通过；生产依赖审计为 0 vulnerabilities。
+
+本节为待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
