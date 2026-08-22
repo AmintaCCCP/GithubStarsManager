@@ -10,6 +10,7 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
+import { isReservedCategoryName } from '../utils/categoryUtils';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
@@ -789,7 +790,7 @@ export const SearchBar: React.FC = () => {
           // 仓库会从分类结果中消失（如 list 名为 "web apps" 而分类为 "Web Apps"）。
           const categoryByLowerName = new Map(
             allCategories
-              .filter(c => c.id !== 'all')
+              .filter(c => c.id !== 'all' && !isReservedCategoryName(c.name))
               .map(c => [c.name.toLowerCase(), c.name])
           );
 
@@ -800,7 +801,7 @@ export const SearchBar: React.FC = () => {
           let createdCategoriesCount = 0;
           lists.forEach((list, idx) => {
             const lower = list.name.toLowerCase();
-            if (categoryByLowerName.has(lower)) return;
+            if (isReservedCategoryName(list.name) || categoryByLowerName.has(lower)) return;
             const newCategory = {
               id: `custom-sync-${Date.now()}-${idx}`,
               name: list.name,

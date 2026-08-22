@@ -797,11 +797,11 @@ export const ReleaseTimeline: React.FC = () => {
                 </p>
                 <div className="bg-card dark:bg-card/60 rounded-lg p-3 text-sm">
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
-                    <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">1</span>
+                    <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">1</span>
                     <span>{t('前往仓库页面', 'Go to Repositories')}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium">
-                    <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">2</span>
+                    <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">2</span>
                     <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
                   </div>
                 </div>
