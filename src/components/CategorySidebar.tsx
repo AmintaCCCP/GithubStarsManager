@@ -397,7 +397,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         <div className="relative flex shrink-0 lg:sticky lg:top-16 lg:self-start z-10">
           {/* 侧栏容器 */}
           <div
-              className={`linear-sidebar relative overflow-visible transition-all duration-250 ease-out ${
+              className={`linear-sidebar relative overflow-visible transition-all duration-200 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
                 : 'w-64 p-4'
