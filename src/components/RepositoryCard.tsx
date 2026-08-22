@@ -909,6 +909,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       ref={cardRef}
       className={cardClassName}
       onClick={handleCardClick}
+      onPointerDown={() => {
+        menuDismissedByPointerDownRef.current = false;
+      }}
       onMouseDown={handleMouseDown}
       onKeyDown={handleCardKeyDown}
       tabIndex={isModalOpen ? -1 : 0}
@@ -1354,7 +1357,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* README Modal - Using portal to render outside card container */}
-      {readmeModalOpen && createPortal(
+      {createPortal(
         <ReadmeModal
           isOpen={readmeModalOpen}
           onClose={() => setReadmeModalOpen(false)}

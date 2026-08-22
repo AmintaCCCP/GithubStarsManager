@@ -76,7 +76,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
       </div>
 
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" closeLabel={t('关闭', 'Close')}>
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20"><Package className="h-6 w-6 text-primary" /></div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from './button';
 
@@ -26,7 +26,10 @@ export const StepperInput: React.FC<StepperInputProps> = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const valueRef = useRef(value);
-  valueRef.current = value;
+
+  useLayoutEffect(() => {
+    valueRef.current = value;
+  }, [value, onChange]);
 
   const clamp = useCallback((nextValue: number) => {
     let result = nextValue;

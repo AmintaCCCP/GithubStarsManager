@@ -201,7 +201,7 @@ const IMPORT_DATA_KEYS = [
 ] as const;
 const resolveImportTypes = (data: ExportData['data']): string[] => {
   const present = IMPORT_DATA_KEYS.filter((key) => data[key] !== undefined) as string[];
-  if (UI_SETTINGS_DATA_KEYS.some((key) => present.includes(key))) {
+  if (UI_SETTINGS_DATA_KEYS.some((key) => data[key] !== undefined)) {
     present.push('uiSettings');
   }
   return present;
@@ -1457,7 +1457,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 exportData(selectedExportTypes);
               }}
               disabled={isExporting}
-              className="w-full px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="w-full gap-2"
             >
               {isExporting ? (
                 <>
@@ -1613,8 +1613,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 )}
               </p>
               <Button
+                variant="destructive"
                 onClick={() => openConfirmation('all')}
-                className="mt-4 h-auto px-6 py-3 bg-destructive hover:bg-red-600 dark:hover:bg-red-700 text-destructive-foreground font-semibold rounded-lg transition-colors flex items-center space-x-2"
+                className="mt-4 h-auto px-6 py-3 font-semibold gap-2"
               >
                 <Trash2 className="w-5 h-5" />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>
@@ -1776,7 +1777,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             }
           }}
         >
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg" closeLabel={t('关闭', 'Close')}>
             <DialogHeader className="rounded-lg bg-background dark:bg-card">
               <DialogTitle className="flex items-center gap-3 text-muted-foreground">
                 <Upload className="h-6 w-6" />

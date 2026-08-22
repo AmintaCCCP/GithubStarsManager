@@ -561,7 +561,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     };
   }, []);
 
-  if (!isOpen || !repository) return null;
+  if (!repository) return null;
 
   const tocIndentClass = (level: number): string => {
     switch (level) {
@@ -589,6 +589,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
+        closeLabel={language === 'zh' ? '关闭' : 'Close'}
         showClose={false}
         aria-describedby={undefined}
         className="w-[calc(100%-2rem)] max-w-[1130px] overflow-hidden p-0"

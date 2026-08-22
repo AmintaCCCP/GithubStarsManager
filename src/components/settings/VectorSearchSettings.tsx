@@ -81,6 +81,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [formApiKey, setFormApiKey] = useState(activeConfig?.apiKey || '');
   const [formModel, setFormModel] = useState(activeConfig?.model || '');
   const [formDimensions, setFormDimensions] = useState(activeConfig?.dimensions || 1536);
+  const [formDimensionsInput, setFormDimensionsInput] = useState(String(activeConfig?.dimensions || 1536));
   const dimensionsInputRef = React.useRef<HTMLInputElement>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -92,10 +93,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   // Index mode state
   const [formIndexMode, setFormIndexMode] = useState<'description' | 'readme'>(vectorSearchConfig.indexMode || 'readme');
   const [formReadmeMaxChars, setFormReadmeMaxChars] = useState(vectorSearchConfig.readmeMaxChars || 6000);
+  const [formReadmeMaxCharsInput, setFormReadmeMaxCharsInput] = useState(String(vectorSearchConfig.readmeMaxChars || 6000));
 
   // Search parameters state
   const [formSearchThreshold, setFormSearchThreshold] = useState(vectorSearchConfig.searchThreshold ?? 0.35);
   const [formSearchTopK, setFormSearchTopK] = useState(vectorSearchConfig.searchTopK ?? 30);
+  const [formSearchTopKInput, setFormSearchTopKInput] = useState(String(vectorSearchConfig.searchTopK ?? 30));
   const [formEnableHyDE, setFormEnableHyDE] = useState(vectorSearchConfig.enableHyDE ?? true);
   const [formEnableReranking, setFormEnableReranking] = useState(vectorSearchConfig.enableReranking ?? true);
 
@@ -124,6 +127,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       setFormApiKey(activeConfig.apiKey);
       setFormModel(activeConfig.model);
       setFormDimensions(activeConfig.dimensions);
+      setFormDimensionsInput(String(activeConfig.dimensions));
     }
   }, [activeConfig]);
 
@@ -632,14 +636,23 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               id="embedding-dimensions"
               ref={dimensionsInputRef}
               type="number"
-              value={formDimensions}
-              onChange={(e) => setFormDimensions(parseInt(e.target.value) || 1536)}
+              value={formDimensionsInput}
+              onChange={(e) => setFormDimensionsInput(e.target.value)}
+              onBlur={() => {
+                const parsed = Number(formDimensionsInput);
+                const dimensions = Number.isFinite(parsed) && parsed > 0
+                  ? parsed
+                  : DEFAULT_DIMENSIONS[formApiType];
+                setFormDimensions(dimensions);
+                setFormDimensionsInput(String(dimensions));
+              }}
               className="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               onClick={() => {
                 const dim = DEFAULT_DIMENSIONS[formApiType];
                 setFormDimensions(dim);
+                setFormDimensionsInput(String(dim));
                 // 临时高亮显示已设置的维度
                 dimensionsInputRef.current?.focus();
                 dimensionsInputRef.current?.select();
@@ -888,8 +901,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             <Input
               id="readme-max-characters"
               type="number"
-              value={formReadmeMaxChars}
-              onChange={(e) => setFormReadmeMaxChars(Math.max(500, parseInt(e.target.value) || 6000))}
+              value={formReadmeMaxCharsInput}
+              onChange={(e) => setFormReadmeMaxCharsInput(e.target.value)}
+              onBlur={() => {
+                const parsed = Number(formReadmeMaxCharsInput);
+                const maxChars = Number.isFinite(parsed)
+                  ? Math.min(20000, Math.max(500, parsed))
+                  : 6000;
+                setFormReadmeMaxChars(maxChars);
+                setFormReadmeMaxCharsInput(String(maxChars));
+              }}
               min={500}
               max={20000}
               step={1000}
@@ -1019,8 +1040,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Input
             id="search-topk"
             type="number"
-            value={formSearchTopK}
-            onChange={(e) => setFormSearchTopK(Math.max(5, Math.min(50, parseInt(e.target.value) || 30)))}
+            value={formSearchTopKInput}
+            onChange={(e) => setFormSearchTopKInput(e.target.value)}
+            onBlur={() => {
+              const parsed = Number(formSearchTopKInput);
+              const topK = Number.isFinite(parsed)
+                ? Math.min(50, Math.max(5, parsed))
+                : 30;
+              setFormSearchTopK(topK);
+              setFormSearchTopKInput(String(topK));
+            }}
             min={5}
             max={50}
             className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
@@ -1145,8 +1174,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           </Button>
         </div>
 
-        {showDeployGuide && (
-          <div id="vector-deploy-guide" className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
+        <div id="vector-deploy-guide" hidden={!showDeployGuide} className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
             {/* 首次部署 */}
             <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
               <p className="font-medium text-foreground dark:text-foreground mb-2">
@@ -1220,8 +1248,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 cloudflare-worker/README.md
               </a>
             </p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

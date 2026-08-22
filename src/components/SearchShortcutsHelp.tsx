@@ -17,7 +17,7 @@ export const SearchShortcutsHelp: React.FC = () => {
           <Keyboard className="h-3 w-3" /><span>{t('快捷键', 'Shortcuts')}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" closeLabel={t('关闭', 'Close')}>
         <DialogHeader>
           <div className="flex items-center gap-2"><Keyboard className="h-5 w-5 text-primary" /><DialogTitle>{t('搜索快捷键', 'Search Shortcuts')}</DialogTitle></div>
           <DialogDescription>{t('查看可用的搜索键盘快捷键。', 'View the available keyboard shortcuts for search.')}</DialogDescription>
