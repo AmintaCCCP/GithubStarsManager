@@ -45,8 +45,8 @@ const LEVEL_FILTER_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destruc
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  '2': 'text-foreground',
-  '4': 'text-muted-foreground',
+  '2': 'text-muted-foreground',
+  '4': 'text-foreground',
   '5': 'text-destructive',
 };
 

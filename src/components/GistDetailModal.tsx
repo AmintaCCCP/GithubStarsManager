@@ -138,16 +138,15 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
   const loadedActiveContent = activeFile ? loadedContents[activeFile.filename] : undefined;
-  const requiresLoadedContent = Boolean(activeFile && (
-    activeFile.truncated || (!activeFile.content && activeFile.raw_url)
+  const effectiveActiveFile = activeFile && loadedActiveContent !== undefined
+    ? { ...activeFile, content: loadedActiveContent, truncated: false }
+    : activeFile;
+  const requiresLoadedContent = Boolean(effectiveActiveFile && (
+    effectiveActiveFile.truncated || (!effectiveActiveFile.content && effectiveActiveFile.raw_url)
   ));
-  const canCopyActiveFile = Boolean(activeFile) && (
-    !requiresLoadedContent || loadedActiveContent !== undefined
-  );
-  const activeCopyContent = activeFile
-    ? requiresLoadedContent
-      ? loadedActiveContent ?? ''
-      : activeFile.content ?? loadedActiveContent ?? ''
+  const canCopyActiveFile = Boolean(effectiveActiveFile) && !requiresLoadedContent;
+  const activeCopyContent = effectiveActiveFile
+    ? effectiveActiveFile.content ?? ''
     : '';
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
@@ -165,10 +164,10 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
     if (!targetFile || (targetFile.content && !targetFile.truncated)) return;
     updateGist({
       ...latest,
-      files: {
-        ...latest.files,
-        [filename]: { ...targetFile, content },
-      },
+        files: {
+          ...latest.files,
+          [filename]: { ...targetFile, content, truncated: false },
+        },
     });
   };
 
@@ -262,7 +261,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             </div>
             <HighlightedCode
               key={`${gist.id}:${activeFile.filename}:${activeFile.raw_url ?? ''}`}
-              file={activeFile}
+              file={effectiveActiveFile!}
               onContentLoaded={handleContentLoaded}
             />
           </div>
