@@ -354,7 +354,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="bg-muted dark:bg-muted/40 rounded-md border border-border max-h-72 overflow-y-auto">
+              <div className="bg-muted rounded-md border border-border max-h-72 overflow-y-auto">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
@@ -374,7 +374,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         }}
                         disabled={isDownloading || isDownloaded}
                         className={`h-auto flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 disabled:opacity-60 ${
-                          link.isSourceCode ? 'bg-muted dark:bg-muted/40' : ''
+                          link.isSourceCode ? 'bg-accent/60' : ''
                         }`}
                       >
                         <div className="flex items-center space-x-1.5 min-w-0 flex-1">
@@ -415,7 +415,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 ${
-                        link.isSourceCode ? 'bg-muted dark:bg-muted/40' : ''
+                        link.isSourceCode ? 'bg-accent/60' : ''
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();

@@ -196,7 +196,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             variant="ghost"
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-primary/15 dark:hover:text-primary"
+            className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-primary/15 dark:hover:text-primary"
             title={t('AI分析', 'AI analyze')}
           >
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
@@ -205,7 +205,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             type="button"
             variant="ghost"
             onClick={handleCopyLink}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
+            className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={t('复制链接', 'Copy link')}
           >
             <Copy className="h-4 w-4" />
@@ -215,7 +215,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
+            className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={t('打开链接', 'Open link')}
           >
             <ExternalLink className="h-4 w-4" />
@@ -226,7 +226,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               variant="ghost"
               onClick={handleUnstar}
               disabled={isMutating}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
+              className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
               title={t('取消收藏', 'Unstar')}
             >
               <StarOff className="h-4 w-4" />
@@ -241,7 +241,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                   event.stopPropagation();
                   onEdit(gist);
                 }}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
                 title={t('编辑', 'Edit')}
               >
                 <Edit3 className="h-4 w-4" />
@@ -251,7 +251,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isMutating}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
                 title={t('删除', 'Delete')}
               >
                 <Trash2 className="h-4 w-4" />

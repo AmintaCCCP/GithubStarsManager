@@ -4,6 +4,7 @@ import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ScrollText,
@@ -89,13 +90,6 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
   const [activeTab, setActiveTab] = useState<ModalTab>('general');
   const eventType = inferEventType(entry.module, entry.message, entry.data);
   const entryData = entry.data as Record<string, unknown> | undefined;
-
-  // Escape to close
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -186,24 +180,31 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-3xl max-h-[80vh] bg-card dark:bg-card rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        aria-describedby={undefined}
+        showClose={false}
+        className="grid-rows-[auto_auto_minmax(0,1fr)] max-w-3xl max-h-[80vh] overflow-hidden p-0"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border dark:border-border">
-          <div className="flex items-center space-x-3 min-w-0">
+        <DialogHeader className="flex-row items-center justify-between space-y-0 border-b border-border px-5 py-4">
+          <div className="flex min-w-0 items-center space-x-3">
             <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
-            <span className="font-medium text-foreground dark:text-foreground truncate">{entry.message}</span>
+            <DialogTitle className="truncate text-sm font-medium leading-normal tracking-normal">{entry.message}</DialogTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0 ml-2">
-            <X className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label={t('关闭日志详情', 'Close log details')}
+            className="ml-2 h-8 w-8 shrink-0"
+          >
+            <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
           </Button>
-        </div>
+        </DialogHeader>
 
         {/* Tabs */}
-        <div className="flex border-b border-border dark:border-border px-5 overflow-x-auto">
+        <div className="flex min-w-0 overflow-x-auto border-b border-border px-5">
           {MODAL_TABS.map(tab => (
             <Button
               key={tab.id}
@@ -222,11 +223,11 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 overflow-y-auto p-5">
           {renderTabContent()}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
