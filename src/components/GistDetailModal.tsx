@@ -19,7 +19,7 @@ interface GistDetailModalProps {
 
 interface HighlightedCodeProps {
   file: GistFile;
-  onContentLoaded?: (filename: string, content: string) => void;
+  onContentLoaded?: (filename: string, content: string, rawUrl?: string) => void;
 }
 
 const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded }) => {
@@ -63,7 +63,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
         const text = await api.getGistFileRaw(file.raw_url!, controller.signal);
         if (controller.signal.aborted) return;
         setRawContent(text);
-        onContentLoadedRef.current?.(file.filename, text);
+        onContentLoadedRef.current?.(file.filename, text, file.raw_url);
       } catch (err) {
         if (controller.signal.aborted) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -138,7 +138,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
-  const loadedContentKey = gist && activeFile ? `${gist.id}:${activeFile.filename}` : null;
+  const loadedContentKey = gist && activeFile
+    ? `${gist.id}:${activeFile.filename}:${activeFile.raw_url ?? ''}`
+    : null;
   const loadedActiveContent = loadedContentKey ? loadedContents[loadedContentKey] : undefined;
   const hasLoadedActiveContent = Boolean(loadedContentKey && Object.prototype.hasOwnProperty.call(loadedContents, loadedContentKey));
   const effectiveActiveFile = activeFile && hasLoadedActiveContent
@@ -153,9 +155,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
     : '';
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
-  const handleContentLoaded = (filename: string, content: string) => {
+  const handleContentLoaded = (filename: string, content: string, rawUrl?: string) => {
     if (!gist) return;
-    const cacheKey = `${gist.id}:${filename}`;
+    const cacheKey = `${gist.id}:${filename}:${rawUrl ?? ''}`;
     setLoadedContents(previous => ({ ...previous, [cacheKey]: content }));
     const state = useAppStore.getState();
     const latest =
@@ -165,7 +167,8 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
       gist;
 
     const targetFile = latest.files?.[filename];
-    if (!targetFile || (targetFile.content && !targetFile.truncated)) return;
+    if (!targetFile || (rawUrl && targetFile.raw_url && targetFile.raw_url !== rawUrl)) return;
+    if (targetFile.content && !targetFile.truncated) return;
     updateGist({
       ...latest,
         files: {
