@@ -537,4 +537,20 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.5</downloadUrl>
   </version>
+  <version>
+    <number>0.7.6</number>
+    <releaseDate>2026-08-24</releaseDate>
+    <changelog>
+      <item>feat: Repository READMEs (Repos and Trending) and release notes now render with official GitHub styling via vendored github-markdown-css dual themes, adding support for GitHub Alerts (&gt; [!NOTE] callouts), gemoji short codes, KaTeX math formulas, and Mermaid diagrams; KaTeX and Mermaid are lazily loaded so startup speed and bundle budget stay unaffected, while the table of contents, side-by-side translation, and copy-code buttons remain fully compatible. (PR #287)</item>
+      <item>refactor: Migrated the presentation layer to shadcn/ui style components built on Radix Primitives. The previous CSS and components were hand-rolled; this migration unifies the UI specification across the app and lays the foundation for consistent, faster iteration going forward. The global theme now uses standard semantic variables (background, foreground, card, popover, primary, secondary, muted, accent, destructive, border, input, ring, radius), shared controls such as Button, Badge, Input, Card, Select, Checkbox, Switch, Tabs, Dialog, and AlertDialog follow the canonical defaults, and dark-theme foreground colors on primary actions were fixed. Business logic and data flow are unchanged — no data migration is required — and an unused react-router-dom dependency was removed so production npm audit reports zero vulnerabilities. (PR #284)</item>
+      <item>fix: Release update times now aggregate asset updates across all visible releases, newly added and changed assets are tracked accurately during refresh, and asset-level Assets updated markers appear consistently in both release views with effective update times in repository headers. (PR #280)</item>
+      <item>fix: Per-asset Assets updated badges are decoupled from release read state — expanding a release or marking it read no longer hides its asset badges; each badge can be dismissed independently via a new per-asset read action, and mark-all-as-read also clears every badge. (PR #283)</item>
+      <item>fix: Right-aligned the latest-release timestamp in the repository header for visual consistency with the release count and latest tag rows. (PR #275)</item>
+      <item>fix: Removed the duplicate preset-filter Reset button and the redundant selected-filter summary row from the expanded Release filter panel, keeping a single top-level Clear all filters action. (PR #281)</item>
+      <item>fix: An existing frontend GitHub token is now synced idempotently to the Docker backend after local state hydration, fixing GITHUB_TOKEN_NOT_CONFIGURED errors for existing sessions without requiring users to log in again. (PR #277, closes #276)</item>
+      <item>fix: GitHub Lists GraphQL queries automatically fall back to a direct browser connection when the backend proxy fails (network errors, 5xx, or missing backend token), transient server errors are retried instead of treated as permanent, backend error details are surfaced for diagnosis, and proxy usage is preserved whenever it works. (PR #278)</item>
+      <item>fix: Watched-repository synchronization no longer fails when GitHub returns an empty 204 No Content response for the public subscriptions endpoint, redundant public-endpoint requests were removed from the sync path, empty Watch lists sync cleanly, and license metadata is normalized to SPDX identifiers. (PR #286, closes #285)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.6</downloadUrl>
+  </version>
 </versions>
