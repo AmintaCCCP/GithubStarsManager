@@ -4,6 +4,8 @@ import { useAppStore } from '../store/useAppStore';
 type MermaidModule = (typeof import('mermaid'))['default'];
 
 let mermaidPromise: Promise<MermaidModule> | null = null;
+
+/** Lazily import the ~1MB mermaid package once and reuse the module promise. */
 const loadMermaid = (): Promise<MermaidModule> => {
   mermaidPromise ||= import('mermaid').then((m) => m.default);
   return mermaidPromise;

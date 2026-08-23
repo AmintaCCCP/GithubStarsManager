@@ -2288,28 +2288,17 @@ html.dark .markdown-body g-emoji img {
 }
 
 
-html.dark .markdown-body a:has(>p,
-html.dark >div,
-html.dark >pre,
-html.dark >blockquote) {
+html.dark .markdown-body a:has(>p,>div,>pre,>blockquote) {
   display: block;
 }
 
 
-html.dark .markdown-body a:has(>p,
-html.dark >div,
-html.dark >pre,
-html.dark >blockquote):not(:has(.snippet-clipboard-content,
-html.dark >pre)) {
+html.dark .markdown-body a:has(>p,>div,>pre,>blockquote):not(:has(.snippet-clipboard-content,>pre)) {
   width: fit-content;
 }
 
 
-html.dark .markdown-body a:has(>p,
-html.dark >div,
-html.dark >pre,
-html.dark >blockquote):has(.snippet-clipboard-content,
-html.dark >pre):focus-visible {
+html.dark .markdown-body a:has(>p,>div,>pre,>blockquote):has(.snippet-clipboard-content,>pre):focus-visible {
   outline: 2px solid var(--borderColor-accent-emphasis);
   outline-offset: 2px;
 }
