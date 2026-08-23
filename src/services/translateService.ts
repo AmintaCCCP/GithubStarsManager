@@ -185,14 +185,15 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
       reject(new DOMException('Aborted', 'AbortError'));
       return;
     }
-    const id = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(id);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    const id = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 
 /** 读取当前生效的翻译引擎（设置页可切换，读取时机为每次翻译请求）。 */

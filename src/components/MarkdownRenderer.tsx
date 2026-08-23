@@ -39,7 +39,7 @@ const REHYPE_PLUGINS_NO_HTML: never[] = [];
 // Matches $$display$$, \(inline\), \[display\] and $inline$ math so KaTeX is
 // only loaded for documents that actually use it.
 const MATH_PATTERN =
-  /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?:\\.|[^$\\\n])+?(?<!\s)\$/;
+  /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?:\\.|[^$\\\n])*?[^\s$\\\n]\$/;
 
 interface MathPlugins {
   remark: typeof import('remark-math')['default'];
