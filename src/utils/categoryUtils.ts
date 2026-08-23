@@ -1,5 +1,34 @@
 import { Category, CategoryMatchMode, Repository } from '../types';
 
+export type CategoryNameTranslator = (zh: string, en: string) => string;
+
+export type CategoryNameValidation =
+  | { value: string; error: null }
+  | { value: null; error: string };
+
+export const isReservedCategoryName = (name: string): boolean => name.trim().toLowerCase() === 'none';
+
+export const validateCategoryName = (
+  name: string,
+  t: CategoryNameTranslator,
+  emptyMessage: readonly [string, string] = ['请输入分类名称', 'Please enter category name']
+): CategoryNameValidation => {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { value: null, error: t(emptyMessage[0], emptyMessage[1]) };
+  }
+  if (isReservedCategoryName(trimmedName)) {
+    return {
+      value: null,
+      error: t(
+        'none 是保留名称，请使用其他分类名称',
+        'The name "none" is reserved. Please choose another category name.'
+      ),
+    };
+  }
+  return { value: trimmedName, error: null };
+};
+
 /**
  * 归一化标签数组：去除前后空白并过滤空白项，避免空白标签匹配任意分类
  */

@@ -1,13 +1,14 @@
 import React from 'react';
 import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'lucide-react';
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
+import { Button } from './ui/button';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  rocket: <Rocket className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  star: <Crown className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  tag: <Tag className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
-  search: <Search className="w-4 h-4 text-gray-700 dark:text-text-secondary" />,
+  trending: <TrendingUp className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  rocket: <Rocket className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  star: <Crown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  tag: <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  search: <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
 };
 
 interface DiscoverySidebarProps {
@@ -55,19 +56,23 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
 
   return (
     <div className="w-full lg:w-64 shrink-0">
-      <div className="bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] p-4">
+      <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('发现频道', 'Discovery Channels')}
           </h3>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            className="p-1.5 rounded-lg bg-gray-100 text-gray-700 dark:bg-white/[0.04] dark:text-text-secondary hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/[0.08] dark:hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={t('刷新全部', 'Refresh All')}
             title={t('刷新全部', 'Refresh All')}
+            className="h-8 w-8"
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-1">
@@ -76,32 +81,34 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
             const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
 
             return (
-              <button
+              <Button
                 key={channel.id}
                 onClick={() => onChannelSelect(channel.id)}
+                variant="ghost"
+                aria-pressed={isSelected}
                 className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.08] dark:text-text-primary font-medium'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-text-secondary dark:hover:text-text-primary dark:hover:bg-white/[0.04]'
+                    ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
                 }`}
               >
-                <div className="flex items-center gap-2.5">
+                <span className="flex items-center gap-2.5">
                   {channel.icon}
                   <span className="font-medium text-sm">
                     {language === 'zh' ? channel.name : channel.nameEn}
                   </span>
-                </div>
-                <div className="flex items-center gap-2.5">
+                </span>
+                <span className="flex items-center gap-2.5">
                   {channelLoading && (
-                    <Loader2 className="w-3 h-3 animate-spin text-brand-violet" />
+                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
                   )}
                   {(lastRefresh && typeof lastRefresh === 'object' && (lastRefresh as Record<string, unknown>)[channel.id]) ? (
-                    <span className="text-xs text-gray-500 dark:text-text-tertiary">
+                    <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                       {formatLastRefresh((lastRefresh as Record<string, string | null>)[channel.id])}
                     </span>
                   ) : null}
-                </div>
-              </button>
+                </span>
+              </Button>
             );
           })}
         </div>

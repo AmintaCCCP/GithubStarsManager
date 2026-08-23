@@ -1,6 +1,15 @@
-import React, { useEffect, useRef, useId } from 'react';
-import { createPortal } from 'react-dom';
+import * as React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './alert-dialog';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -23,117 +32,47 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   type = 'warning',
 }) => {
-  const previousActiveElement = useRef<HTMLElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const onCancelRef = useRef(onCancel);
-  onCancelRef.current = onCancel;
-  const titleId = useId();
+  const isDanger = type === 'danger';
+  const confirmingRef = React.useRef(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      previousActiveElement.current = document.activeElement as HTMLElement;
-      document.body.style.overflow = 'hidden';
-
-      setTimeout(() => {
-        cancelButtonRef.current?.focus();
-      }, 0);
-    } else {
-      document.body.style.overflow = '';
-      previousActiveElement.current?.focus();
+  const handleOpenChange = (open: boolean) => {
+    if (open) return;
+    if (confirmingRef.current) {
+      confirmingRef.current = false;
+      return;
     }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        onCancelRef.current();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleConfirm = () => {
-    onConfirm();
-  };
-
-  const handleCancel = () => {
     onCancel();
   };
 
-  const buttonClass = type === 'danger'
-    ? 'bg-status-red hover:bg-status-red/90 dark:bg-status-red/80 dark:hover:bg-status-red'
-    : 'bg-brand-indigo hover:bg-brand-hover dark:bg-brand-indigo dark:hover:bg-brand-hover';
+  const handleConfirm = () => {
+    confirmingRef.current = true;
+    onConfirm();
+  };
 
-  const dialogContent = (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
-    >
-      {/* Backdrop */}
-      <div
-        className="linear-modal-backdrop fixed inset-0"
-        onClick={onCancel}
-      />
-
-      {/* Dialog */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="linear-modal relative w-full max-w-md mx-4"
-      >
-        <div className="p-6">
-          <div className="flex items-start space-x-4">
-            <div className={`flex-shrink-0 p-2 rounded-full ${
-              type === 'danger' ? 'bg-status-red/10' : 'bg-brand-indigo/10'
-            }`}>
-              <AlertTriangle className={`w-6 h-6 ${
-                type === 'danger' ? 'text-status-red' : 'text-brand-indigo dark:text-brand-indigo'
-              }`} />
+  return (
+    <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <div className="flex items-start gap-4">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isDanger ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+              <AlertTriangle className={`h-5 w-5 ${isDanger ? 'text-destructive' : 'text-primary'}`} />
             </div>
-            <div className="flex-1">
-              <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-text-primary">
-                {title}
-              </h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-text-secondary">
-                {message}
-              </p>
+            <div className="space-y-2">
+              <AlertDialogTitle>{title}</AlertDialogTitle>
+              <AlertDialogDescription>{message}</AlertDialogDescription>
             </div>
           </div>
-        </div>
-
-        <div className="flex justify-end space-x-3 px-6 py-4 bg-light-bg dark:bg-white/[0.02] border-t ui-divider rounded-b-xl">
-          <button
-            ref={cancelButtonRef}
-            onClick={handleCancel}
-            className="ui-button px-4 py-2 text-sm font-medium"
-          >
-            {cancelText}
-          </button>
-          <button
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogAction
             onClick={handleConfirm}
-            className={`ui-button-primary px-4 py-2 text-sm font-medium ${buttonClass}`}
+            className={isDanger ? 'bg-destructive hover:bg-destructive/90' : undefined}
           >
             {confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
-
-  return createPortal(dialogContent, document.body);
 };

@@ -1,4 +1,5 @@
 import { syncLocalGitHubTokenToBackend } from './autoSync';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 

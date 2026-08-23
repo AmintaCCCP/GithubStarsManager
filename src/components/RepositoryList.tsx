@@ -14,6 +14,9 @@ import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptim
 import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory, buildCategoryHints } from '../utils/categoryUtils';
 import { forceSyncToBackend } from '../services/autoSync';
 import { useDialog } from '../hooks/useDialog';
+import { Button } from './ui/button';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -52,7 +55,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const { toast, confirm } = useDialog();
 
   const [showAISummary, setShowAISummary] = useState(true);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   const previousCategoryRef = useRef(selectedCategory);
@@ -311,7 +313,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     isAnalyzingRef.current = true;
     setLoading(true);
     setAnalysisProgress({ current: 0, total: targetRepos.length });
-    setShowDropdown(false);
     setIsPaused(false);
 
     // 创建优化器实例并保存到 ref
@@ -987,7 +988,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-text-tertiary mb-4">
+        <p className="text-muted-foreground dark:text-muted-foreground mb-4">
           {searchFilters.query ? (
             language === 'zh' 
               ? `未找到与"${searchFilters.query}"相关的仓库。`
@@ -1001,7 +1002,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           }
         </p>
         {searchFilters.query && (
-          <div className="text-sm text-gray-400 dark:text-text-tertiary">
+          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
             <p className="mb-2">
               {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
             </p>
@@ -1034,132 +1035,84 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       <div className="ui-toolbar flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
 
-          {/* AI Analysis Dropdown Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              disabled={isLoading}
-              className="linear-filter-toggle flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 disabled:opacity-50 text-sm font-medium"
-            >
-              <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="whitespace-nowrap">
+          {/* AI Analysis Select */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading}
+                aria-label={t('AI 分析操作', 'AI analysis actions')}
+                className="ui-field h-9 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-sm font-medium"
+              >
+                <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
                   ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
-                  : t('AI分析', 'AI Analysis')
-                }
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </button>
-
-            {/* Dropdown Menu */}
-            {showDropdown && !isLoading && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-panel-dark border border-black/[0.06] dark:border-white/[0.04] rounded-lg shadow-dialog z-10">
-                <button
-                  onClick={() => handleAIAnalyze(false)}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-white/[0.04]"
-                >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
-                    {t('分析全部', 'Analyze All')}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
-                    {t(`分析 ${filteredRepositories.length} 个仓库`, `Analyze ${filteredRepositories.length} repositories`)}
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleAIAnalyze(true)}
-                  disabled={unanalyzedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-black/[0.04] dark:border-white/[0.04]"
-                >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
-                    {t('分析未分析的', 'Analyze Unanalyzed')}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
-                    {t(`分析 ${unanalyzedCount} 个未分析仓库`, `Analyze ${unanalyzedCount} unanalyzed repositories`)}
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleAIAnalyze(false, true)}
-                  disabled={failedCount === 0}
-                  className="w-full px-4 py-3 text-left hover:bg-light-bg dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
-                    {t('重新分析失败的', 'Re-analyze Failed')}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5">
-                    {t(`重新分析 ${failedCount} 个失败仓库`, `Re-analyze ${failedCount} failed repositories`)}
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+                  : t('AI分析', 'AI Analysis')}
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onSelect={() => void handleAIAnalyze(false)}>
+                {t(`分析全部（${filteredRepositories.length}）`, `Analyze All (${filteredRepositories.length})`)}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={unanalyzedCount === 0} onSelect={() => void handleAIAnalyze(true)}>
+                {t(`分析未分析的（${unanalyzedCount}）`, `Analyze Unanalyzed (${unanalyzedCount})`)}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={failedCount === 0} onSelect={() => void handleAIAnalyze(false, true)}>
+                {t(`重新分析失败的（${failedCount}）`, `Re-analyze Failed (${failedCount})`)}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (
             <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-20 sm:w-32 bg-gray-200 dark:bg-white/10 rounded-full h-2">
+              <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
                 <div
-                  className="bg-gray-100 dark:bg-white/[0.04] h-2 rounded-full transition-all duration-300"
+                  className="bg-primary dark:bg-primary h-2 rounded-full transition-all duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-text-tertiary">
+              <span className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {Math.round((analysisProgress.current / analysisProgress.total) * 100)}%
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handlePauseResume}
-                className="p-1 sm:p-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-amber/20 dark:text-status-amber hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-amber/30 transition-colors"
+                className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-amber-600/20 dark:text-amber-600 hover:bg-accent dark:hover:bg-amber-600/30 transition-colors"
+                aria-label={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={handleStop}
-                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary dark:bg-status-red/20 dark:text-status-red hover:bg-gray-100 dark:bg-white/[0.04] dark:hover:bg-status-red/30 transition-colors text-xs sm:text-sm"
+                className="h-7 px-2 sm:px-3 py-1 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
               >
                 {t('停止', 'Stop')}
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-text-tertiary">
+              <span id="repository-display-content-label" className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('显示内容:', 'Display:')}
               </span>
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <label 
-                  className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                  title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}
-                >
-                  <input
-                    type="radio"
-                    name="displayContent"
-                    checked={showAISummary}
-                    onChange={() => hasAnalyzedRepos && setShowAISummary(true)}
-                    disabled={!hasAnalyzedRepos}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20 disabled:opacity-50"
-                  />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
-                    {t('AI分析内容', 'AI Analysis')}
-                  </span>
+              <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
+                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
+                  <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
+                  <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
                 </label>
-                <label 
-                  className="flex items-center space-x-1.5 sm:space-x-2 cursor-pointer"
-                  title={t('显示仓库原始描述', 'Show repository original description')}
-                >
-                  <input
-                    type="radio"
-                    name="displayContent"
-                    checked={!showAISummary}
-                    onChange={() => setShowAISummary(false)}
-                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-violet bg-light-surface border-black/[0.06] focus:ring-brand-violet dark:focus:ring-brand-violet dark:ring-offset-marketing-black focus:ring-2 dark:bg-white/5 dark:border-white/20"
-                  />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-text-secondary">
-                    {t('原始描述', 'Original')}
-                  </span>
+                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
+                  <RadioGroupItem value="original" id="display-content-original" aria-labelledby="display-content-original-label" />
+                  <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
                 </label>
-              </div>
+              </RadioGroup>
             </div>
           )}
 
@@ -1167,7 +1120,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-gray-500 dark:text-text-tertiary mt-0.5 sm:text-right">
+          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right">
             <div className="flex items-center justify-between">
               <div>
                 {t(
@@ -1175,7 +1128,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
                 )}
                 {repositories.length !== filteredRepositories.length && (
-                  <span className="ml-2 text-brand-violet dark:text-brand-violet">
+                  <span className="ml-2 text-primary dark:text-primary">
                     {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
                   </span>
                 )}
@@ -1201,27 +1154,31 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
 
           {!isLoading && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-black/[0.06] bg-light-surface p-0.5 dark:border-white/[0.04] dark:bg-white/[0.04]" role="group" aria-label={t('仓库布局', 'Repository layout')}>
-              <button
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'grid' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${repositoryViewMode === 'list' ? 'bg-white text-brand-violet shadow-sm dark:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           )}
         </div>

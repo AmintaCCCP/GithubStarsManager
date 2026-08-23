@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import React, { useId, useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { Modal } from './Modal';
 import { Repository } from '../types';
@@ -20,6 +21,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
   const { customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const categorySelectionLabelId = useId();
 
   const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
 
@@ -58,68 +60,74 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
       title={t('批量分类', 'Bulk Categorize')}
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-700 dark:text-text-secondary">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
           {t(`将为 ${repositories.length} 个仓库设置分类：`, `Will set category for ${repositories.length} repositories:`)}
         </p>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-900 dark:text-text-primary mb-2">
+          <h3 id={categorySelectionLabelId} className="mb-2 block text-sm font-medium text-foreground dark:text-foreground">
             {t('选择分类', 'Select Category')}
-          </label>
+          </h3>
 
-          <div className="max-h-64 overflow-y-auto space-y-2">
+          <div
+            role="group"
+            aria-labelledby={categorySelectionLabelId}
+            className="max-h-64 overflow-y-auto space-y-2"
+          >
             {allCategories.filter(cat => cat.id !== 'all').map(category => (
-              <button
+              <Button
                 key={category.id}
+                variant="ghost"
+                aria-pressed={selectedCategory === category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
+                className={`h-auto w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
                   selectedCategory === category.id
-                    ? 'border-brand-violet bg-gray-100 dark:bg-white/[0.04] dark:bg-brand-indigo/10'
-                    : 'border-black/[0.06] dark:border-white/[0.04] hover:border-black/[0.06] dark:border-white/[0.04] dark:hover:border-white/20'
+                    ? 'border-primary bg-muted dark:bg-primary/10'
+                    : 'border-border dark:hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-900 dark:text-text-primary">
+                  <span className="text-sm font-medium text-foreground dark:text-foreground">
                     {category.name}
                   </span>
                 </div>
                 {selectedCategory === category.id && (
-                  <Check className="w-5 h-5 text-brand-violet" />
+                  <Check className="w-5 h-5 text-primary" />
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {error && (
-          <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-red/10 border border-black/[0.06] dark:border-white/[0.04] dark:border-status-red/20 rounded-lg p-3">
-            <p className="text-sm text-gray-700 dark:text-text-secondary ">
+          <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-destructive dark:bg-destructive/10">
+            <p className="text-sm text-destructive">
               {error}
             </p>
           </div>
         )}
 
-        <div className="bg-gray-100 dark:bg-white/[0.04] dark:bg-status-amber/10 border border-black/[0.06] dark:border-white/[0.04] dark:border-status-amber/20 rounded-lg p-3">
-          <p className="text-sm text-gray-700 dark:text-text-secondary ">
+        <div className="bg-muted dark:bg-amber-600/10 border border-border dark:border-amber-600/20 rounded-lg p-3">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
             {t('提示：此操作将覆盖这些仓库现有的自定义分类。', 'Note: This operation will overwrite the existing custom categories of these repositories.')}
           </p>
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">
-          <button
+          <Button
             onClick={onClose}
             disabled={isProcessing}
-            className="px-4 py-2 text-gray-900 dark:text-text-primary bg-light-surface dark:bg-white/[0.04] rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50"
+            className="px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
           >
             {t('取消', 'Cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleCategorize}
             disabled={!selectedCategory || isProcessing}
-            className="px-4 py-2 bg-brand-indigo text-white rounded-lg hover:bg-brand-hover dark:bg-brand-indigo dark:hover:bg-brand-indigo/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? t('处理中...', 'Processing...') : t('确认分类', 'Confirm Categorize')}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

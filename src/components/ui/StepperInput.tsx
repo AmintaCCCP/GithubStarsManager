@@ -1,5 +1,6 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { Button } from './button';
 
 interface StepperInputProps {
   value: number;
@@ -8,6 +9,8 @@ interface StepperInputProps {
   max?: number;
   step?: number;
   className?: string;
+  decreaseLabel?: string;
+  increaseLabel?: string;
 }
 
 export const StepperInput: React.FC<StepperInputProps> = ({
@@ -17,20 +20,31 @@ export const StepperInput: React.FC<StepperInputProps> = ({
   max,
   step = 1,
   className = '',
+  decreaseLabel = 'Decrease',
+  increaseLabel = 'Increase',
 }) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const valueRef = useRef(value);
 
-  const clamp = useCallback((v: number) => {
-    let result = v;
+  useLayoutEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  const clamp = useCallback((nextValue: number) => {
+    let result = nextValue;
     if (min !== undefined) result = Math.max(min, result);
     if (max !== undefined) result = Math.min(max, result);
     return result;
   }, [min, max]);
 
   const stepValue = useCallback((delta: number) => {
-    onChange(clamp(value + delta));
-  }, [value, onChange, clamp]);
+    const nextValue = clamp(valueRef.current + delta);
+    if (nextValue === valueRef.current) return false;
+    valueRef.current = nextValue;
+    onChange(nextValue);
+    return true;
+  }, [onChange, clamp]);
 
   const stopRepeat = useCallback(() => {
     if (timeoutRef.current) {
@@ -45,44 +59,58 @@ export const StepperInput: React.FC<StepperInputProps> = ({
 
   const startRepeat = useCallback((delta: number) => {
     stopRepeat();
-    stepValue(delta);
+    if (!stepValue(delta)) return;
     timeoutRef.current = setTimeout(() => {
-      intervalRef.current = setInterval(() => stepValue(delta), 120);
+      intervalRef.current = setInterval(() => {
+        if (!stepValue(delta)) stopRepeat();
+      }, 120);
     }, 400);
   }, [stepValue, stopRepeat]);
+
+  useEffect(() => stopRepeat, [stopRepeat]);
 
   const canDecrement = min === undefined || value > min;
   const canIncrement = max === undefined || value < max;
 
   return (
     <div className={`inline-flex items-center ${className}`}>
-      <button
+      <Button
         type="button"
-        onMouseDown={() => canDecrement && startRepeat(-step)}
-        onMouseUp={stopRepeat}
-        onMouseLeave={stopRepeat}
-        onTouchStart={() => canDecrement && startRepeat(-step)}
-        onTouchEnd={stopRepeat}
+        variant="outline"
+        size="icon"
+        onPointerDown={(event) => event.button === 0 && canDecrement && startRepeat(-step)}
+        onClick={(event) => {
+          if (event.detail === 0 && canDecrement) stepValue(-step);
+        }}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
         disabled={!canDecrement}
-        className="flex items-center justify-center w-8 h-8 rounded-l-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        aria-label={decreaseLabel}
+        className="h-8 w-8 rounded-r-none"
       >
-        <Minus className="w-3.5 h-3.5" />
-      </button>
-      <span className="flex items-center justify-center min-w-[2.5rem] h-8 px-2 border-t border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-white tabular-nums select-none">
+        <Minus className="h-3.5 w-3.5" />
+      </Button>
+      <span className="flex h-8 min-w-[2.5rem] select-none items-center justify-center border-y border-input bg-card px-2 text-sm font-medium tabular-nums text-card-foreground">
         {value}
       </span>
-      <button
+      <Button
         type="button"
-        onMouseDown={() => canIncrement && startRepeat(step)}
-        onMouseUp={stopRepeat}
-        onMouseLeave={stopRepeat}
-        onTouchStart={() => canIncrement && startRepeat(step)}
-        onTouchEnd={stopRepeat}
+        variant="outline"
+        size="icon"
+        onPointerDown={(event) => event.button === 0 && canIncrement && startRepeat(step)}
+        onClick={(event) => {
+          if (event.detail === 0 && canIncrement) stepValue(step);
+        }}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        onPointerCancel={stopRepeat}
         disabled={!canIncrement}
-        className="flex items-center justify-center w-8 h-8 rounded-r-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        aria-label={increaseLabel}
+        className="h-8 w-8 rounded-l-none"
       >
-        <Plus className="w-3.5 h-3.5" />
-      </button>
+        <Plus className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 };

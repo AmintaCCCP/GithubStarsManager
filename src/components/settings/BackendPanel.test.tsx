@@ -63,7 +63,7 @@ vi.mock('../../hooks/useDialog', () => ({
 }));
 
 const health = { version: '0.1.0', timestamp: '2026-08-19T00:00:00Z' };
-const t = (zh: string, en: string) => en;
+const t = (_zh: string, en: string) => en;
 
 describe('BackendPanel token synchronization', () => {
   beforeEach(() => {

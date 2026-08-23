@@ -1,3 +1,25 @@
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Checkbox } from '../ui/checkbox';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Trash2,
@@ -143,6 +165,67 @@ const hasMaskedSecrets = (data: ExportData['data']): boolean => {
   );
 };
 
+const UI_SETTINGS_DATA_KEYS = [
+  'theme',
+  'language',
+  'isSidebarCollapsed',
+  'releaseViewMode',
+  'releaseSelectedFilters',
+  'releaseSearchQuery',
+  'releaseExpandedRepositories',
+  'proxyConfig',
+  'rpcDownloadConfig',
+  'backendApiSecret',
+] as const;
+
+const IMPORT_DATA_KEYS = [
+  'repositories',
+  'releases',
+  'aiConfigs',
+  'webdavConfigs',
+  'customCategories',
+  'assetFilters',
+  'discoveryRepos',
+  'discoveryTotalCount',
+  'discoveryHasMore',
+  'discoveryNextPage',
+  'subscriptionRepos',
+  'subscriptionLastRefresh',
+  'subscriptionChannels',
+  'releaseSubscriptions',
+  'releaseSourceSettings',
+  'readReleases',
+  'searchFilters',
+  'hiddenDefaultCategoryIds',
+  'defaultCategoryOverrides',
+  'categoryOrder',
+] as const;
+
+const IMPORT_KEY_ALIASES: Record<string, string> = {
+  discoveryTotalCount: 'discoveryRepos',
+  discoveryHasMore: 'discoveryRepos',
+  discoveryNextPage: 'discoveryRepos',
+  subscriptionLastRefresh: 'subscriptionRepos',
+  subscriptionChannels: 'subscriptionRepos',
+  hiddenDefaultCategoryIds: 'customCategories',
+  defaultCategoryOverrides: 'customCategories',
+  categoryOrder: 'customCategories',
+  releaseSourceSettings: 'releaseSubscriptions',
+  readReleases: 'releaseSubscriptions',
+};
+
+const resolveImportTypes = (data: ExportData['data']): string[] => {
+  const present = Array.from(new Set(
+    IMPORT_DATA_KEYS
+      .filter((key) => data[key] !== undefined)
+      .map((key) => IMPORT_KEY_ALIASES[key] ?? key)
+  ));
+  if (UI_SETTINGS_DATA_KEYS.some((key) => data[key] !== undefined)) {
+    present.push('uiSettings');
+  }
+  return present;
+};
+
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
   const {
     user,
@@ -182,6 +265,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     isOpen: boolean;
     fileName: string;
   }>({ data: null, isOpen: false, fileName: '' });
+  const exportItems = useMemo(() => [
+    { key: 'repositories', label: t('仓库数据', 'Repositories') },
+    { key: 'releases', label: t('Release数据', 'Releases') },
+    { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
+    { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
+    { key: 'customCategories', label: t('分类设置', 'Categories') },
+    { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
+    { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
+    { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
+    { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
+    { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
+    { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
+  ], [t]);
+  const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>(() => exportItems.map((item) => item.key));
 
   const addLog = useCallback((operation: string, success: boolean, details?: string) => {
     const newLog: OperationLog = {
@@ -665,9 +762,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
-          useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
-          store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
-          useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+          if (importedData.releaseSubscriptions !== undefined) {
+            useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
+          }
+          if (importedData.releaseSourceSettings !== undefined) {
+            store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
+          }
+          if (importedData.readReleases !== undefined) {
+            useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+          }
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
           // 旧备份可能缺少新增的 licenses 字段，导入时默认 [] 保持 SearchFilters 契约
@@ -758,17 +861,98 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             }));
           store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
         }
-        if (selectedTypes.includes('customCategories') && importedData.customCategories) {
-          const existingIds = new Set(store.customCategories.map(c => c.id));
-          const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
-          useAppStore.setState({ 
-            customCategories: [...store.customCategories, ...newCategories] 
-          });
+        if (selectedTypes.includes('customCategories')) {
+          if (importedData.customCategories) {
+            const existingIds = new Set(store.customCategories.map(c => c.id));
+            const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
+            useAppStore.setState({
+              customCategories: [...store.customCategories, ...newCategories]
+            });
+          }
+          if (importedData.hiddenDefaultCategoryIds) {
+            const current = useAppStore.getState().hiddenDefaultCategoryIds;
+            useAppStore.setState({
+              hiddenDefaultCategoryIds: Array.from(new Set([...current, ...importedData.hiddenDefaultCategoryIds])),
+            });
+          }
+          if (importedData.defaultCategoryOverrides) {
+            useAppStore.setState({
+              defaultCategoryOverrides: {
+                ...useAppStore.getState().defaultCategoryOverrides,
+                ...importedData.defaultCategoryOverrides,
+              },
+            });
+          }
+          if (importedData.categoryOrder) {
+            const current = useAppStore.getState().categoryOrder;
+            useAppStore.setState({
+              categoryOrder: Array.from(new Set([...current, ...importedData.categoryOrder])),
+            });
+          }
         }
         if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
           const existingIds = new Set(store.assetFilters.map(f => f.id));
           const newFilters = importedData.assetFilters.filter(f => !existingIds.has(f.id));
           useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
+        }
+        if (selectedTypes.includes('discoveryRepos')) {
+          const currentStore = useAppStore.getState();
+          if (importedData.discoveryRepos) {
+            const mergedDiscoveryRepos = { ...currentStore.discoveryRepos };
+            Object.entries(importedData.discoveryRepos).forEach(([channel, repos]) => {
+              const typedChannel = channel as keyof typeof currentStore.discoveryRepos;
+              const existingIds = new Set((currentStore.discoveryRepos[typedChannel] || []).map(repo => repo.id));
+              mergedDiscoveryRepos[typedChannel] = [
+                ...(currentStore.discoveryRepos[typedChannel] || []),
+                ...repos.filter(repo => !existingIds.has(repo.id)),
+              ];
+            });
+            useAppStore.setState({ discoveryRepos: mergedDiscoveryRepos });
+          }
+          if (importedData.discoveryTotalCount) {
+            useAppStore.setState({ discoveryTotalCount: {
+              ...useAppStore.getState().discoveryTotalCount,
+              ...importedData.discoveryTotalCount,
+            } });
+          }
+          if (importedData.discoveryHasMore) {
+            useAppStore.setState({ discoveryHasMore: {
+              ...useAppStore.getState().discoveryHasMore,
+              ...importedData.discoveryHasMore,
+            } });
+          }
+          if (importedData.discoveryNextPage) {
+            useAppStore.setState({ discoveryNextPage: {
+              ...useAppStore.getState().discoveryNextPage,
+              ...importedData.discoveryNextPage,
+            } });
+          }
+        }
+        if (selectedTypes.includes('subscriptionRepos')) {
+          const currentStore = useAppStore.getState();
+          if (importedData.subscriptionRepos) {
+            const mergedSubscriptionRepos = { ...currentStore.subscriptionRepos };
+            Object.entries(importedData.subscriptionRepos).forEach(([channel, repos]) => {
+              const existingIds = new Set((currentStore.subscriptionRepos[channel] || []).map(repo => repo.id));
+              mergedSubscriptionRepos[channel] = [
+                ...(currentStore.subscriptionRepos[channel] || []),
+                ...repos.filter(repo => !existingIds.has(repo.id)),
+              ];
+            });
+            useAppStore.setState({ subscriptionRepos: mergedSubscriptionRepos });
+          }
+          if (importedData.subscriptionLastRefresh) {
+            useAppStore.setState({ subscriptionLastRefresh: {
+              ...useAppStore.getState().subscriptionLastRefresh,
+              ...importedData.subscriptionLastRefresh,
+            } });
+          }
+          if (importedData.subscriptionChannels) {
+            const existingChannels = useAppStore.getState().subscriptionChannels;
+            const existingIds = new Set(existingChannels.map(channel => channel.id));
+            const newChannels = importedData.subscriptionChannels.filter(channel => !existingIds.has(channel.id));
+            useAppStore.setState({ subscriptionChannels: [...existingChannels, ...newChannels] });
+          }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
           if (importedData.releaseSubscriptions) {
@@ -781,6 +965,66 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               store.releaseSourceSettings,
               normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
             ));
+          }
+          if (importedData.readReleases) {
+            const currentReadReleases = useAppStore.getState().readReleases;
+            useAppStore.setState({
+              readReleases: new Set([...currentReadReleases, ...importedData.readReleases]),
+            });
+          }
+        }
+        if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
+          const currentFilters = useAppStore.getState().searchFilters;
+          useAppStore.setState({ searchFilters: {
+            ...currentFilters,
+            ...importedData.searchFilters,
+            licenses: importedData.searchFilters.licenses ?? currentFilters.licenses ?? [],
+          } });
+        }
+        if (selectedTypes.includes('uiSettings')) {
+          const importedUiSettings = importedData;
+          const currentStore = useAppStore.getState();
+          useAppStore.setState({
+            ...(importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark'
+              ? { theme: importedUiSettings.theme }
+              : {}),
+            ...(importedUiSettings.language ? { language: importedUiSettings.language } : {}),
+            ...(typeof importedUiSettings.isSidebarCollapsed === 'boolean'
+              ? { isSidebarCollapsed: importedUiSettings.isSidebarCollapsed }
+              : {}),
+            ...(importedUiSettings.releaseViewMode === 'timeline' || importedUiSettings.releaseViewMode === 'repository'
+              ? { releaseViewMode: importedUiSettings.releaseViewMode }
+              : {}),
+            ...(importedUiSettings.releaseSelectedFilters
+              ? { releaseSelectedFilters: importedUiSettings.releaseSelectedFilters }
+              : {}),
+            ...(importedUiSettings.releaseSearchQuery !== undefined
+              ? { releaseSearchQuery: importedUiSettings.releaseSearchQuery }
+              : {}),
+            ...(importedUiSettings.releaseExpandedRepositories
+              ? { releaseExpandedRepositories: new Set(importedUiSettings.releaseExpandedRepositories) }
+              : {}),
+          });
+          if (importedUiSettings.proxyConfig) {
+            const restoredProxy = {
+              ...importedUiSettings.proxyConfig,
+              password: wasIncluded && isRealSecret(importedUiSettings.proxyConfig.password)
+                ? importedUiSettings.proxyConfig.password
+                : currentStore.proxyConfig.password,
+            };
+            useAppStore.setState({ proxyConfig: restoredProxy });
+          }
+          if (importedUiSettings.rpcDownloadConfig) {
+            const restoredRpc = {
+              ...importedUiSettings.rpcDownloadConfig,
+              secret: wasIncluded && isRealSecret(importedUiSettings.rpcDownloadConfig.secret)
+                ? importedUiSettings.rpcDownloadConfig.secret
+                : currentStore.rpcDownloadConfig.secret,
+            };
+            useAppStore.setState({ rpcDownloadConfig: restoredRpc });
+          }
+          if (wasIncluded && importedUiSettings.backendApiSecret !== undefined && isRealSecret(importedUiSettings.backendApiSecret)) {
+            setBackendApiSecret(importedUiSettings.backendApiSecret);
           }
         }
       }
@@ -822,8 +1066,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Release records not updated in over 90 days',
         count: oldReleases.length,
         icon: <Tag className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary',
-        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
+        color: 'text-muted-foreground dark:text-muted-foreground',
+        bgColor: 'bg-muted dark:bg-muted/40'
       });
     }
 
@@ -837,8 +1081,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Cached repository data from discovery page, safe to clean',
         count: totalDiscoveryRepos,
         icon: <Sparkles className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary',
-        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
+        color: 'text-muted-foreground dark:text-muted-foreground',
+        bgColor: 'bg-muted dark:bg-muted/40'
       });
     }
 
@@ -852,8 +1096,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Repositories that have not been analyzed by AI',
         count: unanalyzedRepos,
         icon: <Bot className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary',
-        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
+        color: 'text-muted-foreground dark:text-muted-foreground',
+        bgColor: 'bg-muted dark:bg-muted/40'
       });
     }
 
@@ -873,8 +1117,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         descriptionEn: 'Read markers for releases that no longer exist, safe to clean',
         count: staleReadReleases,
         icon: <Eye className="w-4 h-4" />,
-        color: 'text-gray-700 dark:text-text-secondary',
-        bgColor: 'bg-light-surface dark:bg-white/[0.04]'
+        color: 'text-muted-foreground dark:text-muted-foreground',
+        bgColor: 'bg-muted dark:bg-muted/40'
       });
     }
 
@@ -1184,8 +1428,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'GitHub Stars repositories with AI summaries, tags, and platform info. Re-sync required after deletion.'),
       count: repositories.length,
       icon: <Github className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'releases',
@@ -1194,8 +1438,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Release version info for subscribed repos, including notes and assets. Re-fetch required after deletion.'),
       count: releases.length,
       icon: <Tag className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'aiConfigs',
@@ -1204,8 +1448,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'AI analysis service configs including API keys, models, and concurrency. AI analysis unavailable after deletion.'),
       count: aiConfigs.length,
       icon: <Bot className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'webdavConfigs',
@@ -1214,8 +1458,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'WebDAV server addresses and credentials. Cloud backup & restore unavailable after deletion.'),
       count: webdavConfigs.length,
       icon: <Cloud className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'categorySettings',
@@ -1224,8 +1468,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Custom categories, default category overrides, and hidden categories. Sidebar resets to defaults after deletion.'),
       count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'assetFilters',
@@ -1234,8 +1478,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Release asset filtering rule presets. Re-create filter rules after deletion.'),
       count: assetFilters.length,
       icon: <Filter className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'discoveryData',
@@ -1244,8 +1488,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Cached repos from discovery channels. Safe to clean — auto-refreshes on next visit.'),
       count: totalDiscoveryReposCount,
       icon: <Sparkles className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'subscriptionData',
@@ -1254,8 +1498,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Cached repos from subscription feeds. Safe to clean — auto-refreshes on next visit.'),
       count: totalSubscriptionReposCount,
       icon: <Rss className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'releaseSubscriptions',
@@ -1264,8 +1508,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Subscribed repo list, source settings, and read marks for releases. Subscription status and read marks lost after deletion.'),
       count: releaseSubscriptions.size + releaseSourceSettings.watchCustomReleaseRepos.length + releaseSourceSettings.customReleaseRepos.length,
       icon: <Eye className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
     {
       key: 'searchHistory',
@@ -1274,8 +1518,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'Search bar history and current filter settings. Search suggestions and filters cleared after deletion.'),
       count: searchHistoryCount,
       icon: <Search className="w-5 h-5" />,
-      color: 'text-gray-700 dark:text-text-secondary',
-      bgColor: 'bg-gray-100 dark:bg-white/[0.04]',
+      color: 'text-muted-foreground dark:text-muted-foreground',
+      bgColor: 'bg-muted dark:bg-muted/40',
     },
   ];
 
@@ -1283,7 +1527,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-white/[0.08] text-white dark:text-text-secondary rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-accent text-white dark:text-muted-foreground rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -1291,7 +1535,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Error Message */}
       {showErrorMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-status-red/10 dark:bg-status-red/20 text-status-red dark:text-status-red rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-destructive/10 dark:bg-destructive/20 text-destructive dark:text-destructive rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <XCircle className="w-5 h-5" />
           <span>{showErrorMessage}</span>
         </div>
@@ -1299,15 +1543,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Statistics */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
+          <Database className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
           {t('数据概览', 'Data Overview')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {dataStats.map((stat) => (
             <div
               key={stat.key}
-              className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4"
+              className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -1315,8 +1559,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-text-tertiary">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-text-primary">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">{stat.label}</p>
+                    <p className="text-2xl font-bold text-foreground dark:text-foreground">
                       {stat.count}
                     </p>
                   </div>
@@ -1329,66 +1573,57 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Data Export/Import */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <HardDrive className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary" />
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
+          <HardDrive className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
           {t('数据导出与导入', 'Data Export & Import')}
         </h3>
 
         {/* Include Keys Toggle - Independent Container */}
-        <div className="mb-4 p-6 bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04]">
+        <div className="mb-4 p-6 bg-card dark:bg-card rounded-lg border border-border dark:border-border">
           <IncludeKeysToggle t={t} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Export */}
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
+              <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Download className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-text-primary">{t('导出数据', 'Export Data')}</h4>
-                <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
+                <h4 className="font-medium text-foreground dark:text-foreground">{t('导出数据', 'Export Data')}</h4>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
               </div>
             </div>
 
             <div className="space-y-2 mb-4">
-              {[
-                { key: 'repositories', label: t('仓库数据', 'Repositories') },
-                { key: 'releases', label: t('Release数据', 'Releases') },
-                { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
-                { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
-                { key: 'customCategories', label: t('分类设置', 'Categories') },
-                { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
-                { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
-                { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
-                { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
-                { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
-                { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center space-x-2 text-sm text-gray-900 dark:text-text-secondary">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="export-checkbox rounded border-black/[0.06] dark:border-white/[0.04] text-brand-violet focus:ring-brand-violet"
-                    data-type={item.key}
+              {exportItems.map((item) => (
+                <div key={item.key} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
+                  <Checkbox
+                    id={`export-type-${item.key}`}
+                    checked={selectedExportTypes.includes(item.key)}
+                    onCheckedChange={(checked) => {
+                      setSelectedExportTypes((prev) => (
+                        checked === true
+                          ? prev.includes(item.key) ? prev : [...prev, item.key]
+                          : prev.filter((key) => key !== item.key)
+                      ));
+                    }}
                   />
-                  <span>{item.label}</span>
-                </label>
+                  <label htmlFor={`export-type-${item.key}`}>{item.label}</label>
+                </div>
               ))}
             </div>
-            <button
+            <Button
               onClick={() => {
-                const checkboxes = document.querySelectorAll('.export-checkbox:checked');
-                const selectedTypes = Array.from(checkboxes).map((cb) => (cb as HTMLInputElement).dataset.type as string);
-                if (selectedTypes.length === 0) {
+                if (selectedExportTypes.length === 0) {
                   showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
                   return;
                 }
-                exportData(selectedTypes);
+                exportData(selectedExportTypes);
               }}
               disabled={isExporting}
-              className="w-full px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="w-full gap-2"
             >
               {isExporting ? (
                 <>
@@ -1401,35 +1636,29 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   <span>{t('导出选中数据', 'Export Selected')}</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
 
           {/* Import */}
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-light-surface dark:bg-white/[0.04] text-gray-700 dark:text-text-secondary">
+              <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Upload className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-text-primary">{t('导入数据', 'Import Data')}</h4>
-                <p className="text-sm text-gray-500 dark:text-text-tertiary">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
+                <h4 className="font-medium text-foreground dark:text-foreground">{t('导入数据', 'Import Data')}</h4>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
               </div>
             </div>
-            <div className="border-2 border-dashed border-black/[0.06] dark:border-white/[0.04] rounded-lg p-6 text-center">
-              <Upload className="w-8 h-8 text-gray-400 dark:text-text-quaternary mx-auto mb-2" />
-              <p className="text-sm text-gray-500 dark:text-text-tertiary mb-2">
+            <div className="border-2 border-dashed border-border dark:border-border rounded-lg p-6 text-center">
+              <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground/70 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-2">
                 {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
               </p>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportFile}
-                className="hidden"
-                id="import-file-input"
-              />
+              <Input type="file" accept=".json" onChange={handleImportFile} className="peer sr-only" id="import-file-input" />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-text-secondary rounded-lg transition-colors inline-block"
+                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
               >
                 {t('选择文件', 'Select File')}
               </label>
@@ -1441,12 +1670,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {/* Data Cleanup Suggestions */}
       {cleanupSuggestions.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-            <RefreshCw className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary " />
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
+            <RefreshCw className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
             {t('数据清理建议', 'Data Cleanup Suggestions')}
           </h3>
-          <div className="bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-4 mb-4">
-            <p className="text-sm text-gray-700 dark:text-text-secondary ">
+          <div className="bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg p-4 mb-4">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
               {t('以下数据可以安全清理以释放存储空间，不会影响核心功能。', 'The following data can be safely cleaned to free up storage without affecting core functionality.')}
             </p>
           </div>
@@ -1454,31 +1683,31 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             {cleanupSuggestions.map((suggestion) => (
               <div
                 key={suggestion.key}
-                className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] p-4 flex items-center justify-between hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
+                className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-accent transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
                     {suggestion.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-text-primary">
+                    <p className="font-medium text-foreground dark:text-foreground">
                       {language === 'zh' ? suggestion.label : suggestion.labelEn}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-text-tertiary">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-700 dark:text-text-tertiary">
+                  <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                     {suggestion.count} {t('条', 'items')}
                   </span>
-                  <button
+                  <Button
                     onClick={() => handleCleanup(suggestion.key)}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors"
                   >
                     {t('清理', 'Clean')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -1488,39 +1717,40 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Selective Data Deletion */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4 flex items-center">
-          <Trash2 className="w-5 h-5 mr-2 text-gray-700 dark:text-text-secondary " />
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
+          <Trash2 className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
           {t('选择性删除数据', 'Selective Data Deletion')}
         </h3>
-        <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+        <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
           <div className="divide-y divide-black/[0.06] dark:divide-gray-700">
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-light-bg dark:hover:bg-white/[0.06] transition-colors"
+                className="flex items-center justify-between px-4 py-4 hover:bg-background dark:hover:bg-accent transition-colors"
               >
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
                     {stat.icon}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-text-primary">{stat.label}</p>
-                    <p className="text-sm text-gray-500 dark:text-text-tertiary mt-0.5">
+                    <p className="font-medium text-foreground dark:text-foreground">{stat.label}</p>
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-0.5">
                       {stat.description}
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-text-quaternary mt-1">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 mt-1">
                       {stat.count} {t('条记录', 'records')}
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.count === 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{t('删除', 'Delete')}</span>
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -1529,74 +1759,76 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       {/* Delete All Data */}
       <section>
-        <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center">
           <AlertTriangle className="w-5 h-5 mr-2" />
           {t('危险区域', 'Danger Zone')}
         </h3>
-        <div className="bg-light-surface dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.04] rounded-lg p-6">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-status-red/10 dark:bg-status-red/20 rounded-lg">
-              <FileWarning className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
+        <Card className="border-destructive/40 py-5">
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+              <FileWarning className="h-5 w-5" aria-hidden="true" />
             </div>
-            <div className="flex-1">
-              <h4 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
+            <div className="min-w-0 flex-1">
+              <h4 className="text-base font-semibold text-foreground dark:text-foreground">
                 {t('删除所有数据', 'Delete All Data')}
               </h4>
-              <p className="mt-2 text-gray-700 dark:text-text-secondary ">
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                 {t(
                   '此操作将永久删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。应用程序将重置为初始状态。此操作不可恢复！',
                   'This will permanently delete ALL application data, including all user data, GitHub tokens, configuration files, etc. The application will be reset to its initial state. This action cannot be undone!'
                 )}
               </p>
-              <button
+              <Button
+                variant="destructive"
+                size="sm"
                 onClick={() => openConfirmation('all')}
-                className="mt-4 px-6 py-3 bg-status-red hover:bg-red-600 dark:hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center space-x-2"
+                className="mt-4"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-4">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4">
             {t('操作日志', 'Operation Logs')}
           </h3>
-          <div className="bg-white dark:bg-panel-dark rounded-lg border border-black/[0.06] dark:border-white/[0.04] overflow-hidden">
+          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-light-bg dark:bg-white/[0.04] sticky top-0">
+                <thead className="bg-background dark:bg-muted/40 sticky top-0">
                   <tr>
-                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
                       {t('时间', 'Time')}
                     </th>
-                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
                       {t('操作', 'Operation')}
                     </th>
-                    <th className="px-4 py-2 text-left text-gray-700 dark:text-text-secondary">
+                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
                       {t('状态', 'Status')}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-light-bg dark:hover:bg-white/[0.06]">
-                      <td className="px-4 py-2 text-gray-500 dark:text-text-tertiary">
+                    <tr key={log.id} className="hover:bg-background dark:hover:bg-accent">
+                      <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">
                         {log.timestamp}
                       </td>
-                      <td className="px-4 py-2 text-gray-900 dark:text-text-primary">{log.operation}</td>
+                      <td className="px-4 py-2 text-foreground dark:text-foreground">{log.operation}</td>
                       <td className="px-4 py-2">
                         {log.success ? (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 dark:text-text-secondary bg-gray-100 dark:bg-white/[0.04] rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 rounded-full">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             {t('成功', 'Success')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 dark:text-text-secondary bg-status-red/10 dark:bg-status-red/20 rounded-full">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-destructive/10 dark:bg-destructive/20 rounded-full">
                             <XCircle className="w-3 h-3 mr-1" />
                             {t('失败', 'Failed')}
                           </span>
@@ -1612,37 +1844,44 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       )}
 
       {/* Confirmation Modal */}
-      {confirmation.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-light-surface dark:bg-white/[0.04] border-b border-black/[0.06] dark:border-white/[0.04]">
-              <div className="flex items-center space-x-3">
-                <AlertTriangle className="w-6 h-6 text-gray-700 dark:text-text-secondary " />
-                <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
-                  {getDeleteTitle(confirmation.type!)}
-                </h3>
-              </div>
-            </div>
+      <AlertDialog
+        open={confirmation.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) closeConfirmation();
+        }}
+      >
+        {confirmation.type && (
+          <AlertDialogContent className="max-w-md">
 
-            <div className="p-6 space-y-4">
-              <div className="flex items-start space-x-3 text-gray-700 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] p-4 rounded-lg">
-                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <p className="text-sm">{getDeleteDescription(confirmation.type!)}</p>
+          <AlertDialogHeader className="rounded-lg bg-muted p-4 dark:bg-muted/40">
+            <AlertDialogTitle className="flex items-center gap-3 text-muted-foreground">
+              <AlertTriangle className="h-6 w-6" />
+              {getDeleteTitle(confirmation.type)}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            <AlertDialogDescription asChild>
+              <div className="flex items-start space-x-3 rounded-lg bg-muted p-4 text-muted-foreground dark:bg-muted/40">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <p className="text-sm">{getDeleteDescription(confirmation.type)}</p>
               </div>
+            </AlertDialogDescription>
 
               {/* GitHub Username Verification for "Delete All" */}
               {confirmation.type === 'all' && user && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-900 dark:text-text-secondary">
+                  <label htmlFor="delete-all-github-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground">
                     {t(
                       '请输入您的GitHub用户名以确认此操作：',
                       'Please enter your GitHub username to confirm this action:'
                     )}
-                    <span className="ml-2 font-mono text-gray-700 dark:text-text-secondary">
+                    <span className="ml-2 font-mono text-muted-foreground dark:text-muted-foreground">
                       {user.login}
                     </span>
                   </label>
-                  <input
+                  <Input
+                    id="delete-all-github-username"
                     type="text"
                     value={confirmation.githubUsernameInput}
                     onChange={(e) =>
@@ -1652,96 +1891,107 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('输入GitHub用户名', 'Enter GitHub username')}
-                    className="w-full px-4 py-2 border border-black/[0.06] dark:border-white/[0.04] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-black/[0.06] dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-primary"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring dark:bg-muted/40 dark:text-foreground"
                   />
                 </div>
               )}
 
-              <div className="flex space-x-3 pt-4">
-                <button
-                  onClick={closeConfirmation}
-                  disabled={isDeleting}
-                  className="flex-1 px-4 py-2 text-gray-900 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {t('取消', 'Cancel')}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={
-                    isDeleting ||
-                    (confirmation.type === 'all' &&
-                      confirmation.githubUsernameInput !== user?.login)
-                  }
-                  className="flex-1 px-4 py-2 bg-status-red hover:bg-red-600 dark:hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  {isDeleting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('删除中...', 'Deleting...')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      <span>{t('确认删除', 'Confirm Delete')}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+            <AlertDialogFooter className="pt-4">
+              <AlertDialogCancel
+                onClick={closeConfirmation}
+                disabled={isDeleting}
+                className="flex-1 bg-muted text-foreground hover:bg-accent dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              >
+                {t('取消', 'Cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete();
+                }}
+                disabled={
+                  isDeleting ||
+                  (confirmation.type === 'all' &&
+                    confirmation.githubUsernameInput !== user?.login)
+                }
+                className="flex-1 bg-destructive font-medium text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{t('删除中...', 'Deleting...')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>{t('确认删除', 'Confirm Delete')}</span>
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </div>
-        </div>
-      )}
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
 
       {/* Import Preview Modal */}
       {importPreview.isOpen && importPreview.data && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white dark:bg-panel-dark rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-light-bg dark:bg-panel-dark border-b border-black/[0.06] dark:border-white/[0.04]">
-              <div className="flex items-center space-x-3">
-                <Upload className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
-                <h3 className="text-lg font-semibold text-gray-700 dark:text-text-secondary ">
-                  {t('导入数据预览', 'Import Data Preview')}
-                </h3>
-              </div>
-            </div>
+        <Dialog
+          open={importPreview.isOpen}
+          onOpenChange={(open) => {
+            if (!open && !isImporting) {
+              setImportPreview({ data: null, isOpen: false, fileName: '' });
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg" closeLabel={t('关闭', 'Close')}>
+            <DialogHeader className="rounded-lg bg-background dark:bg-card">
+              <DialogTitle className="flex items-center gap-3 text-muted-foreground">
+                <Upload className="h-6 w-6" />
+                {t('导入数据预览', 'Import Data Preview')}
+              </DialogTitle>
+              <DialogDescription>
+                {t('确认备份文件内容后选择导入方式。', 'Review the backup contents before choosing an import mode.')}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="p-6 space-y-4">
-              <div className="text-sm text-gray-700 dark:text-text-tertiary">
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground dark:text-muted-foreground">
                 <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
                 <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
                 <p><strong>{t('版本:', 'Version:')}</strong> {importPreview.data.appVersion}</p>
               </div>
 
-              <div className="border-t border-black/[0.06] dark:border-white/[0.04] pt-4">
-                <p className="text-sm font-medium text-gray-900 dark:text-text-secondary mb-2">{t('包含的数据:', 'Included Data:')}</p>
+              <div className="border-t border-border dark:border-border pt-4">
+                <p className="text-sm font-medium text-foreground dark:text-muted-foreground mb-2">{t('包含的数据:', 'Included Data:')}</p>
                 <div className="space-y-1 text-sm">
                   {importPreview.data.data.repositories && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.releases && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.aiConfigs && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.webdavConfigs && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.customCategories && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
                     </p>
                   )}
                   {importPreview.data.data.assetFilters && (
-                    <p className="text-gray-700 dark:text-text-tertiary">
+                    <p className="text-muted-foreground dark:text-muted-foreground">
                       • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
                     </p>
                   )}
@@ -1761,21 +2011,21 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </div>
               )}
 
-              <div className="flex space-x-3 pt-4">
-                <button
+              <DialogFooter className="pt-4">
+                <Button
+                  variant="outline"
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 text-gray-900 dark:text-text-secondary bg-light-surface dark:bg-white/[0.04] hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {t('取消', 'Cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'merge');
+                    importData(resolveImportTypes(importPreview.data!.data), 'merge');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>
@@ -1785,14 +2035,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   ) : (
                     <span>{t('合并导入', 'Merge Import')}</span>
                   )}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
                   onClick={() => {
-                    const types = Object.keys(importPreview.data!.data).filter(k => importPreview.data!.data[k as keyof typeof importPreview.data.data] !== undefined);
-                    importData(types, 'replace');
+                    importData(resolveImportTypes(importPreview.data!.data), 'replace');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-brand-indigo hover:bg-brand-hover text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   {isImporting ? (
                     <>
@@ -1802,11 +2052,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   ) : (
                     <span>{t('覆盖导入', 'Replace Import')}</span>
                   )}
-                </button>
-              </div>
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
