@@ -140,6 +140,12 @@ export function scanDomForTranslation(container: HTMLElement): DomBlockSegment[]
   return segments;
 }
 
+/**
+ * Wrap each eligible text node of `element` in a `<span>` carrying `attr` so
+ * display modes can toggle originals/translations; skips code, `pre`,
+ * opt-out `[data-translate="false"]` and KaTeX/Mermaid subtrees. Returns the
+ * created spans for later unwrapping.
+ */
 export function wrapTextNodesWithAttr(element: HTMLElement, attr: string, value: string): HTMLElement[] {
   const spans: HTMLElement[] = [];
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
