@@ -234,6 +234,18 @@ export const ReleaseTimeline: React.FC = () => {
   // 不依赖 readReleases，避免标记已读时重建快照导致列表项立即消失
   const unreadSnapshotRef = useRef<Set<number>>(new Set());
   const [snapshotVersion, setSnapshotVersion] = useState(0);
+  // 快照重建信号只看可见 release 的 ID 集合：markReleaseAsRead 会清除
+  // “资产已更新”标识并生成新的 releases 数组，但 ID 集合不变——若直接依赖
+  // releases，刚展开标记的条目会在“仅显示未读”下立即消失。
+  const subscribedReleaseKey = useMemo(() =>
+    releases
+      .filter(r =>
+        releaseBelongsToResolvedSources(r, resolvedReleaseSources) &&
+        (includePreRelease || !r.prerelease)
+      )
+      .map(r => r.id)
+      .join(','),
+  [releases, resolvedReleaseSources, includePreRelease]);
   useEffect(() => {
     const state = useAppStore.getState();
     const ids = new Set<number>();
@@ -246,7 +258,10 @@ export const ReleaseTimeline: React.FC = () => {
     });
     unreadSnapshotRef.current = ids;
     setSnapshotVersion(v => v + 1);
-  }, [releases, resolvedReleaseSources, includePreRelease, releaseShowMode, releaseLatestMode]);
+    // 重建时机由 subscribedReleaseKey/releaseShowMode/releaseLatestMode 决定，
+    // 见上方说明；此处刻意不依赖 releases/resolvedReleaseSources 本身。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribedReleaseKey, releaseShowMode, releaseLatestMode]);
 
   // 预计算每个 release 的下载链接和过滤后的链接
   const releasesWithLinks = useMemo(() => {
@@ -1191,7 +1206,10 @@ export const ReleaseTimeline: React.FC = () => {
                   className="grid transition-[grid-template-rows] duration-300 ease-in-out"
                   style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                 >
-                  <div className="overflow-hidden min-h-0" hidden={!isExpanded} aria-hidden={!isExpanded}>
+                  {/* collapse-hidden 用延迟 visibility 替代 hidden：hidden 的 display:none
+                      会直接打断 grid-rows 折叠/展开动画；visibility 过渡同样能把折叠内容
+                      移出 Tab 焦点序与无障碍树，但动画得以保留。 */}
+                  <div className={`overflow-hidden min-h-0 ${isExpanded ? '' : 'collapse-hidden'}`}>
                     <div className="border-t ui-divider bg-background dark:bg-card/50">
                       <div className="p-1.5 space-y-1.5">
                       {releases.map(({ release, displayLinks }) => {

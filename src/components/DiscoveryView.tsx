@@ -177,6 +177,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        role="tablist"
         className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
         style={{
           scrollbarWidth: 'none',
@@ -196,7 +197,8 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
             }}
             onClick={() => onChannelSelect(channel.id)}
             variant="ghost"
-            aria-pressed={selectedChannel === channel.id}
+            role="tab"
+            aria-selected={selectedChannel === channel.id}
             className={`
               relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
               transition-all duration-200 ease-out

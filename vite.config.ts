@@ -17,7 +17,7 @@ export default defineConfig({
   },
   build: {
     // Warn before the 3,000 KiB hard budget enforced by check:bundle-size.
-    chunkSizeWarningLimit: 3072,
+    chunkSizeWarningLimit: 2900,
     rolldownOptions: {
       checks: {
         // The legacy plugin dominates production build time by design; this diagnostic
