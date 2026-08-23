@@ -53,6 +53,7 @@ function stripAstNode<T extends { node?: unknown }>(props: T): Omit<T, 'node'> {
   return rest;
 }
 
+/** GitHub-native fenced code block: hljs highlighting plus a hover copy button. */
 const CodeBlock: React.FC<{
   children: React.ReactNode;
   language: string;
@@ -159,6 +160,7 @@ const CodeBlock: React.FC<{
   );
 };
 
+/** Anchor that externalizes non-anchor links and keeps in-page TOC jumps smooth. */
 const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string; headingIds?: Map<string, string> }> = ({
   href,
   children,
@@ -254,6 +256,7 @@ const truncateUrl = (url: string, maxLength: number = 50): string => {
   }
 };
 
+/** Image with skeleton loading, error fallback, relative-URL resolution and a lightbox. */
 const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> = ({
   src,
   alt,
