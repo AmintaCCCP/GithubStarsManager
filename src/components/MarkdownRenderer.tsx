@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
+import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
@@ -794,13 +795,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     [breaks, mathPlugins]
   );
 
-  const rehypePlugins = useMemo(() => {
+  const rehypePlugins = useMemo<PluggableList>(() => {
     if (!enableHtml) {
       return mathPlugins ? [mathPlugins.rehype] : REHYPE_PLUGINS_NO_HTML;
     }
     return [
       rehypeRaw,
-      [rehypeSanitize, githubMarkdownSchema] as const,
+      [rehypeSanitize, githubMarkdownSchema],
       ...(mathPlugins ? [mathPlugins.rehype] : []),
     ];
   }, [enableHtml, mathPlugins]);

@@ -6,6 +6,12 @@
  */
 export function createCombinedAbortController(parentSignal: AbortSignal | undefined, timeoutMs: number): AbortController {
   const controller = new AbortController();
+  // 父信号已中止时立即中止并返回：此时注册监听器不会被触发（abort 事件只广播一次），
+  // 先建定时器再靠监听器中止反而会白等一个完整超时周期。
+  if (parentSignal?.aborted) {
+    controller.abort();
+    return controller;
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   if (timeoutMs > 0) {
     timer = setTimeout(() => controller.abort(), timeoutMs);

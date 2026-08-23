@@ -23,7 +23,7 @@ let renderCounter = 0;
  */
 const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
   const theme = useAppStore((state) => state.theme);
-  const { language: uiLanguage } = useAppStore();
+  const uiLanguage = useAppStore((state) => state.language);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
