@@ -56,6 +56,12 @@ function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
       return;
     }
 
+    // KaTeX/Mermaid render visual structures whose inner text is glyphs, not
+    // natural language — sending it to translation produces garbage.
+    if (el.closest('.katex, .mermaid')) {
+      return;
+    }
+
     if (el.hasAttribute('data-translate') && el.getAttribute('data-translate') === 'false') {
       return;
     }
@@ -140,6 +146,7 @@ export function wrapTextNodesWithAttr(element: HTMLElement, attr: string, value:
     if (!parent) continue;
     if (parent.tagName === 'CODE' || parent.tagName === 'PRE' || parent.closest('pre')) continue;
     if (parent.closest('[data-translate="false"]')) continue;
+    if (parent.closest('.katex, .mermaid')) continue;
     if (!node.textContent?.trim()) continue;
     replacements.push({ textNode: node as Text, parent });
   }
