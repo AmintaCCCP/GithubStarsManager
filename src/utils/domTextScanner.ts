@@ -37,6 +37,11 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Walk `element` and collect its natural-language text, preserving inline
+ * `<code>` as escaped markup and skipping purely visual subtrees (code
+ * blocks, images, KaTeX/Mermaid) that must not be sent to translation.
+ */
 function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
   let result = '';
   let hasInlineCode = false;
@@ -53,6 +58,12 @@ function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
     const tag = el.tagName.toLowerCase();
 
     if (tag === 'pre' || tag === 'img' || tag === 'svg' || tag === 'input' || tag === 'video' || tag === 'iframe' || tag === 'picture') {
+      return;
+    }
+
+    // KaTeX/Mermaid render visual structures whose inner text is glyphs, not
+    // natural language — sending it to translation produces garbage.
+    if (el.closest('.katex, .mermaid')) {
       return;
     }
 
@@ -129,6 +140,12 @@ export function scanDomForTranslation(container: HTMLElement): DomBlockSegment[]
   return segments;
 }
 
+/**
+ * Wrap each eligible text node of `element` in a `<span>` carrying `attr` so
+ * display modes can toggle originals/translations; skips code, `pre`,
+ * opt-out `[data-translate="false"]` and KaTeX/Mermaid subtrees. Returns the
+ * created spans for later unwrapping.
+ */
 export function wrapTextNodesWithAttr(element: HTMLElement, attr: string, value: string): HTMLElement[] {
   const spans: HTMLElement[] = [];
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -140,6 +157,7 @@ export function wrapTextNodesWithAttr(element: HTMLElement, attr: string, value:
     if (!parent) continue;
     if (parent.tagName === 'CODE' || parent.tagName === 'PRE' || parent.closest('pre')) continue;
     if (parent.closest('[data-translate="false"]')) continue;
+    if (parent.closest('.katex, .mermaid')) continue;
     if (!node.textContent?.trim()) continue;
     replacements.push({ textNode: node as Text, parent });
   }
