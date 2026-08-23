@@ -1,5 +1,5 @@
 import { ListChecks, Star } from 'lucide-react';
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import {
   AlertDialog,

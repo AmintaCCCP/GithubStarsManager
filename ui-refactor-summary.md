@@ -160,6 +160,12 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 
 本节为已完成本地验证、待提交推送并触发下一次 CodeRabbit full review 的 draft 记录；只有后续 review 明确报告 `Actionable comments posted: 0` 后，才能宣称审查收尾完成。
 
+## Round-30 audit findings and visual unification
+
+本轮处理 PR review 的 4 个审计问题并完成两处视觉统一：SyncModeChoiceModal 显式导入 React namespace 以支持 `React.FC` 类型引用；确认 `.linear-card`/`.linear-panel`/`.input-base`/`.btn-ghost`/`.btn-primary` 的重复未分层定义已在 `12b8f13` 清理，仅保留 `@layer components` 单一定义；light/dark 两套主题的 `--accent` 与 `--secondary`/`--muted` 区分（light `210 40% 92%`、dark `217.2 32.6% 21%`），使 chip/filter/release-action 等 hover 与 active 状态产生可见变化；ReleaseCard 展开后的"下载文件"资产列表容器改为浅色内嵌表面（light `bg-background/70`、dark `bg-foreground/[0.06]`）；GistCard 列表项标题从 `text-lg` 对齐全站卡片标题规范 `text-base`；DataManagementPanel 危险区域改用共享 Card/Button 规范（默认 card 表面 + destructive 边框着色、标准标题与正文层级、shared destructive 按钮 size），移除双重内边距。业务逻辑、store、services、API 和同步流程保持不变。
+
+本轮完整门禁通过：31 个测试文件、332 个测试全部通过，测试日志无 React/Radix `Warning`、`act` 或 `Unhandled` 标记；lint 通过；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过（legacy 入口 checker 2,718.26 KiB）；`git diff --check` 通过；生产依赖审计 0 vulnerabilities。
+
 ## Round-29 shadcn visual parity remediation
 
 本轮根据实际生产预览与官方 shadcn/ui 基线完成视觉收尾：全局 helper 改用 semantic tokens；入口、App shell、登录页、Header、CategorySidebar、SearchBar、RepositoryCard、SettingsPanel、GistView 和 settings panels 统一标准字体层级、控件密度、`rounded-md`/`rounded-xl`、薄边框、popover/card surface、focus ring 和 light/dark 对比度。共享 Button 对齐官方 h-9/h-8/h-10/icon 尺寸与状态，Card 对齐官方 flex/gap/py/title/content 视觉结构；专用图片查看器 overlay 颜色保持不变。所有修改均为 presentation/accessibility 层，业务 stores、services、API、同步流程、AI 行为和数据流保持不变。
