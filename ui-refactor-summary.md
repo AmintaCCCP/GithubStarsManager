@@ -175,3 +175,13 @@ b2c21c9 后最终 CodeRabbit full review 的 6 个 actionable 与 4 个 nitpick 
 该记录对应待提交和推送的本地 round-29 draft。CodeRabbit 的 actionable zero 仍须由下一次针对最终 commit 的 completed full review 明确验证。
 
 References: [shadcn/ui component documentation](https://ui.shadcn.com/docs/components)；[official Button/Card source](https://raw.githubusercontent.com/shadcn-ui/ui/main/apps/v4/registry/new-york-v4/ui/button.tsx)。
+
+## Round-31 unread snapshot fix, expanded-card tone swap and full PR audit
+
+本轮完成三项工作。其一是 Release 展开态色调互换：展开的 release 卡片容器改用柔和表面（light `hsl(var(--muted))`、dark `--card` 叠加 16% foreground 提亮），"下载文件"资产列表容器成为更浅的内嵌层（light `bg-background` 接近白色、dark `bg-foreground/[0.08]`），层级为 卡片 < 展开容器 < 资产列表，两套主题均符合规范。
+
+其二是修复"仅显示未读"下展开带"资产已更新"标识的 Release 会立即消失的缺陷：根因是 `markReleaseAsRead` 清空 `updated_asset_ids` 时生成新的 `releases` 数组，触发未读快照 effect 以 `releases` 身份变化为信号整体重建，把刚标记的条目从快照剔除。修复将重建信号改为可见 release 的 ID 集合签名（`subscribedReleaseKey`），badge 清除不改变 ID 集合故不再触发重建；真实的数据增删或来源变更仍会正常刷新快照。新增 `ReleaseTimeline.test.tsx` 回归测试复刻真实 store 行为（标记已读并清空 badge 产生新数组），断言展开后条目保留且资产行可见；该测试对修复前代码失败（经 `git stash` 验证）。
+
+其三是对整个 PR diff（116 个文件）做完整自审：store/services、共享 UI 原语与构建配置、应用组件三个切片并行审计，加上本轮改动文件的逐一复核。已修复的发现：仓库分组折叠容器改用 `.collapse-hidden`（延迟 visibility 过渡）替代此前引入的 `hidden` 属性——后者以 display:none 打断了 grid-rows 折叠/展开动画，新方案在保留动画的同时维持折叠内容不可聚焦、不进入无障碍树的可达性目标；`AlertDialogContent` 对齐 `DialogContent` 补齐 `max-h-[85vh] overflow-y-auto` 滚动保护；RepositoryCard 描述 Tooltip 的 `<p>` 触发器补回 `tabIndex={0}`，恢复键盘可达性；DiscoveryView 频道切换恢复 `role="tablist"`/`role="tab"` 与 `aria-selected` 语义；`vite.config.ts` 的 `chunkSizeWarningLimit` 从 3072 降至 2900，使 Vite 告警真正先于 3,000 KiB 硬预算触发；移除 PR 中失去唯一引用的孤儿字体资产 `public/fonts/`（Inter woff2/css 共约 135 KB）；`tailwindcss-animate` 从 dependencies 移至 devDependencies（仅构建期使用）。审计确认为本 PR 早前评审轮次有意设计、保持不变的项：DataManagementPanel 导入由整体替换改为按键合并与 id 去重（03ef497，响应 follow-up review）、分类名 `none` 保留名策略（round-19 及后续 review 轮次）、NetworkPanel 代理/RPC 开关同步后端设置并支持回滚。其余切片经核查未发现 P0-P2 缺陷：services 层为纯空值加固与死参数清理，Radix 接线、cva 组合、Fast Refresh、Toast 生命周期、ConfirmDialog 单次决议均验证无误。
+
+本轮完整门禁通过：32 个测试文件、333 个测试全部通过（含新增回归测试）；lint 通过 0 errors/0 warnings；TypeScript 无诊断；生产构建与 3,000 KiB bundle budget 通过（legacy 入口 checker 2,718.57 KiB）；`git diff --check` 通过；生产依赖审计 0 vulnerabilities。业务逻辑、store、services、API 和同步流程除上述已记录的早前轮次设计外保持不变。

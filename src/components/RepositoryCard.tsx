@@ -1140,6 +1140,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <p
+              tabIndex={0}
               className={viewMode === 'list'
                 ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
                 : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}

@@ -1467,10 +1467,23 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   color: var(--ui-success);
 }
 
+/* 展开态使用柔和浅色表面：资产列表容器比卡片更浅（light 下接近白色） */
 .release-card.is-expanded {
-  background: hsl(var(--accent));
+  background: hsl(var(--muted));
   border-color: hsl(var(--ring) / 0.5);
   box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2);
+}
+
+html.dark .release-card.is-expanded {
+  background-image: linear-gradient(hsl(var(--foreground) / 0.16), hsl(var(--foreground) / 0.16));
+  background-color: hsl(var(--card));
+}
+
+/* 折叠容器：延迟切换 visibility，既保住 grid-rows 折叠/展开动画，
+   又让折叠内容离开 Tab 焦点序与无障碍树（与 hidden 属性的可达性效果一致） */
+.collapse-hidden {
+  visibility: hidden;
+  transition: visibility 0s linear 300ms;
 }
 
 .linear-release-action {

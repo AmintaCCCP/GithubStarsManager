@@ -354,7 +354,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="rounded-md border border-border max-h-72 overflow-y-auto bg-background/70 dark:bg-foreground/[0.06]">
+              <div className="rounded-md border border-border max-h-72 overflow-y-auto bg-background dark:bg-foreground/[0.08]">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
