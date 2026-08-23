@@ -37,6 +37,11 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Walk `element` and collect its natural-language text, preserving inline
+ * `<code>` as escaped markup and skipping purely visual subtrees (code
+ * blocks, images, KaTeX/Mermaid) that must not be sent to translation.
+ */
 function extractTextPreservingInlineCode(element: HTMLElement): ExtractedText {
   let result = '';
   let hasInlineCode = false;

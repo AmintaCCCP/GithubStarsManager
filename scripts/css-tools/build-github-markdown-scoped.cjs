@@ -21,6 +21,29 @@ const pkgVersion = require('../../node_modules/github-markdown-css/package.json'
 const pkgDir = path.join(__dirname, '..', '..', 'node_modules', 'github-markdown-css');
 const outFile = path.join(__dirname, '..', '..', 'src', 'styles', 'github-markdown.scoped.css');
 
+/**
+ * Split a CSS selector list on commas that sit at parenthesis/bracket depth
+ * zero, so functional pseudo-class arguments like `a:has(>p,>div)` survive
+ * as a single selector instead of being torn apart into invalid fragments.
+ */
+function splitSelectorList(selectorList) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+  for (const ch of selectorList) {
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+    if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
 /** Prefix every selector of every top-level rule in `css` with `prefix`. */
 function prefixSelectors(css, prefix) {
   let out = '';
@@ -56,8 +79,7 @@ function prefixSelectors(css, prefix) {
         out += prelude + '{' + body + '}';
       }
     } else {
-      const prefixed = trimmedPrelude
-        .split(',')
+      const prefixed = splitSelectorList(trimmedPrelude)
         .map((s) => prefix + ' ' + s.trim())
         .join(',\n');
       out += '\n' + prefixed + ' {' + body + '}';
