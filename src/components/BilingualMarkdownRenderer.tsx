@@ -47,10 +47,8 @@ const BILINGUAL_MODE_CSS = `
   font-size: 0.92em;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
-@media (prefers-color-scheme: dark) {
-  [${ATTR_TRANSLATION}] code {
-    background: rgba(255,255,255,0.1);
-  }
+.dark [${ATTR_TRANSLATION}] code {
+  background: rgba(255,255,255,0.1);
 }
 `;
 

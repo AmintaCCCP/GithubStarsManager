@@ -1,16 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn((selector) => {
     const state = {
       language: 'zh',
+      theme: 'dark',
       githubToken: null,
       setReadmeModalOpen: vi.fn(),
     };
     return selector ? selector(state) : state;
   }),
+}));
+
+vi.mock('mermaid', () => ({
+  default: {
+    initialize: vi.fn(),
+    parse: vi.fn().mockResolvedValue(true),
+    render: vi.fn().mockResolvedValue({ svg: '<svg>diagram</svg>' }),
+  },
 }));
 
 describe('MarkdownRenderer', () => {
@@ -169,23 +178,20 @@ describe('MarkdownRenderer', () => {
   });
 
   describe('Code Blocks', () => {
-    it('should show line numbers for code blocks with more than 3 lines', () => {
+    it('should render GitHub-native code blocks without manual line numbers', () => {
       const content = '```javascript\nline1\nline2\nline3\nline4\n```';
       const { container } = render(<MarkdownRenderer content={content} />);
-      const mutedElements = container.querySelectorAll('.text-muted-foreground');
-      const texts = Array.from(mutedElements).map((element) => element.textContent?.trim());
-      expect(texts).toContain('1');
-      expect(texts).toContain('4');
+      expect(container.querySelector('pre')).toBeInTheDocument();
+      expect(container.querySelector('code.language-javascript')).toBeInTheDocument();
+      // No synthetic line-number column
+      const pre = container.querySelector('pre');
+      expect(pre?.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(0);
     });
 
-    it('should not show line numbers for code blocks with 3 or fewer lines', () => {
-      const content = '```javascript\nline1\nline2\n```';
+    it('should provide a hover copy button for code blocks', () => {
+      const content = '```javascript\nconsole.log("hello");\n```';
       const { container } = render(<MarkdownRenderer content={content} />);
-      const lineNumbers = container.querySelectorAll('.text-muted-foreground');
-      const hasLineNumbers = Array.from(lineNumbers).some(el => 
-        el.textContent?.trim() === '1' || el.textContent?.trim() === '2'
-      );
-      expect(hasLineNumbers).toBe(false);
+      expect(container.querySelector('button[aria-label="复制代码"]')).toBeInTheDocument();
     });
 
     it('should normalize language aliases', () => {
@@ -193,6 +199,16 @@ describe('MarkdownRenderer', () => {
         <MarkdownRenderer content={'```sh\necho "hello"\n```'} />
       );
       expect(container.querySelector('.language-bash')).toBeInTheDocument();
+    });
+
+    it('should render mermaid fences as diagrams', async () => {
+      const { container } = render(
+        <MarkdownRenderer content={'```mermaid\nflowchart TD\nA-->B\n```'} />
+      );
+      await waitFor(() => {
+        expect(container.querySelector('.mermaid')).toBeInTheDocument();
+      });
+      expect(container.querySelector('.mermaid')).toHaveTextContent('diagram');
     });
   });
 
@@ -233,7 +249,7 @@ describe('MarkdownRenderer', () => {
 
     it('should handle empty content gracefully', () => {
       const { container } = render(<MarkdownRenderer content="" />);
-      expect(container.querySelector('.prose')).toBeInTheDocument();
+      expect(container.querySelector('.markdown-body')).toBeInTheDocument();
     });
   });
 
@@ -260,10 +276,10 @@ describe('MarkdownRenderer', () => {
     it('should assign IDs to headings from headingIds map', () => {
       const headingIds = new Map<string, string>();
       headingIds.set('Test Heading', 'custom-id-123');
-      
+
       const { container } = render(
-        <MarkdownRenderer 
-          content="# Test Heading" 
+        <MarkdownRenderer
+          content="# Test Heading"
           headingIds={headingIds}
         />
       );
@@ -277,6 +293,89 @@ describe('MarkdownRenderer', () => {
       );
       const h1 = container.querySelector('h1');
       expect(h1?.getAttribute('id')).toMatch(/^heading-extra-\d+$/);
+    });
+
+    it('should disambiguate duplicate headings by occurrence count', () => {
+      const headingIds = new Map<string, string>();
+      headingIds.set('Setup', 'heading-0');
+      headingIds.set('Setup__1', 'heading-1');
+
+      const { container } = render(
+        <MarkdownRenderer
+          content={'# Setup\n\n# Setup'}
+          headingIds={headingIds}
+        />
+      );
+      const [first, second] = Array.from(container.querySelectorAll('h1'));
+      expect(first).toHaveAttribute('id', 'heading-0');
+      expect(second).toHaveAttribute('id', 'heading-1');
+    });
+  });
+
+  describe('GitHub Alerts', () => {
+    const alertContent = '> [!NOTE]\n> Useful information';
+
+    it('should render GitHub alerts as markdown-alert blocks', () => {
+      const { container } = render(<MarkdownRenderer content={alertContent} />);
+      const alert = container.querySelector('.markdown-alert.markdown-alert-note');
+      expect(alert).toBeInTheDocument();
+      expect(alert?.querySelector('.markdown-alert-title')).toHaveTextContent('NOTE');
+      expect(alert?.querySelector('svg.octicon')).toBeInTheDocument();
+    });
+
+    it('should keep alerts intact when HTML sanitization is enabled', () => {
+      const { container } = render(
+        <MarkdownRenderer content={alertContent} enableHtml={true} />
+      );
+      const alert = container.querySelector('.markdown-alert.markdown-alert-note');
+      expect(alert).toBeInTheDocument();
+      expect(alert?.querySelector('svg.octicon path')).toHaveAttribute('d');
+    });
+
+    it('should still render plain blockquotes untouched', () => {
+      const { container } = render(<MarkdownRenderer content="> quoted text" />);
+      expect(container.querySelector('blockquote')).toHaveTextContent('quoted text');
+      expect(container.querySelector('.markdown-alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Gemoji shortcodes', () => {
+    it('should convert :smile: to its unicode emoji', () => {
+      const { container } = render(<MarkdownRenderer content="Great job! :smile:" />);
+      // :smile: → U+1F604 (😄); written as a codepoint so the assertion
+      // can't silently pass for a visually similar emoji
+      expect(container.querySelector('p')).toHaveTextContent('Great job! \u{1F604}');
+    });
+  });
+
+  describe('breaks prop', () => {
+    const twoLines = 'line one\nline two';
+
+    it('should join single newlines into one paragraph by default (GitHub parity)', () => {
+      const { container } = render(<MarkdownRenderer content={twoLines} />);
+      expect(container.querySelectorAll('p')).toHaveLength(1);
+      expect(container.querySelector('br')).toBeNull();
+    });
+
+    it('should convert single newlines to <br> when breaks is true', () => {
+      const { container } = render(<MarkdownRenderer content={twoLines} breaks={true} />);
+      expect(container.querySelector('br')).not.toBeNull();
+    });
+  });
+
+  describe('Math (KaTeX)', () => {
+    it('should lazily load KaTeX and render display math', async () => {
+      const { container } = render(<MarkdownRenderer content="$$E=mc^2$$" />);
+      await waitFor(() => {
+        expect(container.querySelector('.katex')).toBeInTheDocument();
+      }, { timeout: 5000 });
+    }, 10000);
+
+    it('should not load math support for plain documents', async () => {
+      const { container } = render(<MarkdownRenderer content="Just $5 and text" />);
+      // Give the effect a tick; no katex nodes should ever appear
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(container.querySelector('.katex')).toBeNull();
     });
   });
 });

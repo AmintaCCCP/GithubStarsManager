@@ -515,7 +515,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   </div>
                 )}
                 {summary.status === 'done' && summary.content && (
-                  <MarkdownRenderer content={summary.content} shouldRender={true} />
+                  <MarkdownRenderer content={summary.content} shouldRender={true} breaks={true} />
                 )}
                 {summary.status === 'error' && (
                   <div className="py-3 text-xs text-red-500 dark:text-red-400">
