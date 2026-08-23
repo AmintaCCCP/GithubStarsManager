@@ -86,7 +86,9 @@ const protectInlineCode = (text: string): { payload: string; restore: (translate
       for (let i = 0; i < codes.length; i++) {
         const token = `{${i}}`;
         if (!result.includes(token)) return text;
-        result = result.replace(token, codes[i]);
+        const code = codes[i];
+        // 用替换函数插入，避免 code 中的 $& / $` / $' / $1 被解释为替换模式
+        result = result.replace(token, () => code);
       }
       return result;
     },
