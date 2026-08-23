@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
 vi.mock('../store/useAppStore', () => ({
@@ -364,6 +365,12 @@ describe('MarkdownRenderer', () => {
   });
 
   describe('Math (KaTeX)', () => {
+    it('uses a Safari-compatible inline math detector', () => {
+      const source = readFileSync('src/components/MarkdownRenderer.tsx', 'utf8');
+
+      expect(source).not.toContain('(?<!');
+    });
+
     it('should lazily load KaTeX and render display math', async () => {
       const { container } = render(<MarkdownRenderer content="$$E=mc^2$$" />);
       await waitFor(() => {

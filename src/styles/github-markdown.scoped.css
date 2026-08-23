@@ -2458,10 +2458,23 @@ html.dark .markdown-body .highlight pre:has(+.zeroclipboard-container) {
    as a hard-edged box with text flush against its edges (release notes,
    README modal). Keep the root transparent; block elements (pre, table rows)
    still bring their own backgrounds. Must stay after both theme rule sets. */
+/* GitHub's vendored rules consume four Primer color-role custom properties
+   that github-markdown-css never declares (it assumes the host page ships
+   them). Define them per theme so focus outlines, kbd borders and .pl-ii
+   danger highlights resolve; values mirror @primer/primitives functional
+   themes for this package version. */
 .markdown-body {
   background-color: transparent;
+  --borderColor-muted: #d1d9e0b3;
+  --borderColor-accent-emphasis: #0969da;
+  --fgColor-danger: #d1242f;
+  --bgColor-danger-muted: #ffebe9;
 }
 
 html.dark .markdown-body {
   background-color: transparent;
+  --borderColor-muted: #3d444db3;
+  --borderColor-accent-emphasis: #1f6feb;
+  --fgColor-danger: #f85149;
+  --bgColor-danger-muted: #f851491a;
 }
