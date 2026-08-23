@@ -162,6 +162,20 @@ describe('translateService', () => {
     expect(result.translatedText).toBe(original);
   });
 
+  it('html textType: inserts code containing $ sequences verbatim on restore', async () => {
+    installFetch({ msBody: [{ translations: [{ text: '运行 {0} 处理文本' }] }] });
+
+    const result = await translateText({
+      text: "Run <code>sed 's/a/$&/' file</code> to process text",
+      to: 'zh',
+      from: 'en',
+      textType: 'html',
+    });
+
+    // $& 不能被解释为"整个匹配"，必须原样还原
+    expect(result.translatedText).toBe("运行 <code>sed 's/a/$&/' file</code> 处理文本");
+  });
+
   it('timeout during a delayed body read is classified as a transient error and retried, then surfaced as timeout', async () => {
     vi.useFakeTimers();
     const fetchMock = installFetch({ hangBody: true });
