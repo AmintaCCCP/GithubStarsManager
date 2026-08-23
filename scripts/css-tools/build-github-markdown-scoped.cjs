@@ -111,6 +111,19 @@ const glue = `
 .markdown-body .hljs {
   background: transparent !important;
 }
+
+/* The app renders .markdown-body inside cards and modals that already paint
+   their own surface. GitHub's opaque root background would otherwise appear
+   as a hard-edged box with text flush against its edges (release notes,
+   README modal). Keep the root transparent; block elements (pre, table rows)
+   still bring their own backgrounds. Must stay after both theme rule sets. */
+.markdown-body {
+  background-color: transparent;
+}
+
+html.dark .markdown-body {
+  background-color: transparent;
+}
 `;
 
 fs.writeFileSync(outFile, banner + light.trimEnd() + '\n\n' + darkScoped.trim() + '\n' + glue);
