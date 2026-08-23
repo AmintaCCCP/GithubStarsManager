@@ -1,4 +1,5 @@
 import queryString from 'query-string';
+import { createCombinedAbortController } from '../utils/abortUtils';
 
 class AuthExpiredError extends Error {
   readonly isAuthExpired = true;
@@ -25,6 +26,11 @@ const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const TRANSLATE_API_URL = 'https://api-edge.cognitive.microsofttranslator.com/translate';
 const AUTH_URL = 'https://edge.microsoft.com/translate/auth';
 const FALLBACK_TOKEN_TTL_MS = 8 * 60 * 1000;
+
+/** 鉴权接口超时：轻量 GET，10s 足够；防止网络黑洞（如被墙无响应）时请求永久挂起。 */
+const AUTH_TIMEOUT_MS = 10_000;
+/** 翻译请求超时：单批最多 50k 字符，慢网下放宽到 20s。 */
+const TRANSLATE_TIMEOUT_MS = 20_000;
 
 const parseJwtExpiration = (token: string): number => {
   try {
@@ -91,6 +97,28 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
       signal.addEventListener('abort', onAbort, { once: true });
     }
   });
+
+/**
+ * 带超时的 fetch：调用方 signal 与超时任一触发即中止请求。
+ * 超时转换为普通 Error（无 status → isTransientError 视为瞬时，外层
+ * withTranslateRetry 会重试）；调用方主动中止仍以 AbortError 抛出（不重试）。
+ */
+const fetchWithTimeout = async (
+  url: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  timeoutMs: number
+): Promise<Response> => {
+  const controller = createCombinedAbortController(signal, timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError' && !signal?.aborted) {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+};
 
 const extractHttpStatus = (err: unknown): number | null => {
   const anyErr = err as Record<string, unknown>;
@@ -162,10 +190,12 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
   if (!tokenPromise) {
     tokenPromise = (async () => {
       try {
-        const response = await fetch(AUTH_URL, {
-          method: 'GET',
-          credentials: 'omit',
-        });
+        const response = await fetchWithTimeout(
+          AUTH_URL,
+          { method: 'GET', credentials: 'omit' },
+          undefined,
+          AUTH_TIMEOUT_MS
+        );
 
         if (!response.ok) {
           throw new Error(`Auth failed: ${response.status}`);
@@ -184,17 +214,18 @@ export const apiMsAuth = async (signal?: AbortSignal): Promise<string> => {
     return tokenPromise;
   }
 
-  return Promise.race([
-    tokenPromise,
-    new Promise<string>((_, reject) => {
-      if (signal.aborted) {
-        reject(new DOMException('Aborted', 'AbortError'));
-        return;
-      }
-      const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
-      signal.addEventListener('abort', onAbort, { once: true });
-    }),
-  ]);
+  return new Promise<string>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+    // tokenPromise 是共享的单飞请求，胜出后要移除 abort 监听，避免泄漏。
+    tokenPromise.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', onAbort);
+    });
+  });
 };
 
 export interface TranslateOptions {
@@ -222,15 +253,19 @@ export const translateText = async (options: TranslateOptions): Promise<Translat
 
     const url = `${TRANSLATE_API_URL}?${params}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify([{ Text: text }]),
       },
-      body: JSON.stringify([{ Text: text }]),
       signal,
-    });
+      TRANSLATE_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -372,15 +407,19 @@ const translateBatchInternal = async (
 
     const url = `${TRANSLATE_API_URL}?${params}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(texts.map(t => ({ Text: t }))),
       },
-      body: JSON.stringify(texts.map(t => ({ Text: t }))),
       signal,
-    });
+      TRANSLATE_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       if (response.status === 401) {
