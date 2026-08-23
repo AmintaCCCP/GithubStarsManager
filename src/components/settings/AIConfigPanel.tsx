@@ -565,6 +565,7 @@ Repository information:
           <div className="mb-4">
             {notification && (
               <div
+                role={notification.type === 'error' ? 'alert' : 'status'}
                 className={`mb-3 flex items-center space-x-2 rounded-lg p-3 ${
                   notification.type === 'success'
                     ? 'bg-status-green/10 text-status-green dark:bg-status-green/10'

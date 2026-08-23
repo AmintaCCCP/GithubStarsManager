@@ -103,6 +103,7 @@ export class ErrorBoundary extends Component<Props, State> {
                       {strings.errorDetails}
                     </span>
                     <Button
+                      variant="secondary"
                       onClick={this.handleCopyError}
                       className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                     >
