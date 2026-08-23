@@ -5,8 +5,8 @@ import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan } from '../../types';
+import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle, Languages } from 'lucide-react';
+import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan, TranslationEngine } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { AIService } from '../../services/aiService';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
@@ -83,6 +83,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     aiConfigs,
     activeAIConfig,
     language,
+    translationEngine,
+    setTranslationEngine,
     addAIConfig,
     updateAIConfig,
     deleteAIConfig,
@@ -800,6 +802,46 @@ Repository information:
             <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>
           </div>
         )}
+
+      <div className="mt-6 p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
+        <div className="flex items-center space-x-2 mb-3">
+          <Languages className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+          <h4 className="text-sm font-medium text-foreground dark:text-foreground">
+            {t('翻译引擎', 'Translation Engine')}
+          </h4>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label id="translation-engine-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
+              {t('README 文档翻译使用的引擎', 'Engine used for README document translation')}
+            </label>
+            <Select value={translationEngine} onValueChange={(value) => setTranslationEngine(value as TranslationEngine)}>
+              <SelectTrigger aria-labelledby="translation-engine-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="microsoft">{t('微软翻译（免费）', 'Microsoft Translate (Free)')}</SelectItem>
+                <SelectItem value="google">{t('Google 翻译（免费）', 'Google Translate (Free)')}</SelectItem>
+                <SelectItem value="ai">{t('AI 翻译（使用当前激活的 AI 配置）', 'AI Translation (uses the active AI configuration)')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground self-end pb-1">
+            {translationEngine === 'ai'
+              ? t(
+                  'AI 翻译质量通常更高，但速度较慢且消耗 API 额度，将使用上方当前激活的 AI 配置。',
+                  'AI translation usually has higher quality, but is slower and consumes API quota. It uses the active AI configuration above.'
+                )
+              : translationEngine === 'google'
+                ? t(
+                    'Google 免费接口，无需配置；部分地区可能无法直连。',
+                    'Free Google endpoint, no configuration needed; may be unreachable in some regions.'
+                  )
+                : t(
+                    '微软 Edge 免费接口，无需配置，直连速度快。',
+                    'Free Microsoft Edge endpoint, no configuration needed, fast direct connection.'
+                  )}
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

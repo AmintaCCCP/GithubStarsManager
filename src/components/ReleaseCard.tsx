@@ -461,10 +461,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="relative">
+              <div className="rounded-md border border-border bg-white px-5 pt-5 pb-4 dark:border-border dark:bg-muted/30">
                 <MarkdownRenderer
                   content={isFullContent ? (release.body || '') : truncatedBody}
                   shouldRender={true}
+                  fontSize="small"
                 />
 
                 {(release.body || '').length > truncatedBody.length && (
