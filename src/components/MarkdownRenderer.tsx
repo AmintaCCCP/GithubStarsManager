@@ -3,13 +3,19 @@ import { Button } from './ui/button';
 import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
+import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkAlert from 'remark-github-blockquote-alert';
+import remarkGemoji from 'remark-gemoji';
 import { Copy, Check, Download } from 'lucide-react';
 import hljs from 'highlight.js';
+import MermaidBlock from './MermaidBlock';
+import { githubMarkdownSchema } from '../utils/sanitizeSchema';
 import 'highlight.js/styles/github.min.css';
+import '../styles/github-markdown.scoped.css';
 import { useAppStore } from '../store/useAppStore';
 import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
 
@@ -21,17 +27,38 @@ interface MarkdownRendererProps {
   baseUrl?: string;
   headingIds?: Map<string, string>;
   fontSize?: 'small' | 'medium' | 'large';
+  /** Convert single newlines to <br> (GitHub READMEs do not; AI summaries rely on it). */
+  breaks?: boolean;
 }
 
-const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
-const REHYPE_PLUGINS_WITH_HTML = [rehypeRaw, rehypeSanitize];
+// GitHub-style remark pipeline: GFM tables/tasklists/strikethrough, [!NOTE]-style
+// alerts, :emoji: shortcodes. remarkBreaks is opt-in via the `breaks` prop.
+const BASE_REMARK_PLUGINS = [remarkGfm, remarkAlert, remarkGemoji];
 const REHYPE_PLUGINS_NO_HTML: never[] = [];
 
+// Matches $$display$$, \(inline\), \[display\] and $inline$ math so KaTeX is
+// only loaded for documents that actually use it.
+const MATH_PATTERN =
+  /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?:\\.|[^$\\\n])*?[^\s$\\\n]\$/;
+
+interface MathPlugins {
+  remark: typeof import('remark-math')['default'];
+  rehype: typeof import('rehype-katex')['default'];
+}
+
+// react-markdown 会把 AST 节点作为 `node` prop 传给自定义组件，
+// 展开到原生 DOM 元素前需要剥掉这个非 DOM 属性
+function stripAstNode<T extends { node?: unknown }>(props: T): Omit<T, 'node'> {
+  const rest = { ...props };
+  delete (rest as { node?: unknown }).node;
+  return rest;
+}
+
+/** GitHub-native fenced code block: hljs highlighting plus a hover copy button. */
 const CodeBlock: React.FC<{
   children: React.ReactNode;
-  className?: string;
   language: string;
-}> = ({ children, className, language }) => {
+}> = ({ children, language }) => {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const codeRef = useRef<HTMLElement>(null);
@@ -71,9 +98,6 @@ const CodeBlock: React.FC<{
     return String(children).replace(/\n$/, '');
   }, [children]);
 
-  const codeLines = useMemo(() => codeText.split('\n'), [codeText]);
-  const showLineNumbers = codeLines.length > 3;
-
   useEffect(() => {
     if (codeRef.current) {
       try {
@@ -98,116 +122,46 @@ const CodeBlock: React.FC<{
     }
   }, [codeText, uiLanguage]);
 
-  const isBashLike = ['bash', 'sh', 'shell', 'zsh'].includes(normalizedLanguage);
-  const isPowerShell = ['powershell', 'ps1'].includes(normalizedLanguage);
-  const isCmdLike = ['cmd', 'bat'].includes(normalizedLanguage);
-
+  // GitHub-native block: a bare <pre><code> styled by .markdown-body, with a
+  // copy button that appears on hover/focus.
   return (
-    <div className={`relative group my-3 rounded-xl overflow-hidden border shadow-md ${
-      isBashLike
-        ? 'border-border dark:border-border'
-        : isPowerShell
-          ? 'border-primary/30 dark:border-primary/30'
-          : isCmdLike
-            ? 'border-cyan-500/30 dark:border-cyan-400/30'
-            : 'border-border dark:border-border'
-    }`}>
-      <div className="flex items-center justify-between px-4 py-2.5 bg-muted dark:bg-card/90 border-b border-border dark:border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-[#ff5f56] dark:bg-[#ff5f56]/90 shadow-sm" />
-            <span className="w-3 h-3 rounded-full bg-[#ffbd2e] dark:bg-[#ffbd2e]/90 shadow-sm" />
-            <span className="w-3 h-3 rounded-full bg-[#27c93f] dark:bg-[#27c93f]/90 shadow-sm" />
-          </div>
-          {language && (
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
-              isBashLike
-                ? 'bg-green-600/20 text-green-600 border border-green-600/30 dark:bg-green-600/20 dark:text-green-600 dark:border-green-600/30'
-                : isPowerShell
-                  ? 'bg-primary/20 dark:bg-primary/30 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
-                  : isCmdLike
-                    ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800'
-                    : 'bg-accent dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
-            }`}>
-              {isBashLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-green-600 animate-pulse" />
-              )}
-              {isPowerShell && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
-              )}
-              {isCmdLike && (
-                <span className="mr-1.5 inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-              )}
-              {language}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className={`h-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              copyError
-                ? 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border'
-                : copied
-                  ? 'bg-green-600 text-white border border-green-600 hover:bg-green-700 hover:text-white hover:border-green-700'
-                  : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border'
-            }`}
-            title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
-          >
-            {copyError ? (
-              <span>!</span>
-            ) : copied ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                {uiLanguage === 'zh' ? '已复制' : 'Copied'}
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                {uiLanguage === 'zh' ? '复制' : 'Copy'}
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+    <div className="group relative my-0">
       {copyError && (
-        <div className="absolute top-14 right-4 max-w-xs bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground text-xs px-3 py-2 rounded-lg shadow-lg z-20 border border-border dark:border-border">
+        <div
+          data-translate="false"
+          role="alert"
+          className="absolute top-10 right-2 z-20 max-w-xs rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground shadow-lg dark:bg-card"
+        >
           {copyError}
         </div>
       )}
-      <div className={`overflow-x-auto ${
-        isBashLike
-          ? 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0d1117] dark:to-[#161b22]'
-          : isPowerShell
-            ? 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-[#0d1117] dark:to-[#161b22]'
-            : isCmdLike
-              ? 'bg-gradient-to-br from-cyan-50/40 to-slate-100/20 dark:from-[#0d1117] dark:to-[#161b22]'
-              : 'bg-background dark:bg-[#0d1117]'
-      }`}>
-        <div className={`p-4 overflow-x-auto ${className || ''}`}>
-          <pre className={showLineNumbers ? 'flex items-start' : undefined}>
-            {showLineNumbers && (
-              <span className="select-none pr-4 text-right flex-shrink-0" aria-hidden="true">
-                {codeLines.map((_, index) => (
-                  <span key={index} className="block text-muted-foreground text-sm font-mono leading-6">
-                    {index + 1}
-                  </span>
-                ))}
-              </span>
-            )}
-            <code ref={codeRef} className={`text-sm font-mono leading-6 text-foreground dark:text-[#e6edf3] ${showLineNumbers ? 'block min-w-0 flex-1' : ''} ${normalizedLanguage ? `language-${normalizedLanguage}` : ''}`}>
-              {codeText}
-            </code>
-          </pre>
-        </div>
-      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={handleCopy}
+        aria-label={uiLanguage === 'zh' ? '复制代码' : 'Copy code'}
+        title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
+        className={`absolute top-2 right-2 z-10 h-7 w-7 rounded-md p-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 ${
+          copyError
+            ? 'text-destructive opacity-100'
+            : copied
+              ? 'text-green-600 opacity-100 dark:text-green-500'
+              : 'border border-border bg-background/80 text-muted-foreground backdrop-blur hover:text-foreground dark:bg-card/80 dark:text-muted-foreground'
+        }`}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </Button>
+      <pre>
+        <code ref={codeRef} className={normalizedLanguage ? `language-${normalizedLanguage}` : undefined}>
+          {codeText}
+        </code>
+      </pre>
     </div>
   );
 };
 
+/** Anchor that externalizes non-anchor links and keeps in-page TOC jumps smooth. */
 const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string; headingIds?: Map<string, string> }> = ({
   href,
   children,
@@ -268,7 +222,6 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
       href={resolvedHref}
       target={isHashLink || isSpecialLink ? undefined : "_blank"}
       rel={isHashLink || isSpecialLink ? undefined : "noopener noreferrer"}
-      className="text-primary dark:text-primary hover:text-muted-foreground dark:hover:text-muted-foreground underline decoration-blue-400 hover:decoration-blue-600 transition-colors"
       onClick={handleAnchorClick}
     >
       {children}
@@ -304,6 +257,7 @@ const truncateUrl = (url: string, maxLength: number = 50): string => {
   }
 };
 
+/** Image with skeleton loading, error fallback, relative-URL resolution and a lightbox. */
 const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> = ({
   src,
   alt,
@@ -796,7 +750,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   enableHtml = false,
   baseUrl,
   headingIds,
-  fontSize = 'medium'
+  fontSize = 'medium',
+  breaks = false
 }) => {
   const headingCounterRef = useRef(headingIds?.size ?? 0);
   const headingTextCountMapRef = useRef(new Map<string, number>());
@@ -806,19 +761,52 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     headingTextCountMapRef.current = new Map<string, number>();
   }, [content, headingIds]);
 
-  const rehypePlugins = enableHtml ? REHYPE_PLUGINS_WITH_HTML : REHYPE_PLUGINS_NO_HTML;
+  // Math (KaTeX) support is loaded lazily: render pass 1 without math plugins,
+  // then re-render with them once the dynamic imports resolve. react-markdown
+  // rebuilds its processor every render, so swapping plugin arrays via state is
+  // safe. Arrays are memoized to keep references stable across re-renders.
+  const [mathPlugins, setMathPlugins] = useState<MathPlugins | null>(null);
 
-  const getProseClass = useCallback(() => {
-    switch (fontSize) {
-      case 'small':
-        return 'prose prose-sm dark:prose-invert';
-      case 'large':
-        return 'prose prose-lg dark:prose-invert';
-      case 'medium':
-      default:
-        return 'prose dark:prose-invert';
+  useEffect(() => {
+    if (!MATH_PATTERN.test(content)) return;
+    let cancelled = false;
+    Promise.all([
+      import('remark-math'),
+      import('rehype-katex'),
+      import('./lazyKatexCss'),
+    ])
+      .then(([remarkMath, rehypeKatex]) => {
+        if (!cancelled) {
+          setMathPlugins({ remark: remarkMath.default, rehype: rehypeKatex.default });
+        }
+      })
+      .catch((error) => console.warn('Failed to load math support:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [content]);
+
+  const remarkPlugins = useMemo(
+    () => [
+      ...BASE_REMARK_PLUGINS,
+      ...(breaks ? [remarkBreaks] : []),
+      ...(mathPlugins ? [mathPlugins.remark] : []),
+    ],
+    [breaks, mathPlugins]
+  );
+
+  const rehypePlugins = useMemo<PluggableList>(() => {
+    if (!enableHtml) {
+      return mathPlugins ? [mathPlugins.rehype] : REHYPE_PLUGINS_NO_HTML;
     }
-  }, [fontSize]);
+    return [
+      rehypeRaw,
+      [rehypeSanitize, githubMarkdownSchema],
+      ...(mathPlugins ? [mathPlugins.rehype] : []),
+    ];
+  }, [enableHtml, mathPlugins]);
+
+  const fontSizePx = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
 
   const getHeadingId = useCallback((children: React.ReactNode): string | undefined => {
     if (headingIds && headingIds.size > 0) {
@@ -832,34 +820,20 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
     return `heading-extra-${headingCounterRef.current++}`;
   }, [headingIds]);
 
+  // Element cosmetics come from .markdown-body (github-markdown-css); the
+  // overrides below only carry behaviour (heading-id handshake, code blocks,
+  // images, links, read-only checkboxes).
   const markdownComponents: Components = useMemo(() => ({
     a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} headingIds={headingIds} />,
     img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
-    h1: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h1 id={id} className="text-lg font-bold text-foreground dark:text-foreground mt-4 mb-2">{children}</h1>;
-    },
-    h2: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h2 id={id} className="text-base font-semibold text-foreground dark:text-gray-200 mt-3 mb-2">{children}</h2>;
-    },
-    h3: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h3 id={id} className="text-sm font-medium text-foreground dark:text-muted-foreground mt-2 mb-1">{children}</h3>;
-    },
-    h4: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h4 id={id} className="text-sm font-medium text-foreground dark:text-muted-foreground mt-2 mb-1">{children}</h4>;
-    },
-    h5: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h5 id={id} className="text-sm font-medium text-muted-foreground dark:text-muted-foreground mt-1 mb-1">{children}</h5>;
-    },
-    h6: ({ children }) => {
-      const id = getHeadingId(children);
-      return <h6 id={id} className="text-sm font-medium text-muted-foreground dark:text-muted-foreground mt-1 mb-1">{children}</h6>;
-    },
-    p: ({ children }) => {
+    h1: ({ children }) => <h1 id={getHeadingId(children)}>{children}</h1>,
+    h2: ({ children }) => <h2 id={getHeadingId(children)}>{children}</h2>,
+    h3: ({ children }) => <h3 id={getHeadingId(children)}>{children}</h3>,
+    h4: ({ children }) => <h4 id={getHeadingId(children)}>{children}</h4>,
+    h5: ({ children }) => <h5 id={getHeadingId(children)}>{children}</h5>,
+    h6: ({ children }) => <h6 id={getHeadingId(children)}>{children}</h6>,
+    p: (outerProps) => {
+      const { className, children, ...domProps } = stripAstNode(outerProps);
       const childArray = React.Children.toArray(children);
       const hasImagesOnly = childArray.every(
         child => {
@@ -873,31 +847,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       );
 
       return (
-        <p className={`text-foreground dark:text-muted-foreground mb-2 leading-relaxed ${
-          hasImagesOnly
-            ? 'flex flex-wrap items-center justify-center gap-3'
-            : ''
-        }`}>
+        <p
+          {...domProps}
+          className={hasImagesOnly ? 'flex flex-wrap items-center justify-center gap-3' : className}
+        >
           {children}
         </p>
       );
     },
-    ul: ({ children }) => <ul className="list-disc list-inside text-foreground dark:text-muted-foreground mb-2 space-y-1">{children}</ul>,
-    ol: ({ children }) => <ol className="list-decimal list-inside text-foreground dark:text-muted-foreground mb-2 space-y-1">{children}</ol>,
-    li: ({ children, className, ...props }) => (
-      <li className={`ml-2 ${className || ''}`} {...props}>
-        {children}
-      </li>
-    ),
-    strong: ({ children }) => (
-      <strong className="font-semibold text-foreground dark:text-gray-100">{children}</strong>
-    ),
-    em: ({ children }) => (
-      <em className="italic text-foreground dark:text-muted-foreground">{children}</em>
-    ),
-    del: ({ children }) => (
-      <del className="line-through text-muted-foreground dark:text-muted-foreground">{children}</del>
-    ),
     code: ({ className, children, ...props }) => {
       // 检查 props 中是否有 'data-code-block' 标记（由 pre 组件添加）
       const isCodeBlock = 'data-code-block' in props || !!className;
@@ -905,15 +862,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';
 
-      return isInline ? (
-        <code className="px-1.5 py-0.5 bg-muted dark:bg-muted/40 text-foreground dark:text-gray-200 rounded text-xs font-mono" {...props}>
-          {children}
-        </code>
-      ) : (
-        <CodeBlock className={className} language={language}>
-          {children}
-        </CodeBlock>
-      );
+      if (isInline) {
+        return <code {...stripAstNode(props)}>{children}</code>;
+      }
+
+      const codeText = typeof children === 'string' ? children : String(children);
+      if (/^mermaid$/i.test(language)) {
+        return <MermaidBlock code={codeText.replace(/\n$/, '')} />;
+      }
+      return <CodeBlock language={language}>{children}</CodeBlock>;
     },
     pre: ({ children }) => {
       // 给 code 子元素添加标记，表明它是代码块而不是行内代码
@@ -924,40 +881,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
       return <pre>{children}</pre>;
     },
-    blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-border dark:border-border pl-4 py-1 my-2 text-muted-foreground dark:text-muted-foreground italic bg-background dark:bg-card/50 rounded-r">
-        {children}
-      </blockquote>
-    ),
-    hr: () => <hr className="my-4 border-border dark:border-border" />,
-    table: ({ children }) => (
-      <div className="overflow-x-auto my-3">
-        <table className="min-w-full border-collapse border border-border dark:border-border text-sm">
-          {children}
-        </table>
-      </div>
-    ),
-    thead: ({ children }) => <thead className="bg-muted dark:bg-card">{children}</thead>,
-    tbody: ({ children }) => <tbody className="text-foreground dark:text-muted-foreground">{children}</tbody>,
-    th: ({ children }) => (
-      <th className="border border-border dark:border-border px-3 py-2 text-left font-semibold text-foreground dark:text-gray-200">
-        {children}
-      </th>
-    ),
-    td: ({ children }) => (
-      <td className="border border-border dark:border-border px-3 py-2 text-foreground dark:text-muted-foreground">
-        {children}
-      </td>
-    ),
     input: (props) => {
       if (props.type === 'checkbox') {
-        return (
-          <input
-            {...props}
-            readOnly
-            className="mr-1.5 align-middle w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-ring dark:border-border dark:bg-muted/40"
-          />
-        );
+        return <input {...stripAstNode(props)} readOnly />;
       }
       return <Input {...props} />;
     },
@@ -968,9 +894,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   }
 
   return (
-    <div className={`${getProseClass()} max-w-none ${className}`}>
+    <div className={`markdown-body max-w-none ${className}`} style={{ fontSize: fontSizePx }}>
       <ReactMarkdown
-        remarkPlugins={REMARK_PLUGINS}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={markdownComponents}
       >

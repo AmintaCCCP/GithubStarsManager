@@ -674,6 +674,78 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
   }
 
   /**
+   * 使用当前 AI 配置批量翻译文本（README 双语渲染的 AI 翻译引擎）。
+   * 输入一组字符串，返回等长的译文数组；模型输出 JSON 数组，解析失败或
+   * 数量不符时抛错（由调用方按瞬时错误重试）。
+   * @param texts 待翻译文本（不含 Markdown 块级结构，多为段落/标题/列表项）
+   * @param targetLanguage 目标语言代码（'zh' | 'en' 等）
+   * @param sourceLanguage 可选源语言代码，缺省时由模型自动判断
+   * @param signal 可选 AbortSignal
+   */
+  async translateTexts(
+    texts: string[],
+    targetLanguage: string,
+    sourceLanguage?: string,
+    signal?: AbortSignal
+  ): Promise<string[]> {
+    if (texts.length === 0) return [];
+
+    const LANGUAGE_NAMES: Record<string, string> = {
+      zh: 'Simplified Chinese',
+      en: 'English',
+      ja: 'Japanese',
+      ko: 'Korean',
+      fr: 'French',
+      de: 'German',
+      es: 'Spanish',
+      ru: 'Russian',
+      pt: 'Portuguese',
+    };
+    const targetName = LANGUAGE_NAMES[targetLanguage] || targetLanguage;
+    const sourceName = sourceLanguage ? (LANGUAGE_NAMES[sourceLanguage] || sourceLanguage) : 'auto-detect';
+
+    const system = this.language === 'zh'
+      ? '你是一个专业的机器翻译引擎。把用户提供的每条文本翻译成自然流畅的目标语言。规则：保留占位符（如 {0}）、HTML 行内标签（如 <code>）、专有名词和命令原样不译；不加解释；输出一个 JSON 字符串数组，长度与输入完全一致。'
+      : 'You are a professional machine translation engine. Translate each input text into the target language naturally. Rules: keep placeholders (e.g. {0}), inline HTML tags (e.g. <code>), proper nouns and commands untranslated; no explanations; output a JSON array of strings with exactly the same length as the input.';
+
+    const user = this.language === 'zh'
+      ? `目标语言：${targetName}\n源语言：${sourceName}\n\n待翻译文本（JSON 数组）：\n${JSON.stringify(texts)}`
+      : `Target language: ${targetName}\nSource language: ${sourceName}\n\nTexts to translate (JSON array):\n${JSON.stringify(texts)}`;
+
+    const totalChars = texts.reduce((sum, t) => sum + t.length, 0);
+    const raw = await this.requestText({
+      system,
+      user,
+      temperature: 0.2,
+      // 输出至少要容纳等长译文：按输入长度估算并留出 JSON 结构开销
+      maxTokens: Math.min(16000, Math.max(1024, Math.ceil(totalChars * 2) + 512)),
+      signal,
+    });
+
+    const parsed = this.parseTranslationResponse(raw, texts.length);
+    if (!parsed) {
+      throw new Error('AI translation returned an invalid format');
+    }
+    return parsed;
+  }
+
+  /** 从模型输出中提取 JSON 字符串数组；容忍代码块围栏与前后杂文，失败返回 null。 */
+  private parseTranslationResponse(raw: string, expectedCount: number): string[] | null {
+    const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start === -1 || end <= start) return null;
+    try {
+      const data = JSON.parse(cleaned.slice(start, end + 1)) as unknown;
+      if (!Array.isArray(data) || data.length !== expectedCount) return null;
+      if (!data.every((item): item is string => typeof item === 'string')) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * 分析单个 release 的更新日志，输出通俗易懂、按重要程度排序的 Markdown 总结。
    * 用于 Release 列表项的「总结」按钮。直接返回 Markdown 文本，调用方负责渲染。
    * @param releaseBody release 的正文（Markdown 更新说明）
