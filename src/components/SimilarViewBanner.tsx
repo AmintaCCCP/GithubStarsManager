@@ -1,5 +1,6 @@
 import React from 'react';
 import { RotateCcw, Search } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface SimilarViewBannerProps {
   anchorRepoName: string;
@@ -18,28 +19,25 @@ export const SimilarViewBanner: React.FC<SimilarViewBannerProps> = ({
   const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
 
   return (
-    <div className="flex items-center justify-between gap-3 bg-brand-indigo/5 dark:bg-brand-indigo/10 border border-brand-indigo/20 dark:border-brand-indigo/30 rounded-xl px-4 py-3">
+    <div className="flex items-center justify-between gap-3 bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl px-4 py-3">
       <div className="flex items-center gap-2 min-w-0">
-        <Search className="w-4 h-4 flex-shrink-0 text-brand-violet dark:text-brand-violet" />
-        <p className="text-sm text-gray-700 dark:text-text-secondary truncate">
-          <span className="text-gray-500 dark:text-text-tertiary">
+        <Search className="w-4 h-4 flex-shrink-0 text-primary dark:text-primary" />
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
+          <span className="text-muted-foreground dark:text-muted-foreground">
             {t('正在查看 ', 'Viewing similar repositories of ')}
           </span>
-          <span className="font-semibold text-gray-900 dark:text-text-primary">
+          <span className="font-semibold text-foreground dark:text-foreground">
             {anchorRepoName}
           </span>
-          <span className="text-gray-500 dark:text-text-tertiary">
+          <span className="text-muted-foreground dark:text-muted-foreground">
             {t(' 的相似仓库', '')}
           </span>
         </p>
       </div>
-      <button
-        onClick={onReset}
-        className="flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-lg bg-brand-indigo text-white hover:bg-brand-hover transition-colors"
-      >
+      <Button type="button" onClick={onReset} className="h-8 shrink-0 gap-1.5 px-3 text-sm">
         <RotateCcw className="w-4 h-4" />
         {t('重置', 'Reset')}
-      </button>
+      </Button>
     </div>
   );
 };

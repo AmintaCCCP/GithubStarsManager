@@ -1,3 +1,6 @@
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Cable,
@@ -47,8 +50,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     messages: '/messages',
   });
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [portInput, setPortInput] = useState(String(mcpConfig.port || MCP_DEFAULT_PORT));
 
   const isElectronApp = isElectron();
+
+  useEffect(() => {
+    setPortInput(String(mcpConfig.port || MCP_DEFAULT_PORT));
+  }, [mcpConfig.port]);
 
   const baseUrl = useMemo(() => {
     // Electron local MCP always listens on loopback (shared host normalizer)
@@ -92,6 +100,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     };
     return JSON.stringify(config, null, 2);
   }, [mcpSseUrl, mcpConfig.token]);
+
+  const maskToken = useCallback((json: string) => (
+    showToken || !mcpConfig.token ? json : json.replace(mcpConfig.token, '••••••••')
+  ), [mcpConfig.token, showToken]);
 
   const refreshFromBackend = useCallback(async () => {
     if (!backend.isAvailable) {
@@ -217,13 +229,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <Cable className="w-6 h-6 text-gray-700 dark:text-text-secondary" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-text-primary">
+        <Cable className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
           {t('MCP 服务', 'MCP Server')}
         </h3>
       </div>
 
-      <p className="text-sm text-gray-600 dark:text-text-tertiary">
+      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
         {t(
           '让 Claude Code / Cursor 等 Agent 通过 Streamable HTTP 读取本应用中的星标仓库、AI 摘要与标签。默认关闭；开启后无需安装额外软件。',
           'Let agents (Claude Code, Cursor, etc.) read your starred repos, AI summaries, and tags via Streamable HTTP. Off by default; no extra install when enabled.'
@@ -238,13 +250,13 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       )}
 
       {/* Enable + status */}
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] space-y-4">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-text-primary">
+            <h4 className="font-medium text-foreground dark:text-foreground">
               {t('启用 MCP 服务', 'Enable MCP Server')}
             </h4>
-            <p className="text-xs text-gray-500 dark:text-text-tertiary mt-1">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               {backendMode
                 ? t('后端模式：挂载于 /mcp', 'Backend mode: mounted at /mcp')
                 : isElectronApp
@@ -252,44 +264,36 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
                   : t('需要后端连接', 'Requires backend connection')}
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={mcpConfig.enabled}
+          <Switch
+            checked={mcpConfig.enabled}
             disabled={saving || loading}
-            onClick={() => void handleToggle(!mcpConfig.enabled)}
-            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-violet focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
-              mcpConfig.enabled ? 'bg-brand-violet' : 'bg-gray-200 dark:bg-white/10'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                mcpConfig.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+            onCheckedChange={(checked) => void handleToggle(checked)}
+            aria-label={t('启用 MCP 服务', 'Enable MCP service')}
+          />
         </div>
 
         <div className="flex items-center gap-2 text-sm">
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           ) : mcpConfig.enabled ? (
             <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-gray-400" />
+            <AlertCircle className="w-4 h-4 text-muted-foreground" />
           )}
-          <span className="text-gray-700 dark:text-text-secondary">
+          <span className="text-muted-foreground dark:text-muted-foreground">
             {t('状态', 'Status')}: {statusLabel}
           </span>
           {backendMode && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void refreshFromBackend()}
-              className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              className="ml-auto h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('刷新', 'Refresh')}
             >
-              <RefreshCw className="w-4 h-4 text-gray-500" />
-            </button>
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            </Button>
           )}
         </div>
 
@@ -310,46 +314,62 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
 
       {/* Electron local port */}
       {isElectronApp && !backendMode && (
-        <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] space-y-3">
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
+        <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
+          <h4 className="font-medium text-foreground dark:text-foreground">
             {t('本地监听', 'Local Listen')}
           </h4>
           <div className="grid grid-cols-2 gap-3 max-w-md">
-            <label className="text-sm text-gray-600 dark:text-text-tertiary">
+            <label className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('主机', 'Host')}
-              <input
+              <Input
                 type="text"
                 value={mcpConfig.host}
                 onChange={(e) => setMcpConfig({ host: e.target.value })}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-black/[0.06] dark:border-white/[0.08] bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
               />
             </label>
-            <label className="text-sm text-gray-600 dark:text-text-tertiary">
+            <label className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('端口', 'Port')}
-              <input
+              <Input
                 type="number"
                 min={1}
                 max={65535}
-                value={mcpConfig.port}
-                onChange={(e) => setMcpConfig({ port: Number(e.target.value) || 3927 })}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-black/[0.06] dark:border-white/[0.08] bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm"
+                value={portInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPortInput(value);
+                  const parsed = Number(value);
+                  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+                    setMcpConfig({ port: parsed });
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(portInput);
+                  const port = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535
+                    ? parsed
+                    : MCP_DEFAULT_PORT;
+                  setPortInput(String(port));
+                  setMcpConfig({ port });
+                }}
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
               />
             </label>
           </div>
-          <p className="text-xs text-gray-500 dark:text-text-tertiary">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('默认仅绑定 127.0.0.1，仅本机 Agent 可访问。', 'Binds to 127.0.0.1 by default; local agents only.')}
           </p>
         </div>
       )}
 
       {/* Token */}
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] space-y-3">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-900 dark:text-text-primary">
+          <h4 className="font-medium text-foreground dark:text-foreground">
             {t('访问 Token', 'Access Token')}
           </h4>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => void handleResetToken()}
             disabled={saving || !mcpConfig.enabled}
             title={
@@ -357,38 +377,43 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
                 ? t('请先开启 MCP 服务', 'Enable MCP first')
                 : undefined
             }
-            className="text-sm px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {t('重置 Token', 'Reset Token')}
-          </button>
+          </Button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-text-tertiary">
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
           {t(
             'Token 会固定保存，重启后不变，可随时查看与复制。仅当你点击「重置 Token」时才会更换，旧配置会失效。请勿泄露。',
             'Token is stored permanently and stays the same across restarts. It only changes when you click Reset Token (old agent configs then stop working). Do not share it.'
           )}
         </p>
         <div className="flex items-center gap-2">
-          <input
+          <Input
+            aria-label={t('访问 Token', 'Access Token')}
             type={showToken ? 'text' : 'password'}
             readOnly
             value={mcpConfig.token || ''}
             placeholder={t('开启服务后自动生成', 'Generated when enabled')}
-            className="flex-1 px-3 py-2 rounded-lg border border-black/[0.06] dark:border-white/[0.08] bg-light-surface dark:bg-white/[0.04] text-gray-900 dark:text-text-primary text-sm font-mono"
+            className="flex-1 px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm font-mono"
           />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setShowToken((v) => !v)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent"
             aria-label={showToken ? t('隐藏', 'Hide') : t('显示', 'Show')}
           >
             {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => void copyText('token', mcpConfig.token)}
             disabled={!mcpConfig.token}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40"
+            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-40"
             aria-label={t('复制 Token', 'Copy token')}
           >
             {copiedKey === 'token' ? (
@@ -396,92 +421,98 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             ) : (
               <Copy className="w-4 h-4" />
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* URLs + copy config */}
-      <div className="p-6 bg-white dark:bg-panel-dark rounded-xl border border-black/[0.06] dark:border-white/[0.04] space-y-4">
-        <h4 className="font-medium text-gray-900 dark:text-text-primary">
+      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
+        <h4 className="font-medium text-foreground dark:text-foreground">
           {t('连接信息', 'Connection')}
         </h4>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-gray-500 dark:text-text-tertiary w-36 flex-shrink-0">
+            <span className="text-muted-foreground dark:text-muted-foreground w-36 flex-shrink-0">
               Streamable HTTP
             </span>
-            <code className="flex-1 truncate text-xs font-mono text-gray-800 dark:text-text-primary">
+            <code className="flex-1 truncate text-xs font-mono text-foreground dark:text-foreground">
               {mcpHttpUrl}
             </code>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void copyText('http', mcpHttpUrl)}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('复制 Streamable HTTP 地址', 'Copy Streamable HTTP URL')}
             >
               <Copy className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-gray-500 dark:text-text-tertiary w-36 flex-shrink-0">
+            <span className="text-muted-foreground dark:text-muted-foreground w-36 flex-shrink-0">
               SSE ({t('兼容', 'legacy')})
             </span>
-            <code className="flex-1 truncate text-xs font-mono text-gray-800 dark:text-text-primary">
+            <code className="flex-1 truncate text-xs font-mono text-foreground dark:text-foreground">
               {mcpSseUrl}
             </code>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void copyText('sse', mcpSseUrl)}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10"
+              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('复制 SSE 地址', 'Copy SSE URL')}
             >
               <Copy className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-700 dark:text-text-secondary">
+            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('一键复制 Agent 配置 (JSON)', 'Copy agent config (JSON)')}
             </span>
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() => void copyText('json', agentConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90"
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg"
             >
               <Copy className="w-3.5 h-3.5" />
               {copiedKey === 'json' ? t('已复制', 'Copied') : t('复制 JSON', 'Copy JSON')}
-            </button>
+            </Button>
           </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-light-bg dark:bg-black/30 overflow-x-auto text-gray-800 dark:text-text-secondary border border-black/[0.04] dark:border-white/[0.04]">
-            {agentConfigJson}
+          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
+            {maskToken(agentConfigJson)}
           </pre>
-          <p className="text-xs text-gray-500 dark:text-text-tertiary mt-2">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
             {language === 'zh'
               ? '优先使用 Streamable HTTP（上面 JSON）。若客户端只支持旧版 SSE，用下方 SSE URL：GET 打开流后 POST 到 messages。'
               : 'Prefer Streamable HTTP (JSON above). If the client only supports legacy SSE, use the SSE URL below: GET opens the stream, then POST to messages.'}
           </p>
           <div className="flex items-center justify-between mb-2 mt-4">
-            <span className="text-sm text-gray-700 dark:text-text-secondary">
+            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('SSE 兼容配置 (JSON)', 'SSE-compatible config (JSON)')}
             </span>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => void copyText('sse-json', agentSseConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-text-secondary"
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground"
             >
               <Copy className="w-3.5 h-3.5" />
               {copiedKey === 'sse-json' ? t('已复制', 'Copied') : t('复制 SSE JSON', 'Copy SSE JSON')}
-            </button>
+            </Button>
           </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-light-bg dark:bg-black/30 overflow-x-auto text-gray-800 dark:text-text-secondary border border-black/[0.04] dark:border-white/[0.04]">
-            {agentSseConfigJson}
+          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
+            {maskToken(agentSseConfigJson)}
           </pre>
         </div>
       </div>
 
-      <div className="p-4 rounded-xl border border-black/[0.06] dark:border-white/[0.04] bg-light-bg/50 dark:bg-white/[0.02] text-xs text-gray-600 dark:text-text-tertiary space-y-1">
+      <div className="p-4 rounded-xl border border-border dark:border-border bg-background/50 dark:bg-muted/20 text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
         <p>
           {t(
             '只读工具：gsm_status / gsm_search_repos / gsm_get_repo / gsm_list_categories / gsm_list_repos_by_category / gsm_stats',

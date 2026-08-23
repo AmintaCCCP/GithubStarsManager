@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
+import * as React from 'react';
+import * as ToastPrimitive from '@radix-ui/react-toast';
+import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -9,75 +10,56 @@ interface ToastProps {
   type: ToastType;
   onClose: () => void;
   duration?: number;
+  closeLabel?: string;
 }
 
-const iconMap = {
-  success: CheckCircle,
-  error: AlertCircle,
-  info: Info,
-  warning: AlertTriangle,
+const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
+  success: { icon: CheckCircle2, className: 'border-status-green/30 bg-background text-status-green dark:bg-card' },
+  error: { icon: AlertTriangle, className: 'border-destructive/30 bg-background text-destructive dark:bg-card' },
+  warning: { icon: AlertTriangle, className: 'border-status-amber/40 bg-background text-status-amber dark:bg-card' },
+  info: { icon: Info, className: 'border-border bg-background text-muted-foreground dark:bg-card' },
 };
 
-const bgMap = {
-  success: 'bg-gray-50 dark:bg-white/[0.04] border-status-green/30',
-  error: 'bg-gray-50 dark:bg-white/[0.04] border-status-red/30',
-  info: 'bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08]',
-  warning: 'bg-gray-50 dark:bg-white/[0.04] border-amber-400/40',
-};
+const TOAST_EXIT_DURATION_MS = 150;
 
-const iconColorMap = {
-  success: 'text-status-green dark:text-status-green',
-  error: 'text-status-red dark:text-status-red',
-  info: 'text-gray-500 dark:text-text-secondary',
-  warning: 'text-amber-500 dark:text-amber-400',
-};
+export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000, closeLabel = 'Close' }) => {
+  const { icon: Icon, className } = TOAST_META[type];
+  const [open, setOpen] = React.useState(true);
+  const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000 }) => {
-  const previousActiveElement = useRef<HTMLElement | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  React.useEffect(() => () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+  }, []);
 
-  useEffect(() => {
-    previousActiveElement.current = document.activeElement as HTMLElement;
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      closeTimeoutRef.current = setTimeout(onClose, TOAST_EXIT_DURATION_MS);
+    }
+  };
 
-    timeoutRef.current = setTimeout(() => {
-      onCloseRef.current();
-    }, duration);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      // Only restore focus if user hasn't moved focus elsewhere (activeElement is body)
-      if (document.activeElement === document.body) {
-        previousActiveElement.current?.focus();
-      }
-    };
-  }, [duration]);
-
-  const Icon = iconMap[type];
-
-  const toastContent = (
-    <div
-      role={type === 'error' ? 'alert' : 'status'}
-      aria-live={type === 'error' ? 'assertive' : 'polite'}
-      aria-atomic="true"
-      className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 fade-in duration-200"
-    >
-      <div className={`flex items-center space-x-3 px-4 py-3 rounded-lg border shadow-lg ${bgMap[type]}`}>
-        <Icon className={`w-5 h-5 flex-shrink-0 ${iconColorMap[type]}`} aria-hidden="true" />
-        <p className="text-sm text-gray-900 dark:text-text-primary whitespace-pre-line">{message}</p>
-        <button
-          onClick={onClose}
-          aria-label={`${message} - close`}
-          className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-400 dark:text-text-tertiary" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+  return (
+    <ToastPrimitive.Root
+        open={open}
+        duration={duration}
+        onOpenChange={handleOpenChange}
+        className={cn('pointer-events-auto flex w-[min(420px,calc(100vw_-_2rem))] items-center gap-3 rounded-lg border px-4 py-3 shadow-lg outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in', className)}
+      >
+        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+        <ToastPrimitive.Description className="flex-1 whitespace-pre-line text-sm text-foreground dark:text-foreground">
+          {message}
+        </ToastPrimitive.Description>
+        <ToastPrimitive.Close asChild>
+          <button
+            type="button"
+            aria-label={closeLabel}
+            className="rounded p-1 opacity-70 transition-opacity hover:bg-black/5 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring/30 dark:hover:bg-accent"
+          >
+            <X className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
+          </button>
+        </ToastPrimitive.Close>
+      </ToastPrimitive.Root>
   );
-
-  return createPortal(toastContent, document.body);
 };

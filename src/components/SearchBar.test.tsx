@@ -238,4 +238,53 @@ describe('SearchBar', () => {
       vi.useRealTimers();
     }
   });
+
+  it('selects a search history item before the blur delay hides the dropdown', () => {
+    vi.useFakeTimers();
+    const setSearchFilters = vi.fn();
+    const setSearchResults = vi.fn();
+    const repositories = [createRepository({ id: 1, name: 'react', full_name: 'facebook/react' })];
+    localStorage.setItem('github-stars-search-history', JSON.stringify(['react']));
+    currentState = createStoreState({ repositories, setSearchFilters, setSearchResults });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
+
+    try {
+      render(<SearchBar />);
+      const input = screen.getByRole('textbox');
+      fireEvent.focus(input);
+      const historyItem = screen.getByRole('button', { name: 'react' });
+      setSearchResults.mockClear();
+
+      fireEvent.blur(input);
+      fireEvent.click(historyItem);
+
+      expect(input).toHaveValue('react');
+      expect(setSearchFilters).toHaveBeenCalledWith({ query: 'react' });
+      expect(setSearchResults).toHaveBeenCalledWith(expect.any(Array));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('selects a suggestion and keeps real-time search enabled', () => {
+    vi.useFakeTimers();
+    const repositories = [createRepository({ id: 1, language: 'TypeScript' })];
+    currentState = createStoreState({ repositories });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
+
+    try {
+      render(<SearchBar />);
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'type' } });
+      const suggestionItem = screen.getByRole('button', { name: 'TypeScript' });
+
+      fireEvent.blur(input);
+      fireEvent.click(suggestionItem);
+
+      expect(input).toHaveValue('TypeScript');
+      expect(screen.getByText('实时搜索模式 - 匹配仓库名称')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

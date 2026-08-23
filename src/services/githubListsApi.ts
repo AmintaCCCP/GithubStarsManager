@@ -113,6 +113,40 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message?: string; type?: string; extensions?: { code?: string } }>;
 }
 
+type UserListNode = {
+  id: string;
+  name: string;
+  description: string | null;
+  isPrivate: boolean;
+};
+
+type UserListsPage = {
+  user: {
+    lists: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<UserListNode | null> | null;
+    };
+  } | null;
+};
+
+type UserListItemsPage = {
+  node: {
+    items: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string } | null> | null;
+    };
+  } | null;
+};
+
+type UserListSummariesPage = {
+  user: {
+    lists: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<GitHubListSummary | null> | null;
+    };
+  } | null;
+};
+
 /** 后端代理 /api/proxy/github/* 失败时的响应体（proxyService 兜底与上游错误透传）。 */
 interface BackendProxyErrorBody {
   error?: string;
@@ -215,7 +249,7 @@ export class GitHubListsApiService {
       // 避免同一批次的每个查询都先撞击一次失败的代理。
       const useProxy = this.backendUrl !== null && !this.proxyFailed;
       try {
-        return await this.attemptRequest<T>(query, body, controller.signal, options, useProxy);
+        return await this.attemptRequest<T>(body, controller.signal, options, useProxy);
       } catch (e) {
         if (e instanceof RetriableError) {
           lastError = e;
@@ -310,7 +344,6 @@ export class GitHubListsApiService {
    * @param useProxy true 走后端代理；false 走直连（浏览器 token 直连 GitHub）。
    */
   private async attemptRequest<T>(
-    query: string,
     body: string,
     signal: AbortSignal,
     options: { toleratePartialErrors?: boolean },
@@ -498,14 +531,7 @@ export class GitHubListsApiService {
     let cursor: string | null = null;
 
     while (hasNextPage) {
-      const data = await this.request<{
-        user: {
-          lists: {
-            pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: Array<{ id: string; name: string; description?: string; isPrivate: boolean }>;
-          };
-        } | null;
-      }>(
+      const data: UserListsPage = await this.request<UserListsPage>(
         `query($login: String!, $cursor: String) {
           user(login: $login) {
             lists(first: 100, after: $cursor) {
@@ -523,9 +549,14 @@ export class GitHubListsApiService {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
 
-      summaries.push(...data.user.lists.nodes);
+      const nodes = data.user.lists.nodes ?? [];
+      summaries.push(
+        ...nodes
+          .filter((node): node is UserListNode => node !== null)
+          .map((node) => ({ ...node, description: node.description ?? undefined }))
+      );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
-      const nextCursor = data.user.lists.pageInfo.endCursor;
+      const nextCursor: string | null = data.user.lists.pageInfo.endCursor;
       // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页
       if (!nextCursor || nextCursor === cursor) {
         hasNextPage = false;
@@ -565,14 +596,7 @@ export class GitHubListsApiService {
     let itemHasNext = true;
     let itemCursor: string | null = null;
     while (itemHasNext) {
-      const itemPage = await this.request<{
-        node: {
-          items: {
-            pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: Array<{ __typename?: string; id?: string; nameWithOwner?: string }>;
-          };
-        } | null;
-      }>(
+      const itemPage: UserListItemsPage = await this.request<UserListItemsPage>(
         `query($listId: ID!, $itemCursor: String) {
           node(id: $listId) {
             ... on UserList {
@@ -590,11 +614,11 @@ export class GitHubListsApiService {
         { signal }
       );
       if (!itemPage.node) break;
-      for (const item of itemPage.node.items.nodes) {
-        if (item.nameWithOwner) items.push(item.nameWithOwner);
+      for (const item of itemPage.node.items.nodes ?? []) {
+        if (item?.nameWithOwner) items.push(item.nameWithOwner);
       }
       itemHasNext = itemPage.node.items.pageInfo.hasNextPage;
-      const nextItemCursor = itemPage.node.items.pageInfo.endCursor;
+      const nextItemCursor: string | null = itemPage.node.items.pageInfo.endCursor;
       // 防御：游标为空或未前进时终止分页，避免死循环/重复页
       if (!nextItemCursor || nextItemCursor === itemCursor) {
         itemHasNext = false;
@@ -612,14 +636,7 @@ export class GitHubListsApiService {
     let cursor: string | null = null;
 
     while (hasNextPage) {
-      const data = await this.request<{
-        user: {
-          lists: {
-            pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: Array<{ id: string; name: string }>;
-          };
-        } | null;
-      }>(
+      const data: UserListSummariesPage = await this.request<UserListSummariesPage>(
         `query($login: String!, $cursor: String) {
           user(login: $login) {
             lists(first: 100, after: $cursor) {
@@ -634,9 +651,13 @@ export class GitHubListsApiService {
       if (!data.user) {
         throw new Error(`GitHub 用户 "${login}" 不存在或当前 token 无权访问。`);
       }
-      summaries.push(...data.user.lists.nodes);
+      summaries.push(
+        ...(data.user.lists.nodes ?? []).filter(
+          (node): node is GitHubListSummary => node !== null
+        )
+      );
       hasNextPage = data.user.lists.pageInfo.hasNextPage;
-      const nextCursor = data.user.lists.pageInfo.endCursor;
+      const nextCursor: string | null = data.user.lists.pageInfo.endCursor;
       // 防御：若 hasNextPage 为 true 但游标为空或未前进，终止分页避免死循环/重复页
       if (!nextCursor || nextCursor === cursor) {
         hasNextPage = false;

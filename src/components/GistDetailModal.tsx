@@ -1,3 +1,4 @@
+import { Button } from './ui/button';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js';
 import { AlertCircle, Copy, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
@@ -18,7 +19,7 @@ interface GistDetailModalProps {
 
 interface HighlightedCodeProps {
   file: GistFile;
-  onContentLoaded?: (filename: string, content: string) => void;
+  onContentLoaded?: (filename: string, content: string, rawUrl?: string) => void;
 }
 
 const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded }) => {
@@ -62,7 +63,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
         const text = await api.getGistFileRaw(file.raw_url!, controller.signal);
         if (controller.signal.aborted) return;
         setRawContent(text);
-        onContentLoadedRef.current?.(file.filename, text);
+        onContentLoadedRef.current?.(file.filename, text, file.raw_url);
       } catch (err) {
         if (controller.signal.aborted) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -90,36 +91,36 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
 
   if (isLoadingRaw) {
     return (
-      <div className="flex items-center justify-center rounded-lg bg-light-surface p-8 dark:bg-black/30">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-gray-500 dark:text-text-tertiary" />
-        <span className="text-sm text-gray-500 dark:text-text-tertiary">{t('正在加载文件内容...', 'Loading file content...')}</span>
+      <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-black/30">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
+        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载文件内容...', 'Loading file content...')}</span>
       </div>
     );
   }
 
   if (needsRawFetch && rawError) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg bg-light-surface p-8 dark:bg-black/30">
-        <AlertCircle className="mb-3 h-8 w-8 text-gray-600 dark:text-text-secondary" />
-        <p className="mb-4 max-w-md text-center text-sm text-gray-700 dark:text-text-secondary">{rawError}</p>
-        <button
+      <div className="flex flex-col items-center justify-center rounded-lg bg-muted p-8 dark:bg-black/30">
+        <AlertCircle className="mb-3 h-8 w-8 text-muted-foreground dark:text-muted-foreground" />
+        <p className="mb-4 max-w-md text-center text-sm text-muted-foreground dark:text-muted-foreground">{rawError}</p>
+        <Button
           type="button"
           onClick={() => {
             setRawContent(null);
             setRetryTick(tick => tick + 1);
           }}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <RefreshCw className="h-4 w-4" />
           {t('重试', 'Retry')}
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <pre className="max-h-[60vh] overflow-auto rounded-lg bg-light-surface p-4 text-sm leading-6 dark:bg-black/30">
-      <code ref={codeRef} className={`language-${language} font-mono text-gray-800 dark:text-[#e6edf3]`}>
+    <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-sm leading-6 dark:bg-black/30">
+      <code ref={codeRef} className={`language-${language} font-mono text-foreground dark:text-[#e6edf3]`}>
         {content || ''}
       </code>
     </pre>
@@ -131,14 +132,33 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
   const updateGist = useAppStore(state => state.updateGist);
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
+  const [loadedContents, setLoadedContents] = useState<Record<string, string>>({});
+  const previousGistIdRef = useRef<Gist['id'] | null>(null);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
+  const loadedContentKey = gist && activeFile
+    ? `${gist.id}:${activeFile.filename}:${activeFile.raw_url ?? ''}`
+    : null;
+  const loadedActiveContent = loadedContentKey ? loadedContents[loadedContentKey] : undefined;
+  const hasLoadedActiveContent = Boolean(loadedContentKey && Object.prototype.hasOwnProperty.call(loadedContents, loadedContentKey));
+  const effectiveActiveFile = activeFile && hasLoadedActiveContent
+    ? { ...activeFile, content: loadedActiveContent, truncated: false }
+    : activeFile;
+  const requiresLoadedContent = Boolean(activeFile && !hasLoadedActiveContent && (
+    activeFile.truncated || (!activeFile.content && activeFile.raw_url)
+  ));
+  const canCopyActiveFile = Boolean(effectiveActiveFile) && !requiresLoadedContent;
+  const activeCopyContent = effectiveActiveFile
+    ? effectiveActiveFile.content ?? ''
+    : '';
 
   // 截断文件按需拉取到的 raw 内容回写 store，避免每次重开弹窗都重新请求。
-  const handleContentLoaded = (filename: string, content: string) => {
+  const handleContentLoaded = (filename: string, content: string, rawUrl?: string) => {
     if (!gist) return;
+    const cacheKey = `${gist.id}:${filename}:${rawUrl ?? ''}`;
+    setLoadedContents(previous => ({ ...previous, [cacheKey]: content }));
     const state = useAppStore.getState();
     const latest =
       state.gists.find(item => item.id === gist.id) ||
@@ -147,18 +167,29 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
       gist;
 
     const targetFile = latest.files?.[filename];
-    if (!targetFile || (targetFile.content && !targetFile.truncated)) return;
+    if (!targetFile || (rawUrl && targetFile.raw_url && targetFile.raw_url !== rawUrl)) return;
+    if (targetFile.content && !targetFile.truncated) return;
     updateGist({
       ...latest,
-      files: {
-        ...latest.files,
-        [filename]: { ...targetFile, content },
-      },
+        files: {
+          ...latest.files,
+          [filename]: { ...targetFile, content, truncated: false },
+        },
     });
   };
 
   useEffect(() => {
-    setActiveFilename(files[0]?.filename || '');
+    const gistChanged = previousGistIdRef.current !== gist?.id;
+    previousGistIdRef.current = gist?.id ?? null;
+    setActiveFilename((currentFilename) => {
+      if (gistChanged) return files[0]?.filename || '';
+      return currentFilename && files.some((file) => file.filename === currentFilename)
+        ? currentFilename
+        : files[0]?.filename || '';
+    });
+    if (gistChanged) {
+      setLoadedContents({});
+    }
   }, [gist?.id, files]);
 
   const handleCopy = async (text: string, message: string) => {
@@ -170,29 +201,29 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={getGistTitle(gist)} maxWidth="max-w-5xl">
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 text-sm text-gray-500 dark:text-text-tertiary">
+          <div className="min-w-0 text-sm text-muted-foreground dark:text-muted-foreground">
             <span>{gist.owner?.login || t('未知创建者', 'Unknown owner')}</span>
             <span className="mx-2">·</span>
             <span>{t('更新于', 'Updated')} {new Date(gist.updated_at).toLocaleString()}</span>
             <span className="mx-2">·</span>
             <span>{gist.public ? t('公开', 'Public') : t('私有', 'Secret')}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            <Button
               type="button"
               onClick={() => handleCopy(gist.html_url, t('链接已复制', 'Link copied'))}
-              className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
             >
               <Copy className="h-4 w-4" />
               {t('复制链接', 'Copy link')}
-            </button>
+            </Button>
             <a
               href={gist.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-indigo px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-indigo/90"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <ExternalLink className="h-4 w-4" />
               {t('打开', 'Open')}
@@ -201,51 +232,57 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
         </div>
 
         {gist.ai_summary && (
-          <div className="rounded-lg border border-brand-indigo/20 bg-brand-indigo/5 p-4 text-sm text-gray-800 dark:border-brand-indigo/30 dark:bg-brand-indigo/10 dark:text-text-primary">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground dark:border-primary/30 dark:bg-primary/10 dark:text-foreground">
             {gist.ai_summary}
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
           {files.map(file => (
-            <button
+            <Button
               key={file.filename}
               type="button"
+              aria-pressed={activeFile?.filename === file.filename}
               onClick={() => setActiveFilename(file.filename)}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                className={`min-w-0 max-w-full break-all rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${
                 activeFile?.filename === file.filename
-                  ? 'border-brand-indigo bg-brand-indigo text-white'
-                  : 'border-black/[0.06] bg-white text-gray-700 hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent'
               }`}
             >
               {file.filename}
-            </button>
+            </Button>
           ))}
         </div>
 
         {activeFile ? (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate font-medium text-gray-900 dark:text-text-primary">{activeFile.filename}</div>
-                <div className="text-xs text-gray-500 dark:text-text-tertiary">
+                <div className="truncate font-medium text-foreground dark:text-foreground">{activeFile.filename}</div>
+                <div className="text-xs text-muted-foreground dark:text-muted-foreground">
                   {activeFile.language || inferGistCodeLanguage(activeFile.filename)} · {activeFile.size.toLocaleString()} bytes
                   {activeFile.truncated ? ` · ${t('内容已截断', 'Content truncated')}` : ''}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
-                onClick={() => handleCopy(activeFile.content || '', t('文件内容已复制', 'File copied'))}
-                className="inline-flex items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-light-surface dark:border-white/[0.04] dark:bg-white/[0.04] dark:text-text-secondary dark:hover:bg-white/[0.08]"
+                disabled={!canCopyActiveFile}
+                onClick={() => handleCopy(activeCopyContent, t('文件内容已复制', 'File copied'))}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
                 <Copy className="h-4 w-4" />
                 {t('复制文件', 'Copy file')}
-              </button>
+              </Button>
             </div>
-            <HighlightedCode file={activeFile} onContentLoaded={handleContentLoaded} />
+            <HighlightedCode
+              key={`${gist.id}:${activeFile.filename}:${activeFile.raw_url ?? ''}`}
+              file={effectiveActiveFile!}
+              onContentLoaded={handleContentLoaded}
+            />
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-black/[0.08] p-8 text-center text-gray-500 dark:border-white/[0.08] dark:text-text-tertiary">
+          <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground dark:border-border dark:text-muted-foreground">
             {t('没有文件', 'No files')}
           </div>
         )}
