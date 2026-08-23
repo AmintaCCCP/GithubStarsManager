@@ -224,7 +224,9 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
     setIsSyncing(true);
     try {
       const githubApi = new GitHubApiService(githubToken);
-      const watchedRepos = await githubApi.getAllWatchedRepositoriesForCurrentUser();
+      // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
+      // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
+      const watchedRepos = await githubApi.getAllWatchedRepositories();
       const hiddenByRepo = new Map(repos.map(repo => [normalizeRepoKey(repo.full_name), repo.release_hidden]));
       const sourceRepos = watchedRepos.map(repo => ({
         ...repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID),
