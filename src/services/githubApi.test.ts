@@ -165,3 +165,44 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     expect(result.releases.map(r => r.id)).toEqual([50]);
   });
 });
+
+describe('GitHubApiService.getWatchedRepositories', () => {
+  it('returns [] when GitHub responds 204 and makeRequest normalizes the body to null', async () => {
+    const service = new GitHubApiService('token');
+    // 复现 issue #285：GitHub 对 watched repos 返回 204 空响应体，makeRequest 归一化为 null
+    vi.spyOn(service, 'makeRequest' as never).mockResolvedValueOnce(null as never);
+
+    const repos = await service.getWatchedRepositories();
+
+    expect(repos).toEqual([]);
+  });
+
+  it('normalizes raw license objects into SPDX ids', async () => {
+    const service = new GitHubApiService('token');
+    const repo = makeRepository(10, 'owner/repo', {
+      license: { key: 'mit', name: 'MIT License', spdx_id: 'MIT', url: 'https://api.github.com/licenses/mit', node_id: 'x' } as never,
+    });
+    vi.spyOn(service, 'makeRequest' as never).mockResolvedValueOnce([repo] as never);
+
+    const [result] = await service.getWatchedRepositories();
+
+    expect(result.license).toBe('MIT');
+  });
+
+  it('paginates /user/subscriptions only and stops on a partial page', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service, 'makeRequest' as never)
+      .mockResolvedValueOnce(Array.from({ length: 100 }, (_, i) => makeRepository(i + 1, `owner/repo-${i + 1}`)) as never)
+      .mockResolvedValueOnce([makeRepository(999, 'owner/last')] as never);
+
+    const repos = await service.getAllWatchedRepositories();
+
+    expect(repos).toHaveLength(101);
+    // 固定分页行为与端点序列：只走 /user/subscriptions
+    // （旧的 /users/{login}/subscriptions 并行合并已整体移除，由编译器兜底）
+    expect(makeRequestSpy.mock.calls.map(c => (c[0] as string).split('?')[0])).toEqual([
+      '/user/subscriptions',
+      '/user/subscriptions',
+    ]);
+  });
+});
