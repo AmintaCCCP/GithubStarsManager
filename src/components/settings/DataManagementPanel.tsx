@@ -1763,17 +1763,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           <AlertTriangle className="w-5 h-5 mr-2" />
           {t('危险区域', 'Danger Zone')}
         </h3>
-        <Card className="border-destructive/30 bg-background">
-          <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="rounded-md bg-destructive/10 p-3 text-destructive">
-              <FileWarning className="h-6 w-6" aria-hidden="true" />
+        <Card className="border-destructive/40 py-5">
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+              <FileWarning className="h-5 w-5" aria-hidden="true" />
             </div>
-            <div className="flex-1">
-              <h4 className="text-lg font-semibold text-destructive">
+            <div className="min-w-0 flex-1">
+              <h4 className="text-base font-semibold text-foreground dark:text-foreground">
                 {t('删除所有数据', 'Delete All Data')}
               </h4>
-              <p className="mt-2 text-destructive">
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                 {t(
                   '此操作将永久删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。应用程序将重置为初始状态。此操作不可恢复！',
                   'This will permanently delete ALL application data, including all user data, GitHub tokens, configuration files, etc. The application will be reset to its initial state. This action cannot be undone!'
@@ -1781,14 +1780,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </p>
               <Button
                 variant="destructive"
+                size="sm"
                 onClick={() => openConfirmation('all')}
-                className="mt-4 h-auto px-6 py-3 font-semibold gap-2"
+                className="mt-4"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 />
                 <span>{t('删除所有数据', 'Delete All Data')}</span>
               </Button>
             </div>
-          </div>
           </CardContent>
         </Card>
       </section>

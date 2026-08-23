@@ -171,7 +171,7 @@ export const GistCard: React.FC<GistCardProps> = ({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-lg font-semibold text-foreground dark:text-foreground">{title}</h3>
+          <h3 className="truncate text-base font-semibold text-foreground dark:text-foreground">{title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground dark:text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <User className="h-4 w-4" />
