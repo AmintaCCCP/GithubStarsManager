@@ -45,7 +45,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
       className={`bg-card rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isWorkflowsExpanded
           ? 'border-primary/20 shadow-lg ring-1 ring-ring/30'
-          : 'border-border dark:border-border hover:shadow-md hover:border-black/10 dark:hover:border-white/10'
+          : 'border-border dark:border-border hover:shadow-md hover:border-border-strong dark:hover:border-border-strong'
       }`}
     >
       {/* Header */}
@@ -216,7 +216,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   {workflows.map((workflow) => (
                     <div
                       key={workflow.id}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border/60 dark:border-border last:border-b-0"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center space-x-2 min-w-0 flex-1">

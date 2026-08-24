@@ -55,7 +55,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration =
           <button
             type="button"
             aria-label={closeLabel}
-            className="rounded p-1 opacity-70 transition-opacity hover:bg-black/5 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring/30 dark:hover:bg-accent"
+            className="rounded p-1 opacity-70 transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring/30 dark:hover:bg-accent"
           >
             <X className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
           </button>

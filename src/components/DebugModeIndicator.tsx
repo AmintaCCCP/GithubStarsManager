@@ -66,10 +66,10 @@ export const DebugModeIndicator: React.FC = () => {
       type="button"
       variant="secondary"
       onClick={handleClick}
-      className="fixed bottom-6 right-6 z-50 h-auto gap-2 rounded-full bg-success px-3 py-2 text-sm font-medium text-white shadow-lg hover:bg-success/90"
+      className="fixed bottom-6 right-6 z-50 h-auto gap-2 rounded-full bg-success px-3 py-2 text-sm font-medium text-success-foreground shadow-lg hover:bg-success/90"
       title="Click to disable debug mode and open logs / 点击关闭调试并打开日志"
     >
-      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+      <span className="w-2 h-2 rounded-full bg-success-foreground animate-pulse" />
       <span>DEBUG</span>
       {frontendDebug && <span className="text-xs opacity-80">FE</span>}
       {backendDebug && <span className="text-xs opacity-80">BE</span>}
