@@ -689,16 +689,16 @@ textarea:focus-visible,
 }
 
 .ui-chip {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
 }
 
 .ui-chip-active {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--ring) / 0.5);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.35);
 }
 
 /* Component-level class consolidation for existing Tailwind primitives. */
@@ -795,8 +795,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 /* Dense search controls retain a clear state without stacking heavy surfaces. */
 .linear-filter-toggle,
 .linear-filter-chip {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
@@ -809,11 +809,13 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   border-color: hsl(var(--ring) / 0.5);
 }
 
+/* Active filter state uses the app-wide selected-item language (primary tint)
+   instead of solid accent, which is vivid in several theme presets. */
 .linear-filter-toggle.is-active,
 .linear-filter-chip.is-active {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--ring) / 0.5);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.35);
 }
 
 .linear-filter-toggle .filter-badge {
@@ -847,8 +849,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 }
 
 .linear-card-tag {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
 }
@@ -885,8 +887,8 @@ html.dark .release-card.is-expanded {
 }
 
 .linear-release-action {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;

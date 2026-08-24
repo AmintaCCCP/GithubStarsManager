@@ -42,8 +42,8 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
     default: '',
     ai: '', // AI variant uses dynamic classes based on state
     subscribe: '', // Subscribe variant uses dynamic classes based on state
-    edit: 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
-    unstar: 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed',
+    edit: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground',
+    unstar: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:cursor-not-allowed',
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -1074,7 +1074,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={handleAIAnalyze}
             disabled={isAnalyzing}
             selectionMode={selectionMode}
-            className="bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground"
+            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
             title={aiButtonTitle}
           >
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
@@ -1084,7 +1084,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             selectionMode={selectionMode}
             className={`${isSubscribed
               ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
+              : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground'
             }`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
@@ -1107,7 +1107,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -1117,7 +1117,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />

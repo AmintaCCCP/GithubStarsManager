@@ -381,7 +381,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           ? 'bg-primary text-primary-foreground'
                           : isDragTarget
                             ? 'bg-success/10 text-success'
-                            : 'bg-secondary text-secondary-foreground'
+                            : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {count}
@@ -591,7 +591,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                 ? 'bg-primary text-primary-foreground'
                                 : isDragTarget
                                   ? 'bg-success/20 text-success'
-                                  : 'bg-secondary text-secondary-foreground'
+                                  : 'bg-muted text-muted-foreground'
                             } ${showText ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} group-hover:opacity-0 group-focus-within:opacity-0`}
                           >
                             {count}
