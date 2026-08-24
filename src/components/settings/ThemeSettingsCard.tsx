@@ -37,9 +37,14 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
         ? 0
         : (currentIndex + (forward ? 1 : -1) + buttons.length) % buttons.length;
     }
+    const nextButton = buttons[nextIndex];
+    const nextPresetId = nextButton?.dataset.themePresetId;
+    if (nextPresetId) {
+      setThemePreset(nextPresetId as ThemePresetId);
+    }
     event.preventDefault();
-    buttons[nextIndex]?.focus();
-  }, []);
+    nextButton?.focus();
+  }, [setThemePreset]);
 
   return (
     <Card>

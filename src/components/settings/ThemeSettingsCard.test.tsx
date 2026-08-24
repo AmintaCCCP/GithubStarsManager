@@ -57,6 +57,16 @@ describe('ThemeSettingsCard', () => {
     expect(radios.filter((el) => el.getAttribute('tabindex') === '0')).toHaveLength(1);
   });
 
+  it('selects the focused preset when navigating with arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+    const presetGroup = screen.getByRole('radiogroup', { name: '主题配色' });
+    const radios = within(presetGroup).getAllByRole('radio');
+    radios[0].focus();
+    await user.keyboard('{ArrowRight}');
+    expect(mocks.state.themePreset).toBe(THEME_PRESETS[1].id);
+  });
+
   it('marks exactly one preset active by default', () => {
     render(<ThemeSettingsCard t={t} />);
     const presetGroup = screen.getByRole('radiogroup', { name: '主题配色' });
