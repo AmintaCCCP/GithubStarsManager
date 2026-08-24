@@ -226,7 +226,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               variant="ghost"
               onClick={handleUnstar}
               disabled={isMutating}
-              className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-yellow-50 hover:text-yellow-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300"
+              className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-warning/10 hover:text-warning disabled:opacity-50 dark:text-muted-foreground"
               title={t('取消收藏', 'Unstar')}
             >
               <StarOff className="h-4 w-4" />
@@ -251,7 +251,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isMutating}
-                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 dark:text-muted-foreground"
                 title={t('删除', 'Delete')}
               >
                 <Trash2 className="h-4 w-4" />
@@ -266,7 +266,7 @@ export const GistCard: React.FC<GistCardProps> = ({
       </p>
 
       {gist.analysis_failed && (
-        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+        <div className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {gist.analysis_error || t('AI 分析失败', 'AI analysis failed')}
         </div>
       )}

@@ -649,3 +649,31 @@ describe('useAppStore repository view mode', () => {
     expect(useAppStore.getState().repositories).toBe(repositories);
   });
 });
+
+describe('useAppStore theme preset', () => {
+  it('defaults the theme preset for legacy persisted state', () => {
+    const normalized = normalizePersistedState({}, useAppStore.getState());
+
+    expect(normalized.themePreset).toBe('default');
+  });
+
+  it('falls back to the default preset for unknown persisted values', () => {
+    const normalized = normalizePersistedState(
+      { themePreset: 'does-not-exist' as never },
+      useAppStore.getState(),
+    );
+
+    expect(normalized.themePreset).toBe('default');
+  });
+
+  it('restores a known persisted preset and switches it at runtime', () => {
+    const normalized = normalizePersistedState({ themePreset: 'twitter' }, useAppStore.getState());
+    expect(normalized.themePreset).toBe('twitter');
+
+    useAppStore.setState({ themePreset: 'default' });
+    const themeBeforeSwitch = useAppStore.getState().theme;
+    useAppStore.getState().setThemePreset('twitter');
+    expect(useAppStore.getState().themePreset).toBe('twitter');
+    expect(useAppStore.getState().theme).toBe(themeBeforeSwitch);
+  });
+});

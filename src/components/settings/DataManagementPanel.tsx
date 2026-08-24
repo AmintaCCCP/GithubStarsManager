@@ -45,6 +45,8 @@ import {
   Rss,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { isThemePresetId } from '../../constants/themePresets';
+import type { ThemePresetId } from '../../constants/themePresets';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
@@ -124,6 +126,7 @@ interface ExportData {
     defaultCategoryOverrides?: Record<string, Partial<Category>>;
     categoryOrder?: string[];
     theme?: 'light' | 'dark';
+    themePreset?: ThemePresetId;
     language?: 'zh' | 'en';
     isSidebarCollapsed?: boolean;
     releaseViewMode?: 'timeline' | 'repository';
@@ -167,6 +170,7 @@ const hasMaskedSecrets = (data: ExportData['data']): boolean => {
 
 const UI_SETTINGS_DATA_KEYS = [
   'theme',
+  'themePreset',
   'language',
   'isSidebarCollapsed',
   'releaseViewMode',
@@ -621,6 +625,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
       if (selectedTypes.includes('uiSettings')) {
         exportDataObj.data.theme = store.theme;
+        exportDataObj.data.themePreset = store.themePreset;
         exportDataObj.data.language = store.language;
         exportDataObj.data.isSidebarCollapsed = store.isSidebarCollapsed;
         exportDataObj.data.releaseViewMode = store.releaseViewMode;
@@ -785,6 +790,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('uiSettings')) {
           if (importedData.theme === 'light' || importedData.theme === 'dark') {
             useAppStore.setState({ theme: importedData.theme });
+          }
+          if (isThemePresetId(importedData.themePreset)) {
+            useAppStore.getState().setThemePreset(importedData.themePreset);
           }
           if (importedData.language) {
             useAppStore.setState({ language: importedData.language });
@@ -987,6 +995,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           useAppStore.setState({
             ...(importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark'
               ? { theme: importedUiSettings.theme }
+              : {}),
+            ...(isThemePresetId(importedUiSettings.themePreset)
+              ? { themePreset: importedUiSettings.themePreset }
               : {}),
             ...(importedUiSettings.language ? { language: importedUiSettings.language } : {}),
             ...(typeof importedUiSettings.isSidebarCollapsed === 'boolean'
@@ -1527,7 +1538,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-accent text-white dark:text-muted-foreground rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -2000,7 +2011,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
               {/* Warning for masked secrets */}
               {hasMaskedSecrets(importPreview.data.data) && (
-                <div className="flex items-start space-x-3 text-yellow-700 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-start space-x-3 text-warning bg-warning/10 p-4 rounded-lg border border-warning/30">
                   <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p className="text-sm">
                     {t(

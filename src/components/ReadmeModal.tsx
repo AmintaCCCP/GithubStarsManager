@@ -664,7 +664,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleTranslate}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors text-warning hover:bg-warning/10"
                       title={t('重试翻译', 'Retry Translation')}
                     >
                       <Languages className="w-4 h-4" />
@@ -711,7 +711,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               {translateError && (
                 <div
-                  className={`px-3 py-1 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg cursor-pointer ${errorExpanded ? 'max-w-[400px] whitespace-normal break-all' : 'max-w-[200px] truncate'}`}
+                  className={`px-3 py-1 text-xs text-destructive bg-destructive/10 rounded-lg cursor-pointer ${errorExpanded ? 'max-w-[400px] whitespace-normal break-all' : 'max-w-[200px] truncate'}`}
                   onClick={() => setErrorExpanded(!errorExpanded)}
                   title={!errorExpanded ? translateError : undefined}
                 >

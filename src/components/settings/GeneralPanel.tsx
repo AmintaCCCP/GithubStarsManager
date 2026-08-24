@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { ThemeSettingsCard } from './ThemeSettingsCard';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -22,6 +23,8 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         <Package className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground">{t('通用设置', 'General Settings')}</h3>
       </div>
+
+      <ThemeSettingsCard t={t} />
 
       <Card>
         <CardHeader>

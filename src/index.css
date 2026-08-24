@@ -49,22 +49,11 @@
   .scrollbar-auto:hover::-webkit-scrollbar-thumb,
   .scrollbar-auto.scrolling::-webkit-scrollbar-thumb,
   .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.25);
-  }
-
-  .dark .scrollbar-auto:hover::-webkit-scrollbar-thumb,
-  .dark .scrollbar-auto.scrolling::-webkit-scrollbar-thumb,
-  .dark .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.25);
+    background: hsl(var(--foreground) / 0.25);
   }
 
   .scrollbar-auto::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.4) !important;
-    border: 1px solid transparent;
-  }
-
-  .dark .scrollbar-auto::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4) !important;
+    background: hsl(var(--foreground) / 0.4) !important;
     border: 1px solid transparent;
   }
 
@@ -113,7 +102,7 @@
 }
 
 .category-scrollbar.is-scrolling {
-  scrollbar-color: rgba(156, 163, 175, 0.8) transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.8) transparent;
 }
 
 .category-scrollbar::-webkit-scrollbar {
@@ -132,28 +121,12 @@
 }
 
 .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.8);
-}
-
-.dark .category-scrollbar {
-  scrollbar-color: transparent transparent;
-}
-
-.dark .category-scrollbar.is-scrolling {
-  scrollbar-color: rgba(75, 85, 99, 0.8) transparent;
-}
-
-.dark .category-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-.dark .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.8);
+  background: hsl(var(--muted-foreground) / 0.8);
 }
 
 .readme-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
 }
 
 .readme-scrollbar::-webkit-scrollbar {
@@ -166,33 +139,17 @@
 }
 
 .readme-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.4);
+  background: hsl(var(--muted-foreground) / 0.4);
   border-radius: 3px;
   transition: background 0.2s ease;
 }
 
 .readme-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.7);
+  background: hsl(var(--muted-foreground) / 0.7);
 }
 
 .readme-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(107, 114, 128, 0.8);
-}
-
-.dark .readme-scrollbar {
-  scrollbar-color: rgba(75, 85, 99, 0.4) transparent;
-}
-
-.dark .readme-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.4);
-}
-
-.dark .readme-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(75, 85, 99, 0.7);
-}
-
-.dark .readme-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(107, 114, 128, 0.8);
+  background: hsl(var(--muted-foreground) / 0.9);
 }
 
 /* ========== highlight.js Dark Mode Scope Isolation ========== */
@@ -374,31 +331,8 @@ option {
   @apply bg-background dark:bg-card text-foreground;
 }
 
-/* ========== Enhanced Text Area & Input Styles for Light Mode ========== */
-
-/* Optimized text selection colors for better readability */
-::selection {
-  background-color: rgba(94, 106, 210, 0.2);
-  color: inherit;
-}
-
-.dark ::selection {
-  background-color: rgba(113, 112, 255, 0.3);
-}
-
-/* Enhanced focus states for form elements */
-textarea:focus,
-input:focus,
-select:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(94, 106, 210, 0.1);
-}
-
-.dark textarea:focus,
-.dark input:focus,
-.dark select:focus {
-  box-shadow: 0 0 0 3px rgba(113, 112, 255, 0.15);
-}
+/* ========== Text Area & Input Styles ========== */
+/* Selection and focus glow are token-driven; see --ui-selection/--ui-accent-ring. */
 
 /* Smooth scrolling for text areas */
 textarea {
@@ -419,7 +353,7 @@ textarea::-webkit-scrollbar-track {
 }
 
 textarea::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.4);
+  background: hsl(var(--muted-foreground) / 0.4);
   border-radius: 4px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -427,15 +361,7 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 textarea::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.6);
-}
-
-.dark textarea::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.4);
-}
-
-.dark textarea::-webkit-scrollbar-thumb:hover {
-  background: rgba(75, 85, 99, 0.6);
+  background: hsl(var(--muted-foreground) / 0.6);
 }
 
 /* Textarea resize handle styling */
@@ -450,14 +376,10 @@ textarea::-webkit-resizer {
   background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 1L1 9M9 5L5 9M9 9L9 9' stroke='%234B5563' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
-/* Enhanced placeholder styling */
+/* Enhanced placeholder styling (token-driven) */
 ::placeholder {
-  color: #9ca3af;
+  color: hsl(var(--ui-placeholder));
   opacity: 1;
-}
-
-.dark ::placeholder {
-  color: #8a8f98;
 }
 
 /* Responsive text sizing for better readability */
@@ -492,44 +414,7 @@ html body[data-scroll-locked] {
   margin-right: 0 !important;
 }
 
-/* 重绘窗口右侧竖向原生滚动条：thin、半透明灰、dark 适配，hover 变深 */
-html {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
-}
-
-/* dark 类挂在 <html> 上（见 App.tsx），用 html.dark 而非 .dark html */
-html.dark {
-  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
-}
-
-html::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-html::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-html::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.5);
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-html::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.8);
-}
-
-html.dark::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.5);
-}
-
-html.dark::-webkit-scrollbar-thumb:hover {
-  background: rgba(75, 85, 99, 0.8);
-}
+/* 窗口滚动条颜色由 --ui-line-strong 等 token 统一驱动（见文件底部 Linear 段落）。 */
 
 
 
@@ -559,6 +444,23 @@ html.dark::-webkit-scrollbar-thumb:hover {
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
 
+  /* Status colors shared by the legacy status-* aliases and the semantic
+     success/warning utilities. Themes may override; defaults match history. */
+  --success: 142 76% 36%;
+  --warning: 34.7 94.6% 43.7%;
+
+  /* Typography stacks (theme presets may swap families). */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  /* Elevation recipes consumed by the Tailwind boxShadow tokens. */
+  --shadow-color: 0 0% 0%;
+  --shadow-opacity: 0.1;
+  --app-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.035);
+  --app-shadow-elevated: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --app-shadow-dialog: 0 20px 48px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+
   /* Compatibility aliases for existing application-shell utilities. */
   --ui-canvas: hsl(var(--background));
   --ui-panel: hsl(var(--card));
@@ -574,7 +476,10 @@ html.dark::-webkit-scrollbar-thumb:hover {
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring) / 0.25);
-  --ui-success: #16a34a;
+  --ui-selection: hsl(var(--accent));
+  --ui-placeholder: 210 10.6% 64.9%;
+  --ui-success: hsl(var(--success));
+  --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
   --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
   --ui-shadow-float: 0 10px 24px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.04);
@@ -607,6 +512,14 @@ html.dark {
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
 
+  --success: 141 69% 58%;
+  --warning: 43 96% 56%;
+
+  /* Selection tint: solid accent wash in light mode, translucent ring glow in
+     dark mode (mirrors the pre-tokenization visuals). */
+  --ui-selection: hsl(var(--ring) / 0.3);
+  --ui-placeholder: 218 6.4% 56.9%;
+
   --ui-canvas: hsl(var(--background));
   --ui-panel: hsl(var(--card));
   --ui-panel-muted: hsl(var(--muted));
@@ -621,7 +534,8 @@ html.dark {
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring) / 0.3);
-  --ui-success: #4ade80;
+  --ui-success: hsl(var(--success));
+  --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
   --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
   --ui-shadow-float: 0 18px 36px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.2);
@@ -775,16 +689,16 @@ textarea:focus-visible,
 }
 
 .ui-chip {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
 }
 
 .ui-chip-active {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--ring) / 0.5);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.35);
 }
 
 /* Component-level class consolidation for existing Tailwind primitives. */
@@ -799,11 +713,11 @@ select:focus {
 
 ::selection {
   color: var(--ui-text);
-  background: var(--ui-accent-soft);
+  background: var(--ui-selection);
 }
 
 /* Narrow, low-contrast scrolling aligned with the rest of the application chrome. */
-html { scrollbar-color: var(--ui-line-strong) transparent; }
+html { scrollbar-width: thin; scrollbar-color: var(--ui-line-strong) transparent; }
 html::-webkit-scrollbar { width: 10px; height: 10px; }
 html::-webkit-scrollbar-thumb { background: var(--ui-line-strong); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
 html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 3px solid transparent; background-clip: padding-box; }
@@ -881,8 +795,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 /* Dense search controls retain a clear state without stacking heavy surfaces. */
 .linear-filter-toggle,
 .linear-filter-chip {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
@@ -895,11 +809,13 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   border-color: hsl(var(--ring) / 0.5);
 }
 
+/* Active filter state uses the app-wide selected-item language (primary tint)
+   instead of solid accent, which is vivid in several theme presets. */
 .linear-filter-toggle.is-active,
 .linear-filter-chip.is-active {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--ring) / 0.5);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.35);
 }
 
 .linear-filter-toggle .filter-badge {
@@ -933,8 +849,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 }
 
 .linear-card-tag {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
 }
@@ -971,8 +887,8 @@ html.dark .release-card.is-expanded {
 }
 
 .linear-release-action {
-  color: hsl(var(--secondary-foreground));
-  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;

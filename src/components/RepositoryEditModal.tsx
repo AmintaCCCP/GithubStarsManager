@@ -602,7 +602,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
-  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-gray-50 to-white dark:from-white/[0.02] dark:to-white/[0.04] border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
+  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-muted/60 to-background dark:from-white/[0.02] dark:to-white/[0.04] border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
   const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
 
   return (
@@ -736,7 +736,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
             <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-amber-600`}>
+              <p className={`${infoTextClass} text-warning`}>
                 <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                 <span>
                   {repository?.ai_summary
@@ -840,7 +840,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Category Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <FolderOpen className="w-4 h-4 text-green-600 " />
+            <FolderOpen className="w-4 h-4 text-success " />
             <span>{t('分类', 'Category')}</span>
             {customStatus.category && (
               <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
@@ -972,11 +972,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Category Lock - Enhanced */}
-          <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-white/[0.04] dark:to-amber-600/10 rounded-xl border border-border dark:border-amber-600/20 shadow-sm">
+          <div className="mt-4 p-4 bg-gradient-to-br from-muted to-muted/60 dark:from-white/[0.04] dark:to-warning/10 rounded-xl border border-border dark:border-warning/20 shadow-sm">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
-                  <Lock className="w-4 h-4 text-muted-foreground dark:text-amber-600" />
+                  <Lock className="w-4 h-4 text-muted-foreground dark:text-warning" />
                 ) : (
                   <Unlock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                 )}
@@ -1112,12 +1112,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                   </>
                 ) : editIntent.tags === 'reset-to-ai' ? (
                   <>
-                    <span className="mr-2 text-green-600">✓</span>
+                    <span className="mr-2 text-success">✓</span>
                     {t('将显示AI标签。', 'AI tags will be shown.')}
                   </>
                 ) : editIntent.tags === 'reset-to-original' ? (
                   <>
-                    <span className="mr-2 text-green-600">✓</span>
+                    <span className="mr-2 text-success">✓</span>
                     {t('将显示GitHub Topics。', 'GitHub Topics will be shown.')}
                   </>
                 ) : repository?.ai_tags && repository.ai_tags.length > 0 ? (
