@@ -98,7 +98,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     if (draftMode) {
       const draftProps = props as DraftNumberInputProps;
       const raw = e.target.value.trim();
-      const parsed = raw === '' || isNaN(Number(raw)) ? null : parseInt(raw, 10);
+      const parsed = raw !== '' && Number.isInteger(Number(raw)) ? parseInt(raw, 10) : null;
       draftProps.onDraftCommit(parsed === null ? null : clamp(parsed));
       return;
     }

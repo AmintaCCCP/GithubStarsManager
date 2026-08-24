@@ -383,6 +383,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   placeholder="7890"
                   min={1}
                   max={65535}
+                  allowUndefined
                   className="w-full"
                 />
               </div>
@@ -546,6 +547,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   placeholder="6800"
                   min={1}
                   max={65535}
+                  allowUndefined
                   className="w-full"
                 />
               </div>

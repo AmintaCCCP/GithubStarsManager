@@ -16,6 +16,31 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
   const { theme, setTheme, themePreset, setThemePreset } = useAppStore();
   const isDark = theme === 'dark';
 
+  // Roving tabindex: arrow keys move focus across preset options; selection
+  // stays on click/Enter (Space) as with any button.
+  const handlePresetGridKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    const buttons = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"][data-theme-preset-id]'),
+    );
+    if (buttons.length === 0) return;
+    const currentIndex = buttons.findIndex((button) => button === document.activeElement);
+    let nextIndex: number;
+    if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = buttons.length - 1;
+    } else {
+      const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+      nextIndex = currentIndex === -1
+        ? 0
+        : (currentIndex + (forward ? 1 : -1) + buttons.length) % buttons.length;
+    }
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -65,7 +90,12 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           <p className="mb-3 text-xs text-muted-foreground">
             {t('一键切换界面配色，立即生效并自动保存。', 'Switch the interface color scheme instantly; changes apply and persist automatically.')}
           </p>
-          <div role="radiogroup" aria-labelledby="theme-preset-label" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <div
+            role="radiogroup"
+            aria-labelledby="theme-preset-label"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+            onKeyDown={handlePresetGridKeyDown}
+          >
             {THEME_PRESETS.map((preset) => {
               const swatch = getThemeSwatch(preset, isDark);
               const isActive = themePreset === preset.id;
@@ -75,6 +105,8 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                   type="button"
                   role="radio"
                   aria-checked={isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  data-theme-preset-id={preset.id}
                   onClick={() => setThemePreset(preset.id as ThemePresetId)}
                   className={`group relative flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive

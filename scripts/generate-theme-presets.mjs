@@ -153,7 +153,11 @@ function deriveBorderStrong(triplet, isLightMode) {
 // ---------- shadow composition ----------
 
 function px(value) {
-  const num = Number(String(value).replace('px', '')) || 0;
+  const raw = String(value).trim();
+  const num = Number(raw.replace(/px$/, ''));
+  if (!Number.isFinite(num)) {
+    throw new Error(`Unsupported shadow length: ${value}`);
+  }
   return `${round(num, 2)}px`;
 }
 
@@ -167,6 +171,9 @@ function px(value) {
 function composeShadow(styles) {
   const color = styles['shadow-color'] ?? '#000000';
   const opacity = Number(styles['shadow-opacity'] ?? '0.1');
+  if (!Number.isFinite(opacity)) {
+    throw new Error(`Unsupported shadow-opacity: ${styles['shadow-opacity']}`);
+  }
   const ox = px(styles['shadow-offset-x'] ?? '0px');
   const oy = px(styles['shadow-offset-y'] ?? '1px');
   const blur = px(styles['shadow-blur'] ?? '3px');

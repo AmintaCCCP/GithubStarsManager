@@ -125,14 +125,6 @@ export default {
         'caption': '-0.13px',
         'tiny': '-0.15px',
       },
-      boxShadow: {
-        'subtle': '0 1px 2px rgba(0,0,0,0.035)',
-        'ring': '0 0 0 1px rgba(0,0,0,0.08)',
-        'elevated': '0 12px 32px rgba(0,0,0,0.12)',
-        'dialog': '0 20px 48px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
-        'focus': '0 0 0 3px rgba(94,106,210,0.18)',
-        'inset-panel': '0 1px 0 rgba(255,255,255,0.04) inset',
-      },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'fade-out': 'fadeOut 0.15s ease-in forwards',
