@@ -123,7 +123,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1"
+                    className="flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-1"
                   >
                     <Badge variant="secondary" className="h-auto rounded-sm border-0 bg-transparent px-0 text-sm font-medium text-secondary-foreground">
                       {keyword}

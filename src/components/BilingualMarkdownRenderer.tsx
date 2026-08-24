@@ -409,7 +409,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       )}
 
       {error && (
-        <div className="text-center py-2 text-sm text-destructive">{error}</div>
+        <div className="text-center py-2 text-sm text-destructive dark:text-foreground">{error}</div>
       )}
     </div>
   );

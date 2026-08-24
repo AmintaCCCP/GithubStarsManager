@@ -45,6 +45,8 @@ import {
   Rss,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { isThemePresetId } from '../../constants/themePresets';
+import type { ThemePresetId } from '../../constants/themePresets';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
@@ -124,6 +126,7 @@ interface ExportData {
     defaultCategoryOverrides?: Record<string, Partial<Category>>;
     categoryOrder?: string[];
     theme?: 'light' | 'dark';
+    themePreset?: ThemePresetId;
     language?: 'zh' | 'en';
     isSidebarCollapsed?: boolean;
     releaseViewMode?: 'timeline' | 'repository';
@@ -167,6 +170,7 @@ const hasMaskedSecrets = (data: ExportData['data']): boolean => {
 
 const UI_SETTINGS_DATA_KEYS = [
   'theme',
+  'themePreset',
   'language',
   'isSidebarCollapsed',
   'releaseViewMode',
@@ -621,6 +625,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
       if (selectedTypes.includes('uiSettings')) {
         exportDataObj.data.theme = store.theme;
+        exportDataObj.data.themePreset = store.themePreset;
         exportDataObj.data.language = store.language;
         exportDataObj.data.isSidebarCollapsed = store.isSidebarCollapsed;
         exportDataObj.data.releaseViewMode = store.releaseViewMode;
@@ -785,6 +790,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('uiSettings')) {
           if (importedData.theme === 'light' || importedData.theme === 'dark') {
             useAppStore.setState({ theme: importedData.theme });
+          }
+          if (isThemePresetId(importedData.themePreset)) {
+            useAppStore.getState().setThemePreset(importedData.themePreset);
           }
           if (importedData.language) {
             useAppStore.setState({ language: importedData.language });
@@ -987,6 +995,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           useAppStore.setState({
             ...(importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark'
               ? { theme: importedUiSettings.theme }
+              : {}),
+            ...(isThemePresetId(importedUiSettings.themePreset)
+              ? { themePreset: importedUiSettings.themePreset }
               : {}),
             ...(importedUiSettings.language ? { language: importedUiSettings.language } : {}),
             ...(typeof importedUiSettings.isSidebarCollapsed === 'boolean'
