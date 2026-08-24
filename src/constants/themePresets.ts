@@ -13,17 +13,17 @@ export const DEFAULT_THEME_PRESET_ID = 'default' as const;
 
 export const THEME_PRESET_IDS = [
   DEFAULT_THEME_PRESET_ID,
-  'twitter',
-  'supabase',
+  'enterprise-mod-2',
+  'light-green',
   'claude',
   'vercel',
   't3-chat',
-  'catppuccin',
-  'neo-brutalism',
-  'cyberpunk',
-  'soft-pop',
-  'mocha-mousse',
-  'northern-lights',
+  'deep-purple',
+  'openprofile',
+  'autoblog',
+  'zen-inspired',
+  'logistic-one',
+  'whatsapp',
 ] as const;
 
 export type ThemePresetId = (typeof THEME_PRESET_IDS)[number];
@@ -100,17 +100,17 @@ const DEFAULT_PRESET: ThemePreset = {
 
 /** Labels for generated presets, keyed by id. */
 const GENERATED_LABELS_ZH: Record<string, string> = {
-  twitter: 'Twitter 蓝',
-  supabase: 'Supabase 绿',
+  'enterprise-mod-2': 'Enterprise 靛蓝',
+  'light-green': '清新绿',
   claude: 'Claude 暖橘',
   vercel: 'Vercel 极简',
   't3-chat': 'T3 Chat',
-  catppuccin: 'Catppuccin 马卡龙',
-  'neo-brutalism': 'Neo Brutalism',
-  cyberpunk: 'Cyberpunk 霓虹',
-  'soft-pop': 'Soft Pop 波普',
-  'mocha-mousse': '摩卡慕斯',
-  'northern-lights': '北境极光',
+  'deep-purple': '深邃紫',
+  openprofile: 'openprofile 杏黄',
+  autoblog: 'autoblog 暖橙',
+  'zen-inspired': 'Zen 素雅',
+  'logistic-one': 'LogisticOne 藏蓝',
+  whatsapp: 'WhatsApp 青绿',
 };
 
 /**

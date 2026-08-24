@@ -45,21 +45,21 @@ describe('themePresets injector', () => {
 
   it('sets data-theme for a known preset and clears it for the default', () => {
     const root = document.documentElement;
-    applyThemePreset('twitter', root);
-    expect(root.getAttribute('data-theme')).toBe('twitter');
+    applyThemePreset('deep-purple', root);
+    expect(root.getAttribute('data-theme')).toBe('deep-purple');
     applyThemePreset(DEFAULT_THEME_PRESET_ID, root);
     expect(root.hasAttribute('data-theme')).toBe(false);
   });
 
   it('clears data-theme for unknown ids (defensive)', () => {
     const root = document.documentElement;
-    root.setAttribute('data-theme', 'twitter');
+    root.setAttribute('data-theme', 'deep-purple');
     applyThemePreset('nope' as never, root);
     expect(root.hasAttribute('data-theme')).toBe(false);
   });
 
   it('resolves swatch colors for the active mode', () => {
-    const preset = THEME_PRESETS.find((p) => p.id === 'twitter')!;
+    const preset = THEME_PRESETS.find((p) => p.id === 'deep-purple')!;
     const light = getThemeSwatch(preset, false);
     const dark = getThemeSwatch(preset, true);
     expect(light.background).toMatch(/^hsl\(/);

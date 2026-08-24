@@ -480,7 +480,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               {copiedKey === 'json' ? t('已复制', 'Copied') : t('复制 JSON', 'Copy JSON')}
             </Button>
           </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
+          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
             {maskToken(agentConfigJson)}
           </pre>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
@@ -502,7 +502,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               {copiedKey === 'sse-json' ? t('已复制', 'Copied') : t('复制 SSE JSON', 'Copy SSE JSON')}
             </Button>
           </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-black/30 overflow-x-auto text-foreground dark:text-muted-foreground border border-black/[0.04] dark:border-border">
+          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
             {maskToken(agentSseConfigJson)}
           </pre>
         </div>
