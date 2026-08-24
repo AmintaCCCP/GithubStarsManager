@@ -671,8 +671,9 @@ describe('useAppStore theme preset', () => {
     expect(normalized.themePreset).toBe('twitter');
 
     useAppStore.setState({ themePreset: 'default' });
+    const themeBeforeSwitch = useAppStore.getState().theme;
     useAppStore.getState().setThemePreset('twitter');
     expect(useAppStore.getState().themePreset).toBe('twitter');
-    expect(useAppStore.getState().theme).toBe(useAppStore.getState().theme);
+    expect(useAppStore.getState().theme).toBe(themeBeforeSwitch);
   });
 });

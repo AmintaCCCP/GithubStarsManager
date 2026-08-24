@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
 
 import { ThemeSettingsCard } from './ThemeSettingsCard';
+import { THEME_PRESETS } from '../../constants/themePresets';
 
 const t = (zh: string) => zh;
 
@@ -46,7 +47,14 @@ describe('ThemeSettingsCard', () => {
     render(<ThemeSettingsCard t={t} />);
     const presetGroup = screen.getByRole('radiogroup', { name: '主题配色' });
     expect(presetGroup).toBeTruthy();
-    expect(within(presetGroup).getAllByRole('radio')).toHaveLength(12);
+    expect(within(presetGroup).getAllByRole('radio')).toHaveLength(THEME_PRESETS.length);
+  });
+
+  it('keeps a single tab stop inside the preset radiogroup (roving tabindex)', () => {
+    render(<ThemeSettingsCard t={t} />);
+    const presetGroup = screen.getByRole('radiogroup', { name: '主题配色' });
+    const radios = within(presetGroup).getAllByRole('radio');
+    expect(radios.filter((el) => el.getAttribute('tabindex') === '0')).toHaveLength(1);
   });
 
   it('marks exactly one preset active by default', () => {
