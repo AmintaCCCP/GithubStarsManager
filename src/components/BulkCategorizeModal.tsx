@@ -107,7 +107,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
           </div>
         )}
 
-        <div className="bg-muted dark:bg-amber-600/10 border border-border dark:border-amber-600/20 rounded-lg p-3">
+        <div className="bg-muted dark:bg-warning/10 border border-border dark:border-warning/20 rounded-lg p-3">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
             {t('提示：此操作将覆盖这些仓库现有的自定义分类。', 'Note: This operation will overwrite the existing custom categories of these repositories.')}
           </p>

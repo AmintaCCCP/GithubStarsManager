@@ -123,7 +123,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {keywords.map((keyword, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1"
+                    className="flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-1"
                   >
                     <Badge variant="secondary" className="h-auto rounded-sm border-0 bg-transparent px-0 text-sm font-medium text-secondary-foreground">
                       {keyword}
@@ -169,7 +169,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!name.trim() || keywords.length === 0}
-            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-green-600/80 dark:hover:bg-green-600'}`}
+            className={`px-4 py-2 rounded-lg transition-colors ${(!name.trim() || keywords.length === 0) ? 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-success/80 dark:hover:bg-success'}`}
           >
             {filter ? '保存' : '创建'}
           </Button>

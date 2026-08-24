@@ -379,7 +379,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       >
                         <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                           {isDownloaded ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
                           ) : isDownloading ? (
                             <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin flex-shrink-0" />
                           ) : link.isSourceCode ? (
@@ -519,7 +519,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <MarkdownRenderer content={summary.content} shouldRender={true} breaks={true} />
                 )}
                 {summary.status === 'error' && (
-                  <div className="py-3 text-xs text-red-500 dark:text-red-400">
+                  <div className="py-3 text-xs text-destructive">
                     {t('总结生成失败，请重试。', 'Failed to generate summary. Please try again.')}
                   </div>
                 )}

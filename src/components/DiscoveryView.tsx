@@ -55,27 +55,27 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
 
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
   trending: {
-    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-black/[0.08]',
     largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   rocket: {
-    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-black/[0.08]',
     largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   star: {
-    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-black/[0.08]',
     largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   tag: {
-    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-black/[0.08]',
     largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   search: {
-    gradient: 'from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700',
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-black/[0.08]',
     largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
@@ -1031,10 +1031,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </Button>
                   {selectedDiscoveryChannel === 'hot-release' && (
                     <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
-                      <div className="bg-gray-900 dark:bg-muted/40 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                      <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                         {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
                       </div>
-                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 dark:bg-muted/40 rotate-45" />
+                      <div className="absolute -top-1 right-3 w-2 h-2 bg-popover border-t border-l border-border rotate-45" />
                     </div>
                   )}
                 </div>
@@ -1332,7 +1332,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {!currentIsLoading && allRepos.length > 0 && (
               <div className={isDesktopSafeMode
                 ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
-                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/60 dark:to-slate-800/40 rounded-xl border border-black/[0.04] dark:border-border/50 text-sm'}>
+                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-muted/60 to-muted/30 rounded-xl border border-black/[0.04] dark:border-border/50 text-sm'}>
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>

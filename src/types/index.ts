@@ -1,3 +1,5 @@
+import type { ThemePresetId } from '../constants/themePresets';
+
 export interface Repository {
   id: number;
   name: string;
@@ -461,6 +463,8 @@ export interface AppState {
   
   // UI
   theme: 'light' | 'dark';
+  /** 主题配色预设（默认 + 内置精选），见 constants/themePresets */
+  themePreset: ThemePresetId;
   currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription';
   selectedCategory: string;
   language: 'zh' | 'en';

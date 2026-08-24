@@ -1,6 +1,7 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
+import { NumberInput } from '../ui/NumberInput';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Cable,
@@ -243,7 +244,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       </p>
 
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 text-sm">
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -276,7 +277,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           ) : mcpConfig.enabled ? (
-            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <CheckCircle className="w-4 h-4 text-success" />
           ) : (
             <AlertCircle className="w-4 h-4 text-muted-foreground" />
           )}
@@ -298,7 +299,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
         </div>
 
         {vectorAvailable === false && (
-          <p className="text-xs text-amber-700 dark:text-amber-300">
+          <p className="text-xs text-warning">
             {t(
               '向量搜索未配置：Agent 不会看到 gsm_vector_search 工具。可在「向量搜索」中配置。',
               'Vector search not configured: gsm_vector_search will not be listed. Configure under Vector Search.'
@@ -306,7 +307,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
           </p>
         )}
         {vectorAvailable === true && (
-          <p className="text-xs text-green-700 dark:text-green-300">
+          <p className="text-xs text-success">
             {t('向量搜索已启用，将暴露 gsm_vector_search。', 'Vector search enabled; gsm_vector_search is listed.')}
           </p>
         )}
@@ -330,28 +331,23 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </label>
             <label className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('端口', 'Port')}
-              <Input
-                type="number"
+              <NumberInput
                 min={1}
                 max={65535}
-                value={portInput}
-                onChange={(e) => {
-                  const value = e.target.value;
+                draftValue={portInput}
+                onDraftChange={(value) => {
                   setPortInput(value);
                   const parsed = Number(value);
                   if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
                     setMcpConfig({ port: parsed });
                   }
                 }}
-                onBlur={() => {
-                  const parsed = Number(portInput);
-                  const port = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535
-                    ? parsed
-                    : MCP_DEFAULT_PORT;
+                onDraftCommit={(parsed) => {
+                  const port = parsed ?? MCP_DEFAULT_PORT;
                   setPortInput(String(port));
                   setMcpConfig({ port });
                 }}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
+                className="mt-1 w-full"
               />
             </label>
           </div>
@@ -417,7 +413,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             aria-label={t('复制 Token', 'Copy token')}
           >
             {copiedKey === 'token' ? (
-              <CheckCircle className="w-4 h-4 text-green-600" />
+              <CheckCircle className="w-4 h-4 text-success" />
             ) : (
               <Copy className="w-4 h-4" />
             )}

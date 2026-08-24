@@ -79,7 +79,7 @@ export const BackToTop: React.FC = () => {
         border border-border dark:border-border
         transform transition-[opacity,transform,background-color] duration-300 ease-out
         hover:scale-110 hover:bg-accent dark:hover:bg-card/[0.1]
-        focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2
+        focus:outline-none focus:ring-2 focus:ring-ring/60 focus:ring-offset-2
         dark:focus:ring-offset-gray-900
         ${isVisible && !readmeModalOpen
           ? 'opacity-100 translate-y-0 pointer-events-auto'
