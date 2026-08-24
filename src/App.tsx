@@ -14,6 +14,7 @@ import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore } from './store/useAppStore';
+import { applyThemePreset } from './lib/themePresets';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
@@ -125,6 +126,7 @@ function App() {
     currentView,
     selectedCategory,
     theme,
+    themePreset,
     hasHydrated,
     searchResults,
     searchFilters,
@@ -155,6 +157,11 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Theme preset (palette/radius/font/shadow skin) rides on data-theme.
+  useEffect(() => {
+    applyThemePreset(themePreset);
+  }, [themePreset]);
 
   useEffect(() => {
     if (!hasHydrated) return;

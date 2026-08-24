@@ -1527,7 +1527,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     <div className="space-y-8">
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-gray-900 dark:bg-accent text-white dark:text-muted-foreground rounded-lg shadow-lg animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg animate-in slide-in-from-top-2">
           <CheckCircle className="w-5 h-5" />
           <span>{showSuccessMessage}</span>
         </div>
@@ -2000,7 +2000,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
               {/* Warning for masked secrets */}
               {hasMaskedSecrets(importPreview.data.data) && (
-                <div className="flex items-start space-x-3 text-yellow-700 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-start space-x-3 text-warning bg-warning/10 p-4 rounded-lg border border-warning/30">
                   <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p className="text-sm">
                     {t(

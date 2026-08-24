@@ -2,6 +2,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
+import { NumberInput } from '../ui/NumberInput';
 import React, { useState, useEffect } from 'react';
 import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -375,15 +376,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 <label htmlFor="proxy-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
-                <Input
+                <NumberInput
                   id="proxy-port"
-                  type="number"
-                  value={form.port || ''}
-                  onChange={(e) => setForm({ ...form, port: parseInt(e.target.value) || 0 })}
+                  value={form.port || undefined}
+                  onChange={(value) => setForm({ ...form, port: value ?? 0 })}
                   placeholder="7890"
                   min={1}
                   max={65535}
-                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                  className="w-full"
                 />
               </div>
             </div>
@@ -480,8 +480,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {testResult && (
               <div className={`flex items-start space-x-2 p-3 rounded-lg text-sm ${
                 testResult.success
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-destructive/10 text-destructive'
               }`}>
                 {testResult.success ? (
                   <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -539,15 +539,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 <label htmlFor="rpc-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                   {t('端口', 'Port')}
                 </label>
-                <Input
+                <NumberInput
                   id="rpc-port"
-                  type="number"
-                  value={rpcForm.port || ''}
-                  onChange={(e) => setRpcForm({ ...rpcForm, port: parseInt(e.target.value) || 0 })}
+                  value={rpcForm.port || undefined}
+                  onChange={(value) => setRpcForm({ ...rpcForm, port: value ?? 0 })}
                   placeholder="6800"
                   min={1}
                   max={65535}
-                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                  className="w-full"
                 />
               </div>
             </div>
@@ -629,8 +628,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {rpcTestResult && (
               <div className={`flex items-start space-x-2 p-3 rounded-lg text-sm ${
                 rpcTestResult.success
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-destructive/10 text-destructive'
               }`}>
                 {rpcTestResult.success ? (
                   <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />

@@ -150,7 +150,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-foreground dark:text-foreground">{t('文件', 'Files')}</div>
             {hasDuplicateFilenames && (
-              <div className="text-xs text-red-600 dark:text-red-300">
+              <div className="text-xs text-destructive">
                 {t('文件名不能重复', 'Filenames must be unique')}
               </div>
             )}
@@ -180,7 +180,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                   variant="ghost"
                   onClick={() => removeFile(file.id)}
                   disabled={visibleFiles.length === 1}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted-foreground"
                   title={t('删除文件', 'Delete file')}
                 >
                   <Trash2 className="h-4 w-4" />

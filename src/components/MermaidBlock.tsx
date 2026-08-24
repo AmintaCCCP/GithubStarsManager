@@ -63,7 +63,7 @@ const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
       <div
         data-translate="false"
         role="alert"
-        className="my-3 rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+        className="my-3 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
       >
         <p className="font-semibold">
           {uiLanguage === 'zh' ? 'Mermaid 图表渲染失败' : 'Failed to render Mermaid diagram'}

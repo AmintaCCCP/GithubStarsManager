@@ -1600,7 +1600,7 @@ export const SearchBar: React.FC = () => {
               </div>
             </div>
             {searchFilters.minStars !== undefined && searchFilters.maxStars !== undefined && searchFilters.minStars > searchFilters.maxStars && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1.5 flex items-center gap-1">
+              <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
                 {t('最小值不能大于最大值', 'Min cannot be greater than max')}
               </p>

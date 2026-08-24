@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
+import { NumberInput } from '../ui/NumberInput';
 import React, { useState, useCallback } from 'react';
 import {
   Search,
@@ -636,21 +637,18 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {t('向量维度', 'Vector Dimensions')}
           </label>
           <div className="flex gap-2">
-            <Input
+            <NumberInput
               id="embedding-dimensions"
               ref={dimensionsInputRef}
-              type="number"
-              value={formDimensionsInput}
-              onChange={(e) => setFormDimensionsInput(e.target.value)}
-              onBlur={() => {
-                const parsed = Number(formDimensionsInput);
-                const dimensions = Number.isInteger(parsed) && parsed > 0
-                  ? parsed
-                  : DEFAULT_DIMENSIONS[formApiType];
+              min={1}
+              draftValue={formDimensionsInput}
+              onDraftChange={setFormDimensionsInput}
+              onDraftCommit={(parsed) => {
+                const dimensions = parsed !== null && parsed > 0 ? parsed : DEFAULT_DIMENSIONS[formApiType];
                 setFormDimensions(dimensions);
                 setFormDimensionsInput(String(dimensions));
               }}
-              className="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="flex-1 text-sm"
             />
             <Button
               onClick={() => {
@@ -891,24 +889,19 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             <label htmlFor="readme-max-characters" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('README 截取字符数', 'README Max Characters')}
             </label>
-            <Input
+            <NumberInput
               id="readme-max-characters"
-              type="number"
-              value={formReadmeMaxCharsInput}
-              onChange={(e) => setFormReadmeMaxCharsInput(e.target.value)}
-              onBlur={() => {
-                const raw = formReadmeMaxCharsInput.trim();
-                const parsed = Number(raw);
-                const maxChars = raw !== '' && Number.isInteger(parsed)
-                  ? Math.min(20000, Math.max(500, parsed))
-                  : 6000;
-                setFormReadmeMaxChars(maxChars);
-                setFormReadmeMaxCharsInput(String(maxChars));
-              }}
               min={500}
               max={20000}
               step={1000}
-              className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              draftValue={formReadmeMaxCharsInput}
+              onDraftChange={setFormReadmeMaxCharsInput}
+              onDraftCommit={(parsed) => {
+                const maxChars = parsed !== null ? parsed : 6000;
+                setFormReadmeMaxChars(maxChars);
+                setFormReadmeMaxCharsInput(String(maxChars));
+              }}
+              className="w-full text-sm"
             />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('建议 4000-8000，越长精度越高但索引越慢', 'Recommended 4000-8000. Longer = higher precision but slower indexing')}
@@ -1023,23 +1016,18 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <label htmlFor="search-topk" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
             {t('返回结果数 (Top K)', 'Results Count (Top K)')}
           </label>
-          <Input
+          <NumberInput
             id="search-topk"
-            type="number"
-            value={formSearchTopKInput}
-            onChange={(e) => setFormSearchTopKInput(e.target.value)}
-            onBlur={() => {
-              const raw = formSearchTopKInput.trim();
-              const parsed = Number(raw);
-              const topK = raw !== '' && Number.isInteger(parsed)
-                ? Math.min(50, Math.max(5, parsed))
-                : 30;
+            min={5}
+            max={50}
+            draftValue={formSearchTopKInput}
+            onDraftChange={setFormSearchTopKInput}
+            onDraftCommit={(parsed) => {
+              const topK = parsed !== null ? parsed : 30;
               setFormSearchTopK(topK);
               setFormSearchTopKInput(String(topK));
             }}
-            min={5}
-            max={50}
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full text-sm"
           />
           <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('向量检索返回的最大结果数，越多召回越广但 LLM 重排序成本越高', 'Max results from vector search. More = wider recall but higher LLM reranking cost')}

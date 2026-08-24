@@ -15,8 +15,26 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'monospace'],
+        // Theme presets may swap these via --font-sans/--font-serif/--font-mono.
+        sans: ['var(--font-sans)'],
+        serif: ['var(--font-serif)'],
+        mono: ['var(--font-mono)'],
+      },
+      borderRadius: {
+        // shadcn-style radius scale driven by --radius so themes control corner
+        // rounding. Values coincide with Tailwind defaults at --radius: 0.5rem.
+        md: 'calc(var(--radius) - 2px)',
+        lg: 'var(--radius)',
+        xl: 'calc(var(--radius) + 4px)',
+      },
+      boxShadow: {
+        // Elevation recipes are token-driven so themes can restyle shadows.
+        'subtle': 'var(--app-shadow-subtle)',
+        'ring': '0 0 0 1px hsl(var(--shadow-color) / 0.08)',
+        'elevated': 'var(--app-shadow-elevated)',
+        'dialog': 'var(--app-shadow-dialog)',
+        'focus': '0 0 0 3px hsl(var(--ring) / 0.18)',
+        'inset-panel': '0 1px 0 rgba(255,255,255,0.04) inset',
       },
       colors: {
         // shadcn semantic surfaces and compatibility aliases
@@ -67,9 +85,14 @@ export default {
           hover: 'hsl(var(--primary) / 0.9)',
         },
         'security-lavender': 'hsl(var(--accent-foreground) / <alpha-value>)',
-        'status-green': 'rgb(22 163 74 / <alpha-value>)',
-        'status-emerald': 'rgb(22 163 74 / <alpha-value>)',
-        'status-amber': 'rgb(217 119 6 / <alpha-value>)',
+        // Semantic status colors (theme-tunable via --success/--warning).
+        success: 'hsl(var(--success) / <alpha-value>)',
+        'success-foreground': 'hsl(0 0% 100% / <alpha-value>)',
+        warning: 'hsl(var(--warning) / <alpha-value>)',
+        'warning-foreground': 'hsl(0 0% 100% / <alpha-value>)',
+        'status-green': 'hsl(var(--success) / <alpha-value>)',
+        'status-emerald': 'hsl(var(--success) / <alpha-value>)',
+        'status-amber': 'hsl(var(--warning) / <alpha-value>)',
         'status-red': 'hsl(var(--destructive) / <alpha-value>)',
         'border-primary': 'hsl(var(--border) / <alpha-value>)',
         'border-secondary': 'hsl(var(--border) / <alpha-value>)',
