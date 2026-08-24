@@ -187,7 +187,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       
       {/* 底部活动指示器 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-gray-900 dark:bg-text-primary rounded-full transition-all duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-all duration-200 ease-out will-change-transform"
         style={{
           transform: `translateX(${indicatorStyle.translateX}px)`,
           width: indicatorStyle.width,

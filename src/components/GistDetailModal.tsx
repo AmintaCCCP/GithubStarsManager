@@ -120,7 +120,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
 
   return (
     <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-sm leading-6 dark:bg-black/30">
-      <code ref={codeRef} className={`language-${language} font-mono text-foreground dark:text-[#e6edf3]`}>
+      <code ref={codeRef} className={`language-${language} font-mono text-foreground `}>
         {content || ''}
       </code>
     </pre>

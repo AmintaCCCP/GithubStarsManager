@@ -138,8 +138,8 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         </p>
 
         {!hasAnyCustom && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-            <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center">
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+            <p className="text-sm text-warning flex items-center">
               <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
               {t('选中的仓库中没有自定义内容，还原操作无实际效果。', 'No custom content found in selected repositories. Restore will have no effect.')}
             </p>
@@ -223,7 +223,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
               <Checkbox aria-labelledby="bulk-restore-category-heading" checked={config.category.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, category: { ...prev.category, enabled: checked === true } }))} />
-              <FolderOpen className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <FolderOpen className="w-4 h-4 text-success" />
                 <span id="bulk-restore-category-heading" className="text-sm font-medium text-foreground dark:text-foreground">
                   {t('分类', 'Category')}
                 </span>
@@ -256,8 +256,8 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* AI Warning */}
         {hasAiWarning && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-            <p className="text-sm text-amber-700 dark:text-amber-300 flex items-start">
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+            <p className="text-sm text-warning flex items-start">
               <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>
                 {t(
@@ -271,8 +271,8 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* AI Data Loss Warning */}
         {hasOriginalTargetAiLoss && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-            <p className="text-sm text-red-700 dark:text-red-300 flex items-start">
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+            <p className="text-sm text-destructive flex items-start">
               <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>
                 {t(
@@ -298,8 +298,8 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
         )}
 

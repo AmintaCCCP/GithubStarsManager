@@ -146,7 +146,7 @@ const CodeBlock: React.FC<{
           copyError
             ? 'text-destructive opacity-100'
             : copied
-              ? 'text-green-600 opacity-100 dark:text-green-500'
+              ? 'text-success opacity-100'
               : 'border border-border bg-background/80 text-muted-foreground backdrop-blur hover:text-foreground dark:bg-card/80 dark:text-muted-foreground'
         }`}
       >
@@ -490,7 +490,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
         <span className="my-4 flex flex-col items-center group/img">
           {isLoading && (
             <span className="w-full max-w-md h-16 bg-muted dark:bg-card rounded-lg flex items-center justify-center animate-pulse gap-2">
-              <svg className="w-5 h-5 text-gray-300 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">{language === 'zh' ? '加载中...' : 'Loading...'}</span>
@@ -531,7 +531,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 }
               </span>
               {naturalWidth > 0 && (
-                <span className="text-gray-300 dark:text-muted-foreground">|</span>
+                <span className="text-muted-foreground">|</span>
               )}
               {naturalWidth > 0 && (
                 <span>{naturalWidth} × {naturalHeight}</span>

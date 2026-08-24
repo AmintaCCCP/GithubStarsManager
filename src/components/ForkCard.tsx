@@ -42,7 +42,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`bg-card dark:bg-[#121314] rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
+      className={`bg-card rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
         isWorkflowsExpanded
           ? 'border-primary/20 shadow-lg ring-1 ring-ring/30'
           : 'border-border dark:border-border hover:shadow-md hover:border-black/10 dark:hover:border-white/10'
@@ -212,7 +212,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   </span>
                 </div>
 
-                <div className="bg-accent/50 dark:bg-[#121314] rounded border border-border dark:border-border max-h-72 overflow-y-auto">
+                <div className="bg-accent/50 rounded border border-border dark:border-border max-h-72 overflow-y-auto">
                   {workflows.map((workflow) => (
                     <div
                       key={workflow.id}
@@ -221,9 +221,9 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                     >
                       <div className="flex items-center space-x-2 min-w-0 flex-1">
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          workflow.state === 'active' ? 'bg-green-500' :
-                          workflow.state === 'disabled' ? 'bg-gray-400' :
-                          'bg-yellow-500'
+                          workflow.state === 'active' ? 'bg-success' :
+                          workflow.state === 'disabled' ? 'bg-muted-foreground/40' :
+                          'bg-warning'
                         }`} />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm truncate text-foreground dark:text-muted-foreground">
