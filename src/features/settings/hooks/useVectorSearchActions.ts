@@ -128,6 +128,10 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     try {
       const currentState = useAppStore.getState();
       const repositories = currentState.repositories;
+      const excludedVectorIds = repositories
+        .filter((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed))
+        .map((repository) => String(repository.id));
+      const excludedVectorIdSet = new Set(excludedVectorIds);
       currentFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
@@ -136,7 +140,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       const stamp = (id: number) => ({ id, patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) } });
       const newlyIndexed = new Set(repositories.filter((repository) => !repository.vector_indexed_at).map((repository) => repository.id));
       if (!incremental) {
-        state.updateRepositoriesMetadata(repositories.filter((repository) => repository.vector_indexed_at).map((repository) => ({
+        state.updateRepositoriesMetadata(repositories.filter((repository) => (
+          repository.vector_indexed_at && !excludedVectorIdSet.has(String(repository.id))
+        )).map((repository) => ({
           id: repository.id,
           patch: { vector_indexed_at: undefined, vector_indexed_license: undefined },
         })));
@@ -157,9 +163,6 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       });
       if (stamped.length) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      const excludedVectorIds = repositories
-        .filter((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed))
-        .map((repository) => String(repository.id));
       if (!incremental && result.errors === 0) {
         const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];
         await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
@@ -169,7 +172,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       const previousCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
       state.setVectorSearchStatus({
         connected: true,
-        vectorCount: incremental ? previousCount + result.indexedRepoIds.filter((id) => newlyIndexed.has(id)).length : result.indexed,
+        vectorCount: incremental
+          ? previousCount + result.indexedRepoIds.filter((id) => newlyIndexed.has(id)).length
+          : result.indexed + excludedVectorIds.length,
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });
