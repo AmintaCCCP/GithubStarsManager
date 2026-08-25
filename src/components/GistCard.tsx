@@ -4,6 +4,7 @@ import type { Gist } from '../types';
 import { createGitHubApiService } from '../services/githubApiFactory';
 import { AIService } from '../services/aiService';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { safeWriteText } from '../utils/clipboardUtils';
 import { getGistFileCount, getGistPrimaryLanguage, getGistTitle } from '../utils/gistUtils';
@@ -34,7 +35,15 @@ export const GistCard: React.FC<GistCardProps> = ({
     updateGist,
     deleteGist,
     setAnalyzingGist,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    githubToken: state.githubToken,
+    aiConfigs: state.aiConfigs,
+    activeAIConfig: state.activeAIConfig,
+    language: state.language,
+    updateGist: state.updateGist,
+    deleteGist: state.deleteGist,
+    setAnalyzingGist: state.setAnalyzingGist,
+  })));
   const isStoreAnalyzing = useAppStore(state => state.analyzingGistIds.has(gist.id));
   const { toast, confirm } = useDialog();
   const [isAnalyzingLocal, setIsAnalyzingLocal] = useState(false);

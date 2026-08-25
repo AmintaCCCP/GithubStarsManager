@@ -1,6 +1,7 @@
 import { Key } from 'lucide-react';
 import type { FC } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Switch } from '../ui/switch';
 
 interface IncludeKeysToggleProps {
@@ -8,7 +9,10 @@ interface IncludeKeysToggleProps {
 }
 
 export const IncludeKeysToggle: FC<IncludeKeysToggleProps> = ({ t }) => {
-  const { includeKeysInBackup, setIncludeKeysInBackup } = useAppStore();
+  const { includeKeysInBackup, setIncludeKeysInBackup } = useAppStore(useShallow((state) => ({
+    includeKeysInBackup: state.includeKeysInBackup,
+    setIncludeKeysInBackup: state.setIncludeKeysInBackup,
+  })));
   const label = t('备份/导出时包含密钥', 'Include keys in backup/export');
 
   return (

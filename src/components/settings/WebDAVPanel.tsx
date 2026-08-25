@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Cloud, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw } from 'lucide-react';
 import { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useWebDAVActions } from '../../features/settings/hooks/useWebDAVActions';
 import { useDialog } from '../../hooks/useDialog';
 
@@ -18,7 +19,12 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     activeWebDAVConfig,
     deleteWebDAVConfig,
     setActiveWebDAVConfig,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    webdavConfigs: state.webdavConfigs,
+    activeWebDAVConfig: state.activeWebDAVConfig,
+    deleteWebDAVConfig: state.deleteWebDAVConfig,
+    setActiveWebDAVConfig: state.setActiveWebDAVConfig,
+  })));
 
   const { confirm } = useDialog();
   const { testingId, save, test } = useWebDAVActions({ t });

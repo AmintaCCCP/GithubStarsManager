@@ -11,24 +11,14 @@ import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore } from './store/useAppStore';
+import { selectAppShellState } from './store/selectors';
+import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { ListsPushIndicator } from './components/ListsPushIndicator';
-import { backend } from './services/backendAdapter';
-import {
-  syncFromBackend,
-  startAutoSync,
-  stopAutoSync,
-  tryRestoreAuthFromBackend,
-  syncLocalGitHubTokenToBackend,
-} from './services/autoSync';
-import {
-  startMcpElectronBridge,
-  stopMcpElectronBridge,
-  refreshMcpElectronBridge,
-} from './services/mcpElectronBridge';
+import { useBackendLifecycle } from './features/lifecycle/useBackendLifecycle';
 import type { AppState, SearchFilters } from './types';
 
 /**
@@ -180,9 +170,10 @@ function App() {
     searchFilters,
     repositories,
     setSelectedCategory,
-  } = useAppStore();
+  } = useAppStore(useShallow(selectAppShellState));
 
   useAutoUpdateCheck();
+  useBackendLifecycle(hasHydrated);
 
   // Restore persisted frontend debug level at startup so capture is active
   // app-wide, not only after DiagnosticLogsPanel mounts.
@@ -190,12 +181,6 @@ function App() {
     if (sessionStorage.getItem('gsm:frontend-debug') === 'true') {
       logger.setLevel('debug');
     }
-  }, []);
-
-  // Electron local MCP: start after backend discovery so we don't bind :3927
-  // when agents should use backend /mcp instead.
-  useEffect(() => {
-    return () => stopMcpElectronBridge();
   }, []);
 
   useEffect(() => {
@@ -210,58 +195,6 @@ function App() {
   useEffect(() => {
     applyThemePreset(themePreset);
   }, [themePreset]);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-
-    let unsubscribe: (() => void) | null = null;
-    let cancelled = false;
-
-    /**
-     * Initialize backend-backed features after persisted local state is ready.
-     *
-     * Token repair is intentionally bounded so an unavailable backend cannot
-     * block the initial data sync and background synchronization indefinitely.
-     */
-    const initBackend = async () => {
-      try {
-        await backend.init();
-        if (backend.isAvailable && !cancelled) {
-          // Issue #259: recover a session on a fresh browser/device. Only acts
-          // when there is no local session and the backend is authenticated.
-          // Run before the backend data pull so auth can complete before the
-          // app decides whether to render LoginScreen.
-          await tryRestoreAuthFromBackend();
-          if (!cancelled) {
-            await syncLocalGitHubTokenToBackend();
-          }
-          if (!cancelled) {
-            await syncFromBackend();
-          }
-          if (!cancelled) {
-            unsubscribe = startAutoSync();
-          }
-        }
-      } catch (err) {
-        console.error('Failed to initialize backend:', err);
-      } finally {
-        // After backend probe (success or not), wire desktop MCP lifecycle
-        if (!cancelled) {
-          startMcpElectronBridge();
-          refreshMcpElectronBridge();
-        }
-      }
-    };
-
-    initBackend();
-
-    return () => {
-      cancelled = true;
-      if (unsubscribe) {
-        stopAutoSync(unsubscribe);
-      }
-    };
-  }, [hasHydrated]);
 
   const handleCategorySelect = useCallback((category: string) => {
     // 相似仓库视图下点击分类 = 离开相似视图并切换到该分类，避免交互歧义

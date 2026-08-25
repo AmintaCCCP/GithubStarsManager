@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { EmbeddingApiType } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
 import { useVectorSearchActions } from '../../features/settings/hooks/useVectorSearchActions';
@@ -51,7 +52,17 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus,
     vectorIndexingState, addEmbeddingConfig, updateEmbeddingConfig,
     setActiveEmbeddingConfig, setVectorSearchConfig,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    embeddingConfigs: state.embeddingConfigs,
+    activeEmbeddingConfig: state.activeEmbeddingConfig,
+    vectorSearchConfig: state.vectorSearchConfig,
+    vectorSearchStatus: state.vectorSearchStatus,
+    vectorIndexingState: state.vectorIndexingState,
+    addEmbeddingConfig: state.addEmbeddingConfig,
+    updateEmbeddingConfig: state.updateEmbeddingConfig,
+    setActiveEmbeddingConfig: state.setActiveEmbeddingConfig,
+    setVectorSearchConfig: state.setVectorSearchConfig,
+  })));
   const { toast } = useDialog();
   const {
     testingEmbedding, embeddingTestResult, testingWorker, workerTestResult,

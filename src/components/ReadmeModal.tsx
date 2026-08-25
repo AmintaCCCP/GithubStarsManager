@@ -8,6 +8,7 @@ import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { buildReadmeVariants, DEFAULT_README_VARIANT, type GitHubReadmeCandidateItem, type ReadmeVariant } from '../utils/readmeVariants';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 
@@ -47,7 +48,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   onCloseAutoFocus,
   repository
 }) => {
-  const { githubToken, language, setReadmeModalOpen } = useAppStore();
+  const { githubToken, language, setReadmeModalOpen } = useAppStore(useShallow((state) => ({
+    githubToken: state.githubToken,
+    language: state.language,
+    setReadmeModalOpen: state.setReadmeModalOpen,
+  })));
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

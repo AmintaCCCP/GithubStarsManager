@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Bot, Clock, TrendingUp } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SearchResultStatsProps {
   repositories: Repository[];
@@ -18,7 +19,9 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
   isRealTimeSearch,
   searchTime
 }) => {
-  const { language } = useAppStore();
+  const { language } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 

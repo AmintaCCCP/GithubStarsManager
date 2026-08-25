@@ -17,6 +17,7 @@ import { githubMarkdownSchema } from '../utils/sanitizeSchema';
 import 'highlight.js/styles/github.min.css';
 import '../styles/github-markdown.scoped.css';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { safeWriteText, getClipboardErrorMessage } from '../utils/clipboardUtils';
 
 interface MarkdownRendererProps {
@@ -62,7 +63,9 @@ const CodeBlock: React.FC<{
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const codeRef = useRef<HTMLElement>(null);
-  const { language: uiLanguage } = useAppStore();
+  const { language: uiLanguage } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
 
   const normalizedLanguage = useMemo(() => {
     if (!language) return '';
@@ -278,7 +281,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
   const zoomOverlayRef = useRef<HTMLDivElement>(null);
-  const { language } = useAppStore();
+  const { language } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
 
   const imageUrl = useMemo(() => resolveImageSrc(src || '', baseUrl), [src, baseUrl]);
 

@@ -8,6 +8,7 @@ import { Save, X, Plus, Lock, Unlock, RotateCcw, Bot, Edit3, FileText, Tag, Fold
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { forceSyncToBackend } from '../services/autoSync';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 
@@ -59,7 +60,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   onClose,
   repository
 }) => {
-  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore();
+  const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore(useShallow((state) => ({
+    updateRepository: state.updateRepository,
+    language: state.language,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+  })));
 
   const [formData, setFormData] = useState({
     description: '',

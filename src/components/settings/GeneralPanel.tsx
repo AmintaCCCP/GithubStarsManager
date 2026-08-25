@@ -2,6 +2,7 @@ import React from 'react';
 import { ExternalLink, Github, Globe, Mail, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { version } from '../../../package.json';
 import { PROJECT_REPO_URL } from '../../constants/project';
 import { Button } from '../ui/button';
@@ -15,7 +16,10 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { language, setLanguage } = useAppStore();
+  const { language, setLanguage } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    setLanguage: state.setLanguage,
+  })));
 
   return (
     <div className="space-y-6">

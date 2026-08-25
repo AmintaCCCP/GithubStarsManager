@@ -2,6 +2,7 @@ import { Button } from './ui/button';
 import React, { useState } from 'react';
 import { Search, Bot, Lightbulb, Play, CheckCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SearchExample {
   query: string;
@@ -50,7 +51,9 @@ const searchExamples: SearchExample[] = [
 ];
 
 export const SearchDemo: React.FC = () => {
-  const { language } = useAppStore();
+  const { language } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
   const [selectedExample, setSelectedExample] = useState<SearchExample | null>(null);
   const [showDemo, setShowDemo] = useState(false);
 

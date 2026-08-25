@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
 import { useDialog } from '../hooks/useDialog';
@@ -35,7 +36,13 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   onFilterToggle,
   onClearFilters
 }) => {
-  const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore();
+  const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore(useShallow((state) => ({
+    assetFilters: state.assetFilters,
+    addAssetFilter: state.addAssetFilter,
+    updateAssetFilter: state.updateAssetFilter,
+    deleteAssetFilter: state.deleteAssetFilter,
+    language: state.language,
+  })));
 
   const { confirm } = useDialog();
 
