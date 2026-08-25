@@ -1,9 +1,11 @@
 # ADR 0001 — Frontend layering and dependency direction
 
-Status: Accepted
+Status: Proposed
 Date: 2026-08-26
 Supersedes: none
 Applies to: `src/components/**`, `src/features/**`, `src/store/**`, `src/services/**`
+
+> Status is **Proposed** until this PR lands; it flips to **Accepted** on merge.
 
 ## Context
 

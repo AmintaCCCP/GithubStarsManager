@@ -60,14 +60,20 @@ const COMPONENT_ALLOWLIST = new Set([
 ]);
 
 // application purity: banned module specifiers (exact) + banned path patterns.
+// Mirrors eslint.config.js: **/store/** (not just useAppStore) so store/selectors
+// and store/helpers cannot bypass the check. No application module currently
+// imports any store path, so broadening is safe.
 const APPLICATION_BANNED_PATHS = ['react', 'react-dom'];
-const APPLICATION_BANNED_PATTERNS = [/\/store\/useAppStore(\.ts)?$/, /\/services\//];
+const APPLICATION_BANNED_PATTERNS = [/\/store\//, /\/services\//];
 
 const isTestFile = (rel) => /\.test\.(ts|tsx)$/.test(rel);
 
-// Match: import ... from '...';  |  import '...';  |  export ... from '...';
+// Match static imports/exports: import ... from '...'; | import '...'; | export ... from '...';
 // Captures the module specifier. Handles single- and double-quote specifiers.
 const IMPORT_RE = /\b(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"]+)\1/g;
+
+// Match dynamic imports: import('...'). Captures the module specifier.
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -99,6 +105,7 @@ function checkComponentFile(full, relPath) {
     violations++;
     return;
   }
+  // Static imports/exports.
   let m;
   while ((m = IMPORT_RE.exec(src)) !== null) {
     const spec = m[2];
@@ -107,6 +114,18 @@ function checkComponentFile(full, relPath) {
       if (new RegExp(`(^|/)services/${name}(\\.js)?$`).test(spec)) {
         console.error(
           `✖ ${relPath}: View component must not import business service '${name}' (imported '${spec}'). See docs/adr/0001-frontend-layering.md.`,
+        );
+        violations++;
+      }
+    }
+  }
+  // Dynamic imports.
+  while ((m = DYNAMIC_IMPORT_RE.exec(src)) !== null) {
+    const spec = m[2];
+    for (const name of BANNED_COMPONENT_SERVICES) {
+      if (new RegExp(`(^|/)services/${name}(\\.js)?$`).test(spec)) {
+        console.error(
+          `✖ ${relPath}: View component must not dynamically import() business service '${name}' (imported '${spec}'). See docs/adr/0001-frontend-layering.md.`,
         );
         violations++;
       }
@@ -124,23 +143,35 @@ function checkApplicationFile(full, relPath) {
     violations++;
     return;
   }
-  let m;
-  while ((m = IMPORT_RE.exec(src)) !== null) {
-    const spec = m[2];
+  const reportApplication = (spec, kind) => {
+    console.error(
+      `✖ ${relPath}: Application command must not ${kind} '${spec}' (pure state transition). See docs/adr/0001-frontend-layering.md.`,
+    );
+    violations++;
+  };
+  const checkSpec = (spec, kind) => {
     if (APPLICATION_BANNED_PATHS.includes(spec)) {
-      console.error(
-        `✖ ${relPath}: Application command must not import '${spec}' (pure state transition). See docs/adr/0001-frontend-layering.md.`,
-      );
-      violations++;
-      continue;
+      reportApplication(spec, kind === 'import' ? 'import' : `${kind}`);
+      return true;
     }
     if (APPLICATION_BANNED_PATTERNS.some((re) => re.test(spec))) {
-      const kind = /\/store\//.test(spec) ? 'the Store' : 'a service';
+      const storeKind = /\/store\//.test(spec) ? 'the Store' : 'a service';
       console.error(
-        `✖ ${relPath}: Application command must not import ${kind} (imported '${spec}'). See docs/adr/0001-frontend-layering.md.`,
+        `✖ ${relPath}: Application command must not ${kind} ${storeKind} (imported '${spec}'). See docs/adr/0001-frontend-layering.md.`,
       );
       violations++;
+      return true;
     }
+    return false;
+  };
+  // Static imports/exports.
+  let m;
+  while ((m = IMPORT_RE.exec(src)) !== null) {
+    checkSpec(m[2], 'import');
+  }
+  // Dynamic imports.
+  while ((m = DYNAMIC_IMPORT_RE.exec(src)) !== null) {
+    checkSpec(m[2], 'dynamically import()');
   }
 }
 

@@ -9,7 +9,6 @@ making changes that touch src/components/**, src/features/**, or src/store/**.
 
 ## Verification
 
-This PR must keep all gates green **and** change no runtime behavior, persisted data, or UI.
 Run the following locally in this order before pushing:
 
 ```bash
@@ -26,16 +25,24 @@ layering violation fails the job before the slower steps.
 
 ## Scope checklist
 
-- [ ] This PR does **not** change runtime behavior, user-visible UI text, or visual layout.
-- [ ] This PR does **not** change Store keys, `version`, `partialize`, `migrate`, or `merge`
-      (see `src/store/persistence/options.ts` and the v2 three contracts in ADR 0001).
+- [ ] **Runtime/persistence/UI changes described.** If this PR changes runtime behavior,
+      persisted data (Store keys, `version`, `partialize`, `migrate`, `merge` — see
+      `src/store/persistence/options.ts` and ADR 0001), or user-visible UI, describe the
+      change and its migration impact below. Architecture-enforcement PRs should have none.
 - [ ] No new `import` of a business service directly into `src/components/**`
-      (the ESLint `no-restricted-imports` rule and `check:boundaries` enforce this; if a
-      component genuinely needs a service, add a hook in `src/features/*/hooks/**`).
-- [ ] No new `import` of React/JSX/the Store/any service into `src/features/*/application/**`.
+      (the ESLint `no-restricted-imports` / `no-restricted-syntax` rules and
+      `check:boundaries` enforce this, including dynamic `import()`; if a component
+      genuinely needs a service, add a hook in `src/features/*/hooks/**`).
+- [ ] No new `import` of React/JSX/the Store/any service into `src/features/*/application/**`
+      (static or dynamic).
 - [ ] No inline `eslint-disable` to bypass the boundary rules — fix the layering instead.
 - [ ] If this PR migrates a component off the allowlist in `eslint.config.js` /
       `scripts/check-boundaries.cjs`, that entry is removed in the same PR.
+
+### Runtime / persistence / UI changes (if any)
+
+<!-- If this PR touches runtime behavior, persisted data, or UI, describe it here.
+If it is a pure architecture-enforcement PR with none, write "None". -->
 
 ## Notes for reviewers / CodeRabbit
 
