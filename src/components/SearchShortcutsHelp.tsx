@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { HelpCircle, Keyboard } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { searchShortcuts } from '../hooks/useSearchShortcuts';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 
 export const SearchShortcutsHelp: React.FC = () => {
   const [showHelp, setShowHelp] = useState(false);
-  const { language } = useAppStore();
+  const { language } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (

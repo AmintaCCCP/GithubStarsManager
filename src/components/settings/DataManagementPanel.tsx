@@ -45,6 +45,7 @@ import {
   Rss,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { indexedDBStorage } from '../../services/indexedDbStorage';
@@ -250,7 +251,26 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     setRepositories,
     setReleases,
     setBackendApiSecret,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    user: state.user,
+    repositories: state.repositories,
+    releases: state.releases,
+    aiConfigs: state.aiConfigs,
+    webdavConfigs: state.webdavConfigs,
+    customCategories: state.customCategories,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    assetFilters: state.assetFilters,
+    discoveryRepos: state.discoveryRepos,
+    subscriptionRepos: state.subscriptionRepos,
+    releaseSubscriptions: state.releaseSubscriptions,
+    releaseSourceSettings: state.releaseSourceSettings,
+    readReleases: state.readReleases,
+    language: state.language,
+    setRepositories: state.setRepositories,
+    setReleases: state.setReleases,
+    setBackendApiSecret: state.setBackendApiSecret,
+  })));
 
   const [confirmation, setConfirmation] = useState<DeleteConfirmation>({
     type: null,

@@ -14,6 +14,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Switch } from '../ui/switch';
 import { HeaderMenuId } from '../../types';
 
@@ -36,7 +37,10 @@ const MENU_META: Record<HeaderMenuId, {
 };
 
 export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) => {
-  const { headerMenuConfig, setHeaderMenuConfig } = useAppStore();
+  const { headerMenuConfig, setHeaderMenuConfig } = useAppStore(useShallow((state) => ({
+    headerMenuConfig: state.headerMenuConfig,
+    setHeaderMenuConfig: state.setHeaderMenuConfig,
+  })));
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);

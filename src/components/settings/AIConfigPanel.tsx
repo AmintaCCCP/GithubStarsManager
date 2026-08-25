@@ -8,6 +8,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle, Languages } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan, TranslationEngine } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAIConfigActions } from '../../features/settings/hooks/useAIConfigActions';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
@@ -89,7 +90,17 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     updateAIConfig,
     deleteAIConfig,
     setActiveAIConfig,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    aiConfigs: state.aiConfigs,
+    activeAIConfig: state.activeAIConfig,
+    language: state.language,
+    translationEngine: state.translationEngine,
+    setTranslationEngine: state.setTranslationEngine,
+    addAIConfig: state.addAIConfig,
+    updateAIConfig: state.updateAIConfig,
+    deleteAIConfig: state.deleteAIConfig,
+    setActiveAIConfig: state.setActiveAIConfig,
+  })));
 
   const { toast, confirm } = useDialog();
   const { testingId, testingForm, testConfig, testDraft } = useAIConfigActions({ t });

@@ -1,145 +1,55 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
-import { ForkRepo, GitHubOrganization, WorkflowDefinition } from '../types';
-import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
-import { logger } from '../services/logger';
 import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
-import { useDialog } from '../hooks/useDialog';
+import { useForkTimelineActions } from '../features/forks/hooks/useForkTimelineActions';
 import { Modal } from './Modal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 export const ForkTimeline: React.FC = () => {
   const {
-    user,
-    forks,
     readForks,
-    githubToken,
     language,
     markForkAsRead,
     forkSearchQuery,
     forkIsRefreshing,
     setForkSearchQuery,
-    setForkIsRefreshing,
-  } = useAppStore();
+    isLoadingOrganizations,
+    personalOwnerLogin,
+    activeForkOwner,
+    ownerForks,
+    forkOwnerOptions,
+    lastRefreshTime,
+    expandedWorkflows,
+    workflowsMap,
+    loadingWorkflows,
+    syncingForks,
+    runningWorkflows,
+    needsSyncMap,
+    syncModal,
+    setSyncModal,
+    syncModalBranches,
+    isFetchingBranches,
+    t,
+    handleRefresh,
+    handleForkOwnerChange,
+    toggleWorkflows,
+    handleSyncUpstream,
+    confirmSyncUpstream,
+    handleRunWorkflow,
+  } = useForkTimelineActions();
 
-  const { toast } = useDialog();
-
-  const personalOwnerLogin = user?.login || '';
-  const [organizations, setOrganizations] = useState<GitHubOrganization[]>([]);
-  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false);
-  const [selectedForkOwner, setSelectedForkOwner] = useState(personalOwnerLogin);
-  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  // Workflow expansion state (local UI state)
-  const [expandedWorkflows, setExpandedWorkflows] = useState<Set<number>>(new Set());
-  const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
-  const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
-  const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
-  const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
-  // Track which forks need sync (out-of-date vs already-up-to-date)
-  const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
-  const [loadedForkOwners, setLoadedForkOwners] = useState<Set<string>>(new Set());
-
-  // Sync Modal state
-  const [syncModal, setSyncModal] = useState<{
-    isOpen: boolean;
-    forkId: number | null;
-    owner: string;
-    repo: string;
-    branch: string;
-    full_name: string;
-  }>({
-    isOpen: false,
-    forkId: null,
-    owner: '',
-    repo: '',
-    branch: 'main',
-    full_name: ''
-  });
-  const [syncModalBranches, setSyncModalBranches] = useState<string[]>([]);
-  const [isFetchingBranches, setIsFetchingBranches] = useState(false);
-
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
   const searchQuery = forkSearchQuery;
-  const activeForkOwner = selectedForkOwner || personalOwnerLogin;
   const currentOwnerLabel = activeForkOwner || t('个人账号', 'Personal account');
-
-  const isForkUnread = useCallback((forkId: number) => {
-    return !readForks.has(forkId);
-  }, [readForks]);
-
-  useEffect(() => {
-    setSelectedForkOwner(personalOwnerLogin);
+  const isForkUnread = (forkId: number) => !readForks.has(forkId);
+  const handleForkOwnerSelection = (ownerLogin: string) => {
+    handleForkOwnerChange(ownerLogin);
     setCurrentPage(1);
-    setLoadedForkOwners(new Set());
-  }, [personalOwnerLogin]);
-
-  useEffect(() => {
-    if (!githubToken || !personalOwnerLogin) {
-      setOrganizations([]);
-      setIsLoadingOrganizations(false);
-      return;
-    }
-
-    let isCancelled = false;
-    const loadOrganizations = async () => {
-      setIsLoadingOrganizations(true);
-      try {
-        const githubApi = new GitHubApiService(githubToken);
-        const userOrganizations = await githubApi.getUserOrganizations();
-        if (!isCancelled) {
-          setOrganizations(userOrganizations);
-        }
-      } catch (error) {
-        logger.warn('githubApi', 'Failed to load fork owner organizations', error);
-        if (!isCancelled) {
-          setOrganizations([]);
-          toast(
-            language === 'zh'
-              ? '组织列表加载失败，请检查 GitHub token 权限。'
-              : 'Failed to load organizations. Please check GitHub token permissions.',
-            'error'
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoadingOrganizations(false);
-        }
-      }
-    };
-
-    loadOrganizations();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [githubToken, language, personalOwnerLogin, toast]);
-
-  const ownerForks = useMemo(() => {
-    if (!activeForkOwner) return [];
-    return forks.filter(fork => fork.fork === true && fork.owner.login === activeForkOwner);
-  }, [forks, activeForkOwner]);
-
-  const forkOwnerOptions = useMemo(() => {
-    const options = new Map<string, { id: string; login: string; isPersonal: boolean }>();
-    if (personalOwnerLogin) {
-      options.set(personalOwnerLogin, { id: `user-${personalOwnerLogin}`, login: personalOwnerLogin, isPersonal: true });
-    }
-    organizations.forEach(org => {
-      options.set(org.login, { id: `org-${org.id}`, login: org.login, isPersonal: false });
-    });
-    forks.forEach(fork => {
-      if (fork.fork && fork.owner.login !== personalOwnerLogin && !options.has(fork.owner.login)) {
-        options.set(fork.owner.login, { id: `cached-${fork.owner.login}`, login: fork.owner.login, isPersonal: false });
-      }
-    });
-    return Array.from(options.values());
-  }, [forks, organizations, personalOwnerLogin]);
+  };
 
   // Filter and sort forks
   const filteredForks = useMemo(() => {
@@ -214,333 +124,6 @@ export const ForkTimeline: React.FC = () => {
     return rangeWithDots;
   };
 
-  const loadForksForOwner = useCallback(async (ownerLogin: string) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-      return;
-    }
-
-    if (!ownerLogin) {
-      toast(language === 'zh' ? 'Fork 仓库拥有者未找到，请重新登录。' : 'Fork owner not found. Please login again.', 'error');
-      return;
-    }
-
-    const startTime = Date.now();
-    setForkIsRefreshing(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const fetchedForks = ownerLogin === personalOwnerLogin
-        ? await githubApi.getUserForks()
-        : await githubApi.getOrganizationForks(ownerLogin);
-      const newForks = fetchedForks.filter(fork => fork.fork === true && fork.owner.login === ownerLogin);
-      logger.info('githubApi', 'Refresh forks completed', { owner: ownerLogin, forkCount: newForks.length, durationMs: Date.now() - startTime });
-
-      // Merge with existing forks, preserving read status from the latest store state
-      let updatedForks: ForkRepo[] = [];
-      let newCount = 0;
-      useAppStore.setState(state => {
-        const existingForkMap = new Map(state.forks.map(f => [f.id, f]));
-        const nextReadForks = new Set(state.readForks);
-        newCount = newForks.filter(f => !existingForkMap.has(f.id)).length;
-
-        updatedForks = newForks.map(newFork => {
-          const existing = existingForkMap.get(newFork.id);
-          if (!existing) {
-            // New fork — mark as unread if upstream has updates
-            return {
-              ...newFork,
-              has_unread: false,
-              upstream_updated_at: newFork.source?.updated_at,
-            };
-          }
-
-          const prevUpstreamTime = existing.upstream_updated_at;
-          const currentUpstreamTime = newFork.source?.updated_at;
-          const hasNewUpdates = !!prevUpstreamTime && !!currentUpstreamTime
-            && new Date(currentUpstreamTime) > new Date(prevUpstreamTime);
-
-          if (hasNewUpdates) {
-            nextReadForks.delete(newFork.id);
-            return {
-              ...newFork,
-              has_unread: existing.has_unread,
-              upstream_updated_at: currentUpstreamTime,
-            };
-          }
-
-          return {
-            ...newFork,
-            has_unread: existing.has_unread,
-            upstream_updated_at: existing.upstream_updated_at || currentUpstreamTime,
-          };
-        });
-
-        return {
-          forks: [
-            ...state.forks.filter(fork => fork.owner.login !== ownerLogin || fork.fork !== true),
-            ...updatedForks,
-          ],
-          readForks: nextReadForks,
-        };
-      });
-      setLoadedForkOwners(prev => {
-        const next = new Set(prev);
-        next.add(ownerLogin);
-        return next;
-      });
-      const now = new Date().toISOString();
-      setLastRefreshTime(now);
-
-      // Pre-check sync status for refreshed owner forks (out-of-date vs already up-to-date)
-      const syncChecks: Promise<void>[] = updatedForks.map(async (fork) => {
-        if (!fork.fork) return;
-        const [owner, repo] = fork.full_name.split('/');
-        const branch = fork.default_branch || 'main';
-        try {
-          const result = await githubApi.checkForkSyncNeeded(
-            owner,
-            repo,
-            branch,
-            fork.parent?.full_name || fork.source?.full_name
-          );
-          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: result.needsSync }));
-
-          if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
-            useAppStore.setState(state => ({
-              forks: state.forks.map(f => f.id === fork.id ? {
-                ...f,
-                parent: {
-                  id: 0,
-                  full_name: result.parentFullName as string,
-                  name: (result.parentFullName as string).split('/')[1],
-                  html_url: result.parentHtmlUrl as string
-                }
-              } : f)
-            }));
-          }
-        } catch {
-          setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
-        }
-      });
-      await Promise.all(syncChecks);
-
-      if (newCount > 0) {
-        toast(language === 'zh'
-          ? `刷新完成！发现 ${newCount} 个新Fork。`
-          : `Refresh completed! Found ${newCount} new forks.`,
-          'success'
-        );
-      } else {
-        toast(language === 'zh'
-          ? `刷新完成！`
-          : `Refresh completed!`,
-          'info'
-        );
-      }
-    } catch (error) {
-      console.error('Fork refresh failed:', error);
-      logger.error('githubApi', 'Refresh forks failed', { owner: ownerLogin, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startTime });
-      toast(language === 'zh'
-        ? 'Fork刷新失败，请检查网络连接。'
-        : 'Fork refresh failed. Please check your network connection.',
-        'error'
-      );
-    } finally {
-      setForkIsRefreshing(false);
-    }
-  }, [githubToken, language, personalOwnerLogin, setForkIsRefreshing, toast]);
-
-  const handleRefresh = () => {
-    loadForksForOwner(activeForkOwner);
-  };
-
-  const handleForkOwnerChange = (ownerLogin: string) => {
-    setSelectedForkOwner(ownerLogin);
-    setCurrentPage(1);
-
-    const hasCachedOwnerForks = useAppStore.getState().forks.some(fork => fork.fork === true && fork.owner.login === ownerLogin);
-    if (!hasCachedOwnerForks && !loadedForkOwners.has(ownerLogin)) {
-      loadForksForOwner(ownerLogin);
-    }
-  };
-
-  const toggleWorkflows = async (forkId: number) => {
-    setExpandedWorkflows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(forkId)) {
-        newSet.delete(forkId);
-      } else {
-        newSet.add(forkId);
-        // Fetch workflows if not loaded yet
-        if (!workflowsMap[forkId]) {
-          loadWorkflows(forkId);
-        }
-      }
-      return newSet;
-    });
-  };
-
-  const loadWorkflows = async (forkId: number) => {
-    const fork = forks.find(f => f.id === forkId);
-    if (!fork || !githubToken) return;
-
-    setLoadingWorkflows(prev => new Set(prev).add(forkId));
-    try {
-      const [owner, repo] = fork.full_name.split('/');
-      const githubApi = new GitHubApiService(githubToken);
-      const workflows = await githubApi.getRepositoryWorkflows(owner, repo);
-      setWorkflowsMap(prev => ({ ...prev, [forkId]: workflows }));
-    } catch (error) {
-      console.error('Failed to load workflows:', error);
-    } finally {
-      setLoadingWorkflows(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(forkId);
-        return newSet;
-      });
-    }
-  };
-
-  const handleSyncUpstream = async (fork: ForkRepo) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-      return;
-    }
-
-    const defaultBranch = fork.default_branch || 'main';
-    const [owner, repo] = fork.full_name.split('/');
-    
-    setSyncModal({
-      isOpen: true,
-      forkId: fork.id,
-      owner,
-      repo,
-      branch: defaultBranch,
-      full_name: fork.full_name
-    });
-    setSyncModalBranches([]);
-    setIsFetchingBranches(true);
-    
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const branches = await githubApi.getBranches(owner, repo);
-      setSyncModalBranches(branches);
-      if (branches.length > 0 && !branches.includes(defaultBranch)) {
-        setSyncModal(prev => ({ ...prev, branch: branches[0] }));
-      }
-    } finally {
-      setIsFetchingBranches(false);
-    }
-  };
-
-  const confirmSyncUpstream = async () => {
-    if (!githubToken || !syncModal.forkId) return;
-
-    const fork = forks.find(f => f.id === syncModal.forkId);
-    if (!fork) return;
-
-    const { owner, repo, branch } = syncModal;
-    const syncStartTime = Date.now();
-
-    setSyncModal(prev => ({ ...prev, isOpen: false }));
-    setSyncingForks(prev => new Set(prev).add(fork.id));
-
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const result = await githubApi.syncFork(owner, repo, branch);
-      logger.info('githubApi', 'Sync fork completed', { repo: fork.full_name, mergeType: result.mergeType, durationMs: Date.now() - syncStartTime });
-
-      // Mark fork as up-to-date in UI
-      setNeedsSyncMap(prev => ({ ...prev, [fork.id]: false }));
-
-      if (result.mergeType === 'none') {
-        toast(language === 'zh'
-          ? `${fork.name} 已是最新版本，无需更新。`
-          : `${fork.name} is already up to date.`,
-          'info'
-        );
-      } else {
-        toast(language === 'zh'
-          ? `已将 ${fork.name} 成功更新到上游最新版本。`
-          : `${fork.name} has been successfully updated from upstream.`,
-          'success'
-        );
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-      logger.error('githubApi', 'Sync fork failed', { repo: fork.full_name, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - syncStartTime });
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg === 'NOT_A_FORK') {
-        toast(language === 'zh'
-          ? `${fork.name} 不是 Fork 仓库，无法同步上游。`
-          : `${fork.name} is not a fork. Cannot sync upstream.`,
-          'error'
-        );
-      } else if (errorMsg === 'MERGE_CONFLICT') {
-        toast(language === 'zh'
-          ? `同步失败：${fork.name} 与上游仓库存在合并冲突，请手动解决后重试。`
-          : `Sync failed: ${fork.name} has merge conflicts with upstream. Please resolve manually.`,
-          'error'
-        );
-      } else {
-        toast(language === 'zh'
-          ? `同步失败: ${errorMsg}`
-          : `Sync failed: ${errorMsg}`,
-          'error'
-        );
-      }
-    } finally {
-      setSyncingForks(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(fork.id);
-        return newSet;
-      });
-    }
-  };
-
-  const handleRunWorkflow = async (forkId: number, workflowPath: string, workflowName: string) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-      return;
-    }
-
-    const fork = forks.find(f => f.id === forkId);
-    if (!fork) return;
-
-    const branch = fork.default_branch || 'main';
-    const workflowStartTime = Date.now();
-    setRunningWorkflows(prev => new Set(prev).add(forkId));
-    try {
-      const [owner, repo] = fork.full_name.split('/');
-      const githubApi = new GitHubApiService(githubToken);
-      await githubApi.triggerWorkflowRun(owner, repo, workflowPath, branch);
-      logger.info('githubApi', 'Trigger workflow completed', { repo: fork.full_name, workflow: workflowName, branch, durationMs: Date.now() - workflowStartTime });
-
-      toast(language === 'zh'
-        ? `已触发工作流 "${workflowName}" 在 ${branch} 分支。`
-        : `Triggered workflow "${workflowName}" on branch ${branch}.`,
-        'success'
-      );
-
-      // Reload workflows after triggering
-      await loadWorkflows(forkId);
-    } catch (error) {
-      console.error('Failed to run workflow:', error);
-      logger.error('githubApi', 'Trigger workflow failed', { repo: fork.full_name, workflow: workflowName, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - workflowStartTime });
-      toast(language === 'zh'
-        ? `运行工作流失败。`
-        : `Failed to run workflow.`,
-        'error'
-      );
-    } finally {
-      setRunningWorkflows(prev => {
-        const next = new Set(prev);
-        next.delete(forkId);
-        return next;
-      });
-    }
-  };
-
   return (
     <div className="max-w-full mx-auto px-2 sm:px-4">
       {/* Header */}
@@ -558,7 +141,7 @@ export const ForkTimeline: React.FC = () => {
             {/* Fork owner selector */}
             <div className="flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap">
               <span id="fork-owner-label" className="shrink-0 whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
-              <Select value={activeForkOwner} onValueChange={handleForkOwnerChange} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
+              <Select value={activeForkOwner} onValueChange={handleForkOwnerSelection} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
                 <SelectTrigger className="ui-field h-9 w-48 max-w-[calc(100vw-8rem)] shrink px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
                 <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>
               </Select>

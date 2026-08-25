@@ -5,30 +5,20 @@ import { Switch } from './ui/switch';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, ChevronDown, CheckCircle, Settings } from 'lucide-react';
 import { Release } from '../types';
+import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
-import { forceSyncToBackend } from '../services/autoSync';
-import { backend } from '../services/backendAdapter';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
 import { ReleaseSourceSettingsModal } from './ReleaseSourceSettingsModal';
-import { useDialog } from '../hooks/useDialog';
 import {
-  STARRED_RELEASE_SOURCE_ID,
-  WATCH_CUSTOM_RELEASE_SOURCE_ID,
-  CUSTOM_RELEASE_SOURCE_ID,
-  getReleaseSourceLabel,
-  getSourcesForReleaseRepository,
-  normalizeRepoKey,
   releaseBelongsToResolvedSources,
   resolveReleaseSources,
 } from '../utils/releaseSources';
 import {
   effectiveReleaseTime,
-  findReleasesWithChangedAssets,
   latestEffectiveRelease,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
@@ -40,20 +30,10 @@ export const ReleaseTimeline: React.FC = () => {
     releaseSubscriptions,
     releaseSourceSettings,
     readReleases,
-    githubToken,
     language,
     assetFilters,
-    addReleases,
-    upsertReleases,
     markReleaseAsRead,
     markAssetAsRead,
-    markAllReleasesAsRead,
-    batchUnsubscribeReleases,
-    removeReleasesByRepoFullName,
-    updateRepository,
-    removeReleaseSourceRepository,
-    updateReleaseSourceRepository,
-    // Release Timeline View State from global store
     releaseViewMode,
     releaseSelectedFilters,
     releaseSearchQuery,
@@ -64,18 +44,18 @@ export const ReleaseTimeline: React.FC = () => {
     clearReleaseSelectedFilters,
     setReleaseSearchQuery,
     toggleReleaseExpandedRepository,
-    setReleaseIsRefreshing,
     includePreRelease,
     setIncludePreRelease,
     releaseShowMode,
     setReleaseShowMode,
     releaseLatestMode,
     setReleaseLatestMode,
-  } = useAppStore();
-
-  const { toast, confirm } = useDialog();
-
-  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+    lastRefreshTime,
+    isMarkingAllRead,
+    handleRefresh,
+    handleMarkAllRead,
+    handleUnsubscribeRelease,
+  } = useReleaseTimelineActions();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   // 独立的展开状态：下载资产和更新日志分开控制（本地状态，不持久化）
@@ -83,7 +63,6 @@ export const ReleaseTimeline: React.FC = () => {
   const [expandedReleaseNotes, setExpandedReleaseNotes] = useState<Set<number>>(new Set());
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
   const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
@@ -414,117 +393,6 @@ export const ReleaseTimeline: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleRefresh = async () => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-      return;
-    }
-
-    const state = useAppStore.getState();
-    const resolvedSources = resolveReleaseSources(state);
-    const subscribedRepos = resolvedSources.repositories;
-
-    if (resolvedSources.enabledSourceIds.length === 0) {
-      toast(language === 'zh' ? '没有启用的 Release 来源。' : 'No release sources enabled.', 'error');
-      return;
-    }
-
-    if (subscribedRepos.length === 0) {
-      toast(language === 'zh' ? '所选来源中没有可检查的仓库。' : 'No repositories to check in the selected sources.', 'error');
-      return;
-    }
-
-    setReleaseIsRefreshing(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-
-      const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
-        subscribedRepos,
-        { includePreRelease, refreshExistingAssets: true }
-      );
-
-      // Update repository sync metadata only for repos that succeeded
-      const now = new Date().toISOString();
-      const failedRepoIds = new Set(failedRepos.map(repo => repo.repoId));
-      for (const entry of resolvedSources.entries) {
-        const repo = entry.repository;
-        if (failedRepoIds.has(repo.id)) {
-          continue;
-        }
-        if (entry.sources.includes(STARRED_RELEASE_SOURCE_ID)) {
-          const starredRepo = state.repositories.find(item => normalizeRepoKey(item.full_name) === normalizeRepoKey(repo.full_name));
-          if (starredRepo) {
-            updateRepository({
-              ...starredRepo,
-              has_fetched_releases: true,
-              last_release_fetch_time: now,
-            });
-          }
-        }
-        if (entry.sources.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
-          updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, {
-            has_fetched_releases: true,
-            last_release_fetch_time: now,
-          });
-        }
-        if (entry.sources.includes(CUSTOM_RELEASE_SOURCE_ID)) {
-          updateReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, repo.full_name, {
-            has_fetched_releases: true,
-            last_release_fetch_time: now,
-          });
-        }
-      }
-
-      // Filter out existing releases and add new ones
-      const existingIds = new Set(useAppStore.getState().releases.map(r => r.id));
-      const actuallyNewReleases = newReleases.filter(r => !existingIds.has(r.id));
-      const actuallyNewCount = actuallyNewReleases.length;
-
-      if (actuallyNewReleases.length > 0) {
-        addReleases(actuallyNewReleases);
-      }
-
-      // 只比每仓最新 1 条资产指纹：对已存在的最新 Release，若资产发生变化则按 id 合并更新，
-      // 内容变化后由 upsertReleases 自动重置为未读（is_read=false 并从 readReleases 移除）。
-      const updatedReleases = findReleasesWithChangedAssets(
-        latestReleases,
-        useAppStore.getState().releases
-      );
-      const updatedCount = updatedReleases.length;
-
-      if (updatedReleases.length > 0) {
-        upsertReleases(updatedReleases);
-      }
-
-      setLastRefreshTime(now);
-
-      // Build success message with failed repos info
-      let message: string;
-      const updatedPart = updatedCount > 0
-        ? (language === 'zh' ? `，${updatedCount} 个Release资产已更新` : `, ${updatedCount} release assets updated`)
-        : '';
-      if (failedRepos.length > 0) {
-        message = language === 'zh'
-          ? `刷新完成！发现 ${actuallyNewCount} 个新Release${updatedPart}，${failedRepos.length} 个仓库刷新失败。`
-          : `Refresh completed! Found ${actuallyNewCount} new releases${updatedPart}, ${failedRepos.length} repos failed.`;
-      } else {
-        message = language === 'zh'
-          ? `刷新完成！发现 ${actuallyNewCount} 个新Release${updatedPart}。`
-          : `Refresh completed! Found ${actuallyNewCount} new releases${updatedPart}.`;
-      }
-
-      toast(message, actuallyNewCount > 0 || updatedCount > 0 ? 'success' : 'info');
-    } catch (error) {
-      console.error('Refresh failed:', error);
-      const errorMessage = language === 'zh'
-        ? 'Release刷新失败，请检查网络连接。'
-        : 'Release refresh failed. Please check your network connection.';
-      toast(errorMessage, 'error');
-    } finally {
-      setReleaseIsRefreshing(false);
-    }
-  };
-
   const handleShowModeChange = (mode: 'all' | 'unread') => {
     setReleaseShowMode(mode);
     setCurrentPage(1);
@@ -533,19 +401,6 @@ export const ReleaseTimeline: React.FC = () => {
   const handleLatestModeChange = (mode: 'all' | 'latest') => {
     setReleaseLatestMode(mode);
     setCurrentPage(1);
-  };
-
-  const handleMarkAllRead = async () => {
-    setIsMarkingAllRead(true);
-    try {
-      markAllReleasesAsRead();
-      await backend.markAllReleasesAsRead();
-      toast(t('已全部标记为已读', 'All marked as read'), 'success');
-    } catch {
-      toast(t('标记全部已读失败', 'Failed to mark all as read'), 'error');
-    } finally {
-      setIsMarkingAllRead(false);
-    }
   };
 
   const handlePageChange = (page: number) => {
@@ -650,93 +505,6 @@ export const ReleaseTimeline: React.FC = () => {
     });
     return map;
   }, [paginatedReleases, paginatedRepositoryGroups, getTruncatedBody]);
-
-  const handleUnsubscribeRelease = async (repoId: number) => {
-    const release = releases.find(item => item.repository.id === repoId);
-    const releaseRepo = release?.repository;
-    if (!releaseRepo) {
-      toast(t('仓库信息不完整，无法取消订阅。', 'Repository information missing. Cannot unsubscribe.'), 'error');
-      return;
-    }
-
-    const stateBeforeConfirm = useAppStore.getState();
-    const repoKey = normalizeRepoKey(releaseRepo.full_name);
-    const starredRepo = stateBeforeConfirm.repositories.find(item => normalizeRepoKey(item.full_name) === repoKey);
-    const sourcesToRemove = getSourcesForReleaseRepository(stateBeforeConfirm, releaseRepo);
-    const isOrphanRelease = sourcesToRemove.length === 0;
-    const sourceLabels = sourcesToRemove.map(sourceId => getReleaseSourceLabel(sourceId, language));
-
-    let confirmMessage: string;
-    if (isOrphanRelease) {
-      confirmMessage = language === 'zh'
-        ? `"${releaseRepo.full_name}" 当前不在任何 Release 来源中。确认后仅移除本地已缓存的 Release 记录。`
-        : `"${releaseRepo.full_name}" is not in any release source. Confirming will only remove locally cached releases.`;
-    } else if (sourcesToRemove.length > 1) {
-      confirmMessage = language === 'zh'
-        ? `"${releaseRepo.full_name}" 同时来自多个 Release 来源：${sourceLabels.join('、')}。确认后将从这些来源中一并取消订阅。`
-        : `"${releaseRepo.full_name}" comes from multiple release sources: ${sourceLabels.join(', ')}. Confirming will unsubscribe it from all of these sources.`;
-    } else if (sourcesToRemove[0] === WATCH_CUSTOM_RELEASE_SOURCE_ID) {
-      confirmMessage = language === 'zh'
-        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将一并取消 Watch 仓库来源。`
-        : `Unsubscribe from "${releaseRepo.full_name}"? This will also remove it from Watch repositories.`;
-    } else if (sourcesToRemove[0] === CUSTOM_RELEASE_SOURCE_ID) {
-      confirmMessage = language === 'zh'
-        ? `确定取消订阅 "${releaseRepo.full_name}" 吗？确认后将从自定义仓库列表中移除。`
-        : `Unsubscribe from "${releaseRepo.full_name}"? This will remove it from the custom repository list.`;
-    } else {
-      confirmMessage = language === 'zh'
-        ? `确定取消订阅 "${releaseRepo.full_name}" 的 Release 吗？`
-        : `Unsubscribe from releases for "${releaseRepo.full_name}"?`;
-    }
-
-    const confirmed = await confirm(
-      t('取消订阅确认', 'Unsubscribe Confirmation'),
-      confirmMessage,
-      { type: 'warning' }
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    const rollbackState = {
-      repositories: stateBeforeConfirm.repositories,
-      searchResults: stateBeforeConfirm.searchResults,
-      releaseSubscriptions: new Set(stateBeforeConfirm.releaseSubscriptions),
-      releaseSourceSettings: stateBeforeConfirm.releaseSourceSettings,
-      releases: stateBeforeConfirm.releases,
-      readReleases: new Set(stateBeforeConfirm.readReleases),
-      releaseExpandedRepositories: new Set(stateBeforeConfirm.releaseExpandedRepositories),
-    };
-
-    if (sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID) && starredRepo) {
-      updateRepository({ ...starredRepo, subscribed_to_releases: false });
-      batchUnsubscribeReleases([starredRepo.id]);
-    }
-    if (sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
-      removeReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
-    }
-    if (sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)) {
-      removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
-    }
-
-    const stateAfterRemoval = useAppStore.getState();
-    const stillActive = resolveReleaseSources(stateAfterRemoval).entries
-      .some(entry => normalizeRepoKey(entry.repository.full_name) === repoKey);
-    if (!stillActive) {
-      removeReleasesByRepoFullName(releaseRepo.full_name);
-    }
-
-    try {
-      await forceSyncToBackend();
-    } catch (error) {
-      console.error('Failed to unsubscribe release:', error);
-      useAppStore.setState(rollbackState);
-      toast(t('取消订阅失败，请检查后端连接。', 'Failed to unsubscribe. Please check backend connection.'), 'error');
-      return;
-    }
-
-    toast(t('已取消订阅该仓库的 Release。', 'Unsubscribed from repository releases.'), 'success');
-  };
 
   if (subscribedReleases.length === 0) {
     const subscribedRepoCount = activeReleaseRepoCount;

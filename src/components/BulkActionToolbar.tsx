@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock, RotateCcw } from 'lucide-react';
 import { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from './ui/button';
 
 interface BulkActionToolbarProps {
@@ -30,7 +31,9 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
   onClose,
   isVisible = true
 }) => {
-  const { language } = useAppStore();
+  const { language } = useAppStore(useShallow((state) => ({
+    language: state.language,
+  })));
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
