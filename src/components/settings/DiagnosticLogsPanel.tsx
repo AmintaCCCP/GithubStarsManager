@@ -20,11 +20,11 @@ import {
   X,
 } from 'lucide-react';
 import { logger, LogLevel, LogEntry } from '../../services/logger';
-import { backend } from '../../services/backendAdapter';
 import { maskUrlDomain } from '../../utils/logSanitizer';
 import { inferEventType, EVENT_TYPE_LABELS, LogEventType } from '../../utils/logEventTypes';
 import { version as appVersion } from '../../../package.json';
 import { useAppStore } from '../../store/useAppStore';
+import { useDiagnosticBackendActions } from '../../features/settings/hooks/useDiagnosticBackendActions';
 
 interface DiagnosticLogsPanelProps {
   t: (zh: string, en: string) => string;
@@ -262,32 +262,8 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
     }
     return false;
   });
-  const [backendDebug, setBackendDebug] = useState(false);
-  const backendAvailable = backend.isAvailable;
-
-  // Initialize backend debug state from server on mount
-  useEffect(() => {
-    if (!backendAvailable) return;
-    const fetchDebugState = async () => {
-      try {
-        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-        const res = await fetch('/api/logs/debug', {
-          headers: { Authorization: `Bearer ${secret}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setBackendDebug(data.debugMode);
-          sessionStorage.setItem('gsm:backend-debug', String(data.debugMode));
-        }
-      } catch { /* Backend unreachable */ }
-    };
-    fetchDebugState();
-  }, [backendAvailable]);
-
   // Log entries state
   const [entries, setEntries] = useState<LogEntry[]>(() => logger.getEntries());
-  const [backendEntries, setBackendEntries] = useState<LogEntry[]>([]);
-  const [backendLogCount, setBackendLogCount] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [detailEntry, setDetailEntry] = useState<LogEntry | null>(null);
@@ -299,6 +275,10 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevels, setSelectedLevels] = useState<Set<LogLevel>>(new Set(['info', 'warn', 'error']));
   const [selectedScope, setSelectedScope] = useState<'all' | 'frontend' | 'backend'>('all');
+  const {
+    backendAvailable, backendUrl, backendDebug, backendEntries, backendLogCount,
+    clear: clearBackend, refresh: refreshBackend, toggleDebug: toggleBackendDebug, fetchLogs: fetchBackendLogs,
+  } = useDiagnosticBackendActions({ selectedScope });
   const [selectedEventTypes, setSelectedEventTypes] = useState<Set<LogEventType>>(new Set());
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
 
@@ -322,27 +302,6 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
     };
   }, []);
 
-  // Backend log fetching
-  useEffect(() => {
-    if (selectedScope === 'frontend') { setBackendEntries([]); setBackendLogCount(0); return; }
-    if (!backendAvailable) return;
-    const fetchBackend = async () => {
-      try {
-        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-        const res = await fetch('/api/logs?limit=2000', { headers: { Authorization: `Bearer ${secret}` } });
-        if (res.ok) {
-          const raw = await res.json();
-          const logs = Array.isArray(raw) ? raw : [];
-          setBackendEntries(logs);
-          const totalHeader = res.headers.get('X-Log-Count');
-          setBackendLogCount(totalHeader ? parseInt(totalHeader) || 0 : logs.length);
-        }
-      } catch { /* Backend unreachable */ }
-    };
-    fetchBackend();
-    const interval = setInterval(fetchBackend, 10000);
-    return () => clearInterval(interval);
-  }, [selectedScope, backendAvailable]);
 
   // Merge entries — sorted by timestamp DESCENDING (newest first)
   const allEntries = useMemo(() => {
@@ -397,50 +356,20 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
     }
   }, [frontendDebug]);
 
-  // Toggle backend debug mode
-  const toggleBackendDebug = useCallback(async () => {
-    const next = !backendDebug;
-    try {
-      const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-      const res = await fetch('/api/logs/debug', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ enabled: next }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBackendDebug(data.debugMode);
-        sessionStorage.setItem('gsm:backend-debug', String(data.debugMode));
-      }
-    } catch { /* Backend unreachable */ }
-  }, [backendDebug]);
 
   // Clear logs
   const handleClear = useCallback(async () => {
     if (selectedScope === 'frontend' || selectedScope === 'all') { logger.clear(); setEntries([]); }
     if ((selectedScope === 'backend' || selectedScope === 'all') && backendAvailable) {
-      try {
-        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-        await fetch('/api/logs', { method: 'DELETE', headers: { Authorization: `Bearer ${secret}` } });
-        setBackendEntries([]); setBackendLogCount(0);
-      } catch { /* Backend unreachable */ }
+      await clearBackend();
     }
-  }, [selectedScope, backendAvailable]);
+  }, [selectedScope, backendAvailable, clearBackend]);
 
   // Refresh
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    try {
-      const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-      const res = await fetch('/api/logs?limit=2000', { headers: { Authorization: `Bearer ${secret}` } });
-      if (res.ok) {
-        const raw = await res.json();
-        setBackendEntries(Array.isArray(raw) ? raw : []);
-        const totalHeader = res.headers.get('X-Log-Count');
-        setBackendLogCount(totalHeader ? parseInt(totalHeader) || 0 : raw.length);
-      }
-    } catch { /* Backend unreachable */ } finally { setIsRefreshing(false); }
-  }, []);
+    try { await refreshBackend(); } finally { setIsRefreshing(false); }
+  }, [refreshBackend]);
 
   // Export
   const handleExport = useCallback(async () => {
@@ -455,11 +384,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         ? logger.getEntries({ level: minLevelName }).filter(e => selectedLevels.has(e.level)) : [];
       let backendLogs: LogEntry[] = [];
       if (selectedScope !== 'frontend' && backendAvailable) {
-        try {
-          const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-          const res = await fetch(`/api/logs?limit=2000&level=${minLevelName}`, { headers: { Authorization: `Bearer ${secret}` } });
-          if (res.ok) { const raw = await res.json(); backendLogs = Array.isArray(raw) ? raw.filter((e: LogEntry) => selectedLevels.has(e.level)) : []; }
-        } catch { /* Backend unreachable */ }
+        backendLogs = ((await fetchBackendLogs(minLevelName))?.logs ?? []).filter((entry) => selectedLevels.has(entry.level));
       }
       const state = useAppStore.getState();
       const isElectron = typeof window !== 'undefined' && window.electronAPI;
@@ -469,7 +394,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         osPlatform: navigator.platform,
         screenResolution: `${screen.width}x${screen.height}`,
         backendAvailable,
-        backendUrl: backendAvailable ? maskUrlDomain(backend.backendUrl || '') : null,
+        backendUrl: backendAvailable ? maskUrlDomain(backendUrl) : null,
         language: state.language,
         repoCount: state.repositories?.length ?? 0,
         frontendDebugMode: frontendDebug,
@@ -489,7 +414,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
       a.download = `github-stars-manager-logs-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     } catch { /* Export failed */ } finally { setIsExporting(false); }
-  }, [selectedScope, selectedLevels, backendAvailable, frontendDebug, backendDebug, t]);
+  }, [selectedScope, selectedLevels, backendAvailable, backendDebug, backendUrl, fetchBackendLogs, frontendDebug, t]);
 
   const toggleLevel = useCallback((level: LogLevel) => {
     setSelectedLevels(prev => { const next = new Set(prev); if (next.has(level)) next.delete(level); else next.add(level); return next; });

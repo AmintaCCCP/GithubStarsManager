@@ -1046,7 +1046,7 @@ export const normalizePersistedState = (
           host: validHost,
           port: validPort,
           username: typeof obj.username === 'string' ? obj.username : undefined,
-          // password 不从持久化恢复，仅在内存中
+          password: typeof obj.password === 'string' ? obj.password : undefined,
         };
       }
       return { enabled: false, type: 'http' as const, host: '', port: 7890 };
@@ -2536,7 +2536,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'github-stars-manager',
-      version: 10,
+      version: 11,
       storage: debouncedPersistStorage,
       partialize: (state) => ({
         // 持久化用户信息和认证状态
@@ -2661,14 +2661,14 @@ export const useAppStore = create<AppState & AppActions>()(
       discoverySortBy: state.discoverySortBy,
       discoverySortOrder: state.discoverySortOrder,
       discoverySelectedTopic: state.discoverySelectedTopic,
-      // 持久化代理配置，但排除密码（安全考虑）
+      // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
       proxyConfig: {
         enabled: state.proxyConfig.enabled,
         type: state.proxyConfig.type,
         host: state.proxyConfig.host,
         port: state.proxyConfig.port,
         username: state.proxyConfig.username,
-        // password 不持久化，仅保留在内存中
+        password: state.proxyConfig.password,
       },
       // 持久化 RPC 下载配置（含密钥，确保重启后不丢失）
       rpcDownloadConfig: {

@@ -884,8 +884,8 @@ describe('useAppStore backend API secret three-store contract', () => {
   });
 });
 
-describe('useAppStore persistence asymmetry contracts', () => {
-  it('never serializes discovery runtime repositories or proxy passwords, while retaining the RPC secret', () => {
+describe('useAppStore persistence contracts', () => {
+  it('does not serialize discovery runtime repositories while retaining proxy credentials and the RPC secret', () => {
     const persisted = partializeState({
       discoveryRepos: buildTransientDiscoverySnapshot().discoveryRepos as ReturnType<typeof useAppStore.getState>['discoveryRepos'],
       proxyConfig: { enabled: true, type: 'http', host: 'proxy.example.com', port: 7890, username: 'user', password: 'proxy-password' },
@@ -899,12 +899,35 @@ describe('useAppStore persistence asymmetry contracts', () => {
       host: 'proxy.example.com',
       port: 7890,
       username: 'user',
+      password: 'proxy-password',
     });
     expect(persisted.rpcDownloadConfig).toEqual({
       enabled: true,
       host: 'rpc.example.com',
       port: 6800,
       secret: 'rpc-secret',
+    });
+  });
+
+  it('restores the full proxy credential set after hydration', () => {
+    const normalized = normalizePersistedState(buildPersistedSnapshot({
+      proxyConfig: {
+        enabled: true,
+        type: 'socks5',
+        host: 'proxy.example.com',
+        port: 1080,
+        username: 'user',
+        password: 'proxy-password',
+      },
+    }), useAppStore.getInitialState());
+
+    expect(normalized.proxyConfig).toEqual({
+      enabled: true,
+      type: 'socks5',
+      host: 'proxy.example.com',
+      port: 1080,
+      username: 'user',
+      password: 'proxy-password',
     });
   });
 });
