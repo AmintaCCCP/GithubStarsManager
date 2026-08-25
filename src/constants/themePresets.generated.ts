@@ -31,6 +31,7 @@ export interface GeneratedThemePreset {
   radius: string;
   fontSans?: string;
   fontMono?: string;
+  fontSerif?: string;
   lightColors: GeneratedThemePalette;
   darkColors: GeneratedThemePalette;
   shadowColor: string;
@@ -46,6 +47,7 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "radius": "1.4rem",
     "fontSans": "'Plus Jakarta Sans Variable', sans-serif",
     "fontMono": "IBM Plex Mono, monospace",
+    "fontSerif": "Lora, serif",
     "lightColors": {
       "background": "0 0% 99.2%",
       "foreground": "0 0% 0%",
@@ -150,8 +152,9 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "id": "deep-purple",
     "labelEn": "Deep Purple",
     "radius": "1rem",
-    "fontSans": "'Plus Jakarta Sans Variable', Inter, system-ui, sans-serif",
+    "fontSans": "'Plus Jakarta Sans Variable', 'Inter Variable', system-ui, sans-serif",
     "fontMono": "'JetBrains Mono Variable', monospace",
+    "fontSerif": "Georgia, serif",
     "lightColors": {
       "background": "210 40.1% 98%",
       "foreground": "224 71.1% 4%",
@@ -204,8 +207,9 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "id": "enterprise-mod-2",
     "labelEn": "Enterprise Mod 2",
     "radius": "1.4rem",
-    "fontSans": "'Inter', sans-serif",
+    "fontSans": "'Inter Variable', sans-serif",
     "fontMono": "'JetBrains Mono Variable', monospace",
+    "fontSerif": "'Merriweather', serif",
     "lightColors": {
       "background": "240 97.4% 99.6%",
       "foreground": "240 16.2% 6.1%",
@@ -258,8 +262,9 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "id": "light-green",
     "labelEn": "Light Green",
     "radius": "1rem",
-    "fontSans": "Inter, system-ui, sans-serif",
+    "fontSans": "'Inter Variable', system-ui, sans-serif",
     "fontMono": "'JetBrains Mono Variable', monospace",
+    "fontSerif": "Georgia, serif",
     "lightColors": {
       "background": "75 40.2% 98%",
       "foreground": "222.2 47.3% 11.2%",
@@ -312,8 +317,9 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "id": "logistic-one",
     "labelEn": "LogisticOne",
     "radius": "0.5rem",
-    "fontSans": "Inter, ui-sans-serif, sans-serif, system-ui",
+    "fontSans": "'Inter Variable', ui-sans-serif, sans-serif, system-ui",
     "fontMono": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+    "fontSerif": "ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif",
     "lightColors": {
       "background": "225 50.1% 96.9%",
       "foreground": "0 0% 0.4%",
@@ -368,6 +374,7 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "radius": "1.4rem",
     "fontSans": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'",
     "fontMono": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+    "fontSerif": "ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif",
     "lightColors": {
       "background": "0 0% 100%",
       "foreground": "0 0% 10.2%",
@@ -474,6 +481,7 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "radius": "0.5rem",
     "fontSans": "'Geist Variable', sans-serif",
     "fontMono": "'Geist Mono Variable', monospace",
+    "fontSerif": "Georgia, serif",
     "lightColors": {
       "background": "0 0% 98.7%",
       "foreground": "0 0% 0%",
@@ -528,6 +536,7 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "radius": "1rem",
     "fontSans": "Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif",
     "fontMono": "SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+    "fontSerif": "Georgia, serif",
     "lightColors": {
       "background": "216 20.2% 95.1%",
       "foreground": "202.5 32% 9.8%",
@@ -580,8 +589,9 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
     "id": "zen-inspired",
     "labelEn": "Zen Inspired Theme",
     "radius": "0.5rem",
-    "fontSans": "\"Inter\", sans-serif",
+    "fontSans": "'Inter Variable', sans-serif",
     "fontMono": "'JetBrains Mono Variable', monospace",
+    "fontSerif": "\"Playfair Display\", serif",
     "lightColors": {
       "background": "42.4 27.8% 88%",
       "foreground": "0 0% 11.8%",

@@ -602,7 +602,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
-  const infoBoxClass = "mt-3 p-3.5 bg-gradient-to-br from-muted/60 to-background dark:from-foreground/[0.02] dark:to-foreground/[0.04] border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
+  const infoBoxClass = "mt-3 p-3.5 border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
   const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
 
   return (

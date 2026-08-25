@@ -13,6 +13,7 @@ import { ensureThemeStyleTag } from './lib/themePresets';
 
 // Self-hosted webfonts used by built-in theme presets (families load on demand).
 import '@fontsource-variable/open-sans';
+import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -21,7 +22,11 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/plus-jakarta-sans';
 import '@fontsource-variable/jetbrains-mono';
 import '@fontsource-variable/fira-code';
+import '@fontsource/ibm-plex-mono';
 import '@fontsource/space-mono';
+import '@fontsource/merriweather';
+import '@fontsource/lora';
+import '@fontsource/playfair-display';
 
 logger.info('app', 'Main.tsx loading');
 

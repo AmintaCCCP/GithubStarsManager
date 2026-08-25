@@ -28,10 +28,12 @@ describe('themePresets injector', () => {
     expect(css).not.toContain(`[data-theme='${DEFAULT_THEME_PRESET_ID}']`);
   });
 
-  it('emits radius, font and shadow variables for themed presets', () => {
+  it('emits radius, all font families and shadow variables for themed presets', () => {
     const css = buildThemePresetCss();
     expect(css).toContain('--radius:');
     expect(css).toContain('--font-sans:');
+    expect(css).toContain('--font-mono:');
+    expect(css).toContain('--font-serif:');
     expect(css).toContain('--app-shadow-subtle:');
   });
 
