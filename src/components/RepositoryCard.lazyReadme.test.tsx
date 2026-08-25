@@ -42,6 +42,11 @@ const repository: Repository = {
   ai_platforms: ['web'],
 };
 
+type ReadmeModalMockProps = {
+  onClose: () => void;
+  onCloseAutoFocus?: () => void;
+};
+
 const storeState = {
   releaseSubscriptions: new Set<number>(),
   analyzingRepositoryIds: new Set<number>(),
@@ -76,6 +81,39 @@ describe('RepositoryCard README lazy boundary', () => {
     mocks.useAppStore.mockImplementation((selector?: (state: typeof storeState) => unknown) => (
       selector ? selector(storeState) : storeState
     ));
+  });
+
+  it('restores focus to the keyboard trigger after the README modal closes', async () => {
+    vi.doMock('./ReadmeModal', () => ({
+      ReadmeModal: ({ onClose, onCloseAutoFocus }: ReadmeModalMockProps) => (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onCloseAutoFocus?.();
+          }}
+        >
+          Close README
+        </button>
+      ),
+    }));
+
+    const { RepositoryCard } = await import('./RepositoryCard');
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider>
+        <RepositoryCard repository={repository} allCategories={[]} />
+      </TooltipProvider>,
+    );
+
+    const trigger = screen.getByRole('button', { name: /owner\/example-repository/i });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+
+    await user.click(await screen.findByRole('button', { name: 'Close README' }));
+
+    expect(trigger).toHaveFocus();
   });
 
   it('renders the existing error boundary when the README lazy chunk cannot load', async () => {
