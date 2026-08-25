@@ -215,7 +215,7 @@ describe('ForkTimeline async session and sync contracts', () => {
     } as unknown as GitHubApiService));
   });
 
-  it('does not write an old account refresh response after the authentication session changes', async () => {
+  it('does not write an old refresh response after logout and same-credential login', async () => {
     storeState.forks = [];
     let resolveForks: (forks: ForkRepo[]) => void = () => undefined;
     const pendingForks = new Promise<ForkRepo[]>(resolve => {
@@ -228,16 +228,21 @@ describe('ForkTimeline async session and sync contracts', () => {
       getOrganizationForks: vi.fn(),
     } as unknown as GitHubApiService));
 
-    render(<ForkTimeline />);
+    const { rerender } = render(<ForkTimeline />);
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
     await waitFor(() => expect(getUserForks).toHaveBeenCalledOnce());
 
-    storeState.githubToken = 'new-token';
-    storeState.user = { ...storeState.user, id: 2, login: 'another-user' };
+    const originalUser = storeState.user;
+    storeState.githubToken = '';
+    storeState.user = { ...originalUser, id: 0, login: 'signed-out' };
+    rerender(<ForkTimeline />);
+    storeState.githubToken = 'token';
+    storeState.user = originalUser;
+    rerender(<ForkTimeline />);
     resolveForks([personalFork]);
 
     await waitFor(() => expect(storeState.forks).toEqual([]));
-    expect(storeState.forkIsRefreshing).toBe(false);
+    expect(storeState.setForkIsRefreshing).toHaveBeenLastCalledWith(false);
     expect(toastMock).not.toHaveBeenCalledWith('刷新完成！', expect.anything());
   });
 

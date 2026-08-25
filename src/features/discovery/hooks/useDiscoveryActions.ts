@@ -10,13 +10,7 @@ import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisSto
 import { buildCategoryHints, resolveCategoryAssignment } from '../../../utils/categoryUtils';
 import { getAllCategories } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
-
-const getAuthSessionIdentity = () => {
-  const { githubToken, user } = useAppStore.getState();
-  return `${githubToken ?? ''}\u0000${user?.id ?? ''}\u0000${user?.login ?? ''}`;
-};
-
-const isAuthSessionCurrent = (identity: string) => getAuthSessionIdentity() === identity;
+import { useAuthSessionGeneration } from '../../lifecycle/useAuthSessionGeneration';
 
 const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryViewState>, channelId: DiscoveryChannelId) => {
   const common = [state.githubToken, state.discoveryPlatform];
@@ -43,6 +37,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   const channelLoadingVersionRef = useRef<Record<string, number>>({});
   const latestStateRef = useRef(state);
   const authSessionIdentity = useAppStore(current => `${current.githubToken ?? ''}\u0000${current.user?.id ?? ''}\u0000${current.user?.login ?? ''}`);
+  const { captureSession, isCurrentSession } = useAuthSessionGeneration(authSessionIdentity);
   useEffect(() => {
     latestStateRef.current = state;
   }, [state]);
@@ -66,8 +61,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     channelRequestVersionRef.current[channelId] = requestVersion;
     const loadingKey = `${channelId}:${append ? 'append' : 'initial'}`;
     channelLoadingVersionRef.current[loadingKey] = requestVersion;
+    const requestSession = captureSession();
     const requestSignature = getChannelRequestSignature(currentState, channelId);
     const isCurrentRequest = () => channelRequestVersionRef.current[channelId] === requestVersion
+      && isCurrentSession(requestSession)
       && getChannelRequestSignature(useAppStore.getState(), channelId) === requestSignature;
     const ownsLoading = () => channelLoadingVersionRef.current[loadingKey] === requestVersion;
 
@@ -146,7 +143,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         else currentState.setDiscoveryLoading(channelId, false);
       }
     }
-  }, [scrollContainerRef, t, toast]);
+  }, [captureSession, isCurrentSession, scrollContainerRef, t, toast]);
 
   const handleAnalyzePage = useCallback(async () => {
     if (!state.githubToken) return;
@@ -166,7 +163,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       return;
     }
 
-    const analysisSession = getAuthSessionIdentity();
+    const analysisSession = captureSession();
     setIsAnalyzing(true);
     const current = useAppStore.getState();
     const categories = getAllCategories(current.customCategories, current.language, current.hiddenDefaultCategoryIds, current.defaultCategoryOverrides);
@@ -186,7 +183,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       const api = new GitHubApiService(state.githubToken);
       const service = new AIService(activeConfig, state.language);
       const readmeCache = await optimizer.prefetchReadmes(unanalyzed, api);
-      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
+      if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       const results = await optimizer.analyzeRepositories(
         unanalyzed,
         readmeCache,
@@ -194,10 +191,12 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         categoryNames,
         buildCategoryHints(current.customCategories),
         (progressCurrent, total) => {
-          if (isAuthSessionCurrent(analysisSession)) state.setAnalysisProgress({ current: progressCurrent, total });
+          if (!optimizer.isAborted() && isCurrentSession(analysisSession)) {
+            state.setAnalysisProgress({ current: progressCurrent, total });
+          }
         },
         result => {
-          if (!isAuthSessionCurrent(analysisSession) || !result.repo) return;
+          if (optimizer.isAborted() || !isCurrentSession(analysisSession) || !result.repo) return;
           const analyzedAt = new Date().toISOString();
           if (result.success) {
             const updatedRepo: DiscoveryRepo = {
@@ -223,22 +222,22 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           }
         },
       );
-      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
+      if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       const successCount = results.filter(result => result.success).length;
       const failCount = results.length - successCount;
       toast(t(`AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`, `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
     } catch (error) {
-      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
+      if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       console.error('AI analysis error:', error);
       toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
     } finally {
       if (optimizerRef.current === optimizer) optimizerRef.current = null;
-      if (isAuthSessionCurrent(analysisSession)) {
+      if (isCurrentSession(analysisSession)) {
         setIsAnalyzing(false);
         state.setAnalysisProgress({ current: 0, total: 0 });
       }
     }
-  }, [state, t, toast]);
+  }, [captureSession, isCurrentSession, state, t, toast]);
 
   const handleAbortAnalysis = useCallback(() => {
     optimizerRef.current?.abort();
