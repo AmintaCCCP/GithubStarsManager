@@ -20,6 +20,7 @@ interface TocItem {
 interface ReadmeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onCloseAutoFocus?: () => void;
   repository: Repository | null;
 }
 
@@ -43,6 +44,7 @@ const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {
 export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   isOpen,
   onClose,
+  onCloseAutoFocus,
   repository
 }) => {
   const { githubToken, language, setReadmeModalOpen } = useAppStore();
@@ -592,6 +594,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         showClose={false}
         aria-describedby={undefined}
         className="w-[calc(100%_-_2rem)] max-w-[1130px] min-w-0 overflow-hidden p-0"
+        onCloseAutoFocus={(event) => {
+          if (!onCloseAutoFocus) return;
+          event.preventDefault();
+          onCloseAutoFocus();
+        }}
       >
         <div className="relative flex max-h-[90vh] min-w-0 max-w-full w-full flex-col overflow-hidden bg-card dark:bg-card">
           {readmeContent && !loading && (
