@@ -68,12 +68,20 @@ const APPLICATION_BANNED_PATTERNS = [/\/store\//, /\/services\//];
 
 const isTestFile = (rel) => /\.test\.(ts|tsx)$/.test(rel);
 
-// Match static imports/exports: import ... from '...'; | import '...'; | export ... from '...';
-// Captures the module specifier. Handles single- and double-quote specifiers.
-const IMPORT_RE = /\b(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"]+)\1/g;
+// Match static imports/exports in both forms:
+//   ... from 'spec'   (default/named/namespace bindings and re-exports)
+//   import 'spec'     (bare side-effect import, no from clause)
+// The specifier is capture group 2 (from-form) or group 4 (side-effect form).
+const IMPORT_RE =
+  /\b(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"]+)\1|\bimport\s*(['"])([^'"]+)\1/g;
 
 // Match dynamic imports: import('...'). Captures the module specifier.
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+/** Specifier of a static-import match, whichever alternative matched. */
+function staticImportSpecifier(match) {
+  return match[2] ?? match[4];
+}
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -108,7 +116,7 @@ function checkComponentFile(full, relPath) {
   // Static imports/exports.
   let m;
   while ((m = IMPORT_RE.exec(src)) !== null) {
-    const spec = m[2];
+    const spec = staticImportSpecifier(m);
     for (const name of BANNED_COMPONENT_SERVICES) {
       // match ../services/name, ../../services/name, services/name, etc.
       if (new RegExp(`(^|/)services/${name}(\\.js)?$`).test(spec)) {
@@ -167,7 +175,7 @@ function checkApplicationFile(full, relPath) {
   // Static imports/exports.
   let m;
   while ((m = IMPORT_RE.exec(src)) !== null) {
-    checkSpec(m[2], 'import');
+    checkSpec(staticImportSpecifier(m), 'import');
   }
   // Dynamic imports.
   while ((m = DYNAMIC_IMPORT_RE.exec(src)) !== null) {
