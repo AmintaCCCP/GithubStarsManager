@@ -4,6 +4,7 @@ import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { sendToRpcDownload } from '../services/rpcDownloadService';
 import { AIService } from '../services/aiService';
@@ -73,7 +74,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release);
 
   // RPC download support — use refs to avoid stale closure in async handler
-  const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore();
+  const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore(useShallow((state) => ({
+    rpcDownloadConfig: state.rpcDownloadConfig,
+    backendApiSecret: state.backendApiSecret,
+    aiConfigs: state.aiConfigs,
+    activeAIConfig: state.activeAIConfig,
+  })));
   const activeConfig = aiConfigs.find((config) => config.id === activeAIConfig);
 
   // AI 总结的本地状态（展开态与结果均内聚在卡片内，不持久化）

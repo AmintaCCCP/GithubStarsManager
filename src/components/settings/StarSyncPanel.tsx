@@ -1,6 +1,7 @@
 import { GitBranch, ListChecks, Loader2, Star } from 'lucide-react';
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useStarSyncActions } from '../../features/settings/hooks/useStarSyncActions';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -12,7 +13,12 @@ interface StarSyncPanelProps {
 }
 
 export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
-  const { syncMode, setSyncMode, setSyncModeConfigured, listsPush } = useAppStore();
+  const { syncMode, setSyncMode, setSyncModeConfigured, listsPush } = useAppStore(useShallow((state) => ({
+    syncMode: state.syncMode,
+    setSyncMode: state.setSyncMode,
+    setSyncModeConfigured: state.setSyncModeConfigured,
+    listsPush: state.listsPush,
+  })));
   const { pushCategoriesToLists: handlePushCategoriesToLists } = useStarSyncActions({ t });
 
   const progressPercent = listsPush.total > 0 ? Math.min(100, Math.round((listsPush.done / listsPush.total) * 100)) : 0;

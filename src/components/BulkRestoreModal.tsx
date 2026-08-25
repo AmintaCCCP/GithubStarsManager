@@ -4,6 +4,7 @@ import { RotateCcw, Bot, FileText, Tag, FolderOpen, AlertTriangle, Info } from '
 import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Checkbox } from './ui/checkbox';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { getAICategory } from '../utils/categoryUtils';
@@ -36,7 +37,12 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
   repositories,
   onRestore
 }) => {
-  const { customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore();
+  const { customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore(useShallow((state) => ({
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    language: state.language,
+  })));
   const [config, setConfig] = useState<RestoreConfig>({
     description: { enabled: true, target: 'original' },
     tags: { enabled: true, target: 'original' },

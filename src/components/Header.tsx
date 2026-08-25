@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { HeaderMenuId, AppState } from '../types';
 
@@ -30,7 +31,16 @@ export const Header: React.FC = () => {
     setCurrentView,
     logout,
     language,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    user: state.user,
+    theme: state.theme,
+    currentView: state.currentView,
+    headerMenuConfig: state.headerMenuConfig,
+    setTheme: state.setTheme,
+    setCurrentView: state.setCurrentView,
+    logout: state.logout,
+    language: state.language,
+  })));
 
   const { confirm } = useDialog();
 

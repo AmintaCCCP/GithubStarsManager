@@ -1,11 +1,16 @@
 import { Calendar, Download, Package, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { UpdateService } from '../services/updateService';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 export const UpdateNotificationBanner: React.FC = () => {
-  const { updateNotification, dismissUpdateNotification, language } = useAppStore();
+  const { updateNotification, dismissUpdateNotification, language } = useAppStore(useShallow((state) => ({
+    updateNotification: state.updateNotification,
+    dismissUpdateNotification: state.dismissUpdateNotification,
+    language: state.language,
+  })));
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   if (!updateNotification || updateNotification.dismissed) return null;

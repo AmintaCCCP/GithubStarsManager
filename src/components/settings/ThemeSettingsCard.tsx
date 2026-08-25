@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Moon, Palette, Sun } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { THEME_PRESETS } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { getThemeSwatch } from '../../lib/themePresets';
@@ -13,7 +14,12 @@ interface ThemeSettingsCardProps {
 }
 
 export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
-  const { theme, setTheme, themePreset, setThemePreset } = useAppStore();
+  const { theme, setTheme, themePreset, setThemePreset } = useAppStore(useShallow((state) => ({
+    theme: state.theme,
+    setTheme: state.setTheme,
+    themePreset: state.themePreset,
+    setThemePreset: state.setThemePreset,
+  })));
   const isDark = theme === 'dark';
 
   // Roving tabindex: arrow keys move focus across preset options; selection

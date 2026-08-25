@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, ArrowRight, Github, Key, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
 import { safeReadText } from '../utils/clipboardUtils';
@@ -14,7 +15,16 @@ export const LoginScreen: React.FC = () => {
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, repositories, lastSync, language, setLanguage, theme, setTheme } = useAppStore();
+  const { setUser, setGitHubToken, repositories, lastSync, language, setLanguage, theme, setTheme } = useAppStore(useShallow((state) => ({
+    setUser: state.setUser,
+    setGitHubToken: state.setGitHubToken,
+    repositories: state.repositories,
+    lastSync: state.lastSync,
+    language: state.language,
+    setLanguage: state.setLanguage,
+    theme: state.theme,
+    setTheme: state.setTheme,
+  })));
 
   const handleConnect = async () => {
     if (!token.trim()) {

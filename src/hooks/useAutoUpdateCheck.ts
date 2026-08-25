@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { UpdateService } from '../services/updateService';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // 用于应用启动时自动检查更新的 Hook
 export const useAutoUpdateCheck = () => {
-  const { setUpdateNotification } = useAppStore();
+  const { setUpdateNotification } = useAppStore(useShallow((state) => ({
+    setUpdateNotification: state.setUpdateNotification,
+  })));
 
   useEffect(() => {
     const checkUpdatesOnStartup = async () => {
