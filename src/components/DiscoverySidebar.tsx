@@ -88,8 +88,8 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 aria-pressed={isSelected}
                 className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
                 <span className="flex items-center gap-2.5">

@@ -192,7 +192,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
             type="button"
             variant="ghost"
             onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-destructive"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
             title={t('移除仓库', 'Remove repository')}
             aria-label={t('移除仓库', 'Remove repository')}
           >
@@ -283,7 +283,7 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
               variant="ghost"
               onClick={() => updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, { release_hidden: !hidden })}
               aria-pressed={hidden}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               title={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
               aria-label={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
             >
@@ -361,7 +361,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 }`}
               >
                 <span className="flex items-start gap-3">
-                  <span className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground'}`}>
+                  <span className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
                   </span>
                   <span>
@@ -370,7 +370,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                   </span>
                 </span>
                 <span className="flex flex-shrink-0 items-center gap-3">
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground dark:bg-accent/60 dark:text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     {source.count}
                   </span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted dark:bg-accent'}`}>

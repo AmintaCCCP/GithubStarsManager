@@ -1226,7 +1226,7 @@ export const SearchBar: React.FC = () => {
                     type="button"
                     onClick={() => { void handleStarSync(); }}
                     disabled={isSyncingStars}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
                     title={t('同步星标仓库列表', 'Sync starred repositories')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
@@ -1237,7 +1237,7 @@ export const SearchBar: React.FC = () => {
                       type="button"
                       disabled={isSyncingStars}
                       aria-label={t('更多同步选项', 'More sync options')}
-                      className="group inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-primary-foreground/20"
+                      className="group inline-flex items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
                       title={t('更多同步选项', 'More sync options')}
                     >
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
