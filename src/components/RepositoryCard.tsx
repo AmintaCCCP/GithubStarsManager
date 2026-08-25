@@ -17,6 +17,7 @@ import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { shallow } from 'zustand/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { logger } from '../services/logger';
+import { applyAnalysisFailure, applyAnalysisSuccess } from '../features/repositories/application/repositoryPatches';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
@@ -407,17 +408,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       if (controller.signal.aborted) return;
 
-      const updatedRepo = {
-        ...repository,
-        ai_summary: result.summary,
-        ai_tags: result.tags,
-        ai_platforms: result.platforms,
-        custom_category: result.custom_category,
-        category_locked: result.category_locked,
-        analyzed_at: result.analyzed_at,
-        analysis_failed: result.analysis_failed,
-        analysis_error: undefined,
-      };
+      const updatedRepo = applyAnalysisSuccess(repository, {
+        summary: result.summary,
+        tags: result.tags,
+        platforms: result.platforms,
+        category: result.custom_category,
+        categoryLocked: result.category_locked,
+        analyzedAt: result.analyzed_at,
+      });
 
       const updateStartedAt = performance.now();
       updateRepository(updatedRepo);
@@ -441,12 +439,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           ? error.message
           : (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection');
         const failedResult = createFailedAnalysisResult(errorMsg);
-        const failedRepo = {
-          ...repository,
-          analyzed_at: failedResult.analyzed_at,
-          analysis_failed: failedResult.analysis_failed,
-          analysis_error: failedResult.analysis_error,
-        };
+        const failedRepo = applyAnalysisFailure(repository, {
+          analyzedAt: failedResult.analyzed_at,
+          error: failedResult.analysis_error,
+        });
 
         const updateStartedAt = performance.now();
         updateRepository(failedRepo);
