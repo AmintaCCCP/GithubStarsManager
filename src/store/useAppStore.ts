@@ -819,7 +819,7 @@ export const normalizePersistedState = (
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
       ? safePersisted.backendApiSecret
-      : (authMirror?.backendApiSecret ?? null);
+      : (authMirror?.backendApiSecret ?? currentState.backendApiSecret ?? null);
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const gists = Array.isArray(safePersisted.gists) ? safePersisted.gists : [];
@@ -872,8 +872,8 @@ export const normalizePersistedState = (
     selectedGistCategory: safePersisted.selectedGistCategory === 'starred' || safePersisted.selectedGistCategory === 'mine'
       ? safePersisted.selectedGistCategory
       : 'all',
-    // 不恢复 analyzingGistIds：异步分析任务无法在页面重载后存活，
-    // 恢复会导致 Gist 卡片永久卡在“分析中”状态。
+    // 不恢复分析中状态：异步任务无法在页面重载后存活，恢复会导致卡片永久卡在“分析中”状态。
+    analyzingRepositoryIds: new Set<number>(),
     analyzingGistIds: new Set<string>(),
     releases,
     searchResults: migratedRepositories,
