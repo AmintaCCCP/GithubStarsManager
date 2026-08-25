@@ -1,12 +1,9 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
-import { backend } from '../../services/backendAdapter';
-import { tryRestoreAuthFromBackend, syncLocalGitHubTokenToBackend } from '../../services/autoSync';
-import { useDialog } from '../../hooks/useDialog';
+import { useBackendSettingsActions } from '../../features/settings/hooks/useBackendSettingsActions';
 
 interface BackendPanelProps {
   t: (zh: string, en: string) => string;
@@ -14,199 +11,17 @@ interface BackendPanelProps {
 
 export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const {
-    repositories,
-    releases,
-    aiConfigs,
-    webdavConfigs,
-    activeAIConfig,
-    activeWebDAVConfig,
-    hiddenDefaultCategoryIds,
-    categoryOrder,
-    customCategories,
-    assetFilters,
-    collapsedSidebarCategoryCount,
-    backendApiSecret,
-    setBackendApiSecret,
-    setRepositories,
-    setReleases,
-    setAIConfigs,
-    setWebDAVConfigs,
-    showDefaultCategory,
-    hideDefaultCategory,
-  } = useAppStore();
-
-  const { toast, confirm } = useDialog();
-
-  const [status, setStatus] = useState<'connected' | 'disconnected' | 'checking'>('disconnected');
-  const [health, setHealth] = useState<{ version: string; timestamp: string } | null>(null);
-  const [isSyncingToBackend, setIsSyncingToBackend] = useState(false);
-  const [isSyncingFromBackend, setIsSyncingFromBackend] = useState(false);
-  const [secretInput, setSecretInput] = useState(backendApiSecret || '');
-
-  useEffect(() => {
-    const checkBackend = async () => {
-      setStatus('checking');
-      try {
-        await backend.init();
-        const healthData = await backend.checkHealth();
-        if (healthData) {
-          setStatus('connected');
-          setHealth({ version: healthData.version, timestamp: healthData.timestamp });
-          // Issue #276: backend became reachable after app startup, so push the
-          // local GitHub token now instead of waiting for the next app launch.
-          void syncLocalGitHubTokenToBackend();
-        } else {
-          setStatus('disconnected');
-          setHealth(null);
-        }
-      } catch {
-        setStatus('disconnected');
-        setHealth(null);
-      }
-    };
-    checkBackend();
-  }, []);
-
-  const handleTestConnection = async () => {
-    setStatus('checking');
-    setBackendApiSecret(secretInput || null);
-    try {
-      await backend.init();
-      const healthData = await backend.checkHealth();
-      const authOk = secretInput ? await backend.verifyAuth() : true;
-      if (healthData && authOk) {
-        setStatus('connected');
-        setHealth({ version: healthData.version, timestamp: healthData.timestamp });
-        toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
-        // Issue #259: after the one-time secret bootstrap succeeds on a fresh
-        // browser/device, try to recover the stored GitHub session.
-        void tryRestoreAuthFromBackend();
-        // Issue #276: sync the local GitHub token so proxy features (e.g. GitHub
-        // Lists) work when the backend was enabled after the local session.
-        void syncLocalGitHubTokenToBackend();
-      } else {
-        setStatus('disconnected');
-        setHealth(null);
-        toast(t(
-          '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
-          'Backend connection failed. Please check the server status or whether the API Secret is correct.'
-        ), 'error');
-      }
-    } catch {
-      setStatus('disconnected');
-      setHealth(null);
-      toast(t(
-        '后端连接失败，请检查服务器状态或 API Secret 是否正确。',
-        'Backend connection failed. Please check the server status or whether the API Secret is correct.'
-      ), 'error');
-    }
-  };
-
-  const handleSyncToBackend = async () => {
-    if (!backend.isAvailable) {
-      toast(t('后端不可用', 'Backend not available'), 'error');
-      return;
-    }
-    setIsSyncingToBackend(true);
-    try {
-      // Use allSettled so that one failure doesn't block other syncs
-      const results = await Promise.allSettled([
-        backend.syncRepositories(repositories),
-        backend.syncReleases(releases),
-        backend.syncAIConfigs(aiConfigs),
-        backend.syncWebDAVConfigs(webdavConfigs),
-        backend.syncSettings({
-            activeAIConfig,
-            activeWebDAVConfig,
-            hiddenDefaultCategoryIds,
-            categoryOrder,
-            customCategories,
-            assetFilters,
-            collapsedSidebarCategoryCount,
-          }),
-      ]);
-
-      const failures = results.filter(r => r.status === 'rejected');
-      const successes = results.filter(r => r.status === 'fulfilled');
-
-      if (failures.length > 0) {
-        console.warn('Some syncs failed:', failures.map(f => (f as PromiseRejectedResult).reason));
-        toast(
-          t(
-            `同步部分失败：${failures.length} 项失败，${successes.length} 项成功`,
-            `Partial sync failure: ${failures.length} failed, ${successes.length} succeeded`
-          ),
-          'error'
-        );
-      } else {
-        toast(t(
-          `已同步到后端：仓库 ${repositories.length}，发布 ${releases.length}，AI配置 ${aiConfigs.length}，WebDAV配置 ${webdavConfigs.length}`,
-          `Synced to backend: repos ${repositories.length}, releases ${releases.length}, AI configs ${aiConfigs.length}, WebDAV configs ${webdavConfigs.length}`
-        ), 'success');
-      }
-    } catch (error) {
-      console.error('Sync to backend failed:', error);
-      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
-    } finally {
-      setIsSyncingToBackend(false);
-    }
-  };
-
-  const handleSyncFromBackend = async () => {
-    if (!backend.isAvailable) {
-      toast(t('后端不可用', 'Backend not available'), 'error');
-      return;
-    }
-
-    const confirmed = await confirm(
-      t('从后端同步', 'Sync from Backend'),
-      t('从后端同步将覆盖本地数据，是否继续？', 'Syncing from backend will overwrite local data. Continue?'),
-      { type: 'warning' }
-    );
-    if (!confirmed) return;
-
-    setIsSyncingFromBackend(true);
-    try {
-      const repoData = await backend.fetchRepositories();
-      const releaseData = await backend.fetchReleases();
-      const aiConfigData = await backend.fetchAIConfigs();
-      const webdavConfigData = await backend.fetchWebDAVConfigs();
-      const settingsData = await backend.fetchSettings();
-
-      // Always apply backend snapshot to state (empty array allowed)
-      setRepositories(repoData.repositories);
-      setReleases(releaseData.releases);
-      setAIConfigs(aiConfigData);
-      setWebDAVConfigs(webdavConfigData);
-      // 从服务端数据中隐藏所有应隐藏的分类
-      if (Array.isArray(settingsData.hiddenDefaultCategoryIds)) {
-        for (const categoryId of settingsData.hiddenDefaultCategoryIds) {
-          if (typeof categoryId === 'string') hideDefaultCategory(categoryId);
-        }
-      }
-      // 显示本地隐藏列表中但服务端没有隐藏的分类（即本地手动显示的）
-      if (Array.isArray(hiddenDefaultCategoryIds)) {
-        const hiddenIdsFromServer = Array.isArray(settingsData.hiddenDefaultCategoryIds)
-          ? settingsData.hiddenDefaultCategoryIds
-          : [];
-        for (const categoryId of hiddenDefaultCategoryIds) {
-          if (typeof categoryId === 'string' && !hiddenIdsFromServer.includes(categoryId)) {
-            showDefaultCategory(categoryId);
-          }
-        }
-      }
-
-      toast(t(
-        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}，AI配置 ${aiConfigData.length}，WebDAV配置 ${webdavConfigData.length}`,
-        `Synced from backend: repos ${repoData.repositories.length}, releases ${releaseData.releases.length}, AI configs ${aiConfigData.length}, WebDAV configs ${webdavConfigData.length}`
-      ), 'success');
-    } catch (error) {
-      console.error('Sync from backend failed:', error);
-      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
-    } finally {
-      setIsSyncingFromBackend(false);
-    }
-  };
+    status,
+    health,
+    secretInput,
+    backendAvailable,
+    isSyncingToBackend,
+    isSyncingFromBackend,
+    setSecretInput,
+    testConnection: handleTestConnection,
+    syncToBackend: handleSyncToBackend,
+    syncFromBackend: handleSyncFromBackend,
+  } = useBackendSettingsActions({ t });
 
   const getStatusIcon = () => {
     switch (status) {
@@ -296,7 +111,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </p>
       </div>
 
-      {backend.isAvailable && (
+      {backendAvailable && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-6 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
             <div className="flex items-center space-x-3 mb-4">

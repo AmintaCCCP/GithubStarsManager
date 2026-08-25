@@ -4,7 +4,7 @@ import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import { NumberInput } from '../ui/NumberInput';
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   Eye,
@@ -18,23 +18,11 @@ import {
   ChevronRight,
   Zap,
 } from 'lucide-react';
-import {
-  LEGACY_EMBEDDING_FORMAT_VERSION,
-  isKnownEmbeddingFormatVersion,
-  useAppStore,
-} from '../../store/useAppStore';
-import {
-  EmbeddingClient,
-  VectorSearchService,
-  indexAllRepos,
-  needsReindex,
-  EMBEDDING_FORMAT_VERSION,
-} from '../../services/vectorSearchService';
-import { GitHubApiService } from '../../services/githubApi';
-import type { EmbeddingApiType, EmbeddingConfig } from '../../types';
-import { normalizeLicense } from '../../utils/licenseFilter';
+import type { EmbeddingApiType } from '../../types';
+import { useAppStore } from '../../store/useAppStore';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
+import { useVectorSearchActions } from '../../features/settings/hooks/useVectorSearchActions';
 
 interface VectorSearchSettingsProps {
   t: (zh: string, en: string) => string;
@@ -60,25 +48,18 @@ const DEFAULT_DIMENSIONS: Record<EmbeddingApiType, number> = {
 
 export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t }) => {
   const {
-    embeddingConfigs,
-    activeEmbeddingConfig,
-    vectorSearchConfig,
-    vectorSearchStatus,
-    vectorIndexingState,
-    addEmbeddingConfig,
-    updateEmbeddingConfig,
-    setActiveEmbeddingConfig,
-    setVectorSearchConfig,
-    setVectorSearchStatus,
-    setVectorIndexingState,
-    repositories,
-    githubToken,
-    updateRepositoriesMetadata,
+    embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus,
+    vectorIndexingState, addEmbeddingConfig, updateEmbeddingConfig,
+    setActiveEmbeddingConfig, setVectorSearchConfig,
   } = useAppStore();
   const { toast } = useDialog();
+  const {
+    testingEmbedding, embeddingTestResult, testingWorker, workerTestResult,
+    incrementalTargetCount, testEmbedding, testWorker, rebuildIndex,
+    incrementalIndex, abortIndexing,
+  } = useVectorSearchActions();
 
-  // Local form state for embedding config
-  const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
+  const activeConfig = embeddingConfigs.find((config) => config.id === activeEmbeddingConfig);
   const [formApiType, setFormApiType] = useState<EmbeddingApiType>(activeConfig?.apiType || 'openai');
   const [formBaseUrl, setFormBaseUrl] = useState(activeConfig?.baseUrl || '');
   const [formApiKey, setFormApiKey] = useState(activeConfig?.apiKey || '');
@@ -87,42 +68,21 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [formDimensionsInput, setFormDimensionsInput] = useState(String(activeConfig?.dimensions || 1536));
   const dimensionsInputRef = React.useRef<HTMLInputElement>(null);
   const [showApiKey, setShowApiKey] = useState(false);
-
-  // Worker form state
   const [formWorkerUrl, setFormWorkerUrl] = useState(vectorSearchConfig.workerUrl || '');
   const [formAuthToken, setFormAuthToken] = useState(vectorSearchConfig.authToken || '');
   const [showAuthToken, setShowAuthToken] = useState(false);
-
-  // Index mode state
   const [formIndexMode, setFormIndexMode] = useState<'description' | 'readme'>(vectorSearchConfig.indexMode || 'readme');
   const [formReadmeMaxChars, setFormReadmeMaxChars] = useState(vectorSearchConfig.readmeMaxChars || 6000);
   const [formReadmeMaxCharsInput, setFormReadmeMaxCharsInput] = useState(String(vectorSearchConfig.readmeMaxChars || 6000));
-
-  // Search parameters state
   const [formSearchThreshold, setFormSearchThreshold] = useState(vectorSearchConfig.searchThreshold ?? 0.35);
   const [formSearchTopK, setFormSearchTopK] = useState(vectorSearchConfig.searchTopK ?? 30);
   const [formSearchTopKInput, setFormSearchTopKInput] = useState(String(vectorSearchConfig.searchTopK ?? 30));
   const [formEnableHyDE, setFormEnableHyDE] = useState(vectorSearchConfig.enableHyDE ?? true);
   const [formEnableReranking, setFormEnableReranking] = useState(vectorSearchConfig.enableReranking ?? true);
-
-  // Test state
-  const [testingEmbedding, setTestingEmbedding] = useState(false);
-  const [embeddingTestResult, setEmbeddingTestResult] = useState<{ success: boolean; dimensions: number; error?: string } | null>(null);
-  const [testingWorker, setTestingWorker] = useState(false);
-  const [workerTestResult, setWorkerTestResult] = useState<{ success: boolean; vectorCount: number; dimensions: number; error?: string } | null>(null);
-
-  // Save feedback
   const [embeddingSaved, setEmbeddingSaved] = useState(false);
   const [workerSaved, setWorkerSaved] = useState(false);
-
-  // Indexing state (from store, persists across navigation)
-  const { isIndexing, phase, phaseDone, phaseTotal, result: indexResult } = vectorIndexingState;
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
-
-  // Deploy guide
   const [showDeployGuide, setShowDeployGuide] = useState(false);
 
-  // Sync form state when active config changes
   React.useEffect(() => {
     if (activeConfig) {
       setFormApiType(activeConfig.apiType);
@@ -133,350 +93,39 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       setFormDimensionsInput(String(activeConfig.dimensions));
     }
   }, [activeConfig]);
-
-  // Sync worker form state
   React.useEffect(() => {
     setFormWorkerUrl(vectorSearchConfig.workerUrl);
     setFormAuthToken(vectorSearchConfig.authToken);
   }, [vectorSearchConfig.workerUrl, vectorSearchConfig.authToken]);
 
-  const handleSaveEmbeddingConfig = useCallback(() => {
-    const configData: Omit<EmbeddingConfig, 'id' | 'isActive' | 'apiKeyStatus'> = {
-      name: `${formApiType} Embedding`,
-      apiType: formApiType,
-      baseUrl: formBaseUrl,
-      apiKey: formApiKey,
-      model: formModel,
-      dimensions: formDimensions,
-    };
-
-    if (activeConfig) {
-      updateEmbeddingConfig(activeConfig.id, configData);
-    } else {
+  const handleSaveEmbeddingConfig = () => {
+    const configData = { name: `${formApiType} Embedding`, apiType: formApiType, baseUrl: formBaseUrl, apiKey: formApiKey, model: formModel, dimensions: formDimensions };
+    if (activeConfig) updateEmbeddingConfig(activeConfig.id, configData);
+    else {
       const id = `emb_${Date.now()}`;
-      addEmbeddingConfig({
-        ...configData,
-        id,
-        isActive: true,
-      });
+      addEmbeddingConfig({ ...configData, id, isActive: true });
       setActiveEmbeddingConfig(id);
     }
     setEmbeddingSaved(true);
     setTimeout(() => setEmbeddingSaved(false), 2000);
-  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, addEmbeddingConfig, updateEmbeddingConfig, setActiveEmbeddingConfig]);
-
-  const handleSaveWorkerConfig = useCallback(() => {
+  };
+  const handleSaveWorkerConfig = () => {
     setVectorSearchConfig({
-      workerUrl: formWorkerUrl,
-      authToken: formAuthToken,
-      embeddingConfigId: activeEmbeddingConfig || '',
-      indexMode: formIndexMode,
-      readmeMaxChars: formReadmeMaxChars,
-      searchThreshold: formSearchThreshold,
-      searchTopK: formSearchTopK,
-      enableHyDE: formEnableHyDE,
-      enableReranking: formEnableReranking,
+      workerUrl: formWorkerUrl, authToken: formAuthToken, embeddingConfigId: activeEmbeddingConfig || '',
+      indexMode: formIndexMode, readmeMaxChars: formReadmeMaxChars, searchThreshold: formSearchThreshold,
+      searchTopK: formSearchTopK, enableHyDE: formEnableHyDE, enableReranking: formEnableReranking,
     });
     setWorkerSaved(true);
     setTimeout(() => setWorkerSaved(false), 2000);
-  }, [formWorkerUrl, formAuthToken, formIndexMode, formReadmeMaxChars, formSearchThreshold, formSearchTopK, formEnableHyDE, formEnableReranking, activeEmbeddingConfig, setVectorSearchConfig]);
-
-  const handleTestEmbedding = useCallback(async () => {
-    setTestingEmbedding(true);
-    setEmbeddingTestResult(null);
-    try {
-      const client = new EmbeddingClient({
-        id: 'test',
-        name: 'test',
-        apiType: formApiType,
-        baseUrl: formBaseUrl,
-        apiKey: formApiKey,
-        model: formModel,
-        dimensions: formDimensions,
-        isActive: true,
-      });
-      const result = await client.testConnection();
-      setEmbeddingTestResult(result);
-    } catch (err) {
-      setEmbeddingTestResult({
-        success: false,
-        dimensions: 0,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setTestingEmbedding(false);
-    }
-  }, [formApiType, formBaseUrl, formApiKey, formModel, formDimensions]);
-
-  const handleTestWorker = useCallback(async () => {
-    setTestingWorker(true);
-    setWorkerTestResult(null);
-    try {
-      const service = new VectorSearchService({
-        workerUrl: formWorkerUrl,
-        authToken: formAuthToken,
-      });
-      const result = await service.testConnection();
-      setWorkerTestResult(result);
-      // 同步更新 store 中的状态，让状态区域实时反映
-      if (result.success) {
-        setVectorSearchStatus({
-          connected: true,
-          vectorCount: result.vectorCount,
-          dimensions: result.dimensions,
-        });
-      }
-    } catch (err) {
-      setWorkerTestResult({
-        success: false,
-        vectorCount: 0,
-        dimensions: 0,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setTestingWorker(false);
-    }
-  }, [formWorkerUrl, formAuthToken, setVectorSearchStatus]);
-
-  // 未索引数量（已分析、未失败、未向量索引或内容已更新）。仅计算内容/license 维度，
-  // 不含格式版本升级——后者由 incrementalTargetCount 在 formatVersionNeedsReindex 时另行叠加。
-  const unindexedCount = repositories.filter((r) => {
-    if (!r.analyzed_at || r.analysis_failed) return false;
-    return needsReindex(r, false);
-  }).length;
-  const indexableCount = repositories.filter((r) => r.analyzed_at && !r.analysis_failed).length;
-
-  // 嵌入文本格式版本升级时，即使无内容更新也需要触发增量索引来重建所有向量
-  const storedEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(vectorSearchConfig.embeddingFormatVersion)
-    ? vectorSearchConfig.embeddingFormatVersion
-    : LEGACY_EMBEDDING_FORMAT_VERSION;
-  const formatVersionNeedsReindex = storedEmbeddingFormatVersion < EMBEDDING_FORMAT_VERSION;
-  const incrementalTargetCount = formatVersionNeedsReindex ? indexableCount : unindexedCount;
-
-  const createClients = useCallback(() => {
-    if (!activeConfig) return null;
-    const embeddingClient = new EmbeddingClient({
-      ...activeConfig,
-      apiType: formApiType,
-      baseUrl: formBaseUrl,
-      apiKey: formApiKey,
-      model: formModel,
-      dimensions: formDimensions,
-    });
-    const vectorService = new VectorSearchService({
-      workerUrl: formWorkerUrl,
-      authToken: formAuthToken,
-    });
-    // 复用单个 GitHubApiService 实例，保留 rate-limit state
-    const githubApi = githubToken ? new GitHubApiService(githubToken) : null;
-    const readmeFetcher = githubApi
-      ? (owner: string, repo: string, signal?: AbortSignal) =>
-          githubApi.getRepositoryReadme(owner, repo, signal)
-      : undefined;
-    return { embeddingClient, vectorService, readmeFetcher };
-  }, [activeConfig, formApiType, formBaseUrl, formApiKey, formModel, formDimensions, formWorkerUrl, formAuthToken, githubToken]);
-
-  const handleRebuildIndex = useCallback(async () => {
-    const clients = createClients();
-    if (!clients) return;
-
-    const controller = new AbortController();
-    setAbortController(controller);
-    setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
-
-    try {
-      // 每次点击时读取最新的 repositories，避免闭包捕获过期数据
-      const currentRepos = useAppStore.getState().repositories;
-      const now = new Date().toISOString();
-      // 按 id 取 license，用于在 stamp vector_indexed_at 的同时记录本次采用的
-      // 归一化 license（向量增量谓词据此判断 license 变更触发重索引）。
-      const licenseById = new Map(currentRepos.map(r => [r.id, r.license ?? null]));
-      const stampRepo = (id: number) => ({
-        id,
-        patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) },
-      });
-
-      // 1. 清除所有 vector_indexed_at（包括之前失败/不可索引的 repo 的残留值）
-      //    用 updateRepositoriesMetadata 避免重置当前过滤的 searchResults
-      //    同步清除 vector_indexed_license，使 license 指纹与 stamp 同进退。
-      updateRepositoriesMetadata(
-        currentRepos.filter(r => r.vector_indexed_at).map(r => ({
-          id: r.id,
-          patch: { vector_indexed_at: undefined, vector_indexed_license: undefined },
-        }))
-      );
-
-      // 2. 全量索引，逐批确认后立即 stamp（中断不丢失已确认进度）
-      const stampedRepoIds: number[] = [];
-      const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
-        onProgress: (progress) => setVectorIndexingState({
-          phase: progress.phase,
-          phaseDone: progress.done,
-          phaseTotal: progress.total,
-        }),
-        signal: controller.signal,
-        readmeFetcher: clients.readmeFetcher,
-        indexMode: formIndexMode,
-        readmeMaxChars: formReadmeMaxChars,
-        incremental: false,
-        onRepoIndexed: (repoId) => {
-          stampedRepoIds.push(repoId);
-          // 批量 stamp：每 32 个（一个 batch）刷新一次，减少 UI 刷新频率
-          if (stampedRepoIds.length % 32 === 0) {
-            const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
-            updateRepositoriesMetadata(batch.map(stampRepo));
-          }
-        },
-      });
-
-      // stamp 剩余未刷新的
-      if (stampedRepoIds.length > 0) {
-        updateRepositoriesMetadata(stampedRepoIds.map(stampRepo));
-      }
-
-      // 3. cleanup：全量重建后只保留本次成功重建的向量
-      try {
-        await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
-      } catch (cleanupErr) {
-        console.warn('Vector cleanup failed after rebuild:', cleanupErr);
-        throw cleanupErr;
-      }
-
-      setVectorIndexingState({ result, isIndexing: false, phase: null });
-      setVectorSearchStatus({
-        connected: true,
-        vectorCount: result.indexed,
-        dimensions: formDimensions,
-        lastSyncAt: new Date().toISOString(),
-      });
-      // 索引成功后更新格式版本号，避免下次增量索引重复触发全量重建
-      setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
-    } catch (err) {
-      if (err instanceof Error && err.message === 'Aborted') {
-        setVectorIndexingState({ isIndexing: false, phase: null, result: null });
-      } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        const currentRepos = useAppStore.getState().repositories;
-        const indexableCount = currentRepos.filter((r) => r.analyzed_at && !r.analysis_failed).length;
-        setVectorIndexingState({ isIndexing: false, phase: null, result: { indexed: 0, skipped: currentRepos.length - indexableCount, errors: indexableCount, error: msg } });
-      }
-    } finally {
-      setAbortController(null);
-    }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, setVectorSearchConfig]);
-
-  const handleIncrementalIndex = useCallback(async () => {
-    const clients = createClients();
-    if (!clients) return;
-
-    const controller = new AbortController();
-    setAbortController(controller);
-    setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
-    let currentEmbeddingFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
-
-    try {
-      // 每次点击时读取最新的 repositories / vectorSearchConfig，避免闭包捕获过期数据
-      const currentState = useAppStore.getState();
-      const currentRepos = currentState.repositories;
-      currentEmbeddingFormatVersion = isKnownEmbeddingFormatVersion(currentState.vectorSearchConfig.embeddingFormatVersion)
-        ? currentState.vectorSearchConfig.embeddingFormatVersion
-        : LEGACY_EMBEDDING_FORMAT_VERSION;
-
-      // 记录索引前无 vector_indexed_at 的 repo，用于精确计算新增数量
-      const newlyIndexedRepoIds = new Set(
-        currentRepos.filter(r => !r.vector_indexed_at).map(r => r.id)
-      );
-
-      const now = new Date().toISOString();
-      // 与全量重建一致：stamp 时同步记录本次索引采用的归一化 license，
-      // 供增量谓词下次判断 license 是否变化。
-      const licenseById = new Map(currentRepos.map(r => [r.id, r.license ?? null]));
-      const stampRepo = (id: number) => ({
-        id,
-        patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) },
-      });
-      const stampedRepoIds: number[] = [];
-      const result = await indexAllRepos(currentRepos, clients.embeddingClient, clients.vectorService, {
-        onProgress: (progress) => setVectorIndexingState({
-          phase: progress.phase,
-          phaseDone: progress.done,
-          phaseTotal: progress.total,
-        }),
-        signal: controller.signal,
-        readmeFetcher: clients.readmeFetcher,
-        indexMode: formIndexMode,
-        readmeMaxChars: formReadmeMaxChars,
-        incremental: true,
-        formatVersion: currentEmbeddingFormatVersion,
-        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
-        onRepoIndexed: (repoId) => {
-          stampedRepoIds.push(repoId);
-          if (stampedRepoIds.length % 32 === 0) {
-            const batch = stampedRepoIds.splice(0, stampedRepoIds.length);
-            updateRepositoriesMetadata(batch.map(stampRepo));
-          }
-        },
-      });
-
-      // stamp 剩余未刷新的
-      if (stampedRepoIds.length > 0) {
-        updateRepositoriesMetadata(stampedRepoIds.map(stampRepo));
-      }
-
-      setVectorIndexingState({ result, isIndexing: false, phase: null });
-      // 只计算本次新增索引的 repo（之前无 vector_indexed_at），不包含重新索引的
-      // 用可选链避免 vectorSearchStatus 为 undefined 时抛错（旧版本持久化状态或未测试连接）
-      const newlyIndexedCount = result.indexedRepoIds.filter(id => newlyIndexedRepoIds.has(id)).length;
-      const prevCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
-      try {
-        setVectorSearchStatus({
-          connected: true,
-          vectorCount: prevCount + newlyIndexedCount,
-          dimensions: formDimensions,
-          lastSyncAt: new Date().toISOString(),
-        });
-      } catch (statusErr) {
-        // 状态更新失败不应回滚已成功的索引结果
-        console.warn('Failed to update vector search status:', statusErr);
-      }
-      // 索引成功后更新格式版本号，避免下次增量索引重复触发全量重建
-      setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
-    } catch (err) {
-      if (err instanceof Error && err.message === 'Aborted') {
-        setVectorIndexingState({ isIndexing: false, phase: null, result: null });
-      } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        const currentRepos = useAppStore.getState().repositories;
-        // 与 indexAllRepos 增量谓词保持一致（含格式版本升级判定），避免计数漂移。
-        const formatVersionChanged = currentEmbeddingFormatVersion < EMBEDDING_FORMAT_VERSION;
-        const attemptedCount = currentRepos.filter((r) => {
-          if (!r.analyzed_at || r.analysis_failed) return false;
-          return needsReindex(r, formatVersionChanged);
-        }).length;
-        const skippedCount = currentRepos.length - attemptedCount;
-        setVectorIndexingState({
-          isIndexing: false,
-          phase: null,
-          result: { indexed: 0, skipped: skippedCount, errors: attemptedCount, error: msg },
-        });
-      }
-    } finally {
-      setAbortController(null);
-    }
-  }, [createClients, formIndexMode, formReadmeMaxChars, formDimensions, updateRepositoriesMetadata, setVectorSearchStatus, setVectorIndexingState, setVectorSearchConfig]);
-
-  const handleAbortIndexing = useCallback(() => {
-    abortController?.abort();
-  }, [abortController]);
-
-  const isConfigComplete = !!(
-    activeConfig &&
-    formBaseUrl &&
-    formModel &&
-    (formApiType === 'ollama' || formApiKey) &&
-    formWorkerUrl &&
-    formAuthToken
-  );
+  };
+  const draft = () => ({ apiType: formApiType, baseUrl: formBaseUrl, apiKey: formApiKey, model: formModel, dimensions: formDimensions, workerUrl: formWorkerUrl, authToken: formAuthToken, indexMode: formIndexMode, readmeMaxChars: formReadmeMaxChars });
+  const handleTestEmbedding = () => testEmbedding(draft());
+  const handleTestWorker = () => testWorker({ workerUrl: formWorkerUrl, authToken: formAuthToken });
+  const handleRebuildIndex = () => rebuildIndex(draft());
+  const handleIncrementalIndex = () => incrementalIndex(draft());
+  const handleAbortIndexing = () => abortIndexing();
+  const { isIndexing, phase, phaseDone, phaseTotal, result: indexResult } = vectorIndexingState;
+  const isConfigComplete = !!(activeConfig && formBaseUrl && formModel && (formApiType === 'ollama' || formApiKey) && formWorkerUrl && formAuthToken);
 
   return (
     <div className="space-y-6">

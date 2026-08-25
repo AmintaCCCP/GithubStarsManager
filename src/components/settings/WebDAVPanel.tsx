@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Cloud, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw } from 'lucide-react';
 import { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
-import { WebDAVService } from '../../services/webdavService';
+import { useWebDAVActions } from '../../features/settings/hooks/useWebDAVActions';
 import { useDialog } from '../../hooks/useDialog';
 
 interface WebDAVPanelProps {
@@ -16,17 +16,15 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   const {
     webdavConfigs,
     activeWebDAVConfig,
-    addWebDAVConfig,
-    updateWebDAVConfig,
     deleteWebDAVConfig,
     setActiveWebDAVConfig,
   } = useAppStore();
 
-  const { toast, confirm } = useDialog();
+  const { confirm } = useDialog();
+  const { testingId, save, test } = useWebDAVActions({ t });
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [testingId, setTestingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -49,40 +47,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   };
 
   const handleSave = () => {
-    const errors = WebDAVService.validateConfig(form);
-    if (errors.length > 0) {
-      const translated = errors.map(err => {
-        if (err === 'WebDAV URL是必需的') return t('WebDAV URL是必需的', 'WebDAV URL is required');
-        if (err === 'WebDAV URL必须以 http:// 或 https:// 开头') return t('WebDAV URL必须以 http:// 或 https:// 开头', 'WebDAV URL must start with http:// or https://');
-        if (err === '用户名是必需的') return t('用户名是必需的', 'Username is required');
-        if (err === '密码是必需的') return t('密码是必需的', 'Password is required');
-        if (err === '路径是必需的') return t('路径是必需的', 'Path is required');
-        if (err === '路径必须以 / 开头') return t('路径必须以 / 开头', 'Path must start with /');
-        return err;
-      });
-      toast(translated.join('\n'), 'error');
-      return;
-    }
-
-    // When editing, preserve existing isActive value from current config
-    const existingConfig = editingId ? webdavConfigs.find(c => c.id === editingId) : undefined;
-    const config: WebDAVConfig = {
-      id: editingId || Date.now().toString(),
-      name: form.name,
-      url: form.url.replace(/\/$/, ''),
-      username: form.username,
-      password: form.password,
-      path: form.path,
-      isActive: existingConfig?.isActive ?? false,
-    };
-
-    if (editingId) {
-      updateWebDAVConfig(editingId, config);
-    } else {
-      addWebDAVConfig(config);
-    }
-
-    resetForm();
+    if (save(form, editingId)) resetForm();
   };
 
   const handleEdit = (config: WebDAVConfig) => {
@@ -97,24 +62,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     setShowForm(true);
   };
 
-  const handleTest = async (config: WebDAVConfig) => {
-    setTestingId(config.id);
-    try {
-      const webdavService = new WebDAVService(config);
-      const isConnected = await webdavService.testConnection();
-
-      if (isConnected) {
-        toast(t('WebDAV连接成功！', 'WebDAV connection successful!'), 'success');
-      } else {
-        toast(t('WebDAV连接失败，请检查配置。', 'WebDAV connection failed. Please check configuration.'), 'error');
-      }
-    } catch (error) {
-      console.error('WebDAV test failed:', error);
-      toast(`${t('WebDAV测试失败', 'WebDAV test failed')}: ${(error as Error).message}`, 'error');
-    } finally {
-      setTestingId(null);
-    }
-  };
+  const handleTest = (config: WebDAVConfig) => test(config);
 
   return (
     <div className="space-y-6">
