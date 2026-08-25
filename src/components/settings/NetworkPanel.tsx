@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
 import { NumberInput } from '../ui/NumberInput';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { ProxyType } from '../../types';
 import { useNetworkActions } from '../../features/settings/hooks/useNetworkActions';
@@ -24,6 +24,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
+
+  useEffect(() => {
+    if (form.username || form.password) setShowAuth(true);
+  }, [form.username, form.password]);
 
   return (
     <div className="space-y-4">

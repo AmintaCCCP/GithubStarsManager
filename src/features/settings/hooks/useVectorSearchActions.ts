@@ -156,7 +156,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         },
       });
       if (stamped.length) state.updateRepositoriesMetadata(stamped.map(stamp));
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (!incremental) await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       state.setVectorIndexingState({ result, isIndexing: false, phase: null });
       const previousCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
       state.setVectorSearchStatus({
@@ -165,9 +167,11 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });
-      state.setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
+      if (result.errors === 0) state.setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
     } catch (reason) {
-      if (reason instanceof Error && reason.message === 'Aborted') {
+      const isCancelled = controller.signal.aborted
+        || (reason instanceof Error && (reason.name === 'AbortError' || reason.message === 'Aborted'));
+      if (isCancelled) {
         state.setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const repositories = useAppStore.getState().repositories;
