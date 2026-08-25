@@ -1162,7 +1162,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -1174,7 +1174,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-card text-primary shadow-sm dark:bg-accent' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
+                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />

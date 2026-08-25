@@ -930,7 +930,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Button
             onClick={handleIncrementalIndex}
             disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
@@ -1101,7 +1101,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制删除命令失败', 'Failed to copy delete command'), 'error');
               }
             }}
-            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-muted dark:hover:bg-accent"
+            className="rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground"
           >
             {t('复制删除命令', 'Copy Delete Command')}
           </Button>
@@ -1115,7 +1115,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制创建命令失败', 'Failed to copy create command'), 'error');
               }
             }}
-            className="px-4 py-2 text-sm bg-accent dark:bg-muted text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-muted dark:hover:bg-accent"
+            className="rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground"
           >
             {t('复制创建命令', 'Copy Create Command')}
           </Button>

@@ -175,8 +175,8 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                       key={preset.id}
                       className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                         isSelected
-                          ? 'bg-primary border-transparent text-primary-foreground dark:bg-card/[0.12] dark:border-border/[0.2] dark:text-foreground font-medium'
-                          : 'bg-card border-border text-muted-foreground dark:bg-muted/40 dark:border-border dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
+                          ? 'bg-primary border-transparent text-primary-foreground font-medium'
+                          : 'bg-card border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       }`}
                     >
                       <Button
@@ -195,7 +195,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         <Button
                           variant="ghost"
                           onClick={() => handleEditFilter(preset)}
-                          className="h-6 w-6 rounded p-0 hover:bg-card dark:hover:bg-accent transition-colors"
+                          className="h-6 w-6 rounded p-0 hover:bg-accent hover:text-accent-foreground transition-colors"
                           title={t('编辑', 'Edit')}
                           type="button"
                           aria-label={t('编辑', 'Edit')}
@@ -222,8 +222,8 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                     key={filter.id}
                     className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
                       selectedFilters.includes(filter.id)
-                        ? 'bg-primary border-transparent text-primary-foreground dark:bg-card/[0.12] dark:border-border/[0.2] dark:text-foreground font-medium'
-                        : 'bg-muted border-border text-foreground dark:bg-muted/40 dark:border-border dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                        ? 'bg-primary border-transparent text-primary-foreground font-medium'
+                        : 'bg-muted border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }`}
                   >
                     <Button
