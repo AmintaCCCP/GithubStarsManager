@@ -17,6 +17,15 @@ import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  applyAnalysisFailure,
+  applyAnalysisSuccess,
+  applyCategoryAssignment,
+  lockRepositoryCategory,
+  restoreRepositoryFields,
+  setReleaseSubscriptionMarker,
+  unlockRepositoryCategory,
+} from '../features/repositories/application/repositoryPatches';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -350,25 +359,20 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           const wasCategoryLocked = !!result.repo.category_locked;
 
-          updateRepository({
-            ...result.repo,
-            ai_summary: result.summary,
-            ai_tags: result.tags,
-            ai_platforms: result.platforms,
-            custom_category: resolvedCategory,
-            category_locked: wasCategoryLocked,
-            analyzed_at: new Date().toISOString(),
-            analysis_failed: false,
-            analysis_error: undefined,
-          });
+          updateRepository(applyAnalysisSuccess(result.repo, {
+            summary: result.summary,
+            tags: result.tags,
+            platforms: result.platforms,
+            category: resolvedCategory,
+            categoryLocked: wasCategoryLocked,
+            analyzedAt: new Date().toISOString(),
+          }));
           successCount++;
         } else {
-          updateRepository({
-            ...result.repo,
-            analyzed_at: new Date().toISOString(),
-            analysis_failed: true,
-            analysis_error: result.error?.message || undefined,
-          });
+          updateRepository(applyAnalysisFailure(result.repo, {
+            analyzedAt: new Date().toISOString(),
+            error: result.error?.message || undefined,
+          }));
           failedCount++;
         }
       };
@@ -504,53 +508,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     for (const repo of selectedRepos) {
       try {
-        const updatedRepo = { ...repo };
+        const updatedRepo = restoreRepositoryFields(repo, config, new Date().toISOString());
 
-        if (config.description.enabled) {
-          updatedRepo.custom_description = undefined;
-          if (config.description.target === 'original') {
-            updatedRepo.ai_summary = undefined;
-            updatedRepo.analyzed_at = undefined;
-            updatedRepo.analysis_failed = undefined;
-            updatedRepo.analysis_error = undefined;
-          }
-        }
-
-        if (config.tags.enabled) {
-          updatedRepo.custom_tags = undefined;
-          if (config.tags.target === 'original') {
-            updatedRepo.ai_tags = undefined;
-            updatedRepo.ai_platforms = undefined;
-            updatedRepo.analyzed_at = undefined;
-            updatedRepo.analysis_failed = undefined;
-            updatedRepo.analysis_error = undefined;
-          }
-        }
-
-        if (config.category.enabled) {
-          updatedRepo.custom_category = undefined;
-          updatedRepo.category_locked = false;
-          if (config.category.target === 'original') {
-            updatedRepo.ai_tags = undefined;
-            updatedRepo.ai_platforms = undefined;
-            updatedRepo.analyzed_at = undefined;
-            updatedRepo.analysis_failed = undefined;
-            updatedRepo.analysis_error = undefined;
-          }
-        }
-
-        const hasChanges = updatedRepo.custom_description !== repo.custom_description ||
-          updatedRepo.custom_tags !== repo.custom_tags ||
-          updatedRepo.custom_category !== repo.custom_category ||
-          updatedRepo.category_locked !== repo.category_locked ||
-          updatedRepo.ai_summary !== repo.ai_summary ||
-          updatedRepo.ai_tags !== repo.ai_tags ||
-          updatedRepo.ai_platforms !== repo.ai_platforms ||
-          updatedRepo.analyzed_at !== repo.analyzed_at ||
-          updatedRepo.analysis_failed !== repo.analysis_failed;
-
-        if (hasChanges) {
-          updatedRepo.last_edited = new Date().toISOString();
+        if (updatedRepo) {
           updateRepository(updatedRepo);
         }
         successCount++;
@@ -708,25 +668,20 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 const wasCategoryLocked = !!result.repo.category_locked;
                 const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
 
-                updateRepository({
-                  ...result.repo,
-                  ai_summary: result.summary,
-                  ai_tags: result.tags,
-                  ai_platforms: result.platforms,
-                  custom_category: resolvedCategory,
-                  category_locked: shouldKeepLocked || wasCategoryLocked,
-                  analyzed_at: new Date().toISOString(),
-                  analysis_failed: false,
-                  analysis_error: undefined,
-                });
+                updateRepository(applyAnalysisSuccess(result.repo, {
+                  summary: result.summary,
+                  tags: result.tags,
+                  platforms: result.platforms,
+                  category: resolvedCategory,
+                  categoryLocked: shouldKeepLocked || wasCategoryLocked,
+                  analyzedAt: new Date().toISOString(),
+                }));
                 successCount++;
               } else {
-                updateRepository({
-                  ...result.repo,
-                  analyzed_at: new Date().toISOString(),
-                  analysis_failed: true,
-                  analysis_error: result.error?.message || undefined,
-                });
+                updateRepository(applyAnalysisFailure(result.repo, {
+                  analyzedAt: new Date().toISOString(),
+                  error: result.error?.message || undefined,
+                }));
                 failedCount++;
               }
             };
@@ -775,8 +730,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           for (const repo of repos) {
             try {
               // 显式设置订阅为 true，避免误取消已订阅仓库
-              const updatedRepo = { ...repo, subscribed_to_releases: true };
-              updateRepository(updatedRepo);
+              updateRepository(setReleaseSubscriptionMarker(repo, true));
               // 只在未订阅时才调用 toggle，避免误取消
               if (!releaseSubscriptions.has(repo.id)) {
                 toggleReleaseSubscription(repo.id);
@@ -812,8 +766,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           const failedRepos: string[] = [];
           for (const repo of subscribedRepos) {
             try {
-              const updatedRepo = { ...repo, subscribed_to_releases: false };
-              updateRepository(updatedRepo);
+              updateRepository(setReleaseSubscriptionMarker(repo, false));
             } catch (error) {
               console.error(`Failed to update repository ${repo.full_name}:`, error);
               failedRepos.push(repo.full_name);
@@ -848,12 +801,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           for (const repo of repos) {
             try {
               // 只有有自定义分类的仓库才能锁定，锁定不改变自定义状态
-              if (repo.custom_category && repo.custom_category !== '') {
-                updateRepository({
-                  ...repo,
-                  category_locked: true,
-                  last_edited: new Date().toISOString()
-                });
+              const updatedRepo = lockRepositoryCategory(repo, new Date().toISOString());
+              if (updatedRepo) {
+                updateRepository(updatedRepo);
                 successCount++;
               } else {
                 skippedCount++;
@@ -890,11 +840,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           for (const repo of repos) {
             try {
-              updateRepository({
-                ...repo,
-                category_locked: false,
-                last_edited: new Date().toISOString()
-              });
+              updateRepository(unlockRepositoryCategory(repo, new Date().toISOString()));
               successCount++;
             } catch (error) {
               console.error(`Failed to unlock category for ${repo.full_name}:`, error);
@@ -949,12 +895,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         // 如果设置的分类与AI/默认一致，则清除自定义标记
         const customCategoryValue = computeCustomCategory(categoryName, aiCat, defaultCat);
 
-        updateRepository({
-          ...repo,
-          custom_category: customCategoryValue,
-          category_locked: customCategoryValue !== undefined && customCategoryValue !== '',
-          last_edited: new Date().toISOString()
-        });
+        updateRepository(applyCategoryAssignment(repo, customCategoryValue, new Date().toISOString()));
       } catch (error) {
         console.error(`Failed to categorize ${repo.full_name}:`, error);
         failedRepos.push(repo.full_name);
