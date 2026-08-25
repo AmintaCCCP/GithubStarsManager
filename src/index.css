@@ -623,9 +623,21 @@ textarea:focus-visible,
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
+  border-radius: var(--ui-radius-md);
+  background-clip: padding-box;
   box-shadow: var(--ui-shadow-card);
   transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Recessed content lives inside cards without introducing a new visual system.
+   It uses the theme canvas and the smaller native radius to retain hierarchy. */
+.ui-inset-surface {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--ui-radius-sm);
+  background-clip: padding-box;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.03);
 }
 
 /* Interactive card surfaces share the same quiet elevation in every view.
