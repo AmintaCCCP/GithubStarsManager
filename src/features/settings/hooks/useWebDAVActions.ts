@@ -32,7 +32,7 @@ export const useWebDAVActions = ({ t }: UseWebDAVActionsOptions): WebDAVActions 
     if (errors.length > 0) {
       const translated = errors.map((error) => {
         if (error === 'WebDAV URL是必需的') return t('WebDAV URL是必需的', 'WebDAV URL is required');
-        if (error === 'WebDAV URL必须以 http:// 或 https:// 开头') return t('WebDAV URL必须以 http:// or https:// 开头', 'WebDAV URL must start with http:// or https://');
+        if (error === 'WebDAV URL必须以 http:// 或 https:// 开头') return t('WebDAV URL必须以 http:// 或 https:// 开头', 'WebDAV URL must start with http:// or https://');
         if (error === '用户名是必需的') return t('用户名是必需的', 'Username is required');
         if (error === '密码是必需的') return t('密码是必需的', 'Password is required');
         if (error === '路径是必需的') return t('路径是必需的', 'Path is required');
