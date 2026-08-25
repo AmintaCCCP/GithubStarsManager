@@ -1,15 +1,12 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useEffect, useMemo, useCallback } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
-import { ReleaseTimeline } from './components/ReleaseTimeline';
-import { ForkTimeline } from './components/ForkTimeline';
-import { SettingsPanel } from './components/SettingsPanel';
+
 import { DebugModeIndicator } from './components/DebugModeIndicator';
-import { DiscoveryView } from './components/DiscoveryView';
-import { GistView } from './components/GistView';
+
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
@@ -55,6 +52,34 @@ function hasActiveSearchFilters(filters: SearchFilters): boolean {
     filters.sortOrder !== 'desc'
   );
 }
+
+const LazyReleaseTimeline = React.lazy(() =>
+  import('./components/ReleaseTimeline').then((module) => ({ default: module.ReleaseTimeline }))
+);
+const LazyForkTimeline = React.lazy(() =>
+  import('./components/ForkTimeline').then((module) => ({ default: module.ForkTimeline }))
+);
+const LazySettingsPanel = React.lazy(() =>
+  import('./components/SettingsPanel').then((module) => ({ default: module.SettingsPanel }))
+);
+const LazyDiscoveryView = React.lazy(() =>
+  import('./components/DiscoveryView').then((module) => ({ default: module.DiscoveryView }))
+);
+const LazyGistView = React.lazy(() =>
+  import('./components/GistView').then((module) => ({ default: module.GistView }))
+);
+
+const ViewLoadingFallback: React.FC = () => (
+  <div className="flex min-h-[12rem] items-center justify-center bg-background text-foreground" role="status" aria-live="polite">
+    <div className="animate-pulse text-lg font-medium text-foreground">Loading...</div>
+  </div>
+);
+
+const LazyViewBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ErrorBoundary>
+    <Suspense fallback={<ViewLoadingFallback />}>{children}</Suspense>
+  </ErrorBoundary>
+);
 
 /**
  * Main repository view combining category sidebar, search bar, and repository list.
@@ -108,17 +133,40 @@ const RepositoriesView = React.memo(({
 });
 RepositoriesView.displayName = 'RepositoriesView';
 
-const ReleasesView = React.memo(() => <ReleaseTimeline />);
+const ReleasesView = React.memo(() => (
+  <LazyViewBoundary>
+    <LazyReleaseTimeline />
+  </LazyViewBoundary>
+));
 ReleasesView.displayName = 'ReleasesView';
 
-const GistsView = React.memo(() => <GistView />);
+const GistsView = React.memo(() => (
+  <LazyViewBoundary>
+    <LazyGistView />
+  </LazyViewBoundary>
+));
 GistsView.displayName = 'GistsView';
 
-const ForksView = React.memo(() => <ForkTimeline />);
+const ForksView = React.memo(() => (
+  <LazyViewBoundary>
+    <LazyForkTimeline />
+  </LazyViewBoundary>
+));
 ForksView.displayName = 'ForksView';
 
-const SettingsView = React.memo(() => <SettingsPanel />);
+const SettingsView = React.memo(() => (
+  <LazyViewBoundary>
+    <LazySettingsPanel />
+  </LazyViewBoundary>
+));
 SettingsView.displayName = 'SettingsView';
+
+const DiscoverySubscriptionView = React.memo(() => (
+  <Suspense fallback={<ViewLoadingFallback />}>
+    <LazyDiscoveryView />
+  </Suspense>
+));
+DiscoverySubscriptionView.displayName = 'DiscoverySubscriptionView';
 
 function App() {
   const {
@@ -244,7 +292,7 @@ function App() {
       case 'subscription':
         return (
           <ErrorBoundary>
-            <DiscoveryView />
+            <DiscoverySubscriptionView />
           </ErrorBoundary>
         );
       case 'settings':
