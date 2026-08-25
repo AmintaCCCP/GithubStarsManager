@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
@@ -8,24 +9,13 @@ import { BulkRestoreModal, RestoreConfig } from './BulkRestoreModal';
 
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
-import { AIService } from '../services/aiService';
-import { AIAnalysisOptimizer, AnalysisResult } from '../services/aiAnalysisOptimizer';
-import { resolveCategoryAssignment, getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory, buildCategoryHints } from '../utils/categoryUtils';
-import { forceSyncToBackend } from '../services/autoSync';
+import { matchesCategory } from '../utils/categoryUtils';
+import { useRepositoryAnalysisJob } from '../features/repositories/hooks/useRepositoryAnalysisJob';
+import { useBulkRepositoryActions } from '../features/repositories/hooks/useBulkRepositoryActions';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import {
-  applyAnalysisFailure,
-  applyAnalysisSuccess,
-  applyCategoryAssignment,
-  lockRepositoryCategory,
-  restoreRepositoryFields,
-  setReleaseSubscriptionMarker,
-  unlockRepositoryCategory,
-} from '../features/repositories/application/repositoryPatches';
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -37,43 +27,38 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   selectedCategory
 }) => {
   const {
-    githubToken,
-    aiConfigs,
-    activeAIConfig,
-    isLoading,
-    setLoading,
-    updateRepository,
-    deleteRepository,
     language,
     customCategories,
     hiddenDefaultCategoryIds,
     defaultCategoryOverrides,
     categoryMatchMode,
-    analysisProgress,
-    setAnalysisProgress,
     searchFilters,
-    toggleReleaseSubscription,
-    batchUnsubscribeReleases,
-    releaseSubscriptions,
     similarView,
     resetSimilarView,
     repositoryViewMode,
-    setRepositoryViewMode
-  } = useAppStore();
+    setRepositoryViewMode,
+  } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    categoryMatchMode: state.categoryMatchMode,
+    searchFilters: state.searchFilters,
+    similarView: state.similarView,
+    resetSimilarView: state.resetSimilarView,
+    repositoryViewMode: state.repositoryViewMode,
+    setRepositoryViewMode: state.setRepositoryViewMode,
+  })));
 
-  const { toast, confirm } = useDialog();
+
+  const { toast } = useDialog();
 
   const [showAISummary, setShowAISummary] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
   const [disableCardAnimations, setDisableCardAnimations] = useState(false);
   const previousCategoryRef = useRef(selectedCategory);
   const savedScrollYRef = useRef<number | null>(null);
   const restoreScrollFrameRef = useRef<number | null>(null);
   
-  // 使用 useRef 来管理停止状态，确保在异步操作中能正确访问最新值
-  const shouldStopRef = useRef(false);
-  const isAnalyzingRef = useRef(false);
-  const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
 
   // 批量选择状态
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<number>>(new Set());
@@ -86,6 +71,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
     [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]
   );
+  const analysisJob = useRepositoryAnalysisJob({ allCategories });
+  const bulkActions = useBulkRepositoryActions({ allCategories });
+  const isLoading = analysisJob.isRunning;
+  const { isPaused, progress: analysisProgress } = analysisJob;
 
   const filteredRepositories = useMemo(() => {
     if (selectedCategory === 'all') return repositories;
@@ -262,204 +251,30 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const handleAIAnalyze = async (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
-    if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-      return;
-    }
-
-    const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    if (!activeConfig) {
-      toast(language === 'zh' ? '请先在设置中配置AI服务。' : 'Please configure AI service in settings first.', 'error');
-      return;
-    }
-
-    if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(language === 'zh' ? 'AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.', 'error');
-      return;
-    }
-
-    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.', 'error');
-      return;
-    }
-
-    const targetRepos = analyzeFailedOnly
-      ? filteredRepositories.filter(repo => repo.analysis_failed)
-      : analyzeUnanalyzedOnly 
-        ? filteredRepositories.filter(repo => !repo.analyzed_at)
+  const handleAIAnalyze = (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
+    const scope = analyzeFailedOnly ? 'failed' : analyzeUnanalyzedOnly ? 'unanalyzed' : 'all';
+    const targetRepositories = analyzeFailedOnly
+      ? filteredRepositories.filter((repository) => repository.analysis_failed)
+      : analyzeUnanalyzedOnly
+        ? filteredRepositories.filter((repository) => !repository.analyzed_at)
         : filteredRepositories;
 
-    if (targetRepos.length === 0) {
-      const message = analyzeFailedOnly
-        ? t('没有分析失败的仓库！', 'No failed repositories to re-analyze!')
-        : analyzeUnanalyzedOnly
-          ? t('所有仓库都已经分析过了！', 'All repositories have been analyzed!')
-          : t('没有可分析的仓库！', 'No repositories to analyze!');
-      toast(message, 'info');
-      return;
-    }
-
-    const actionText = analyzeFailedOnly
-      ? (language === 'zh' ? '失败' : 'failed')
-      : analyzeUnanalyzedOnly
-        ? (language === 'zh' ? '未分析' : 'unanalyzed')
-        : (language === 'zh' ? '全部' : 'all');
-
-    const confirmMessage = language === 'zh'
-      ? `将对 ${targetRepos.length} 个${actionText}仓库进行AI分析，这可能需要几分钟时间。是否继续？`
-      : `Will analyze ${targetRepos.length} ${actionText} repositories with AI. This may take several minutes. Continue?`;
-
-    const confirmed = await confirm(
-      t('AI分析确认', 'AI Analysis Confirmation'),
-      confirmMessage,
-      { type: 'warning' }
-    );
-    if (!confirmed) return;
-
-    // 重置状态
-    shouldStopRef.current = false;
-    isAnalyzingRef.current = true;
-    setLoading(true);
-    setAnalysisProgress({ current: 0, total: targetRepos.length });
-    setIsPaused(false);
-
-    // 创建优化器实例并保存到 ref
-    optimizerRef.current = new AIAnalysisOptimizer({
-      initialConcurrency: activeConfig.concurrency || 3,
-      maxConcurrency: 10,
-      minConcurrency: 1,
-      targetResponseTime: 5000,
-      batchDelayMs: 100,
-      maxRetries: 3,
-      retryDelayBaseMs: 1000,
-      enableAdaptiveConcurrency: true,
-      rateLimiter: {
-        maxConcurrency: 0,
-        requestsPerMinute: activeConfig.requestsPerMinute || 0,
-      },
+    return analysisJob.run({
+      repositories: targetRepositories,
+      scope,
+      syncOnComplete: false,
     });
-
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const aiService = new AIService(activeConfig, language);
-      const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
-      const aiCategoryHints = buildCategoryHints(allCategories);
-
-      let successCount = 0;
-      let failedCount = 0;
-
-      const handleResult = (result: AnalysisResult) => {
-        if (result.success) {
-          const resolvedCategory = resolveCategoryAssignment(
-            { ...result.repo, ai_summary: result.summary },
-            result.tags || [],
-            allCategories
-          );
-
-          const wasCategoryLocked = !!result.repo.category_locked;
-
-          updateRepository(applyAnalysisSuccess(result.repo, {
-            summary: result.summary,
-            tags: result.tags,
-            platforms: result.platforms,
-            category: resolvedCategory,
-            categoryLocked: wasCategoryLocked,
-            analyzedAt: new Date().toISOString(),
-          }));
-          successCount++;
-        } else {
-          updateRepository(applyAnalysisFailure(result.repo, {
-            analyzedAt: new Date().toISOString(),
-            error: result.error?.message || undefined,
-          }));
-          failedCount++;
-        }
-      };
-
-      setAnalysisProgress({ current: 0, total: targetRepos.length });
-
-      await optimizerRef.current!.analyzeRepositoriesPipelined(
-        targetRepos,
-        githubApi,
-        aiService,
-        categoryNames,
-        aiCategoryHints,
-        (completed, total, currentConcurrency) => {
-          setAnalysisProgress({ current: completed, total });
-          console.log(`AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
-        },
-        handleResult
-      );
-
-      const stats = optimizerRef.current!.getStats();
-      console.log('AI Analysis Stats:', stats);
-
-      const completionMessage = shouldStopRef.current
-        ? (language === 'zh'
-            ? `AI分析已停止！成功: ${successCount}, 失败: ${failedCount}`
-            : `AI analysis stopped! Success: ${successCount}, Failed: ${failedCount}`)
-        : (language === 'zh'
-            ? `AI分析完成！成功: ${successCount}, 失败: ${failedCount} (平均响应: ${stats.averageResponseTime}ms)`
-            : `AI analysis completed! Success: ${successCount}, Failed: ${failedCount} (avg: ${stats.averageResponseTime}ms)`);
-
-      toast(completionMessage, 'success');
-    } catch (error) {
-      console.error('AI analysis failed:', error);
-      const errorMessage = language === 'zh'
-        ? 'AI分析失败，请检查AI配置和网络连接。'
-        : 'AI analysis failed. Please check AI configuration and network connection.';
-      toast(errorMessage, 'error');
-    } finally {
-      // 清理状态
-      optimizerRef.current = null;
-      isAnalyzingRef.current = false;
-      shouldStopRef.current = false;
-      setLoading(false);
-      setAnalysisProgress({ current: 0, total: 0 });
-      setIsPaused(false);
-    }
   };
 
   const handlePauseResume = () => {
-    if (!isAnalyzingRef.current) return;
-    const newPausedState = !isPaused;
-    setIsPaused(newPausedState);
-
-    // 控制优化器的暂停/恢复
-    if (optimizerRef.current) {
-      if (newPausedState) {
-        optimizerRef.current.pause();
-        console.log('Analysis paused');
-      } else {
-        optimizerRef.current.resume();
-        console.log('Analysis resumed');
-      }
+    if (isPaused) {
+      analysisJob.resume();
+      return;
     }
+    analysisJob.pause();
   };
 
-  const handleStop = async () => {
-    if (!isAnalyzingRef.current) return;
-
-    const confirmMessage = language === 'zh'
-      ? '确定要停止 AI 分析吗？已分析的结果将会保存。'
-      : 'Are you sure you want to stop AI analysis? Analyzed results will be saved.';
-
-    const confirmed = await confirm(
-      t('停止AI分析', 'Stop AI Analysis'),
-      confirmMessage,
-      { type: 'warning' }
-    );
-    if (confirmed) {
-      shouldStopRef.current = true;
-      // 中止优化器
-      if (optimizerRef.current) {
-        optimizerRef.current.abort();
-      }
-      setIsPaused(false);
-      console.log('Stop requested by user');
-    }
-  };
+  const handleStop = () => analysisJob.requestStop();
 
   // 批量操作处理函数
   // 使用 useCallback 优化事件处理函数
@@ -499,42 +314,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     }, 250);
   }, []);
 
-  const handleBulkRestore = useCallback(async (config: RestoreConfig) => {
-    const selectedRepos = repositories.filter(repo => selectedRepoIds.has(repo.id));
-    if (selectedRepos.length === 0) return;
-
-    let successCount = 0;
-    const failedRepos: string[] = [];
-
-    for (const repo of selectedRepos) {
-      try {
-        const updatedRepo = restoreRepositoryFields(repo, config, new Date().toISOString());
-
-        if (updatedRepo) {
-          updateRepository(updatedRepo);
-        }
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to restore ${repo.full_name}:`, error);
-        failedRepos.push(repo.full_name);
-      }
-    }
-
-    await forceSyncToBackend();
-
-    const skipMsg = failedRepos.length > 0
-      ? (language === 'zh'
-        ? `\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-        : `\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`)
-      : '';
-
-    toast(language === 'zh'
-      ? `成功还原 ${successCount} 个仓库${skipMsg}`
-      : `Successfully restored ${successCount} repositories${skipMsg}`,
-      failedRepos.length > 0 ? 'error' : 'success'
-    );
-  }, [repositories, selectedRepoIds, updateRepository, language, toast]);
-
   // 处理单击空白处 - 触发回到顶部按钮跳跃动画
   const handleClick = useCallback((e: React.MouseEvent) => {
     // 检查点击的是否是空白区域（不是卡片或其他元素）
@@ -552,325 +331,46 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     }
   }, [showBulkToolbar, handleDeselectAll]);
 
-  const handleBulkAction = async (action: string, repos: Repository[]) => {
+  const handleBulkAction = async (action: string, selectedRepositories: Repository[]) => {
     try {
+      let completed = false;
       switch (action) {
-        case 'unstar': {
-          if (!githubToken) {
-            toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-            return;
-          }
-
-          const confirmMessage = language === 'zh'
-            ? `确定要取消 ${repos.length} 个仓库的 Star 吗？此操作不可撤销！`
-            : `Are you sure you want to unstar ${repos.length} repositories? This action cannot be undone!`;
-
-          const confirmed = await confirm(
-            t('取消Star确认', 'Unstar Confirmation'),
-            confirmMessage,
-            { type: 'danger', confirmText: t('取消Star', 'Unstar') }
-          );
-          if (!confirmed) return;
-
-          const githubApi = new GitHubApiService(githubToken);
-          const successIds: number[] = [];
-
-          for (const repo of repos) {
-            try {
-              const [owner, name] = repo.full_name.split('/');
-              await githubApi.unstarRepository(owner, name);
-              successIds.push(repo.id);
-            } catch (error) {
-              console.error(`Failed to unstar ${repo.full_name}:`, error);
-            }
-          }
-
-          // 仅删除成功 unstar 的仓库
-          for (const repoId of successIds) {
-            deleteRepository(repoId);
-          }
-
-          await forceSyncToBackend();
-          toast(language === 'zh'
-            ? `成功取消 ${successIds.length} 个仓库的 Star`
-            : `Successfully unstarred ${successIds.length} repositories`,
-            'success'
-          );
+        case 'unstar':
+          completed = await bulkActions.unstar(selectedRepositories);
           break;
-        }
-
-        case 'categorize': {
+        case 'categorize':
           setShowCategorizeModal(true);
           return;
-        }
-
-        case 'restore': {
+        case 'restore':
           setShowRestoreModal(true);
           return;
-        }
-
-        case 'ai-summary': {
-          if (!githubToken) {
-            toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
-            return;
-          }
-
-          const confirmMessage = language === 'zh'
-            ? `将对 ${repos.length} 个仓库进行 AI 分析，这可能需要几分钟时间。是否继续？`
-            : `Will analyze ${repos.length} repositories with AI. This may take several minutes. Continue?`;
-
-          if (!await confirm(t('AI分析确认', 'AI Analysis Confirmation'), confirmMessage, { type: 'warning' })) return;
-
-          const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-          if (!activeConfig) {
-            toast(language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.', 'error');
-            return;
-          }
-
-          // 设置加载状态
-          setLoading(true);
-          isAnalyzingRef.current = true;
-          setAnalysisProgress({ current: 0, total: repos.length });
-
-          // 创建优化器实例并保存到 ref
-          optimizerRef.current = new AIAnalysisOptimizer({
-            initialConcurrency: activeConfig.concurrency || 3,
-            maxConcurrency: 10,
-            minConcurrency: 1,
-            targetResponseTime: 5000,
-            batchDelayMs: 100,
-            maxRetries: 3,
-            retryDelayBaseMs: 1000,
-            enableAdaptiveConcurrency: true,
-            rateLimiter: {
-              maxConcurrency: 0,
-              requestsPerMinute: activeConfig.requestsPerMinute || 0,
-            },
+        case 'ai-summary':
+          completed = await analysisJob.run({
+            repositories: selectedRepositories,
+            scope: 'selected',
+            syncOnComplete: true,
           });
-
-          try {
-            const githubApi = new GitHubApiService(githubToken);
-            const aiService = new AIService(activeConfig, language);
-            const categoryNames = allCategories.filter(cat => cat.id !== 'all').map(cat => cat.name);
-            const aiCategoryHints = buildCategoryHints(allCategories);
-
-            let successCount = 0;
-            let failedCount = 0;
-
-            const handleResult = (result: AnalysisResult) => {
-              if (result.success) {
-                const resolvedCategory = resolveCategoryAssignment(
-                  { ...result.repo, ai_summary: result.summary },
-                  result.tags || [],
-                  allCategories
-                );
-
-                const wasCategoryLocked = !!result.repo.category_locked;
-                const shouldKeepLocked = wasCategoryLocked && resolvedCategory !== undefined && resolvedCategory !== '';
-
-                updateRepository(applyAnalysisSuccess(result.repo, {
-                  summary: result.summary,
-                  tags: result.tags,
-                  platforms: result.platforms,
-                  category: resolvedCategory,
-                  categoryLocked: shouldKeepLocked || wasCategoryLocked,
-                  analyzedAt: new Date().toISOString(),
-                }));
-                successCount++;
-              } else {
-                updateRepository(applyAnalysisFailure(result.repo, {
-                  analyzedAt: new Date().toISOString(),
-                  error: result.error?.message || undefined,
-                }));
-                failedCount++;
-              }
-            };
-
-            setAnalysisProgress({ current: 0, total: repos.length });
-
-            await optimizerRef.current!.analyzeRepositoriesPipelined(
-              repos,
-              githubApi,
-              aiService,
-              categoryNames,
-              aiCategoryHints,
-              (completed, total, currentConcurrency) => {
-                setAnalysisProgress({ current: completed, total });
-                console.log(`Bulk AI Analysis Progress: ${completed}/${total}, Concurrency: ${currentConcurrency}`);
-              },
-              handleResult
-            );
-
-            const stats = optimizerRef.current!.getStats();
-            console.log('Bulk AI Analysis Stats:', stats);
-
-            await forceSyncToBackend();
-            toast(language === 'zh'
-              ? `成功分析 ${successCount} 个仓库，失败 ${failedCount} 个 (平均响应: ${stats.averageResponseTime}ms)`
-              : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`,
-              failedCount > 0 ? 'error' : 'success'
-            );
-          } catch (error) {
-            console.error('Bulk AI analysis failed:', error);
-            toast(language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed', 'error');
-          } finally {
-            // 确保状态重置
-            optimizerRef.current = null;
-            isAnalyzingRef.current = false;
-            shouldStopRef.current = false;
-            setLoading(false);
-            setAnalysisProgress({ current: 0, total: 0 });
-          }
           break;
-        }
-
-        case 'subscribe': {
-          let successCount = 0;
-
-          for (const repo of repos) {
-            try {
-              // 显式设置订阅为 true，避免误取消已订阅仓库
-              updateRepository(setReleaseSubscriptionMarker(repo, true));
-              // 只在未订阅时才调用 toggle，避免误取消
-              if (!releaseSubscriptions.has(repo.id)) {
-                toggleReleaseSubscription(repo.id);
-              }
-              successCount++;
-            } catch (error) {
-              console.error(`Failed to subscribe ${repo.full_name}:`, error);
-            }
-          }
-
-          await forceSyncToBackend();
-          toast(language === 'zh'
-            ? `成功订阅 ${successCount} 个仓库的版本发布`
-            : `Successfully subscribed to ${successCount} repositories releases`,
-            'success'
-          );
+        case 'subscribe':
+          completed = await bulkActions.subscribe(selectedRepositories);
           break;
-        }
-
-        case 'unsubscribe': {
-          const subscribedRepos = repos.filter(repo => releaseSubscriptions.has(repo.id));
-
-          if (subscribedRepos.length === 0) {
-            toast(t('选中的仓库中没有被订阅的', 'None of the selected repositories are subscribed'), 'info');
-            return;
-          }
-
-          // 批量取消订阅
-          const repoIds = subscribedRepos.map(repo => repo.id);
-          batchUnsubscribeReleases(repoIds);
-
-          // 更新仓库的 subscribed_to_releases 字段，记录失败项
-          const failedRepos: string[] = [];
-          for (const repo of subscribedRepos) {
-            try {
-              updateRepository(setReleaseSubscriptionMarker(repo, false));
-            } catch (error) {
-              console.error(`Failed to update repository ${repo.full_name}:`, error);
-              failedRepos.push(repo.full_name);
-            }
-          }
-
-          await forceSyncToBackend();
-
-          // 汇总结果显示
-          const successCount = subscribedRepos.length - failedRepos.length;
-          if (failedRepos.length > 0) {
-            toast(language === 'zh'
-              ? `成功取消 ${successCount} 个仓库的版本发布订阅\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-              : `Successfully unsubscribed ${successCount} repositories from releases\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
-              'error'
-            );
-          } else {
-            toast(language === 'zh'
-              ? `成功取消 ${successCount} 个仓库的版本发布订阅`
-              : `Successfully unsubscribed ${successCount} repositories from releases`,
-              'success'
-            );
-          }
+        case 'unsubscribe':
+          completed = await bulkActions.unsubscribe(selectedRepositories);
           break;
-        }
-
-        case 'lock-category': {
-          let successCount = 0;
-          let skippedCount = 0;
-          const failedRepos: string[] = [];
-
-          for (const repo of repos) {
-            try {
-              // 只有有自定义分类的仓库才能锁定，锁定不改变自定义状态
-              const updatedRepo = lockRepositoryCategory(repo, new Date().toISOString());
-              if (updatedRepo) {
-                updateRepository(updatedRepo);
-                successCount++;
-              } else {
-                skippedCount++;
-              }
-            } catch (error) {
-              console.error(`Failed to lock category for ${repo.full_name}:`, error);
-              failedRepos.push(repo.full_name);
-            }
-          }
-
-          await forceSyncToBackend();
-          const skipMsg = skippedCount > 0
-            ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个没有自定义分类的仓库` : `\n\nSkipped ${skippedCount} repositories without custom category`)
-            : '';
-          if (failedRepos.length > 0) {
-            toast(language === 'zh'
-              ? `成功锁定 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}${skipMsg}`
-              : `Successfully locked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}${skipMsg}`,
-              'error'
-            );
-          } else {
-            toast(language === 'zh'
-              ? `成功锁定 ${successCount} 个仓库的分类${skipMsg}`
-              : `Successfully locked categories for ${successCount} repositories${skipMsg}`,
-              'success'
-            );
-          }
+        case 'lock-category':
+          completed = await bulkActions.lockCategory(selectedRepositories);
           break;
-        }
-
-        case 'unlock-category': {
-          let successCount = 0;
-          const failedRepos: string[] = [];
-
-          for (const repo of repos) {
-            try {
-              updateRepository(unlockRepositoryCategory(repo, new Date().toISOString()));
-              successCount++;
-            } catch (error) {
-              console.error(`Failed to unlock category for ${repo.full_name}:`, error);
-              failedRepos.push(repo.full_name);
-            }
-          }
-
-          await forceSyncToBackend();
-          if (failedRepos.length > 0) {
-            toast(language === 'zh'
-              ? `成功解锁 ${successCount} 个仓库的分类\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-              : `Successfully unlocked categories for ${successCount} repositories\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
-              'error'
-            );
-          } else {
-            toast(language === 'zh'
-              ? `成功解锁 ${successCount} 个仓库的分类`
-              : `Successfully unlocked categories for ${successCount} repositories`,
-              'success'
-            );
-          }
+        case 'unlock-category':
+          completed = await bulkActions.unlockCategory(selectedRepositories);
           break;
-        }
-
         default:
           toast(language === 'zh' ? '未知操作' : 'Unknown action', 'error');
+          completed = true;
       }
 
-      // 清除选择
-      handleDeselectAll();
+      if (completed) {
+        handleDeselectAll();
+      }
     } catch (error) {
       console.error('Bulk action failed:', error);
       toast(language === 'zh' ? '批量操作失败' : 'Bulk action failed', 'error');
@@ -878,49 +378,17 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   };
 
   const handleBulkCategorize = async (categoryName: string) => {
-    const selectedRepos = filteredRepositories.filter(repo =>
-      selectedRepoIds.has(repo.id)
-    );
-
-    const failedRepos: string[] = [];
-
-    for (const repo of selectedRepos) {
-      try {
-        // 获取所有分类用于计算AI和默认分类
-        const allCategoriesList = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
-        const aiCat = getAICategory(repo, allCategoriesList);
-        const defaultCat = getDefaultCategory(repo, allCategoriesList);
-
-        // 使用通用函数计算应该保存的自定义分类值
-        // 如果设置的分类与AI/默认一致，则清除自定义标记
-        const customCategoryValue = computeCustomCategory(categoryName, aiCat, defaultCat);
-
-        updateRepository(applyCategoryAssignment(repo, customCategoryValue, new Date().toISOString()));
-      } catch (error) {
-        console.error(`Failed to categorize ${repo.full_name}:`, error);
-        failedRepos.push(repo.full_name);
-      }
+    const selectedRepositories = filteredRepositories.filter((repository) => selectedRepoIds.has(repository.id));
+    if (await bulkActions.categorize(selectedRepositories, categoryName)) {
+      handleDeselectAll();
     }
+  };
 
-    await forceSyncToBackend();
-
-    // 汇总结果显示
-    const successCount = selectedRepos.length - failedRepos.length;
-    if (failedRepos.length > 0) {
-      toast(language === 'zh'
-        ? `成功为 ${successCount} 个仓库设置分类：${categoryName}\n\n失败 (${failedRepos.length} 个):\n${failedRepos.join('\n')}`
-        : `Successfully categorized ${successCount} repositories as: ${categoryName}\n\nFailed (${failedRepos.length}):\n${failedRepos.join('\n')}`,
-        'error'
-      );
-    } else {
-      toast(language === 'zh'
-        ? `成功为 ${successCount} 个仓库设置分类：${categoryName}`
-        : `Successfully categorized ${successCount} repositories as: ${categoryName}`,
-        'success'
-      );
+  const handleBulkRestore = async (config: RestoreConfig) => {
+    const selectedRepositories = repositories.filter((repository) => selectedRepoIds.has(repository.id));
+    if (await bulkActions.restore(selectedRepositories, config)) {
+      handleDeselectAll();
     }
-
-    handleDeselectAll();
   };
 
   if (filteredRepositories.length === 0) {
@@ -1138,7 +606,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             key={repo.id}
             repository={repo}
             showAISummary={showAISummary}
-            searchQuery={useAppStore.getState().searchFilters.query}
+            searchQuery={searchFilters.query}
             isSelected={selectedRepoIds.has(repo.id)}
             onSelect={handleSelectRepo}
             selectionMode={showBulkToolbar}
