@@ -3,321 +3,31 @@ import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
 import { NumberInput } from '../ui/NumberInput';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
-import { backend } from '../../services/backendAdapter';
-import { isElectron, electronProxy } from '../../services/electronProxy';
-import { testRpcDownload } from '../../services/rpcDownloadService';
-import type { ProxyConfig, ProxyType, RpcDownloadConfig } from '../../types';
+import type { ProxyType } from '../../types';
+import { useNetworkActions } from '../../features/settings/hooks/useNetworkActions';
 
 interface NetworkPanelProps {
   t: (zh: string, en: string) => string;
 }
 
 export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
-  const { proxyConfig, setProxyConfig, rpcDownloadConfig, setRpcDownloadConfig, backendApiSecret } = useAppStore();
-
-  // --- Proxy state ---
-  const [form, setForm] = useState<ProxyConfig>(proxyConfig);
+  const {
+    canUseProxy, form, rpcForm, testing, saving, isProxyToggling, testResult,
+    rpcTesting, rpcSaving, isRpcToggling, rpcTestResult, hasStoredSecret,
+    isFormValid, isRpcFormValid, hasProxyChanges: hasChanges, hasRpcChanges: rpcHasChanges,
+    setForm, setRpcForm, clearStoredSecret,
+    saveProxy: handleSave, testProxy: handleTest, toggleProxy: handleProxyToggle,
+    saveRpc: handleRpcSave, testRpc: handleRpcTest, toggleRpc: handleRpcToggle,
+  } = useNetworkActions({ t });
   const [showPassword, setShowPassword] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [isProxyToggling, setIsProxyToggling] = useState(false);
-
-  // --- RPC Download state ---
-  const [rpcForm, setRpcForm] = useState<RpcDownloadConfig>(rpcDownloadConfig);
   const [showSecret, setShowSecret] = useState(false);
-  const [hasStoredSecret, setHasStoredSecret] = useState(() => !!rpcDownloadConfig.secret);
-  const [rpcTesting, setRpcTesting] = useState(false);
-  const [rpcTestResult, setRpcTestResult] = useState<{ success: boolean; error?: string; version?: string } | null>(null);
-  const [rpcSaving, setRpcSaving] = useState(false);
-  const [isRpcToggling, setIsRpcToggling] = useState(false);
 
-  // Ensure backend is initialized, then return base URL
-  const getRpcBaseUrl = async (): Promise<string> => {
-    if (!backend.isAvailable) {
-      await backend.init();
-    }
-    if (!backend.backendUrl) {
-      throw new Error('Backend not available');
-    }
-    return backend.backendUrl;
-  };
-
-  // Sync proxy form when store changes externally
   useEffect(() => {
-    setForm(currentForm => ({ ...currentForm, enabled: proxyConfig.enabled }));
-    if (proxyConfig.username || proxyConfig.password) {
-      setShowAuth(true);
-    }
-  }, [proxyConfig]);
-
-  // Sync RPC form when store changes externally
-  useEffect(() => {
-    setRpcForm(currentForm => ({ ...currentForm, enabled: rpcDownloadConfig.enabled }));
-  }, [rpcDownloadConfig]);
-
-  // Load RPC config from backend on mount (to get hasSecret flag)
-  useEffect(() => {
-    const loadRpcConfig = async () => {
-      try {
-        const base = await getRpcBaseUrl();
-        const authHeaders: Record<string, string> = {};
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const resp = await fetch(`${base}/settings/rpc-download`, { headers: authHeaders });
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.hasSecret) {
-            setHasStoredSecret(true);
-          }
-          // Hydrate backend state into the store and form without overwriting local draft edits.
-          if (data.enabled !== undefined || data.host || data.port) {
-            const currentStoreConfig = useAppStore.getState().rpcDownloadConfig;
-            const hydratedConfig = {
-              ...currentStoreConfig,
-              enabled: data.enabled ?? currentStoreConfig.enabled,
-              host: data.host || currentStoreConfig.host,
-              port: data.port || currentStoreConfig.port,
-            };
-            setRpcForm((currentForm) => (
-              JSON.stringify(currentForm) === JSON.stringify(currentStoreConfig)
-                ? hydratedConfig
-                : currentForm
-            ));
-            setRpcDownloadConfig(hydratedConfig);
-          }
-        }
-      } catch { /* best effort */ }
-    };
-    loadRpcConfig();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const canUseProxy = isElectron() || backend.isAvailable;
-
-  // --- Proxy handlers ---
-
-  const isFormValid = !form.enabled || (form.host.trim() && form.port >= 1 && form.port <= 65535);
-
-  const handleSave = async () => {
-    if (!isFormValid) return;
-
-    setSaving(true);
-    setTestResult(null);
-    const previousConfig = proxyConfig;
-    try {
-      // Sync to Electron first (if applicable)
-      if (isElectron()) {
-        await electronProxy.setProxy(form);
-      }
-
-      // Sync to backend (if applicable)
-      if (backend.isAvailable) {
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const resp = await fetch('/api/settings/proxy', {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(form),
-        });
-        if (!resp.ok) {
-          throw new Error(`Backend returned ${resp.status}`);
-        }
-      }
-
-      // Only persist locally after remote sync succeeds
-      setProxyConfig(form);
-    } catch (e) {
-      // Rollback: restore Electron proxy to previous state
-      if (isElectron()) {
-        try { await electronProxy.setProxy(previousConfig); } catch { /* best effort */ }
-      }
-      setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      if (isElectron()) {
-        const result = await electronProxy.testProxy(form);
-        setTestResult(result);
-      } else if (backend.isAvailable) {
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const resp = await fetch('/api/settings/proxy/test', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(form),
-        });
-        const data = await resp.json();
-        setTestResult(data);
-      }
-    } catch (e) {
-      setTestResult({ success: false, error: e instanceof Error ? e.message : 'Unknown error' });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const hasChanges = JSON.stringify(form) !== JSON.stringify(proxyConfig);
-
-  const handleProxyToggle = async (enabled: boolean) => {
-    if (isProxyToggling) return;
-    const previousForm = form;
-    const previousConfig = proxyConfig;
-    setIsProxyToggling(true);
-    const newConfig = { ...proxyConfig, enabled };
-    setForm(currentForm => ({ ...currentForm, enabled }));
-    setTestResult(null);
-
-    try {
-      if (isElectron()) {
-        await electronProxy.setProxy(newConfig);
-      }
-
-      if (backend.isAvailable) {
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const resp = await fetch('/api/settings/proxy', {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(newConfig),
-        });
-        if (!resp.ok) {
-          throw new Error(`Backend returned ${resp.status}`);
-        }
-      }
-
-      setProxyConfig(newConfig);
-    } catch (e) {
-      if (isElectron()) {
-        try { await electronProxy.setProxy(previousConfig); } catch { /* best effort */ }
-      }
-      setForm(previousForm);
-      setTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
-    } finally {
-      setIsProxyToggling(false);
-    }
-  };
-
-  // --- RPC Download handlers ---
-
-  const isRpcFormValid = !rpcForm.enabled || (rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
-
-  const handleRpcSave = async () => {
-    if (!isRpcFormValid) return;
-
-    setRpcSaving(true);
-    setRpcTestResult(null);
-    try {
-      // Sync to backend if available
-      if (backend.isAvailable) {
-        const base = await getRpcBaseUrl();
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const body: Record<string, unknown> = {
-          enabled: rpcForm.enabled,
-          host: rpcForm.host,
-          port: rpcForm.port,
-        };
-        if (rpcForm.secret) {
-          body.secret = rpcForm.secret;
-        }
-
-        const resp = await fetch(`${base}/settings/rpc-download`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-          throw new Error(`Backend returned ${resp.status}`);
-        }
-      }
-
-      // Always persist to local store
-      setRpcDownloadConfig(rpcForm);
-      if (rpcForm.secret) {
-        setHasStoredSecret(true);
-      }
-    } catch (e) {
-      setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
-    } finally {
-      setRpcSaving(false);
-    }
-  };
-
-  const handleRpcTest = async () => {
-    setRpcTesting(true);
-    setRpcTestResult(null);
-    try {
-      const result = await testRpcDownload(rpcForm, backendApiSecret || undefined);
-      setRpcTestResult(result);
-    } catch (e) {
-      setRpcTestResult({ success: false, error: e instanceof Error ? e.message : 'Unknown error' });
-    } finally {
-      setRpcTesting(false);
-    }
-  };
-
-  const rpcHasChanges = JSON.stringify(rpcForm) !== JSON.stringify(rpcDownloadConfig);
-
-  const handleRpcToggle = async (enabled: boolean) => {
-    if (isRpcToggling) return;
-    const previousForm = rpcForm;
-    setIsRpcToggling(true);
-    const newConfig = { ...rpcDownloadConfig, enabled };
-    setRpcForm(currentForm => ({ ...currentForm, enabled }));
-    setRpcTestResult(null);
-
-    try {
-      if (backend.isAvailable) {
-        const base = await getRpcBaseUrl();
-        const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (backendApiSecret) {
-          authHeaders['Authorization'] = `Bearer ${backendApiSecret}`;
-        }
-        const body: Record<string, unknown> = {
-          enabled: newConfig.enabled,
-          host: newConfig.host,
-          port: newConfig.port,
-        };
-        if (newConfig.secret) {
-          body.secret = newConfig.secret;
-        }
-        const resp = await fetch(`${base}/settings/rpc-download`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-          throw new Error(`Backend returned ${resp.status}`);
-        }
-      }
-
-      setRpcDownloadConfig(newConfig);
-    } catch (e) {
-      setRpcForm(previousForm);
-      setRpcTestResult({ success: false, error: e instanceof Error ? e.message : t('保存失败', 'Save failed') });
-    } finally {
-      setIsRpcToggling(false);
-    }
-  };
+    if (form.username || form.password) setShowAuth(true);
+  }, [form.username, form.password]);
 
   return (
     <div className="space-y-4">
@@ -565,7 +275,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   value={rpcForm.secret || ''}
                   onChange={(e) => {
                     setRpcForm({ ...rpcForm, secret: e.target.value || undefined });
-                    if (e.target.value) setHasStoredSecret(false);
+                    if (e.target.value) clearStoredSecret();
                   }}
                   placeholder={hasStoredSecret
                     ? t('已保存密钥，留空则保留', 'Secret saved, leave blank to keep')

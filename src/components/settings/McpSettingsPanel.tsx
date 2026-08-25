@@ -14,42 +14,20 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { backend } from '../../services/backendAdapter';
 import { isElectron } from '../../services/electronProxy';
 import { useDialog } from '../../hooks/useDialog';
+import { useMcpActions } from '../../features/settings/hooks/useMcpActions';
 import { MCP_DEFAULT_PORT, normalizeMcpHost } from '../../utils/mcpHost';
 
 interface McpSettingsPanelProps {
   t: (zh: string, en: string) => string;
 }
 
-function generateLocalToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  let binary = '';
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
-  });
-  const b64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `gsm_mcp_${b64}`;
-}
-
 export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
   const { mcpConfig, setMcpConfig, language } = useAppStore();
-  const { toast, confirm } = useDialog();
-
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useDialog();
+  const { loading, saving, error, backendMode, vectorAvailable, endpoints, refresh: refreshFromBackend, toggle: handleToggle, resetToken: handleResetToken } = useMcpActions({ t });
   const [showToken, setShowToken] = useState(false);
-  const [backendMode, setBackendMode] = useState(false);
-  const [vectorAvailable, setVectorAvailable] = useState<boolean | null>(null);
-  // Defaults for Electron local; backend overwrites via /api/mcp/status
-  const [endpoints, setEndpoints] = useState({
-    streamableHttp: '/mcp',
-    sse: '/sse',
-    messages: '/messages',
-  });
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [portInput, setPortInput] = useState(String(mcpConfig.port || MCP_DEFAULT_PORT));
 
@@ -106,42 +84,6 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     showToken || !mcpConfig.token ? json : json.replace(mcpConfig.token, '••••••••')
   ), [mcpConfig.token, showToken]);
 
-  const refreshFromBackend = useCallback(async () => {
-    if (!backend.isAvailable) {
-      setBackendMode(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const status = await backend.getMcpStatus();
-      setBackendMode(true);
-      setMcpConfig({
-        enabled: status.enabled,
-        token: status.token,
-      });
-      setEndpoints(status.endpoints);
-      setVectorAvailable(status.vectorAvailable);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [setMcpConfig]);
-
-  useEffect(() => {
-    void refreshFromBackend();
-  }, [refreshFromBackend]);
-
-  // Mint a durable local token only when enabling without one (persisted in IndexedDB).
-  // Never rotate automatically — only user "Reset Token" replaces it.
-  // Lifecycle (start/stop/snapshot) lives in mcpElectronBridge (App session).
-  useEffect(() => {
-    if (!backendMode && isElectronApp && mcpConfig.enabled && !mcpConfig.token) {
-      setMcpConfig({ token: generateLocalToken() });
-    }
-  }, [backendMode, isElectronApp, mcpConfig.enabled, mcpConfig.token, setMcpConfig]);
-
   const copyText = async (key: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -150,76 +92,6 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       setTimeout(() => setCopiedKey(null), 1500);
     } catch {
       toast(t('复制失败', 'Copy failed'), 'error');
-    }
-  };
-
-  const handleToggle = async (enabled: boolean) => {
-    setSaving(true);
-    setError(null);
-    try {
-      if (backendMode && backend.isAvailable) {
-        const result = await backend.updateMcpConfig({ enabled });
-        setMcpConfig({ enabled: result.enabled, token: result.token });
-        setEndpoints(result.endpoints);
-        toast(
-          enabled
-            ? t('MCP 服务已开启', 'MCP server enabled')
-            : t('MCP 服务已关闭', 'MCP server disabled'),
-          'success'
-        );
-      } else if (isElectronApp) {
-        let token = mcpConfig.token;
-        if (enabled && !token) token = generateLocalToken();
-        setMcpConfig({ enabled, token });
-        toast(
-          enabled
-            ? t('MCP 服务已开启（本地）', 'MCP server enabled (local)')
-            : t('MCP 服务已关闭', 'MCP server disabled'),
-          'success'
-        );
-      } else {
-        toast(t('需要后端或客户端才能使用 MCP', 'Backend or desktop client required for MCP'), 'error');
-      }
-    } catch (err) {
-      setError((err as Error).message);
-      toast(t('操作失败', 'Operation failed'), 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleResetToken = async () => {
-    if (!mcpConfig.enabled) {
-      toast(
-        t('请先开启 MCP 服务再重置 Token', 'Enable MCP before resetting the token'),
-        'error'
-      );
-      return;
-    }
-    const ok = await confirm(
-      t('重置 MCP Token', 'Reset MCP Token'),
-      t(
-        '重置后旧 Token 立即失效，需要更新 Agent 配置。是否继续？',
-        'The old token will stop working immediately. Update your agent config. Continue?'
-      )
-    );
-    if (!ok) return;
-
-    setSaving(true);
-    try {
-      if (backendMode && backend.isAvailable) {
-        const result = await backend.updateMcpConfig({ resetToken: true, enabled: true });
-        // Backend token is session/UI only — store still holds local electron prefs separately
-        setMcpConfig({ token: result.token, enabled: result.enabled });
-      } else {
-        setMcpConfig({ token: generateLocalToken() });
-      }
-      toast(t('Token 已重置', 'Token reset'), 'success');
-    } catch (err) {
-      setError((err as Error).message);
-      toast(t('重置失败', 'Reset failed'), 'error');
-    } finally {
-      setSaving(false);
     }
   };
 
