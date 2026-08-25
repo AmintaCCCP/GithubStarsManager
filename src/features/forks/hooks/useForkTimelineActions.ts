@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { ForkRepo, GitHubOrganization, WorkflowDefinition } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
@@ -28,6 +28,7 @@ export const useForkTimelineActions = () => {
   const [expandedWorkflows, setExpandedWorkflows] = useState<Set<number>>(new Set());
   const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
+  const workflowLoadInFlightRef = useRef<Set<number>>(new Set());
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
   const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
@@ -90,7 +91,8 @@ export const useForkTimelineActions = () => {
   const loadWorkflows = useCallback(async (forkId: number) => {
     const fork = useAppStore.getState().forks.find(item => item.id === forkId);
     const githubToken = useAppStore.getState().githubToken;
-    if (!fork || !githubToken) return;
+    if (!fork || !githubToken || workflowLoadInFlightRef.current.has(forkId)) return;
+    workflowLoadInFlightRef.current.add(forkId);
     setLoadingWorkflows(previous => new Set(previous).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
@@ -99,6 +101,7 @@ export const useForkTimelineActions = () => {
     } catch (error) {
       console.error('Failed to load workflows:', error);
     } finally {
+      workflowLoadInFlightRef.current.delete(forkId);
       setLoadingWorkflows(previous => {
         const next = new Set(previous);
         next.delete(forkId);
@@ -180,16 +183,16 @@ export const useForkTimelineActions = () => {
   }, [loadedForkOwners, loadForksForOwner]);
 
   const toggleWorkflows = useCallback((forkId: number) => {
-    setExpandedWorkflows(previous => {
-      const next = new Set(previous);
-      if (next.has(forkId)) next.delete(forkId);
-      else {
-        next.add(forkId);
-        if (!workflowsMap[forkId]) void loadWorkflows(forkId);
-      }
-      return next;
-    });
-  }, [workflowsMap, loadWorkflows]);
+    const isExpanding = !expandedWorkflows.has(forkId);
+    const nextExpandedWorkflows = new Set(expandedWorkflows);
+    if (isExpanding) nextExpandedWorkflows.add(forkId);
+    else nextExpandedWorkflows.delete(forkId);
+    setExpandedWorkflows(nextExpandedWorkflows);
+
+    if (isExpanding && !workflowsMap[forkId]) {
+      void loadWorkflows(forkId);
+    }
+  }, [expandedWorkflows, workflowsMap, loadWorkflows]);
 
   const handleSyncUpstream = useCallback(async (fork: ForkRepo) => {
     if (!state.githubToken) {
