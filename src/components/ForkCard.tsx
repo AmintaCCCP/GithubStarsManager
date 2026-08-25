@@ -42,7 +42,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`ui-card rounded-xl cursor-pointer ${
+      className={`ui-card cursor-pointer ${
         isWorkflowsExpanded ? 'border-primary/20 ring-1 ring-ring/30' : ''
       }`}
     >

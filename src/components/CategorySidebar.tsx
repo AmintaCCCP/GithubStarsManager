@@ -564,7 +564,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           aria-pressed={isSelected}
                           size="sm"
-                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out pr-0 ${
+                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out pr-3 ${
                             isSelected
                               ? 'bg-accent text-accent-foreground font-medium'
                               : isDragTarget
