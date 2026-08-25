@@ -146,8 +146,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   }, [captureSession, isCurrentSession, scrollContainerRef, t, toast]);
 
   const handleAnalyzePage = useCallback(async () => {
-    if (!state.githubToken) return;
-    const activeConfig = state.aiConfigs.find(config => config.id === state.activeAIConfig);
+    const analysisState = latestStateRef.current;
+    if (!analysisState.githubToken) return;
+    const activeConfig = analysisState.aiConfigs.find(config => config.id === analysisState.activeAIConfig);
     if (!activeConfig) {
       toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
       return;
@@ -156,7 +157,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
       return;
     }
-    const pageRepos = state.discoveryRepos[state.selectedDiscoveryChannel] || [];
+    const pageRepos = analysisState.discoveryRepos[analysisState.selectedDiscoveryChannel] || [];
     const unanalyzed = pageRepos.filter(repo => !repo.analyzed_at || repo.analysis_failed);
     if (unanalyzed.length === 0) {
       toast(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'), 'info');
@@ -169,7 +170,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     const categories = getAllCategories(current.customCategories, current.language, current.hiddenDefaultCategoryIds, current.defaultCategoryOverrides);
     const categoryNames = [
       ...current.customCategories.map(category => category.name),
-      ...(state.language === 'zh'
+      ...(analysisState.language === 'zh'
         ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
         : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
     ];
@@ -178,10 +179,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       rateLimiter: { maxConcurrency: 0, requestsPerMinute: activeConfig.requestsPerMinute || 0 },
     });
     optimizerRef.current = optimizer;
-    state.setAnalysisProgress({ current: 0, total: unanalyzed.length });
+    analysisState.setAnalysisProgress({ current: 0, total: unanalyzed.length });
     try {
-      const api = new GitHubApiService(state.githubToken);
-      const service = new AIService(activeConfig, state.language);
+      const api = new GitHubApiService(analysisState.githubToken);
+      const service = new AIService(activeConfig, analysisState.language);
       const readmeCache = await optimizer.prefetchReadmes(unanalyzed, api);
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       const results = await optimizer.analyzeRepositories(
@@ -192,7 +193,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         buildCategoryHints(current.customCategories),
         (progressCurrent, total) => {
           if (!optimizer.isAborted() && isCurrentSession(analysisSession)) {
-            state.setAnalysisProgress({ current: progressCurrent, total });
+            analysisState.setAnalysisProgress({ current: progressCurrent, total });
           }
         },
         result => {
@@ -202,8 +203,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             const updatedRepo: DiscoveryRepo = {
               ...result.repo,
               rank: 0,
-              channel: state.selectedDiscoveryChannel,
-              platform: state.discoveryPlatform,
+              channel: analysisState.selectedDiscoveryChannel,
+              platform: analysisState.discoveryPlatform,
               ai_summary: result.summary,
               ai_tags: result.tags,
               ai_platforms: result.platforms,
@@ -213,11 +214,11 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
               analysis_failed: false,
               analysis_error: undefined,
             };
-            state.updateDiscoveryRepo(updatedRepo);
+            analysisState.updateDiscoveryRepo(updatedRepo);
             void discoveryAnalysisStorage.saveAnalysis(updatedRepo.id, { ai_summary: result.summary, ai_tags: result.tags, ai_platforms: result.platforms, analyzed_at: analyzedAt, analysis_failed: false, analysis_error: undefined });
           } else {
-            const failedRepo: DiscoveryRepo = { ...result.repo, rank: 0, channel: state.selectedDiscoveryChannel, platform: state.discoveryPlatform, analyzed_at: analyzedAt, analysis_failed: true, analysis_error: result.error?.message || undefined };
-            state.updateDiscoveryRepo(failedRepo);
+            const failedRepo: DiscoveryRepo = { ...result.repo, rank: 0, channel: analysisState.selectedDiscoveryChannel, platform: analysisState.discoveryPlatform, analyzed_at: analyzedAt, analysis_failed: true, analysis_error: result.error?.message || undefined };
+            analysisState.updateDiscoveryRepo(failedRepo);
             void discoveryAnalysisStorage.saveAnalysis(failedRepo.id, { analyzed_at: analyzedAt, analysis_failed: true, analysis_error: failedRepo.analysis_error });
           }
         },
@@ -234,10 +235,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (optimizerRef.current === optimizer) optimizerRef.current = null;
       if (isCurrentSession(analysisSession)) {
         setIsAnalyzing(false);
-        state.setAnalysisProgress({ current: 0, total: 0 });
+        analysisState.setAnalysisProgress({ current: 0, total: 0 });
       }
     }
-  }, [captureSession, isCurrentSession, state, t, toast]);
+  }, [captureSession, isCurrentSession, t, toast]);
 
   const handleAbortAnalysis = useCallback(() => {
     optimizerRef.current?.abort();

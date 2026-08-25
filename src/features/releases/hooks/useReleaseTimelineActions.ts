@@ -84,8 +84,9 @@ export const useReleaseTimelineActions = () => {
       }
 
       const existingReleases = useAppStore.getState().releases;
-      const actuallyNewReleases = newReleases.filter(release => !new Set(existingReleases.map(item => item.id)).has(release.id));
-      const updatedReleases = findReleasesWithChangedAssets(latestReleases, useAppStore.getState().releases);
+      const existingReleaseIds = new Set(existingReleases.map(item => item.id));
+      const actuallyNewReleases = newReleases.filter(release => !existingReleaseIds.has(release.id));
+      const updatedReleases = findReleasesWithChangedAssets(latestReleases, existingReleases);
       if (actuallyNewReleases.length > 0) addReleases(actuallyNewReleases);
       if (updatedReleases.length > 0) upsertReleases(updatedReleases);
       setLastRefreshTime(now);
@@ -110,12 +111,14 @@ export const useReleaseTimelineActions = () => {
   }, [state, toast]);
 
   const handleMarkAllRead = useCallback(async () => {
+    const readReleasesBeforeUpdate = new Set(useAppStore.getState().readReleases);
     setIsMarkingAllRead(true);
     try {
       state.markAllReleasesAsRead();
       await backend.markAllReleasesAsRead();
       toast(t('已全部标记为已读', 'All marked as read'), 'success');
     } catch {
+      useAppStore.setState({ readReleases: readReleasesBeforeUpdate });
       toast(t('标记全部已读失败', 'Failed to mark all as read'), 'error');
     } finally {
       setIsMarkingAllRead(false);

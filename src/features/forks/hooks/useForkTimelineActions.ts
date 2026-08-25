@@ -33,6 +33,8 @@ export const useForkTimelineActions = () => {
   const workflowLoadInFlightRef = useRef<Map<number, AuthSessionGeneration>>(new Map());
   const refreshRequestRef = useRef<{ id: number; session: AuthSessionGeneration } | null>(null);
   const refreshRequestIdRef = useRef(0);
+  const branchRequestRef = useRef<{ id: number; forkId: number; session: AuthSessionGeneration } | null>(null);
+  const branchRequestIdRef = useRef(0);
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
   const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
@@ -57,6 +59,12 @@ export const useForkTimelineActions = () => {
       refreshRequestRef.current = null;
       setForkIsRefreshing(false);
     }
+    if (branchRequestRef.current && !isCurrentSession(branchRequestRef.current.session)) {
+      branchRequestRef.current = null;
+      setIsFetchingBranches(false);
+      setSyncModalBranches([]);
+    }
+    setSyncingForks(new Set());
   }, [authSessionIdentity, isCurrentSession, setForkIsRefreshing]);
 
   useEffect(() => {
@@ -230,7 +238,15 @@ export const useForkTimelineActions = () => {
       toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
-    const requestSession = captureSession();
+    const request = {
+      id: ++branchRequestIdRef.current,
+      forkId: fork.id,
+      session: captureSession(),
+    };
+    branchRequestRef.current = request;
+    const isCurrentBranchRequest = () => branchRequestRef.current?.id === request.id
+      && branchRequestRef.current.forkId === request.forkId
+      && isCurrentSession(request.session);
     const defaultBranch = fork.default_branch || 'main';
     const [owner, repo] = fork.full_name.split('/');
     setSyncModal({ isOpen: true, forkId: fork.id, owner, repo, branch: defaultBranch, full_name: fork.full_name });
@@ -238,17 +254,20 @@ export const useForkTimelineActions = () => {
     setIsFetchingBranches(true);
     try {
       const branches = await new GitHubApiService(state.githubToken).getBranches(owner, repo);
-      if (!isCurrentSession(requestSession)) return;
+      if (!isCurrentBranchRequest()) return;
       setSyncModalBranches(branches);
       if (branches.length > 0 && !branches.includes(defaultBranch)) setSyncModal(previous => ({ ...previous, branch: branches[0] }));
     } catch (error) {
-      if (!isCurrentSession(requestSession)) return;
+      if (!isCurrentBranchRequest()) return;
       logger.error('githubApi', 'Failed to load fork branches for upstream sync', { repo: fork.full_name, error: error instanceof Error ? error.message : String(error) });
       setSyncModal(previous => ({ ...previous, isOpen: false, forkId: null }));
       setSyncModalBranches([]);
       toast(t('加载分支失败，请检查网络连接后重试。', 'Failed to load branches. Please check your network connection and try again.'), 'error');
     } finally {
-      if (isCurrentSession(requestSession)) setIsFetchingBranches(false);
+      if (branchRequestRef.current?.id === request.id) {
+        branchRequestRef.current = null;
+        if (isCurrentSession(request.session)) setIsFetchingBranches(false);
+      }
     }
   }, [captureSession, isCurrentSession, state.githubToken, t, toast]);
 
@@ -258,10 +277,10 @@ export const useForkTimelineActions = () => {
     const fork = useAppStore.getState().forks.find(item => item.id === syncModal.forkId);
     if (!fork) return;
     const syncStartTime = Date.now();
+    const requestSession = captureSession();
     setSyncModal(previous => ({ ...previous, isOpen: false }));
     setSyncingForks(previous => new Set(previous).add(fork.id));
     try {
-      const requestSession = captureSession();
       const result = await new GitHubApiService(githubToken).syncFork(syncModal.owner, syncModal.repo, syncModal.branch);
       if (!isCurrentSession(requestSession)) return;
       logger.info('githubApi', 'Sync fork completed', { repo: fork.full_name, mergeType: result.mergeType, durationMs: Date.now() - syncStartTime });
@@ -280,6 +299,7 @@ export const useForkTimelineActions = () => {
       setNeedsSyncMap(previous => ({ ...previous, [fork.id]: false }));
       toast(result.mergeType === 'none' ? t(`${fork.name} 已是最新版本，无需更新。`, `${fork.name} is already up to date.`) : t(`已将 ${fork.name} 成功更新到上游最新版本。`, `${fork.name} has been successfully updated from upstream.`), result.mergeType === 'none' ? 'info' : 'success');
     } catch (error) {
+      if (!isCurrentSession(requestSession)) return;
       console.error('Sync failed:', error);
       const message = error instanceof Error ? error.message : String(error);
       logger.error('githubApi', 'Sync fork failed', { repo: fork.full_name, error: message, durationMs: Date.now() - syncStartTime });
@@ -290,7 +310,9 @@ export const useForkTimelineActions = () => {
           : t(`同步失败: ${message}`, `Sync failed: ${message}`);
       toast(userMessage, 'error');
     } finally {
-      setSyncingForks(previous => { const next = new Set(previous); next.delete(fork.id); return next; });
+      if (isCurrentSession(requestSession)) {
+        setSyncingForks(previous => { const next = new Set(previous); next.delete(fork.id); return next; });
+      }
     }
   }, [captureSession, isCurrentSession, syncModal, t, toast]);
 
