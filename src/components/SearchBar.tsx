@@ -1021,7 +1021,7 @@ export const SearchBar: React.FC = () => {
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
-            <div className="p-2 border-b border-border/60 dark:border-border flex items-center justify-between">
+            <div className="p-2 border-b border-border/60 dark:border-border/60 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索历史', 'Search History')}
               </span>
@@ -1052,7 +1052,7 @@ export const SearchBar: React.FC = () => {
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
-            <div className="p-2 border-b border-border/60 dark:border-border">
+            <div className="p-2 border-b border-border/60 dark:border-border/60">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索建议', 'Search Suggestions')}
               </span>

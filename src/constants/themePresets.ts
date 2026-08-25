@@ -38,6 +38,7 @@ export interface ThemePreset {
   radius?: string;
   fontSans?: string;
   fontMono?: string;
+  fontSerif?: string;
   shadowColor?: string;
   shadowOpacity?: number;
   /** Canonical box-shadow shared by subtle/elevated/dialog elevation tokens. */
@@ -136,6 +137,7 @@ export const THEME_PRESETS: ThemePreset[] = (() => {
       radius: generated.radius,
       fontSans: generated.fontSans,
       fontMono: generated.fontMono,
+      fontSerif: generated.fontSerif,
       shadowColor: generated.shadowColor,
       shadowOpacity: generated.shadowOpacity,
       shadow: generated.shadow,
@@ -153,6 +155,7 @@ export const THEME_PRESETS: ThemePreset[] = (() => {
       radius: generated.radius,
       fontSans: generated.fontSans,
       fontMono: generated.fontMono,
+      fontSerif: generated.fontSerif,
       shadowColor: generated.shadowColor,
       shadowOpacity: generated.shadowOpacity,
       shadow: generated.shadow,
