@@ -42,10 +42,8 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`bg-card rounded-xl border transition-all duration-300 ease-in-out cursor-pointer ${
-        isWorkflowsExpanded
-          ? 'border-primary/20 shadow-lg ring-1 ring-ring/30'
-          : 'border-border dark:border-border hover:shadow-md hover:border-black/10 dark:hover:border-white/10'
+      className={`ui-card cursor-pointer ${
+        isWorkflowsExpanded ? 'border-primary/20 ring-1 ring-ring/30' : ''
       }`}
     >
       {/* Header */}
@@ -64,7 +62,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   {fork.name}
                 </h4>
                 {fork.language && (
-                  <span className="px-1.5 py-0.5 bg-muted dark:bg-accent/60 text-muted-foreground dark:text-muted-foreground text-xs font-medium rounded-md border border-border dark:border-border shrink-0">
+                  <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs font-medium rounded-md border border-border shrink-0">
                     {fork.language}
                   </span>
                 )}
@@ -145,7 +143,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 disabled={isSyncing || !needsSync}
                 className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
                   needsSync
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
+                    ? 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
                 title={needsSync
@@ -167,7 +165,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 href={fork.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+                className="p-1 rounded bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 title={t('在GitHub上查看', 'View on GitHub')}
                 aria-label={t('在GitHub上查看', 'View on GitHub')}
                 onClick={(e) => {
@@ -216,7 +214,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   {workflows.map((workflow) => (
                     <div
                       key={workflow.id}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-black/[0.04] dark:border-border last:border-b-0"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border/60 dark:border-border last:border-b-0"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center space-x-2 min-w-0 flex-1">

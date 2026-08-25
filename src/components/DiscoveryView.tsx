@@ -56,27 +56,27 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
 const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
   trending: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-black/[0.08]',
+    shadow: 'shadow-subtle',
     largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   rocket: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-black/[0.08]',
+    shadow: 'shadow-subtle',
     largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   star: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-black/[0.08]',
+    shadow: 'shadow-subtle',
     largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   tag: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-black/[0.08]',
+    shadow: 'shadow-subtle',
     largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   search: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-black/[0.08]',
+    shadow: 'shadow-subtle',
     largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
 };
@@ -1086,7 +1086,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <div className="relative">
                         <div className="px-2 py-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground flex items-center gap-1.5 overflow-hidden">
                           <div 
-                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-purple-300/70 via-purple-400/70 to-purple-300/70 dark:from-purple-700/70 dark:via-purple-600/70 dark:to-purple-700/70 transition-all duration-400 ease-out"
+                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary/50 via-primary/70 to-primary/50 transition-all duration-400 ease-out"
                             style={{
                               width: analysisProgress.total > 0
                                 ? `${Math.min((analysisProgress.current / analysisProgress.total) * 100, 100)}%`
@@ -1217,7 +1217,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {currentIsLoading && allRepos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-4">
                 <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-background dark:from-accent/40 dark:to-transparent flex items-center justify-center">
                     <Loader2 className="w-7 h-7 animate-spin text-primary" />
                   </div>
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-green rounded-full animate-ping opacity-75" />
@@ -1332,7 +1332,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {!currentIsLoading && allRepos.length > 0 && (
               <div className={isDesktopSafeMode
                 ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
-                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-muted/60 to-muted/30 rounded-xl border border-black/[0.04] dark:border-border/50 text-sm'}>
+                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-muted/60 to-muted/30 rounded-xl border border-border/60 dark:border-border/50 text-sm'}>
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>

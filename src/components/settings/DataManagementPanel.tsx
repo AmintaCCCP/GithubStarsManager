@@ -1733,7 +1733,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {t('选择性删除数据', 'Selective Data Deletion')}
         </h3>
         <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
-          <div className="divide-y divide-black/[0.06] dark:divide-gray-700">
+          <div className="divide-y divide-border/60 dark:divide-border">
             {dataStats.map((stat) => (
               <div
                 key={stat.key}
@@ -1825,7 +1825,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.06] dark:divide-gray-700">
+                <tbody className="divide-y divide-border/60 dark:divide-border">
                   {operationLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-background dark:hover:bg-accent">
                       <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">

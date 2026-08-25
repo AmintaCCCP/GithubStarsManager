@@ -79,8 +79,8 @@ describe('ThemeSettingsCard', () => {
   it('switches presets on click and persists through the store action', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
-    await user.click(screen.getByRole('radio', { name: /Twitter/ }));
-    expect(mocks.state.themePreset).toBe('twitter');
+    await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
+    expect(mocks.state.themePreset).toBe('deep-purple');
     expect(mocks.state.theme).toBe('dark');
   });
 

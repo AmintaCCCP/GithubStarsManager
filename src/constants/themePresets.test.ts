@@ -58,7 +58,7 @@ describe('themePresets registry', () => {
   });
 
   it('validates ids through isThemePresetId', () => {
-    expect(isThemePresetId('twitter')).toBe(true);
+    expect(isThemePresetId('deep-purple')).toBe(true);
     expect(isThemePresetId(DEFAULT_THEME_PRESET_ID)).toBe(true);
     expect(isThemePresetId('does-not-exist')).toBe(false);
     expect(isThemePresetId(42)).toBe(false);

@@ -528,7 +528,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           {t('编辑分类', 'Edit Category')}
                         </span>
                         {isDefault && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
                             {t('默认分类', 'Default Category')}
                           </span>
                         )}
@@ -611,7 +611,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditIcon(originalCategory.icon);
                                   }
                                 }}
-                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
                                 {t('名字/图标', 'Name/Icon')}
                               </Button>
@@ -624,14 +624,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditKeywords(originalCategory.keywords?.join(', ') || '');
                                   }
                                 }}
-                                className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
                                 {t('关键词', 'Keywords')}
                               </Button>
                             )}
                             <Button
                               onClick={() => handleResetDefault(category.id, originalCategory)}
-                              className="h-auto text-xs px-2 py-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                              className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             >
                               {t('全部', 'All')}
                             </Button>
@@ -667,7 +667,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             size="icon"
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label={t('置顶', 'Move to top')}
                             title={t('置顶', 'Move to top')}
                           >
@@ -677,7 +677,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             size="icon"
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
-                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label={t('上移', 'Move up')}
                             title={t('上移', 'Move up')}
                           >
@@ -687,7 +687,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             size="icon"
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label={t('下移', 'Move down')}
                             title={t('下移', 'Move down')}
                           >
@@ -697,7 +697,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             size="icon"
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
-                            className="p-1.5 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label={t('置底', 'Move to bottom')}
                             title={t('置底', 'Move to bottom')}
                           >
@@ -711,7 +711,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >
@@ -720,7 +720,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 size="icon"
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 aria-label={t('删除', 'Delete')}
                                 title={t('删除', 'Delete')}
                               >
@@ -732,7 +732,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                               <Button
                                 size="icon"
                                 onClick={() => handleStartEdit(category)}
-                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground"
+                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 aria-label={t('编辑', 'Edit')}
                                 title={t('编辑', 'Edit')}
                               >

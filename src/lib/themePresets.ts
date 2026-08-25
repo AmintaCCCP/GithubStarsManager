@@ -29,6 +29,7 @@ export function buildThemePresetCss(): string {
       preset.radius ? `  --radius: ${preset.radius};` : '',
       preset.fontSans ? `  --font-sans: ${preset.fontSans};` : '',
       preset.fontMono ? `  --font-mono: ${preset.fontMono};` : '',
+      preset.fontSerif ? `  --font-serif: ${preset.fontSerif};` : '',
       ...(preset.shadowColor
         ? [
             `  --shadow-color: ${preset.shadowColor};`,

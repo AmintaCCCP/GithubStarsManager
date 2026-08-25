@@ -64,7 +64,7 @@ export const SearchDemo: React.FC = () => {
 
   if (!showDemo) {
     return (
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-border p-4 mb-6">
+      <div className="bg-gradient-to-r from-accent/70 to-background dark:from-accent/40 dark:to-background rounded-xl border border-border p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-primary/20 dark:bg-primary/20 rounded-lg">
@@ -95,8 +95,8 @@ export const SearchDemo: React.FC = () => {
     <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
-            <Search className="w-5 h-5 text-white" />
+          <div className="p-2 bg-primary rounded-lg">
+            <Search className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-foreground dark:text-foreground">

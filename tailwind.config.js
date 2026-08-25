@@ -34,7 +34,7 @@ export default {
         'elevated': 'var(--app-shadow-elevated)',
         'dialog': 'var(--app-shadow-dialog)',
         'focus': '0 0 0 3px hsl(var(--ring) / 0.18)',
-        'inset-panel': '0 1px 0 rgba(255,255,255,0.04) inset',
+        'inset-panel': '0 1px 0 hsl(var(--border) / 0.04) inset',
       },
       colors: {
         // shadcn semantic surfaces and compatibility aliases
@@ -71,6 +71,10 @@ export default {
         border: 'hsl(var(--border) / <alpha-value>)',
         input: 'hsl(var(--input) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
+        overlay: {
+          DEFAULT: 'hsl(var(--overlay) / <alpha-value>)',
+          foreground: 'hsl(var(--overlay-foreground) / <alpha-value>)',
+        },
         'marketing-black': 'hsl(var(--background) / <alpha-value>)',
         'panel-dark': 'hsl(var(--card) / <alpha-value>)',
         'surface-3': 'hsl(var(--muted) / <alpha-value>)',
@@ -87,9 +91,9 @@ export default {
         'security-lavender': 'hsl(var(--accent-foreground) / <alpha-value>)',
         // Semantic status colors (theme-tunable via --success/--warning).
         success: 'hsl(var(--success) / <alpha-value>)',
-        'success-foreground': 'hsl(0 0% 100% / <alpha-value>)',
+        'success-foreground': 'hsl(var(--success-foreground) / <alpha-value>)',
         warning: 'hsl(var(--warning) / <alpha-value>)',
-        'warning-foreground': 'hsl(0 0% 100% / <alpha-value>)',
+        'warning-foreground': 'hsl(var(--warning-foreground) / <alpha-value>)',
         'status-green': 'hsl(var(--success) / <alpha-value>)',
         'status-emerald': 'hsl(var(--success) / <alpha-value>)',
         'status-amber': 'hsl(var(--warning) / <alpha-value>)',
@@ -170,8 +174,8 @@ export default {
           '75%': { transform: 'translateY(-8px)' },
         },
         selectionExit: {
-          '0%': { transform: 'scale(1)', boxShadow: '0 0 0 2px #3b82f6' },
-          '50%': { transform: 'scale(1.01)', boxShadow: '0 0 0 3px #60a5fa' },
+          '0%': { transform: 'scale(1)', boxShadow: '0 0 0 2px hsl(var(--ring) / 0.9)' },
+          '50%': { transform: 'scale(1.01)', boxShadow: '0 0 0 3px hsl(var(--ring) / 0.6)' },
           '100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 transparent' },
         },
         expandFade: {

@@ -519,7 +519,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               onError={handleImageError}
               onClick={handleImageClick}
             />
-            <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none" />
+            <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-foreground/5 dark:ring-foreground/10 pointer-events-none" />
           </span>
 
           {!isLoading && !hasError && (
@@ -563,20 +563,20 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       {isZoomed && createPortal(
         <div
           ref={zoomOverlayRef}
-          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-sm flex items-center justify-center cursor-default select-none"
+          className="fixed inset-0 z-[99999] bg-overlay/90 backdrop-blur-sm flex items-center justify-center cursor-default select-none"
           onClick={() => {
             if (!isDragging) {
               closeZoom();
             }
           }}
         >
-          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-overlay/60 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 pointer-events-auto">
               {alt && (
-                <span className="text-white/70 text-sm truncate max-w-[300px]">{alt}</span>
+                <span className="text-overlay-foreground/70 text-sm truncate max-w-[300px]">{alt}</span>
               )}
               {naturalWidth > 0 && (
-                <span className="text-white/50 text-xs">{naturalWidth} × {naturalHeight}</span>
+                <span className="text-overlay-foreground/50 text-xs">{naturalWidth} × {naturalHeight}</span>
               )}
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
@@ -589,7 +589,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                     e.stopPropagation();
                     window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
                   }}
-                  className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                  className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
                   title={language === 'zh' ? '打开链接' : 'Open link'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -606,7 +606,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   handleDownload(e);
                 }}
                 disabled={isDownloading}
-                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
                 title={language === 'zh' ? '下载图片' : 'Download image'}
               >
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
@@ -619,12 +619,12 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   e.stopPropagation();
                   setZoomScale(prev => Math.min(5, prev + 0.5));
                 }}
-                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '放大' : 'Zoom in'}
               >
                 +
               </Button>
-              <span className="text-white/60 text-xs min-w-[3rem] text-center">
+              <span className="text-overlay-foreground/60 text-xs min-w-[3rem] text-center">
                 {Math.round(zoomScale * 100)}%
               </span>
               <Button
@@ -635,7 +635,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   e.stopPropagation();
                   setZoomScale(prev => Math.max(0.5, prev - 0.5));
                 }}
-                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
                 title={language === 'zh' ? '缩小' : 'Zoom out'}
               >
                 −
@@ -649,7 +649,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   setZoomScale(1);
                   setZoomPos({ x: 0, y: 0 });
                 }}
-                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm text-xs"
+                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-xs"
                 title={language === 'zh' ? '重置' : 'Reset'}
               >
                 1:1
@@ -658,7 +658,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 p-0 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeZoom();
@@ -718,9 +718,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             />
           </div>
 
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/50 text-xs pointer-events-none flex items-center gap-3">
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-overlay-foreground/50 text-xs pointer-events-none flex items-center gap-3">
             <span>{language === 'zh' ? '滚轮缩放 · 拖拽移动' : 'Scroll to zoom · Drag to pan'}</span>
-            <span className="text-white/30">|</span>
+            <span className="text-overlay-foreground/30">|</span>
             <span>{language === 'zh' ? 'Esc 或点击背景关闭' : 'Esc or click background to close'}</span>
           </div>
         </div>,

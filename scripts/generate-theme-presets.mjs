@@ -189,11 +189,12 @@ function composeShadow(styles) {
 
 /**
  * @fontsource-variable packages register families as "<Name> Variable", so
- * bundled families are aliased here. Unbundled families keep their original
- * names and degrade to system fallbacks.
+ * only those bundled families are aliased here. Regular @fontsource families,
+ * including the imported serif fonts, retain their declared family names.
  */
 const BUNDLED_VARIABLE_FONTS = new Set([
   'Open Sans',
+  'Inter',
   'Outfit',
   'Geist',
   'Geist Mono',
@@ -249,6 +250,7 @@ const presets = Object.entries(source.presets).map(([id, preset]) => {
     radius: lightStyles.radius ?? '0.5rem',
     fontSans: aliasFontFamily(lightStyles['font-sans']),
     fontMono: aliasFontFamily(lightStyles['font-mono']),
+    fontSerif: aliasFontFamily(lightStyles['font-serif']),
     lightColors,
     darkColors,
     shadowColor: shadow.colorTriplet,
@@ -292,6 +294,7 @@ export interface GeneratedThemePreset {
   radius: string;
   fontSans?: string;
   fontMono?: string;
+  fontSerif?: string;
   lightColors: GeneratedThemePalette;
   darkColors: GeneratedThemePalette;
   shadowColor: string;

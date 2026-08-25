@@ -172,7 +172,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                   aria-label={t(`文件名 ${index + 1}`, `Filename ${index + 1}`)}
                   value={file.filename}
                   onChange={(event) => updateFile(file.id, { filename: event.target.value })}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
                   placeholder={`file-${index + 1}.txt`}
                 />
                 <Button
@@ -192,7 +192,7 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                 value={file.content}
                 onChange={(event) => updateFile(file.id, { content: event.target.value })}
                 rows={8}
-                className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-black/20 dark:text-foreground"
+                className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
                 placeholder={t('输入文件内容', 'Enter file content')}
               />
             </div>

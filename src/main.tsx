@@ -13,6 +13,7 @@ import { ensureThemeStyleTag } from './lib/themePresets';
 
 // Self-hosted webfonts used by built-in theme presets (families load on demand).
 import '@fontsource-variable/open-sans';
+import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -21,7 +22,11 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/plus-jakarta-sans';
 import '@fontsource-variable/jetbrains-mono';
 import '@fontsource-variable/fira-code';
+import '@fontsource/ibm-plex-mono';
 import '@fontsource/space-mono';
+import '@fontsource/merriweather';
+import '@fontsource/lora';
+import '@fontsource/playfair-display';
 
 logger.info('app', 'Main.tsx loading');
 
@@ -73,9 +78,9 @@ try {
     <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
       <div style="max-width: 400px; text-align: center;">
         <div style="font-size: 48px; margin-bottom: 16px;">😵</div>
-        <h1 style="font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #333;">${strings.title}</h1>
-        <p style="color: #666; margin-bottom: 16px;">${strings.desc}</p>
-        <button onclick="window.location.reload()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">${strings.button}</button>
+        <h1 style="font-size: 20px; font-weight: bold; margin-bottom: 8px; color: hsl(var(--foreground, 222.2 84% 4.9%));">${strings.title}</h1>
+        <p style="color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%)); margin-bottom: 16px;">${strings.desc}</p>
+        <button onclick="window.location.reload()" style="padding: 8px 16px; background: hsl(var(--primary, 222.2 47.4% 11.2%)); color: hsl(var(--primary-foreground, 210 40% 98%)); border: none; border-radius: 6px; cursor: pointer;">${strings.button}</button>
       </div>
     </div>
   `;
