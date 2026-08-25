@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
@@ -57,18 +57,16 @@ export const useBulkRepositoryActions = ({
     toggleReleaseSubscription,
     batchUnsubscribeReleases,
     releaseSubscriptions,
-  } = useAppStore(
-    useCallback((state) => ({
-      githubToken: state.githubToken,
-      language: state.language,
-      updateRepository: state.updateRepository,
-      deleteRepository: state.deleteRepository,
-      toggleReleaseSubscription: state.toggleReleaseSubscription,
-      batchUnsubscribeReleases: state.batchUnsubscribeReleases,
-      releaseSubscriptions: state.releaseSubscriptions,
-    }), []),
-    shallow,
-  );
+  } = useAppStore(useShallow((state) => ({
+    githubToken: state.githubToken,
+    language: state.language,
+    updateRepository: state.updateRepository,
+    deleteRepository: state.deleteRepository,
+    toggleReleaseSubscription: state.toggleReleaseSubscription,
+    batchUnsubscribeReleases: state.batchUnsubscribeReleases,
+    releaseSubscriptions: state.releaseSubscriptions,
+  })));
+
   const { toast, confirm } = useDialog();
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
