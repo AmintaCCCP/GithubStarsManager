@@ -13,7 +13,7 @@ import tseslint from 'typescript-eslint';
  * mcpElectronBridge, aiRequestLimiter, discoveryAnalysisStorage) are intentionally NOT
  * banned — they are tools, not orchestration.
  */
-const BANNED_COMPONENT_SERVICE_IMPORTS = [
+const BANNED_COMPONENT_SERVICES = [
   'githubApi',
   'aiService',
   'aiAnalysisHelper',
@@ -24,8 +24,20 @@ const BANNED_COMPONENT_SERVICE_IMPORTS = [
   'backendAdapter',
   'rpcDownloadService',
   'githubApiFactory',
-].map((name) => `**/services/${name}`);
+];
 
+// Static-import ban patterns for no-restricted-imports.
+const BANNED_COMPONENT_SERVICE_IMPORTS = BANNED_COMPONENT_SERVICES.map(
+  (name) => `**/services/${name}`,
+);
+
+// Dynamic-import (ImportExpression) selectors for no-restricted-syntax. esquery's regex
+// attribute does not accept unescaped parens, so we emit one selector per service rather
+// than one alternation. Each matches a dynamic import() whose specifier ends in
+// .../services/<name>. Keep in sync with scripts/check-boundaries.cjs.
+const BANNED_COMPONENT_SERVICE_DYNAMIC_SELECTORS = BANNED_COMPONENT_SERVICES.map(
+  (name) => `ImportExpression > Literal[value=/\\/services\\/${name}$/]`,
+);
 /**
  * Phased allowlist: components whose operations have NOT yet been lifted into a hook.
  * The boundary rule is enforced everywhere in src/components/** EXCEPT these files.
@@ -74,9 +86,14 @@ export default tseslint.config(
   },
   {
     /**
-     * Boundary rule for View components: no direct imports of business services.
-     * Tests are exempt so vi.mock('../services/...') in *.test.tsx stays legal.
-     * The phased allowlist exempts not-yet-migrated components; see ADR §"Phased enforcement".
+     * Boundary rule for View components: no direct imports of business services, neither
+     * static nor dynamic. Tests are exempt so vi.mock('../services/...') in *.test.tsx
+     * stays legal. The phased allowlist exempts not-yet-migrated components; see ADR
+     * §"Phased enforcement".
+     *
+     * `no-restricted-imports` covers static `import ... from` / `export ... from`.
+     * `no-restricted-syntax` covers dynamic `import('...')` (ImportExpression), which
+     * no-restricted-imports does not inspect.
      */
     files: ['src/components/**/*.{ts,tsx}'],
     ignores: [
@@ -96,12 +113,25 @@ export default tseslint.config(
           ],
         },
       ],
+      'no-restricted-syntax': [
+        'error',
+        ...BANNED_COMPONENT_SERVICE_DYNAMIC_SELECTORS.map((selector) => ({
+          selector,
+          message:
+            'View components must not dynamically import() business services. Move the call into a hook in src/features/.../hooks/**. See docs/adr/0001-frontend-layering.md.',
+        })),
+      ],
     },
   },
   {
     /**
      * Purity rule for application commands: no React, no JSX, no DOM globals, no service or
-     * Store coupling. These modules are pure (state, input) => state functions.
+     * Store coupling — neither static nor dynamic. These modules are pure
+     * (state, input) => state functions.
+     *
+     * The pattern `** /store/**` (not just useAppStore) blocks store/selectors, store/helpers,
+     * etc. (space added here only to keep the comment open; the real pattern has no space.)
+     * No application module currently imports any store path.
      */
     files: ['src/features/*/application/**/*.{ts,tsx}'],
     rules: {
@@ -122,11 +152,29 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ['**/store/useAppStore', '**/store/useAppStore.ts', '**/services/**'],
+              group: ['**/store/**', '**/services/**'],
               message:
                 'Application command modules must not import the Store or any service. They are pure state transitions. See docs/adr/0001-frontend-layering.md.',
             },
           ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression > Literal[value=/^(react|react-dom)$/]',
+          message:
+            'Application command modules must not dynamically import() React. They are pure state transitions. See docs/adr/0001-frontend-layering.md.',
+        },
+        {
+          selector: 'ImportExpression > Literal[value=/\\/store\\//]',
+          message:
+            'Application command modules must not dynamically import() the Store. They are pure state transitions. See docs/adr/0001-frontend-layering.md.',
+        },
+        {
+          selector: 'ImportExpression > Literal[value=/\\/services\\//]',
+          message:
+            'Application command modules must not dynamically import() any service. They are pure state transitions. See docs/adr/0001-frontend-layering.md.',
         },
       ],
     },
