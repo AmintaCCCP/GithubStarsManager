@@ -629,10 +629,13 @@ textarea:focus-visible,
 }
 
 /* Interactive card surfaces share the same quiet elevation in every view.
-   Individual components may still express a selected/expanded state, but do
-   not introduce competing hover shadows or transforms. */
+   Selected and expanded cards retain their own ring/shadow treatment while
+   still receiving the shared hover border. */
 .ui-card:hover {
   border-color: hsl(var(--ring) / 0.5);
+}
+
+.ui-card:not(.linear-card-selected):not(.is-expanded):not(.ring-1):hover {
   box-shadow: var(--ui-shadow-float);
 }
 
