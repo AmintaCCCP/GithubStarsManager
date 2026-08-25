@@ -6,13 +6,10 @@ import { Bot, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Search, Star, Use
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
-import { GistCreateInput, GistUpdateInput } from '../services/githubApi';
-import { createGitHubApiService } from '../services/githubApiFactory';
-import { AIService } from '../services/aiService';
+import { useGistActions, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
 import { useAppStore } from '../store/useAppStore';
 import type { Gist, GistCategoryId } from '../types';
 import { filterAndSortGists, getGistCategoryItems } from '../utils/gistUtils';
-import { useDialog } from '../hooks/useDialog';
 
 const categoryIcons = {
   all: FileCode2,
@@ -30,30 +27,28 @@ const sortOptions = [
 export const GistView: React.FC = () => {
   const {
     user,
-    githubToken,
     gists,
     starredGists,
     gistSearchFilters,
     gistSearchResults,
     selectedGistCategory,
-    aiConfigs,
-    activeAIConfig,
     language,
-    setGists,
-    setStarredGists,
-    updateGist,
-    deleteGist,
     setGistSearchFilters,
     setGistSearchResults,
     setSelectedGistCategory,
-    setAnalyzingGist,
-  } = useAppStore();
-  const { toast, confirm } = useDialog();
+    deleteGist,
+    setStarredGists,
+    isRefreshing,
+    isSearching,
+    isAnalyzingAll,
+    refreshGists,
+    aiSearch: runAiSearch,
+    analyzeVisibleGists,
+    fetchGistDetail,
+    submitGist,
+  } = useGistActions();
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const [query, setQuery] = useState(gistSearchFilters.query);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [detailGist, setDetailGist] = useState<Gist | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingGist, setEditingGist] = useState<Gist | null>(null);
@@ -85,186 +80,27 @@ export const GistView: React.FC = () => {
     { id: 'mine', name: '我的gist', nameEn: 'My gists' },
   ];
 
-  const refreshGists = async () => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    setIsRefreshing(true);
-    try {
-      const api = createGitHubApiService(githubToken);
-      const [mine, starred] = await Promise.all([
-        api.getAllGists(gists),
-        api.getAllStarredGists([...gists, ...starredGists]),
-      ]);
-      const starredIds = new Set(starred.map(gist => gist.id));
-      setGists(mine.map(gist => ({ ...gist, starred: starredIds.has(gist.id) || gist.starred })));
-      setStarredGists(starred);
-      toast(t('Gist 同步完成', 'Gists synced'), 'success');
-    } catch (error) {
-      toast(error instanceof Error ? error.message : t('Gist 同步失败', 'Failed to sync gists'), 'error');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   const basicSearch = () => {
     setGistSearchFilters({ query });
   };
 
-  const aiSearch = async () => {
-    if (!query.trim()) return;
-    const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    if (!activeConfig) {
-      basicSearch();
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const aiService = new AIService(activeConfig, language);
-      const ranked = await aiService.searchGistsWithReranking(
-        filterAndSortGists(currentCategoryItems, { ...gistSearchFilters, query: '' }),
-        query
-      );
-      // AI 重排序结果已含完整顺序，先写入标记，避免 effect 因 query 变化把结果覆盖。
+  const aiSearch = () => {
+    void runAiSearch(query, currentCategoryItems, () => {
       aiRerankedRef.current = true;
-      setGistSearchFilters({ query });
-      setGistSearchResults(ranked);
-    } catch {
-      basicSearch();
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const analyzeVisibleGists = async () => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-    const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
-      return;
-    }
-    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model || activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务配置不完整，请检查设置。', 'AI service configuration is incomplete. Please check settings.'), 'error');
-      return;
-    }
-
-    const targets = gistSearchResults.filter(gist => !gist.analyzed_at || gist.analysis_failed);
-    if (targets.length === 0) {
-      toast(t('当前列表没有需要分析的 gist', 'No gists need analysis in the current list'), 'info');
-      return;
-    }
-
-    const confirmed = await confirm(
-      t('批量 AI 分析', 'Batch AI Analysis'),
-      t(`将分析 ${targets.length} 个 gist，是否继续？`, `Analyze ${targets.length} gists. Continue?`),
-      { type: 'warning' }
-    );
-    if (!confirmed) return;
-
-    setIsAnalyzingAll(true);
-    const api = createGitHubApiService(githubToken);
-    const aiService = new AIService(activeConfig, language);
-    let success = 0;
-    let failed = 0;
-
-    const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
-
-    const analyzeOne = async (gist: Gist) => {
-      setAnalyzingGist(gist.id, true);
-      try {
-        const detail = await api.getGistForAnalysis(gist.id, gist);
-        const summary = await aiService.analyzeGist(detail, api.getGistContentPreview(detail));
-        updateGist({
-          ...detail,
-          ai_summary: summary.trim(),
-          analyzed_at: new Date().toISOString(),
-          analysis_failed: false,
-          analysis_error: undefined,
-        });
-        success++;
-      } catch (error) {
-        updateGist({
-          ...gist,
-          analyzed_at: new Date().toISOString(),
-          analysis_failed: true,
-          analysis_error: error instanceof Error ? error.message : String(error),
-        });
-        failed++;
-      } finally {
-        setAnalyzingGist(gist.id, false);
-      }
-    };
-
-    // 按 concurrency 分批并发执行
-    for (let i = 0; i < targets.length; i += concurrency) {
-      const batch = targets.slice(i, i + concurrency);
-      await Promise.all(batch.map(gist => analyzeOne(gist)));
-    }
-
-    setIsAnalyzingAll(false);
-    toast(t(`AI分析完成：成功 ${success}，失败 ${failed}`, `AI analysis done: ${success} succeeded, ${failed} failed`), failed > 0 ? 'error' : 'success');
+    });
   };
 
   const openDetail = async (gist: Gist) => {
     const requestSeq = ++detailRequestSeqRef.current;
     setDetailGist(gist);
     setIsDetailOpen(true);
-    if (!githubToken) return;
-
-    try {
-      const detail = await createGitHubApiService(githubToken).getGist(gist.id, gist);
-      // 防止旧请求覆盖新打开的 gist 详情
-      if (requestSeq !== detailRequestSeqRef.current) return;
-      updateGist(detail);
-      setDetailGist(detail);
-    } catch (error) {
-      if (requestSeq !== detailRequestSeqRef.current) return;
-      const msg = error instanceof Error ? error.message : '';
-      // 502/503/504 通常是 GitHub gist API 对该 gist 稳定返回的服务端错误（如 karpathy/8627fe...），
-      // 重试无意义。此时用已缓存的 gist 数据降级打开弹窗，文件内容由 HighlightedCode 按需从 raw_url 获取。
-      const isServerFailure = /5\d{2}/.test(msg);
-      if (isServerFailure && gist) {
-        toast(
-          t('GitHub Gist API 暂时不可用，已使用缓存数据打开。文件内容将按需加载。', 'GitHub Gist API is temporarily unavailable. Opening with cached data. File content will load on demand.'),
-          'warning'
-        );
-        return;
-      }
-      toast(t(`获取 Gist 详情失败${msg ? `：${msg}` : ''}`, `Failed to load gist details${msg ? `: ${msg}` : ''}`), 'error');
-    }
+    const detail = await fetchGistDetail(gist);
+    if (requestSeq !== detailRequestSeqRef.current || !detail) return;
+    setDetailGist(detail);
   };
 
   const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {
-    if (!githubToken) return;
-    const api = createGitHubApiService(githubToken);
-    try {
-      if (editingGist) {
-        const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
-        updateGist({ ...updated, last_edited: new Date().toISOString() });
-        toast(t('Gist 已更新', 'Gist updated'), 'success');
-        return;
-      }
-
-      const created = await api.createGist(input as GistCreateInput);
-      updateGist({ ...created, last_edited: new Date().toISOString() });
-      toast(t('Gist 已创建', 'Gist created'), 'success');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : '';
-      const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
-      toast(
-        t(
-          `Gist ${editingGist ? '更新' : '创建'}失败：${msg || '未知错误'}${isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : ''}`,
-          `Failed to ${editingGist ? 'update' : 'create'} gist: ${msg || 'Unknown error'}${isPermission ? ' (Make sure your token has the gist scope and re-login with the updated token)' : ''}`
-        ),
-        'error'
-      );
-    }
+    await submitGist(input, editingGist);
   };
 
   return (

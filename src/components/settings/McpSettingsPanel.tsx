@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { isElectron } from '../../services/electronProxy';
 import { useDialog } from '../../hooks/useDialog';
 import { useMcpActions } from '../../features/settings/hooks/useMcpActions';
@@ -24,7 +25,11 @@ interface McpSettingsPanelProps {
 }
 
 export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
-  const { mcpConfig, setMcpConfig, language } = useAppStore();
+  const { mcpConfig, setMcpConfig, language } = useAppStore(useShallow((state) => ({
+    mcpConfig: state.mcpConfig,
+    setMcpConfig: state.setMcpConfig,
+    language: state.language,
+  })));
   const { toast } = useDialog();
   const { loading, saving, error, backendMode, vectorAvailable, endpoints, refresh: refreshFromBackend, toggle: handleToggle, resetToken: handleResetToken } = useMcpActions({ t });
   const [showToken, setShowToken] = useState(false);

@@ -2,6 +2,7 @@ import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { AIService } from '../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../services/vectorSearchService';
 import { GitHubApiService } from '../services/githubApi';
@@ -91,7 +92,28 @@ export const SearchBar: React.FC = () => {
     syncMode,
     user,
     addCustomCategory,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    searchFilters: state.searchFilters,
+    repositories: state.repositories,
+    releaseSubscriptions: state.releaseSubscriptions,
+    aiConfigs: state.aiConfigs,
+    activeAIConfig: state.activeAIConfig,
+    language: state.language,
+    setSearchFilters: state.setSearchFilters,
+    setSearchResults: state.setSearchResults,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    githubToken: state.githubToken,
+    lastSync: state.lastSync,
+    setRepositories: state.setRepositories,
+    setLastSync: state.setLastSync,
+    isSyncingStars: state.isSyncingStars,
+    setSyncingStars: state.setSyncingStars,
+    syncMode: state.syncMode,
+    user: state.user,
+    addCustomCategory: state.addCustomCategory,
+  })));
 
   const { toast, confirm } = useDialog();
   

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, Download, ExternalLink, Package, RefreshCw } from 'lucide-react';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -11,7 +12,10 @@ interface UpdateCheckerProps {
 }
 
 export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable }) => {
-  const { language, setUpdateNotification } = useAppStore();
+  const { language, setUpdateNotification } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    setUpdateNotification: state.setUpdateNotification,
+  })));
   const { toast } = useDialog();
   const [isChecking, setIsChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);

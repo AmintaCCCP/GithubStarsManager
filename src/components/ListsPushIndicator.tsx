@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 
 /**
@@ -8,7 +9,11 @@ import { useDialog } from '../hooks/useDialog';
  * 进度浮层，并在完成/失败时给出 toast 反馈。
  */
 export const ListsPushIndicator: React.FC = () => {
-  const { language, listsPush, resetListsPush } = useAppStore();
+  const { language, listsPush, resetListsPush } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    listsPush: state.listsPush,
+    resetListsPush: state.resetListsPush,
+  })));
   const { toast } = useDialog();
   const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
 

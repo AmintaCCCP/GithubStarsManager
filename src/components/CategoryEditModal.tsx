@@ -5,6 +5,7 @@ import { Save, X, Plus } from 'lucide-react';
 import { Modal } from './Modal';
 import { Category } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { validateCategoryName } from '../utils/categoryUtils';
 
@@ -798,7 +799,17 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   category,
   isCreating = false
 }) => {
-  const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore();
+  const { addCustomCategory, updateCustomCategory, updateDefaultCategory, resetDefaultCategory, resetDefaultCategoryNameIcon, resetDefaultCategoryKeywords, defaultCategoryOverrides, language, customCategories } = useAppStore(useShallow((state) => ({
+    addCustomCategory: state.addCustomCategory,
+    updateCustomCategory: state.updateCustomCategory,
+    updateDefaultCategory: state.updateDefaultCategory,
+    resetDefaultCategory: state.resetDefaultCategory,
+    resetDefaultCategoryNameIcon: state.resetDefaultCategoryNameIcon,
+    resetDefaultCategoryKeywords: state.resetDefaultCategoryKeywords,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    language: state.language,
+    customCategories: state.customCategories,
+  })));
 
   const { toast } = useDialog();
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;

@@ -19,24 +19,18 @@ import {
   X,
   Calendar
 } from 'lucide-react';
-import { useAppStore, getAllCategories } from '../store/useAppStore';
-import { GitHubApiService } from '../services/githubApi';
-import { AIService } from '../services/aiService';
-import { AIAnalysisOptimizer } from '../services/aiAnalysisOptimizer';
-import { resolveCategoryAssignment, buildCategoryHints } from '../utils/categoryUtils';
-import { discoveryAnalysisStorage } from '../services/discoveryAnalysisStorage';
+import { useAppStore } from '../store/useAppStore';
+import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
-import { useDialog } from '../hooks/useDialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import type {
   DiscoveryChannelId,
   DiscoveryChannelIcon,
-  DiscoveryRepo,
   DiscoveryPlatform,
   ProgrammingLanguage,
   SortBy,
@@ -418,6 +412,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, languag
 };
 
 export const DiscoveryView: React.FC = React.memo(() => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const {
     githubToken,
     language,
@@ -429,16 +424,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     discoveryLoadMoreError,
     selectedDiscoveryChannel,
     setSelectedDiscoveryChannel,
-    setDiscoveryLoading,
-    setDiscoveryLoadingMore,
-    setDiscoveryLoadMoreError,
-    setDiscoveryRepos,
-    setDiscoveryLastRefresh,
-    updateDiscoveryRepo,
-    aiConfigs,
-    activeAIConfig,
+    setDiscoveryScrollPosition,
     analysisProgress,
-    setAnalysisProgress,
     discoveryPlatform,
     setDiscoveryPlatform,
     discoveryLanguage,
@@ -452,25 +439,19 @@ export const DiscoveryView: React.FC = React.memo(() => {
     discoverySelectedTopic,
     setDiscoverySelectedTopic,
     discoveryHasMore,
-    setDiscoveryHasMore,
     discoveryNextPage,
-    setDiscoveryNextPage,
     discoveryTotalCount,
-    setDiscoveryTotalCount,
-    setDiscoveryScrollPosition,
-    appendDiscoveryRepos,
     trendingTimeRange,
     setTrendingTimeRange,
-  } = useAppStore();
+    t,
+    isAnalyzing,
+    refreshChannel,
+    handleAnalyzePage,
+    handleAbortAnalysis,
+  } = useDiscoveryActions(scrollContainerRef);
 
-  const { toast } = useDialog();
-
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisOptimizer, setAnalysisOptimizer] = useState<AIAnalysisOptimizer | null>(null);
-  const [, setAnalysisState] = useState<{ paused: boolean; aborted: boolean }>({ paused: false, aborted: false });
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
   
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
@@ -481,9 +462,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 用于记录最近一次自动拉取的频道，防止空频道无限循环拉取
   const autoFetchChannelRef = useRef<string | null>(null);
   const appliedTopicRef = useRef<{ topic: string | null; platform: DiscoveryPlatform } | null>(null);
-  const topicRequestVersionRef = useRef(0);
 
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const isAnalyzingThisChannel = isAnalyzing && analysisProgress.total > 0;
   const isDesktopSafeMode = useMemo(() => {
     if (typeof window === 'undefined') return false;
     return window.location.protocol === 'file:' || navigator.userAgent.includes('Electron');
@@ -512,149 +492,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
 
 
-
-  const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page: number = 1, append: boolean = false) => {
-    if (!githubToken) {
-      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    const topicRequestVersion = channelId === 'topic' ? ++topicRequestVersionRef.current : null;
-    const topicRequestSelection = channelId === 'topic'
-      ? { topic: discoverySelectedTopic, platform: discoveryPlatform }
-      : null;
-    const isCurrentTopicRequest = () => {
-      if (topicRequestVersion === null) return true;
-      const currentStore = useAppStore.getState();
-      return topicRequestVersionRef.current === topicRequestVersion
-        && currentStore.discoverySelectedTopic === topicRequestSelection?.topic
-        && currentStore.discoveryPlatform === topicRequestSelection?.platform;
-    };
-    const ownsTopicLoading = () => (
-      topicRequestVersion === null || topicRequestVersionRef.current === topicRequestVersion
-    );
-
-    if (append) {
-      setDiscoveryLoadingMore(channelId, true);
-      setDiscoveryLoadMoreError(channelId, null);
-    } else {
-      setDiscoveryLoading(channelId, true);
-    }
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      let result;
-
-      switch (channelId) {
-        case 'trending':
-          result = await githubApi.getTrendingRepositories(discoveryPlatform, page, 20, trendingTimeRange);
-          break;
-        case 'hot-release':
-          result = await githubApi.getHotReleaseRepositories(discoveryPlatform, page);
-          break;
-        case 'most-popular':
-          result = await githubApi.getMostPopular(discoveryPlatform, page);
-          break;
-        case 'topic':
-          if (discoverySelectedTopic) {
-            result = await githubApi.getTopicRepositories(discoverySelectedTopic, discoveryPlatform, page);
-          } else {
-            result = await githubApi.getTrendingRepositories(discoveryPlatform, page);
-          }
-          break;
-        case 'search':
-          if (discoverySearchQuery.trim()) {
-            result = await githubApi.searchRepositories(
-              discoverySearchQuery,
-              discoveryPlatform,
-              discoveryLanguage,
-              discoverySortBy,
-              discoverySortOrder,
-              page
-            );
-          } else {
-            result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
-          }
-          break;
-        default:
-          result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
-      }
-
-      if (!isCurrentTopicRequest()) return;
-
-      const prevCount = useAppStore.getState().discoveryRepos[channelId]?.length ?? 0;
-
-      const currentAllRepos = useAppStore.getState().discoveryRepos[channelId] || [];
-      const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
-      if (!isCurrentTopicRequest()) return;
-      const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
-        const existingRepo = currentAllRepos.find((r: DiscoveryRepo) => r.id === newRepo.id);
-        if (existingRepo && existingRepo.analyzed_at) {
-          return {
-            ...newRepo,
-            ai_summary: existingRepo.ai_summary,
-            ai_tags: existingRepo.ai_tags,
-            ai_platforms: existingRepo.ai_platforms,
-            analyzed_at: existingRepo.analyzed_at,
-            analysis_failed: existingRepo.analysis_failed,
-            analysis_error: existingRepo.analysis_error,
-          };
-        }
-        const persisted = persistedAnalyses.get(newRepo.id);
-        if (persisted && persisted.analyzed_at) {
-          return {
-            ...newRepo,
-            ai_summary: persisted.ai_summary,
-            ai_tags: persisted.ai_tags,
-            ai_platforms: persisted.ai_platforms,
-            analyzed_at: persisted.analyzed_at,
-            analysis_failed: persisted.analysis_failed,
-            analysis_error: persisted.analysis_error,
-          };
-        }
-        return newRepo;
-      });
-
-      if (append) {
-        appendDiscoveryRepos(channelId, mergedRepos);
-      } else {
-        setDiscoveryRepos(channelId, mergedRepos);
-      }
-      setDiscoveryHasMore(channelId, result.hasMore);
-      setDiscoveryNextPage(channelId, result.nextPageIndex);
-      if (result.totalCount !== undefined) {
-        setDiscoveryTotalCount(channelId, result.totalCount);
-      }
-      setDiscoveryLastRefresh(channelId, new Date().toISOString());
-
-      if (append && scrollContainerRef.current) {
-        requestAnimationFrame(() => {
-          if (!scrollContainerRef.current) return;
-          const repoCards = scrollContainerRef.current.querySelectorAll('[data-repo-index]');
-          const targetCard = repoCards[prevCount] as HTMLElement | undefined;
-          if (targetCard) {
-            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        });
-      }
-    } catch (error) {
-      if (!isCurrentTopicRequest()) return;
-      if (channelId === 'topic') {
-        appliedTopicRef.current = null;
-      }
-      console.error(`Failed to refresh channel ${channelId}:`, error);
-      if (append) {
-        setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
-      } else {
-        toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
-      }
-    } finally {
-      if (append) {
-        setDiscoveryLoadingMore(channelId, false);
-      } else if (ownsTopicLoading()) {
-        setDiscoveryLoading(channelId, false);
-      }
-    }
-  }, [githubToken, t, toast, setDiscoveryLoading, setDiscoveryLoadingMore, setDiscoveryLoadMoreError, setDiscoveryRepos, setDiscoveryLastRefresh, discoveryPlatform, discoveryLanguage, discoverySortBy, discoverySortOrder, discoverySearchQuery, discoverySelectedTopic, setDiscoveryHasMore, setDiscoveryNextPage, setDiscoveryTotalCount, appendDiscoveryRepos, trendingTimeRange]);
 
   // 切换频道时恢复滚动位置，并自动加载空数据
   useEffect(() => {
@@ -735,169 +572,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
       }
     };
   }, [handleScroll]);
-
-  const handleAnalyzePage = useCallback(async () => {
-    if (!githubToken) return;
-
-    const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
-    if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
-      return;
-    }
-
-    if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
-      return;
-    }
-
-    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
-      return;
-    }
-
-    const pageRepos = allRepos;
-
-    if (pageRepos.length === 0) {
-      toast(t('当前没有项目。', 'No projects available.'), 'error');
-      return;
-    }
-
-    const unanalyzed = pageRepos.filter(
-      (r: DiscoveryRepo) => !r.analyzed_at || r.analysis_failed
-    );
-
-    if (unanalyzed.length === 0) {
-      toast(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'), 'info');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setAnalysisState({ paused: false, aborted: false });
-    const storeState = useAppStore.getState();
-    const allCategoriesForResolution = getAllCategories(
-      storeState.customCategories,
-      storeState.language,
-      storeState.hiddenDefaultCategoryIds,
-      storeState.defaultCategoryOverrides
-    );
-    const allCategoryNames = storeState
-      .customCategories.map(c => c.name);
-    const categoryNames = [
-      ...allCategoryNames,
-      ...(language === 'zh'
-        ? ['全部分类', 'Web应用', '移动应用', '桌面应用', '数据库', 'AI/机器学习', '开发工具', '安全工具', '游戏', '设计工具', '效率工具', '教育学习', '社交网络', '数据分析']
-        : ['All', 'Web Apps', 'Mobile Apps', 'Desktop Apps', 'Database', 'AI/ML', 'Dev Tools', 'Security Tools', 'Games', 'Design Tools', 'Productivity', 'Education', 'Social Networks', 'Data Analysis']),
-    ];
-    const aiCategoryHints = buildCategoryHints(storeState.customCategories);
-
-    const githubApi = new GitHubApiService(githubToken);
-    const aiService = new AIService(activeConfig, language);
-    const optimizer = new AIAnalysisOptimizer({
-      initialConcurrency: activeConfig.concurrency || 3,
-      rateLimiter: {
-        maxConcurrency: 0,
-        requestsPerMinute: activeConfig.requestsPerMinute || 0,
-      },
-    });
-    setAnalysisOptimizer(optimizer);
-
-    setAnalysisProgress({ current: 0, total: unanalyzed.length });
-
-    try {
-      const readmeCache = await optimizer.prefetchReadmes(unanalyzed, githubApi);
-      if (optimizer.isAborted()) return;
-
-      const results = await optimizer.analyzeRepositories(
-        unanalyzed,
-        readmeCache,
-        aiService,
-        categoryNames,
-        aiCategoryHints,
-        (current: number, total: number) => {
-          setAnalysisProgress({ current, total });
-        },
-        (result) => {
-          if (result.success && result.repo) {
-            const resolvedCategory = resolveCategoryAssignment(
-              { ...result.repo, ai_summary: result.summary },
-              result.tags || [],
-              allCategoriesForResolution
-            );
-
-            const wasCategoryLocked = !!result.repo.category_locked;
-
-            const updatedRepo: DiscoveryRepo = {
-              ...result.repo,
-              rank: 0,
-              channel: selectedDiscoveryChannel,
-              platform: discoveryPlatform,
-              ai_summary: result.summary,
-              ai_tags: result.tags,
-              ai_platforms: result.platforms,
-              custom_category: resolvedCategory,
-              category_locked: wasCategoryLocked,
-              analyzed_at: new Date().toISOString(),
-              analysis_failed: false,
-              analysis_error: undefined,
-            };
-            updateDiscoveryRepo(updatedRepo);
-            discoveryAnalysisStorage.saveAnalysis(updatedRepo.id, {
-              ai_summary: result.summary,
-              ai_tags: result.tags,
-              ai_platforms: result.platforms,
-              analyzed_at: updatedRepo.analyzed_at,
-              analysis_failed: false,
-              analysis_error: undefined,
-            });
-          } else if (!result.success && result.repo) {
-            const failedRepo: DiscoveryRepo = {
-              ...result.repo,
-              rank: 0,
-              channel: selectedDiscoveryChannel,
-              platform: discoveryPlatform,
-              analyzed_at: new Date().toISOString(),
-              analysis_failed: true,
-              analysis_error: result.error?.message || undefined,
-            };
-            updateDiscoveryRepo(failedRepo);
-            discoveryAnalysisStorage.saveAnalysis(failedRepo.id, {
-              analyzed_at: failedRepo.analyzed_at,
-              analysis_failed: true,
-              analysis_error: failedRepo.analysis_error,
-            });
-          }
-        }
-      );
-
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.filter(r => !r.success).length;
-      toast(
-        t(
-          `AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`,
-          `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`
-        ),
-        successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success'
-      );
-    } catch (err) {
-      console.error('AI analysis error:', err);
-      toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
-    } finally {
-      setIsAnalyzing(false);
-      setAnalysisOptimizer(null);
-      setAnalysisProgress({ current: 0, total: 0 });
-    }
-  }, [githubToken, aiConfigs, activeAIConfig, language, allRepos, t, toast, updateDiscoveryRepo, setAnalysisProgress, selectedDiscoveryChannel, discoveryPlatform]);
-
-
-
-  const handleAbortAnalysis = useCallback(() => {
-    analysisOptimizer?.abort();
-    setAnalysisState(prev => ({ ...prev, aborted: true }));
-  }, [analysisOptimizer]);
-
-  const isAnalyzingThisChannel = isAnalyzing && (
-    analysisProgress.total > 0
-  );
 
   const handleSearch = useCallback(() => {
     if (selectedDiscoveryChannel === 'search') {

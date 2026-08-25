@@ -6,6 +6,10 @@ import { useAppStore } from '../store/useAppStore';
 import { defaultReleaseSourceSettings } from '../types';
 import type { Release, Repository } from '../types';
 
+const { markAllReleasesOnBackend } = vi.hoisted(() => ({
+  markAllReleasesOnBackend: vi.fn(),
+}));
+
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn(),
 }));
@@ -15,7 +19,7 @@ vi.mock('../services/githubApi', () => ({
 }));
 
 vi.mock('../services/backendAdapter', () => ({
-  backend: {},
+  backend: { markAllReleasesAsRead: markAllReleasesOnBackend },
 }));
 
 vi.mock('../services/autoSync', () => ({
@@ -141,10 +145,15 @@ describe('ReleaseTimeline unread snapshot', () => {
       selector ? selector(storeState) : storeState) as unknown as typeof useAppStore);
     Object.assign(mockUseAppStore, {
       getState: vi.fn(() => storeState),
+      setState: vi.fn((update: Partial<typeof storeState>) => Object.assign(storeState, update)),
     });
 
     // 复刻真实 store 的 markReleaseAsRead 行为：标记已读并清空
     // updated_asset_ids 时会生成新的 releases 数组（引用变化）。
+    markAllReleasesOnBackend.mockResolvedValue(undefined);
+    storeState.markAllReleasesAsRead = vi.fn(() => {
+      storeState.readReleases = new Set(storeState.releases.map(release => release.id));
+    });
     storeState.markReleaseAsRead = vi.fn((releaseId: number) => {
       storeState.readReleases = new Set(storeState.readReleases);
       storeState.readReleases.add(releaseId);
@@ -154,6 +163,20 @@ describe('ReleaseTimeline unread snapshot', () => {
           : r
       );
     }) as unknown as typeof storeState.markReleaseAsRead;
+  });
+
+  it('restores the prior read state when backend bulk mark-all fails', async () => {
+    const user = userEvent.setup();
+    storeState.readReleases = new Set([999]);
+    markAllReleasesOnBackend.mockRejectedValueOnce(new Error('backend offline'));
+
+    render(<ReleaseTimeline />);
+    await user.click(screen.getByRole('button', { name: '全部已读' }));
+
+    await waitFor(() => {
+      expect(storeState.readReleases).toEqual(new Set([999]));
+      expect(toastMock).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    });
   });
 
   it('expanding an asset-updated release keeps it visible under unread-only mode', async () => {
