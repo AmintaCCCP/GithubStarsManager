@@ -14,7 +14,13 @@ function formatKiB(bytes) {
 }
 
 function compareChunks(left, right) {
-  return right.bytes - left.bytes || left.fileName.localeCompare(right.fileName);
+  if (right.bytes !== left.bytes) {
+    return right.bytes - left.bytes;
+  }
+
+  if (left.fileName < right.fileName) return -1;
+  if (left.fileName > right.fileName) return 1;
+  return 0;
 }
 
 function readChunks() {

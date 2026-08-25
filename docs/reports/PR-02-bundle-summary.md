@@ -6,7 +6,8 @@ This comparison uses raw filesystem bytes from `dist/assets`, sorted by size and
 |---|---:|---:|---:|
 | Modern entry | 2,398.64 KiB | 323.11 KiB | -2,075.53 KiB |
 | Legacy entry | 2,762.40 KiB | 458.57 KiB | -2,303.83 KiB (-83.39%) |
-| Legacy 3,000 KiB budget headroom | 237.60 KiB | 2,541.43 KiB | +2,303.83 KiB |
+| Largest legacy chunk (hard-gate input) | 2,762.40 KiB | 996.19 KiB | -1,766.21 KiB (-63.93%) |
+| Legacy 3,000 KiB budget headroom | 237.60 KiB | 2,003.81 KiB | +1,766.21 KiB |
 
 > The post-change build passes the unchanged 3,000 KiB legacy hard gate. Its largest legacy JavaScript asset is `github.min-legacy-mA468bxD.js` at 996.19 KiB; the legacy entry is 458.57 KiB.
 
