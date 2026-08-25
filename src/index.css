@@ -640,6 +640,7 @@ textarea:focus-visible,
   box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.03);
 }
 
+
 /* Interactive card surfaces share the same quiet elevation in every view.
    Selected and expanded cards retain their own ring/shadow treatment while
    still receiving the shared hover border. */
