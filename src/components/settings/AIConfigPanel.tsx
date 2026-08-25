@@ -8,7 +8,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle, Languages } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan, TranslationEngine } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
-import { AIService } from '../../services/aiService';
+import { useAIConfigActions } from '../../features/settings/hooks/useAIConfigActions';
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
@@ -92,11 +92,10 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   } = useAppStore();
 
   const { toast, confirm } = useDialog();
+  const { testingId, testingForm, testConfig, testDraft } = useAIConfigActions({ t });
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [testingForm, setTestingForm] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -248,61 +247,26 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     setShowCustomPrompt(config.useCustomPrompt || false);
   };
 
-  const handleTest = async (config: AIConfig) => {
-    setTestingId(config.id);
-    try {
-      const aiService = new AIService(config, language);
-      const result = await aiService.testConnection();
-
-      if (result.success) {
-        toast(t('AI服务连接成功！', 'AI service connection successful!'), 'success');
-      } else {
-        toast(result.message, 'error');
-      }
-    } catch (error) {
-      console.error('AI test failed:', error);
-      toast(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'), 'error');
-    } finally {
-      setTestingId(null);
-    }
-  };
+  const handleTest = (config: AIConfig) => testConfig(config);
 
   const handleTestForm = async () => {
     if (!form.baseUrl || !form.apiKey || !form.model) {
       toast(t('请先填写API端点、API密钥和模型名称', 'Please fill in API Endpoint, API Key and Model Name first'), 'error');
       return;
     }
-
-    setTestingForm(true);
-    try {
-      const tempConfig: AIConfig = {
-        id: '' as string,
-        name: form.name || 'Test',
-        apiType: form.apiType,
-        baseUrl: form.baseUrl.replace(/\/$/, ''),
-        apiKey: form.apiKey,
-        model: form.model,
-        isActive: false,
-        customPrompt: form.customPrompt || undefined,
-        useCustomPrompt: form.useCustomPrompt,
-        concurrency: form.concurrency,
-        reasoningEffort: form.reasoningEffort || undefined,
-      };
-
-      const aiService = new AIService(tempConfig, language);
-      const result = await aiService.testConnection();
-
-      if (result.success) {
-        toast(t('✅ AI服务连接成功！', '✅ AI service connection successful!'), 'success');
-      } else {
-        toast(result.message, 'error');
-      }
-    } catch (error) {
-      console.error('AI test failed:', error);
-      toast(t('AI服务测试失败，请检查网络连接和配置。', 'AI service test failed. Please check network connection and configuration.'), 'error');
-    } finally {
-      setTestingForm(false);
-    }
+    await testDraft({
+      id: '' as string,
+      name: form.name || 'Test',
+      apiType: form.apiType,
+      baseUrl: form.baseUrl.replace(/\/$/, ''),
+      apiKey: form.apiKey,
+      model: form.model,
+      isActive: false,
+      customPrompt: form.customPrompt || undefined,
+      useCustomPrompt: form.useCustomPrompt,
+      concurrency: form.concurrency,
+      reasoningEffort: form.reasoningEffort || undefined,
+    });
   };
 
   const defaultPrompt = useMemo(() => {
