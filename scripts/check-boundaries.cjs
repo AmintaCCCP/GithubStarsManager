@@ -73,7 +73,7 @@ const isTestFile = (rel) => /\.test\.(ts|tsx)$/.test(rel);
 //   import 'spec'     (bare side-effect import, no from clause)
 // The specifier is capture group 2 (from-form) or group 4 (side-effect form).
 const IMPORT_RE =
-  /\b(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"]+)\1|\bimport\s*(['"])([^'"]+)\1/g;
+  /\b(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"]+)\1|\bimport\s*(['"])([^'"]+)\3/g;
 
 // Match dynamic imports: import('...'). Captures the module specifier.
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
