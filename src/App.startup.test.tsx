@@ -1,10 +1,10 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const storeState = {
     isAuthenticated: true,
-    currentView: 'settings',
+    currentView: 'repositories',
     selectedCategory: 'all',
     theme: 'light',
     hasHydrated: true,
@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => {
     stopMcpElectronBridge: vi.fn(),
     refreshMcpElectronBridge: vi.fn(),
     useAutoUpdateCheck: vi.fn(),
+    loadedViews: new Set<string>(),
   };
 });
 
@@ -81,14 +82,29 @@ vi.mock('./services/autoSync', async () => {
 vi.mock('./components/LoginScreen', () => ({ LoginScreen: () => null }));
 vi.mock('./components/Header', () => ({ Header: () => null }));
 vi.mock('./components/SearchBar', () => ({ SearchBar: () => null }));
-vi.mock('./components/RepositoryList', () => ({ RepositoryList: () => null }));
+vi.mock('./components/RepositoryList', () => ({ RepositoryList: () => <div data-testid="repositories-view" /> }));
 vi.mock('./components/CategorySidebar', () => ({ CategorySidebar: () => null }));
-vi.mock('./components/ReleaseTimeline', () => ({ ReleaseTimeline: () => null }));
-vi.mock('./components/ForkTimeline', () => ({ ForkTimeline: () => null }));
-vi.mock('./components/SettingsPanel', () => ({ SettingsPanel: () => null }));
+vi.mock('./components/ReleaseTimeline', () => {
+  mocks.loadedViews.add('releases');
+  return { ReleaseTimeline: () => <div data-testid="releases-view" /> };
+});
+vi.mock('./components/ForkTimeline', () => {
+  mocks.loadedViews.add('forks');
+  return { ForkTimeline: () => <div data-testid="forks-view" /> };
+});
+vi.mock('./components/SettingsPanel', () => {
+  mocks.loadedViews.add('settings');
+  return { SettingsPanel: () => <div data-testid="settings-view" /> };
+});
 vi.mock('./components/DebugModeIndicator', () => ({ DebugModeIndicator: () => null }));
-vi.mock('./components/DiscoveryView', () => ({ DiscoveryView: () => null }));
-vi.mock('./components/GistView', () => ({ GistView: () => null }));
+vi.mock('./components/DiscoveryView', () => {
+  mocks.loadedViews.add('subscription');
+  return { DiscoveryView: () => <div data-testid="subscription-view" /> };
+});
+vi.mock('./components/GistView', () => {
+  mocks.loadedViews.add('gists');
+  return { GistView: () => <div data-testid="gists-view" /> };
+});
 vi.mock('./components/BackToTop', () => ({ BackToTop: () => null }));
 vi.mock('./components/ErrorBoundary', () => ({ ErrorBoundary: ({ children }: { children: unknown }) => children }));
 vi.mock('./components/SyncModeChoiceModal', () => ({ SyncModeChoiceModal: () => null }));
@@ -101,6 +117,8 @@ describe('App backend initialization', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mocks.storeState.currentView = 'repositories';
+    mocks.loadedViews.clear();
     mocks.backend.isAvailable = true;
     mocks.backend.init.mockResolvedValue(undefined);
     mocks.tryRestoreAuthFromBackend.mockResolvedValue(false);
@@ -128,5 +146,34 @@ describe('App backend initialization', () => {
     expect(mocks.backend.syncSettings).toHaveBeenCalledOnce();
     expect(mocks.syncFromBackend).toHaveBeenCalledOnce();
     expect(mocks.startAutoSync).toHaveBeenCalledOnce();
+  });
+
+  it('renders repositories before dormant views load, then resolves every lazy primary view after a view switch', async () => {
+    vi.useRealTimers();
+    const { rerender } = render(<App />);
+
+    expect(screen.getByTestId('repositories-view')).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mocks.loadedViews).toEqual(new Set());
+
+    const lazyViews = [
+      ['settings', 'settings-view'],
+      ['subscription', 'subscription-view'],
+      ['gists', 'gists-view'],
+      ['releases', 'releases-view'],
+      ['forks', 'forks-view'],
+    ] as const;
+
+    for (const [currentView, testId] of lazyViews) {
+      await act(async () => {
+        mocks.storeState.currentView = currentView;
+        rerender(<App />);
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId(testId)).toBeInTheDocument();
+      expect(mocks.loadedViews).toContain(currentView);
+    }
   });
 });
