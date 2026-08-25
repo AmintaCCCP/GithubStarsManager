@@ -91,10 +91,25 @@ describe('useVectorSearchActions', () => {
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+    expect(mocks.cleanup).not.toHaveBeenCalled();
     expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
       isIndexing: false,
       result: expect.objectContaining({ errors: 1 }),
     }));
+  });
+
+  it('keeps the format migration pending when an existing legacy vector is excluded from indexing', async () => {
+    storeState.repositories = [
+      repository,
+      { ...repository, id: 2, analyzed_at: undefined, analysis_failed: true, vector_indexed_at: '2026-08-01T00:00:00.000Z' } as Repository,
+    ];
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 1, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1'], expect.any(AbortSignal));
   });
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {
