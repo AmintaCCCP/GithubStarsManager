@@ -667,13 +667,13 @@ describe('useAppStore theme preset', () => {
   });
 
   it('restores a known persisted preset and switches it at runtime', () => {
-    const normalized = normalizePersistedState({ themePreset: 'twitter' }, useAppStore.getState());
-    expect(normalized.themePreset).toBe('twitter');
+    const normalized = normalizePersistedState({ themePreset: 'deep-purple' }, useAppStore.getState());
+    expect(normalized.themePreset).toBe('deep-purple');
 
     useAppStore.setState({ themePreset: 'default' });
     const themeBeforeSwitch = useAppStore.getState().theme;
-    useAppStore.getState().setThemePreset('twitter');
-    expect(useAppStore.getState().themePreset).toBe('twitter');
+    useAppStore.getState().setThemePreset('deep-purple');
+    expect(useAppStore.getState().themePreset).toBe('deep-purple');
     expect(useAppStore.getState().theme).toBe(themeBeforeSwitch);
   });
 });

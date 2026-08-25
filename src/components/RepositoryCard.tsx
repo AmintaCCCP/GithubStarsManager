@@ -42,8 +42,8 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
     default: '',
     ai: '', // AI variant uses dynamic classes based on state
     subscribe: '', // Subscribe variant uses dynamic classes based on state
-    edit: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground',
-    unstar: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground disabled:cursor-not-allowed',
+    edit: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+    unstar: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed',
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -208,7 +208,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         return (
           <mark
             key={index}
-            className="bg-primary/15 text-foreground px-1 rounded"
+            className="search-result-highlight px-1"
           >
             {part}
           </mark>
@@ -1074,7 +1074,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             onClick={handleAIAnalyze}
             disabled={isAnalyzing}
             selectionMode={selectionMode}
-            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground"
+            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             title={aiButtonTitle}
           >
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
@@ -1084,7 +1084,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             selectionMode={selectionMode}
             className={`${isSubscribed
               ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground'
+              : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
             }`}
             title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
           >
@@ -1107,7 +1107,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
           >
             <BookOpen className="w-4 h-4" />
@@ -1117,7 +1117,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
             title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
           >
             <ExternalLink className="w-4 h-4" />
@@ -1306,8 +1306,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               }}
               className={`flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
                 isSelected
-                  ? 'bg-accent text-foreground dark:bg-accent dark:text-foreground'
-                  : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
             >

@@ -44,7 +44,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-border p-4 mb-4">
+    <div className="bg-gradient-to-r from-accent/70 to-background dark:from-accent/30 dark:to-background rounded-lg border border-border p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           {isRealTimeSearch ? (

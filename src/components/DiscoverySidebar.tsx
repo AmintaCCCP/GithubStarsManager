@@ -3,12 +3,12 @@ import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'luci
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 import { Button } from './ui/button';
 
-const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  rocket: <Rocket className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  star: <Crown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  tag: <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  search: <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ComponentType<{ className?: string }>> = {
+  trending: TrendingUp,
+  rocket: Rocket,
+  star: Crown,
+  tag: Tag,
+  search: Search,
 };
 
 interface DiscoverySidebarProps {
@@ -47,10 +47,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
     return date.toLocaleDateString();
   };
 
-  const enabledChannels = (channels || []).filter(ch => ch.enabled).map(ch => ({
-    ...ch,
-    icon: discoveryChannelIconMap[ch.icon] || <Crown className="w-4 h-4 opacity-70" />,
-  }));
+  const enabledChannels = (channels || []).filter(ch => ch.enabled);
   
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 
@@ -78,6 +75,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
         <div className="space-y-1">
           {enabledChannels.map((channel) => {
             const isSelected = selectedChannel === channel.id;
+            const ChannelIcon = discoveryChannelIconMap[channel.icon] || Crown;
             const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
 
             return (
@@ -88,12 +86,12 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 aria-pressed={isSelected}
                 className={`flex w-full items-center justify-between px-3 py-2 rounded-lg text-left transition-all duration-200 ${
                   isSelected
-                    ? 'bg-muted text-foreground dark:bg-accent dark:text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-accent/60'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
                 <span className="flex items-center gap-2.5">
-                  {channel.icon}
+                  <ChannelIcon className="w-4 h-4" />
                   <span className="font-medium text-sm">
                     {language === 'zh' ? channel.name : channel.nameEn}
                   </span>

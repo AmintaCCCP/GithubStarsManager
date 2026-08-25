@@ -243,7 +243,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             className={`p-4 rounded-lg border transition-colors ${
               config.id === activeWebDAVConfig
                 ? 'border-border bg-accent/50 dark:border-border/[0.12] dark:bg-accent/60'
-                : 'border-border dark:border-border hover:border-border dark:hover:border-white/[0.08]'
+                : 'border-border dark:border-border hover:border-border dark:hover:border-border-strong'
             }`}
           >
             <div className="flex items-center justify-between">

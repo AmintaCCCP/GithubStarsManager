@@ -41,14 +41,14 @@ const BILINGUAL_MODE_CSS = `
 .bimd-mode-translated [${ATTR_ORIGINAL}] { display: none !important; }
 .bimd-mode-original [${ATTR_TRANSLATION}] { display: none !important; }
 [${ATTR_TRANSLATION}] code {
-  background: rgba(0,0,0,0.06);
+  background: hsl(var(--muted));
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 0.92em;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 .dark [${ATTR_TRANSLATION}] code {
-  background: rgba(255,255,255,0.1);
+  background: hsl(var(--foreground) / 0.1);
 }
 `;
 
@@ -232,7 +232,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
         const wrapper = document.createElement('div');
         wrapper.setAttribute(ATTR_TRANSLATION, 'true');
         wrapper.className =
-          'mt-1 pl-3 border-l-2 border-blue-400 dark:border-blue-500 text-muted-foreground dark:text-muted-foreground text-sm leading-relaxed';
+          'mt-1 pl-3 border-l-2 border-ring/70 dark:border-ring/80 text-muted-foreground dark:text-muted-foreground text-sm leading-relaxed';
 
         if (segments[i].hasInlineCode) {
           // 修改正则以支持带属性的 code 标签（如 <code class="...">）

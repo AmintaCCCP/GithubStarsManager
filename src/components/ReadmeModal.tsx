@@ -597,7 +597,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
               <div
-                className="h-full bg-blue-500 dark:bg-blue-400 transition-[width] duration-150 ease-out"
+                className="h-full bg-primary transition-[width] duration-150 ease-out"
                 style={{ width: `${scrollProgress}%` }}
               />
             </div>
@@ -687,7 +687,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
                       isTranslating
                         ? 'text-muted-foreground dark:text-muted-foreground/70 cursor-not-allowed'
-                        : 'text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-accent'
+                        : 'text-muted-foreground dark:text-foreground hover:text-foreground hover:bg-muted dark:hover:bg-accent'
                     }`}
                     title={t('翻译文档', 'Translate Document')}
                   >
@@ -748,7 +748,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 href={repository.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
+                className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-foreground hover:text-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
                 title={t('在 GitHub 上查看', 'View on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
@@ -798,7 +798,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </div>
                 <div
                   onMouseDown={handleResizeMouseDown}
-                  className="w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors flex-shrink-0 relative group"
+                  className="w-1.5 cursor-col-resize bg-transparent hover:bg-ring dark:hover:bg-ring transition-colors flex-shrink-0 relative group"
                 >
                   <div className="absolute inset-y-0 -left-1 -right-1" />
                 </div>
@@ -858,7 +858,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 onClick={scrollToTop}
                 aria-label={t('回到顶部', 'Back to top')}
-                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:hover:text-white transition-all z-10"
+                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground transition-all z-10"
                 title={t('回到顶部', 'Back to top')}
               >
                 <ArrowUp className="w-4 h-4" />

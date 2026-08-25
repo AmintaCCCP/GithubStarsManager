@@ -306,7 +306,7 @@
     @apply bg-transparent text-muted-foreground px-[10px] py-0 rounded-full border border-border text-[12px] font-medium flex items-center gap-1;
   }
   .pill-success {
-    @apply bg-emerald-700 text-white rounded-full text-[10px] font-medium;
+    @apply bg-success text-success-foreground rounded-full text-[10px] font-medium;
   }
   .badge-subtle {
     @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-[10px] font-medium;
@@ -378,7 +378,7 @@ textarea::-webkit-resizer {
 
 /* Enhanced placeholder styling (token-driven) */
 ::placeholder {
-  color: hsl(var(--ui-placeholder));
+  color: var(--ui-placeholder);
   opacity: 1;
 }
 
@@ -444,10 +444,18 @@ html body[data-scroll-locked] {
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
 
-  /* Status colors shared by the legacy status-* aliases and the semantic
-     success/warning utilities. Themes may override; defaults match history. */
+  /* Status fills use a dark foreground in every mode. The legacy white
+     foreground fails the 4.5:1 WCAG text target on these palettes. */
   --success: 142 76% 36%;
+  --success-foreground: 222.2 47.4% 11.2%;
   --warning: 34.7 94.6% 43.7%;
+  --warning-foreground: 222.2 47.4% 11.2%;
+
+  /* Scrim tokens for modal backdrops and the image lightbox — conventional
+     dark overlays in both modes. Not part of the tweakcn palette, so theme
+     presets cannot desaturate the scrim, but overridable here if desired. */
+  --overlay: 0 0% 0%;
+  --overlay-foreground: 0 0% 100%;
 
   /* Typography stacks (theme presets may swap families). */
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -477,7 +485,10 @@ html body[data-scroll-locked] {
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring) / 0.25);
   --ui-selection: hsl(var(--accent));
-  --ui-placeholder: 210 10.6% 64.9%;
+  --ui-selection-foreground: hsl(var(--accent-foreground));
+  --ui-search-highlight: hsl(var(--primary) / 0.16);
+  --ui-search-highlight-foreground: hsl(var(--foreground));
+  --ui-placeholder: hsl(var(--muted-foreground) / 0.55);
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
@@ -515,10 +526,18 @@ html.dark {
   --success: 141 69% 58%;
   --warning: 43 96% 56%;
 
+  /* Status fills use a dark foreground in both modes: white falls below the
+     WCAG text contrast target on the saturated success/warning palettes. */
+  --success-foreground: 222.2 47.4% 11.2%;
+  --warning-foreground: 222.2 47.4% 11.2%;
+
   /* Selection tint: solid accent wash in light mode, translucent ring glow in
      dark mode (mirrors the pre-tokenization visuals). */
   --ui-selection: hsl(var(--ring) / 0.3);
-  --ui-placeholder: 218 6.4% 56.9%;
+  --ui-selection-foreground: hsl(var(--foreground));
+  --ui-search-highlight: hsl(var(--ring) / 0.28);
+  --ui-search-highlight-foreground: hsl(var(--foreground));
+  --ui-placeholder: hsl(var(--muted-foreground) / 0.6);
 
   --ui-canvas: hsl(var(--background));
   --ui-panel: hsl(var(--card));
@@ -604,12 +623,33 @@ textarea:focus-visible,
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
   border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
+  border-radius: var(--ui-radius-md);
+  background-clip: padding-box;
   box-shadow: var(--ui-shadow-card);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
+/* Recessed content lives inside cards without introducing a new visual system.
+   It uses the theme canvas and the smaller native radius to retain hierarchy. */
+.ui-inset-surface {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--ui-radius-sm);
+  background-clip: padding-box;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.03);
+}
+
+
+/* Interactive card surfaces share the same quiet elevation in every view.
+   Selected and expanded cards retain their own ring/shadow treatment while
+   still receiving the shared hover border. */
 .ui-card:hover {
   border-color: hsl(var(--ring) / 0.5);
+}
+
+.ui-card:not(.linear-card-selected):not(.is-expanded):not(.ring-1):hover {
+  box-shadow: var(--ui-shadow-float);
 }
 
 .ui-divider {
@@ -712,8 +752,16 @@ select:focus {
 }
 
 ::selection {
-  color: var(--ui-text);
+  color: var(--ui-selection-foreground);
   background: var(--ui-selection);
+}
+
+.search-result-highlight {
+  color: var(--ui-search-highlight-foreground);
+  background: var(--ui-search-highlight);
+  border-radius: 0.25rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* Narrow, low-contrast scrolling aligned with the rest of the application chrome. */
@@ -819,7 +867,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 }
 
 .linear-filter-toggle .filter-badge {
-  color: #fff;
+  color: hsl(var(--primary-foreground));
   background: var(--ui-accent);
 }
 
@@ -841,11 +889,13 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   background: hsl(var(--accent));
 }
 
-/* Repository surfaces: an active item receives an accent line, not a heavy fill. */
+/* Repository surfaces: an active item receives an accent line, not a heavy fill.
+   Keeping the card surface intact avoids inheriting an incompatible text color
+   from a theme's accent token while the ring remains visually unambiguous. */
 .linear-card-selected {
-  background: hsl(var(--accent));
-  border-color: hsl(var(--ring) / 0.5);
-  box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2);
+  background: hsl(var(--card));
+  border-color: hsl(var(--ring) / 0.65);
+  box-shadow: 0 0 0 1px hsl(var(--ring) / 0.28), var(--ui-shadow-card);
 }
 
 .linear-card-tag {
@@ -909,7 +959,7 @@ html.dark .release-card.is-expanded {
 
 /* Floating layers use one elevated surface across settings, forms and details. */
 .linear-modal-backdrop {
-  background: rgb(0 0 0 / 0.5);
+  background: hsl(var(--overlay) / 0.5);
   backdrop-filter: blur(2px);
 }
 

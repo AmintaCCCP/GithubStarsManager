@@ -1021,7 +1021,7 @@ export const SearchBar: React.FC = () => {
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
-            <div className="p-2 border-b border-black/[0.04] dark:border-border flex items-center justify-between">
+            <div className="p-2 border-b border-border/60 dark:border-border/60 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索历史', 'Search History')}
               </span>
@@ -1052,7 +1052,7 @@ export const SearchBar: React.FC = () => {
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
-            <div className="p-2 border-b border-black/[0.04] dark:border-border">
+            <div className="p-2 border-b border-border/60 dark:border-border/60">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索建议', 'Search Suggestions')}
               </span>
@@ -1226,7 +1226,7 @@ export const SearchBar: React.FC = () => {
                     type="button"
                     onClick={() => { void handleStarSync(); }}
                     disabled={isSyncingStars}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
                     title={t('同步星标仓库列表', 'Sync starred repositories')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
@@ -1237,7 +1237,7 @@ export const SearchBar: React.FC = () => {
                       type="button"
                       disabled={isSyncingStars}
                       aria-label={t('更多同步选项', 'More sync options')}
-                      className="group inline-flex items-center px-1.5 py-2 text-sm font-medium disabled:opacity-50 border-l border-primary-foreground/20"
+                      className="group inline-flex items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
                       title={t('更多同步选项', 'More sync options')}
                     >
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />

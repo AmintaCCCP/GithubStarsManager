@@ -91,7 +91,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
 
   if (isLoadingRaw) {
     return (
-      <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-black/30">
+      <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
         <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
         <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载文件内容...', 'Loading file content...')}</span>
       </div>
@@ -100,7 +100,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
 
   if (needsRawFetch && rawError) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg bg-muted p-8 dark:bg-black/30">
+      <div className="flex flex-col items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
         <AlertCircle className="mb-3 h-8 w-8 text-muted-foreground dark:text-muted-foreground" />
         <p className="mb-4 max-w-md text-center text-sm text-muted-foreground dark:text-muted-foreground">{rawError}</p>
         <Button
@@ -119,7 +119,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
   }
 
   return (
-    <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-sm leading-6 dark:bg-black/30">
+    <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-sm leading-6 dark:bg-muted/40">
       <code ref={codeRef} className={`language-${language} font-mono text-foreground `}>
         {content || ''}
       </code>

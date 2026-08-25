@@ -354,7 +354,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="rounded-md border border-border max-h-72 overflow-y-auto bg-background dark:bg-foreground/[0.08]">
+              <div className="ui-inset-surface max-h-72 overflow-hidden overflow-y-auto">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   const isDownloading = downloadingRef.current[link.url];
@@ -373,7 +373,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading || isDownloaded}
-                        className={`h-auto flex items-center justify-between px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 disabled:opacity-60 ${
+                        className={`h-auto flex items-center justify-between rounded-none px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 disabled:opacity-60 ${
                           link.isSourceCode ? 'bg-accent/60' : ''
                         }`}
                       >
