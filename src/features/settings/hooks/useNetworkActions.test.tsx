@@ -70,7 +70,7 @@ describe('useNetworkActions', () => {
     expect(mocks.testRpcDownload).toHaveBeenCalledWith(rpcDownloadConfig, undefined);
   });
 
-  it('passes the proxy password to the store action for the existing persistence shell to omit', async () => {
+  it('passes the proxy password to the Store so it persists with the proxy configuration', async () => {
     const { result } = renderHook(() => useNetworkActions({ t: (zh) => zh }));
 
     await act(async () => { await result.current.saveProxy(); });

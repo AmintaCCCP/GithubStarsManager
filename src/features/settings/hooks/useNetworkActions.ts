@@ -121,15 +121,17 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
     }
   }, [backendHeaders]);
 
+  const isFormValid = !form.enabled || Boolean(form.host.trim() && form.port >= 1 && form.port <= 65535);
+  const isRpcFormValid = !rpcForm.enabled || Boolean(rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
+
   const saveProxy = useCallback(async () => {
-    const valid = !form.enabled || (form.host.trim() && form.port >= 1 && form.port <= 65535);
-    if (!valid) return;
+    if (!isFormValid) return;
     setSaving(true);
     setTestResult(null);
     const previous = proxyConfig;
     try {
       await putProxy(form);
-      // This store action is intentionally responsible for omitting password from persistence.
+      // Store persists the complete proxy configuration, including authentication credentials.
       setProxyConfig(form);
     } catch (reason) {
       if (isElectron()) {
@@ -139,7 +141,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
     } finally {
       setSaving(false);
     }
-  }, [form, proxyConfig, putProxy, setProxyConfig, t]);
+  }, [form, isFormValid, proxyConfig, putProxy, setProxyConfig, t]);
 
   const testProxy = useCallback(async () => {
     setTesting(true);
@@ -195,8 +197,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
   }, [backendHeaders, getRpcBaseUrl]);
 
   const saveRpc = useCallback(async () => {
-    const valid = !rpcForm.enabled || (rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
-    if (!valid) return;
+    if (!isRpcFormValid) return;
     setRpcSaving(true);
     setRpcTestResult(null);
     try {
@@ -209,7 +210,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
     } finally {
       setRpcSaving(false);
     }
-  }, [putRpc, rpcForm, setRpcDownloadConfig, t]);
+  }, [isRpcFormValid, putRpc, rpcForm, setRpcDownloadConfig, t]);
 
   const testRpc = useCallback(async () => {
     setRpcTesting(true);
@@ -240,9 +241,6 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
       setIsRpcToggling(false);
     }
   }, [isRpcToggling, putRpc, rpcDownloadConfig, rpcForm, setRpcDownloadConfig, t]);
-
-  const isFormValid = !form.enabled || Boolean(form.host.trim() && form.port >= 1 && form.port <= 65535);
-  const isRpcFormValid = !rpcForm.enabled || Boolean(rpcForm.host.trim() && rpcForm.port >= 1 && rpcForm.port <= 65535);
 
   return {
     canUseProxy: isElectron() || backend.isAvailable,
