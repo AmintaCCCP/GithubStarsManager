@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal } from 'lucide-react';
 import { Repository, Category } from '../types';
@@ -10,7 +10,8 @@ import { forceSyncToBackend } from '../services/autoSync';
 import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
-import { ReadmeModal } from './ReadmeModal';
+import { ErrorBoundary } from './ErrorBoundary';
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { shallow } from 'zustand/shallow';
@@ -18,6 +19,22 @@ import { useDialog } from '../hooks/useDialog';
 import { logger } from '../services/logger';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+
+const LazyReadmeModal = React.lazy(() =>
+  import('./ReadmeModal').then((module) => ({ default: module.ReadmeModal }))
+);
+
+const ReadmeModalLoadingFallback: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <DialogContent aria-describedby={undefined} className="w-[calc(100%_-_2rem)] max-w-[1130px] p-6">
+      <DialogTitle className="sr-only">Loading README</DialogTitle>
+      <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+        <p className="text-muted-foreground">Loading README...</p>
+      </div>
+    </DialogContent>
+  </Dialog>
+);
 
 // Selection-aware button component to centralize selectionMode disable logic
 interface SelectionAwareButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -1329,13 +1346,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         document.body
       )}
 
-      {/* README Modal - Using portal to render outside card container */}
+      {/* README Modal - lazily loaded and rendered outside the card container */}
       {readmeModalOpen && createPortal(
-        <ReadmeModal
-          isOpen={readmeModalOpen}
-          onClose={() => setReadmeModalOpen(false)}
-          repository={repository}
-        />,
+        <ErrorBoundary>
+          <Suspense fallback={<ReadmeModalLoadingFallback onClose={() => setReadmeModalOpen(false)} />}>
+            <LazyReadmeModal
+              isOpen={readmeModalOpen}
+              onClose={() => setReadmeModalOpen(false)}
+              repository={repository}
+            />
+          </Suspense>
+        </ErrorBoundary>,
         document.body
       )}
     </div>
