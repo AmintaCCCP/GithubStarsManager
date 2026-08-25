@@ -276,3 +276,72 @@ describe('ForkTimeline async session and sync contracts', () => {
     });
   });
 });
+
+
+describe('ForkTimeline branch request ordering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
+    Object.assign(mockUseAppStore, {
+      getState: vi.fn(() => storeState),
+      setState: vi.fn((updater: unknown) => {
+        if (typeof updater === 'function') {
+          Object.assign(storeState, (updater as (state: typeof storeState) => Partial<typeof storeState>)(storeState));
+        } else if (updater && typeof updater === 'object') {
+          Object.assign(storeState, updater);
+        }
+      }),
+    });
+    MockGitHubApiService.mockImplementation(() => ({
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([personalFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
+      checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
+    } as unknown as GitHubApiService));
+  });
+
+  it('ignores an earlier branch-load failure after a later fork request owns the modal', async () => {
+    storeState.forks = [personalFork, orgFork];
+    let rejectFirstRequest: (error: Error) => void = () => undefined;
+    const firstRequest = new Promise<string[]>((_, reject) => {
+      rejectFirstRequest = reject;
+    });
+    const secondRequest = new Promise<string[]>(() => undefined);
+    const getBranches = vi.fn()
+      .mockReturnValueOnce(firstRequest)
+      .mockReturnValueOnce(secondRequest);
+    const checkForkSyncNeeded = vi.fn().mockResolvedValue({ needsSync: true });
+    MockGitHubApiService.mockImplementation(() => ({
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([personalFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
+      checkForkSyncNeeded,
+      getBranches,
+    } as unknown as GitHubApiService));
+
+    render(<ForkTimeline />);
+    fireEvent.click(await screen.findByRole('button', { name: '刷新' }));
+    fireEvent.click(await screen.findByRole('button', { name: '更新分支' }));
+
+    fireEvent.click(screen.getByText('tamina（个人）'));
+    fireEvent.click(await screen.findByRole('option', { name: 'team-org' }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await screen.findByText('管理 team-org 的 1 个Fork仓库');
+    const refreshButton = screen.getByText('刷新').closest('button');
+    expect(refreshButton).not.toBeNull();
+    fireEvent.click(refreshButton!);
+    await waitFor(() => {
+      expect(checkForkSyncNeeded).toHaveBeenCalledWith('team-org', 'org-fork', 'main', 'upstream/org-fork');
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '更新分支' }));
+
+    rejectFirstRequest(new Error('stale branch request'));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/team-org\/org-fork/).length).toBeGreaterThan(0);
+      expect(screen.getByText('加载分支列表中...')).toBeInTheDocument();
+    });
+    expect(toastMock).not.toHaveBeenCalledWith('加载分支失败，请检查网络连接后重试。', 'error');
+  });
+});
