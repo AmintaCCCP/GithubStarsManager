@@ -107,9 +107,15 @@ describe('useVectorSearchActions', () => {
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
+    await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '2'], expect.any(AbortSignal));
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1', '2'], expect.any(AbortSignal));
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1', '2'], expect.any(AbortSignal));
+    expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 2 }),
+    ]));
+    expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 2 }));
   });
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {
