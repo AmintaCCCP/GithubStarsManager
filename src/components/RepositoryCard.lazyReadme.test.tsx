@@ -7,14 +7,25 @@ import type { Repository } from '../types';
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
   consoleError: vi.fn(),
+  repositoryCardActions: {
+    analyze: vi.fn(),
+    findSimilar: vi.fn(),
+    unstar: vi.fn(),
+    toggleReleaseSubscription: vi.fn(),
+    isSubscribed: false,
+    isAnalyzing: false,
+    isFindingSimilar: false,
+    isUnstarring: false,
+    vectorSearchAvailable: false,
+  },
 }));
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: mocks.useAppStore,
 }));
 
-vi.mock('../hooks/useDialog', () => ({
-  useDialog: () => ({ toast: vi.fn(), confirm: vi.fn() }),
+vi.mock('../features/repositories/hooks/useRepositoryCardActions', () => ({
+  useRepositoryCardActions: () => mocks.repositoryCardActions,
 }));
 
 vi.mock('./RepositoryEditModal', () => ({

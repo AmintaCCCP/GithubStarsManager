@@ -6,12 +6,26 @@ import { RepositoryCard } from './RepositoryCard';
 import { useAppStore } from '../store/useAppStore';
 import type { Repository } from '../types';
 
+const actionMocks = vi.hoisted(() => ({
+  actions: {
+    analyze: vi.fn(),
+    findSimilar: vi.fn(),
+    unstar: vi.fn(),
+    toggleReleaseSubscription: vi.fn(),
+    isSubscribed: true,
+    isAnalyzing: false,
+    isFindingSimilar: false,
+    isUnstarring: false,
+    vectorSearchAvailable: true,
+  },
+}));
+
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn(),
 }));
 
-vi.mock('../hooks/useDialog', () => ({
-  useDialog: () => ({ toast: vi.fn(), confirm: vi.fn() }),
+vi.mock('../features/repositories/hooks/useRepositoryCardActions', () => ({
+  useRepositoryCardActions: () => actionMocks.actions,
 }));
 
 vi.mock('./FloatingTooltip', () => ({
@@ -98,6 +112,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   storeState.releaseSubscriptions = new Set<number>([1]);
   storeState.vectorSearchConfig.enabled = true;
+  Object.assign(actionMocks.actions, {
+    isSubscribed: true,
+    isAnalyzing: false,
+    isFindingSimilar: false,
+    isUnstarring: false,
+    vectorSearchAvailable: true,
+  });
   mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
     selector ? selector(storeState) : storeState
   )) as typeof useAppStore);
@@ -130,9 +151,9 @@ describe('RepositoryCard view modes', () => {
 
   it('only exposes similar-repository search in the menu when vector search is available', async () => {
     const user = userEvent.setup();
-    const originalVectorSearchEnabled = storeState.vectorSearchConfig.enabled;
+    const originalVectorSearchAvailable = actionMocks.actions.vectorSearchAvailable;
     try {
-      storeState.vectorSearchConfig.enabled = false;
+      actionMocks.actions.vectorSearchAvailable = false;
       renderRepositoryCard('list');
 
       await user.click(screen.getByRole('button', { name: '更多操作' }));
@@ -141,8 +162,18 @@ describe('RepositoryCard view modes', () => {
       await user.keyboard('{Escape}');
       await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
     } finally {
-      storeState.vectorSearchConfig.enabled = originalVectorSearchEnabled;
+      actionMocks.actions.vectorSearchAvailable = originalVectorSearchAvailable;
     }
+  });
+
+  it('delegates the list similar-search menu action to the domain Hook', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('list');
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    await user.click(screen.getByRole('menuitem', { name: '查找同类仓库' }));
+
+    expect(actionMocks.actions.findSimilar).toHaveBeenCalledOnce();
   });
 
   it('closes the list action menu from card whitespace, page whitespace, or Escape', async () => {
@@ -186,7 +217,7 @@ describe('RepositoryCard view modes', () => {
     const unsubscribe = await screen.findByRole('menuitem', { name: '取消订阅 Release' });
     unsubscribe.focus();
     await user.keyboard('{Enter}');
-    expect(storeState.toggleReleaseSubscription).toHaveBeenCalledWith(repository.id);
+    expect(actionMocks.actions.toggleReleaseSubscription).toHaveBeenCalledOnce();
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消订阅 Release' })).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
@@ -194,6 +225,17 @@ describe('RepositoryCard view modes', () => {
     editAction.focus();
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
+  });
+
+  it('delegates grid quick actions to the domain Hook without changing their presentation', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+
+    await user.click(screen.getByTitle('AI分析此仓库'));
+    await user.click(screen.getByTitle('取消 Star'));
+
+    expect(actionMocks.actions.analyze).toHaveBeenCalledOnce();
+    expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
   });
 
   it('retains the existing quick action row in grid mode', () => {
