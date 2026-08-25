@@ -157,8 +157,12 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       });
       if (stamped.length) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const excludedVectorIds = repositories
+        .filter((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed))
+        .map((repository) => String(repository.id));
       if (!incremental && result.errors === 0) {
-        await clients.vectorService.cleanup(result.indexedRepoIds.map(String), controller.signal);
+        const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];
+        await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
       }
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       state.setVectorIndexingState({ result, isIndexing: false, phase: null });
@@ -169,8 +173,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });
-      const hasExcludedLegacyVector = currentFormatVersion < EMBEDDING_FORMAT_VERSION
-        && repositories.some((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed));
+      const hasExcludedLegacyVector = currentFormatVersion < EMBEDDING_FORMAT_VERSION && excludedVectorIds.length > 0;
       if (result.errors === 0 && !hasExcludedLegacyVector) {
         state.setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
       }

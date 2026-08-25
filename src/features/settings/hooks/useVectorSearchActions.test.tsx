@@ -109,7 +109,7 @@ describe('useVectorSearchActions', () => {
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1'], expect.any(AbortSignal));
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '2'], expect.any(AbortSignal));
   });
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {
