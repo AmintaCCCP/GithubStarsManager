@@ -384,7 +384,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         ? logger.getEntries({ level: minLevelName }).filter(e => selectedLevels.has(e.level)) : [];
       let backendLogs: LogEntry[] = [];
       if (selectedScope !== 'frontend' && backendAvailable) {
-        backendLogs = (await fetchBackendLogs(minLevelName)).logs.filter((entry) => selectedLevels.has(entry.level));
+        backendLogs = ((await fetchBackendLogs(minLevelName))?.logs ?? []).filter((entry) => selectedLevels.has(entry.level));
       }
       const state = useAppStore.getState();
       const isElectron = typeof window !== 'undefined' && window.electronAPI;
