@@ -3,6 +3,12 @@ import { EmbeddingConfig, Release, Repository, VectorSearchConfig, VectorSearchS
 import { EMBEDDING_FORMAT_VERSION, indexAllRepos } from '../services/vectorSearchService';
 import { CUSTOM_RELEASE_SOURCE_ID, createCustomReleaseRepository } from '../utils/releaseSources';
 import { findReleasesWithChangedAssets, shouldShowAssetsUpdatedIndicator } from '../utils/releaseAssets';
+import {
+  buildExpectedResetDiscoveryState,
+  buildPersistedSnapshot,
+  buildTransientDiscoverySnapshot,
+  type PersistedSnapshot,
+} from './__fixtures__/persistedSnapshots';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
 let normalizePersistedState: typeof import('./useAppStore').normalizePersistedState;
@@ -675,5 +681,226 @@ describe('useAppStore theme preset', () => {
     useAppStore.getState().setThemePreset('deep-purple');
     expect(useAppStore.getState().themePreset).toBe('deep-purple');
     expect(useAppStore.getState().theme).toBe(themeBeforeSwitch);
+  });
+});
+
+type PersistenceOptions = {
+  partialize: (state: typeof useAppStore extends never ? never : ReturnType<typeof useAppStore.getState>) => PersistedSnapshot;
+  migrate: (snapshot: PersistedSnapshot, version: number) => PersistedSnapshot | Promise<PersistedSnapshot>;
+  merge: (
+    snapshot: PersistedSnapshot,
+    currentState: ReturnType<typeof useAppStore.getState>,
+  ) => ReturnType<typeof useAppStore.getState>;
+};
+
+const persistenceOptions = (): PersistenceOptions => (
+  useAppStore.persist.getOptions() as unknown as PersistenceOptions
+);
+
+const migrateSnapshot = async (snapshot: PersistedSnapshot): Promise<PersistedSnapshot> => (
+  await persistenceOptions().migrate(snapshot, 0)
+);
+
+const partializeState = (overrides: Partial<ReturnType<typeof useAppStore.getState>> = {}): PersistedSnapshot => (
+  persistenceOptions().partialize({ ...useAppStore.getState(), ...overrides })
+);
+
+const backendSecretMirror = (secret: string | null): void => {
+  window.localStorage.setItem(
+    'github-stars-manager-auth',
+    JSON.stringify({ user: null, githubToken: null, backendApiSecret: secret }),
+  );
+};
+
+describe('useAppStore persisted-state historical fixtures', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem('github-stars-manager-auth');
+    window.sessionStorage.removeItem('github-stars-manager-backend-secret');
+  });
+
+  it('migrates the historical __EMPTY__ description marker to an explicit empty description', async () => {
+    const migrated = await migrateSnapshot(buildPersistedSnapshot({
+      repositories: [createRepository(1, { custom_description: '__EMPTY__' })],
+    }));
+
+    expect((migrated.repositories as Repository[])[0].custom_description).toBe('');
+  });
+
+  it('backfills release-sync metadata from the latest persisted release for legacy repositories', () => {
+    const normalized = normalizePersistedState(buildPersistedSnapshot({
+      repositories: [createRepository(1)],
+      releases: [
+        makeRelease(11, { repository: { id: 1, full_name: 'owner/repo-1', name: 'repo-1' }, published_at: '2026-01-03T00:00:00.000Z' }),
+        makeRelease(12, { repository: { id: 1, full_name: 'owner/repo-1', name: 'repo-1' }, published_at: '2026-02-04T00:00:00.000Z' }),
+      ],
+    }), useAppStore.getInitialState());
+
+    expect(normalized.repositories?.[0]).toMatchObject({
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-02-04T00:00:00.000Z',
+    });
+  });
+
+  it('preserves a historical MCP token while filling host and port defaults during migration and hydration', async () => {
+    const migrated = await migrateSnapshot(buildPersistedSnapshot({
+      mcpConfig: { enabled: true, token: 'mcp-historical-token' },
+    }));
+    const normalized = normalizePersistedState(migrated, useAppStore.getInitialState());
+
+    expect(normalized.mcpConfig).toEqual({
+      ...useAppStore.getInitialState().mcpConfig,
+      enabled: true,
+      token: 'mcp-historical-token',
+    });
+  });
+
+  it('maps legacy daily-dev channels into the most-dev schema and restores the trending channel', async () => {
+    const migrated = await migrateSnapshot(buildPersistedSnapshot({
+      subscriptionChannels: [{ id: 'daily-dev', name: 'Daily developers', enabled: false }],
+    }));
+    const channels = migrated.subscriptionChannels as Array<Record<string, unknown>>;
+
+    expect(channels).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'most-dev', nameEn: 'Top Developers', enabled: false }),
+      expect.objectContaining({ id: 'trending', nameEn: 'Trending', enabled: true }),
+    ]));
+  });
+
+  it('fills the header menu contract for snapshots written before the header configuration existed', async () => {
+    const migrated = await migrateSnapshot(buildPersistedSnapshot());
+
+    expect(migrated.headerMenuConfig).toEqual(useAppStore.getInitialState().headerMenuConfig);
+  });
+
+  it('migrates a historical snapshot idempotently across repeated startups', async () => {
+    const fixture = buildPersistedSnapshot({
+      repositories: [createRepository(1, { custom_description: '__EMPTY__' })],
+      subscriptionChannels: [{ id: 'daily-dev', name: 'Daily developers', enabled: true }],
+    });
+
+    const once = await migrateSnapshot(fixture);
+    const twice = await migrateSnapshot(once);
+
+    expect(twice).toEqual(once);
+  });
+
+  it('does not revive analyzing or discovery loading state from historical snapshots', () => {
+    const snapshot = buildPersistedSnapshot({
+      ...buildTransientDiscoverySnapshot(),
+      analyzingRepositoryIds: [1],
+      analyzingGistIds: ['gist-1'],
+    });
+    const normalized = normalizePersistedState(snapshot, useAppStore.getInitialState());
+
+    expect(normalized.analyzingRepositoryIds).toEqual(new Set());
+    expect(normalized.analyzingGistIds).toEqual(new Set());
+    expect(normalized).toMatchObject(buildExpectedResetDiscoveryState());
+  });
+
+  it('serializes number Sets as arrays and reconstructs Sets during hydration', () => {
+    const serialized = partializeState({
+      releaseSubscriptions: new Set([1, 2]),
+      readReleases: new Set([3]),
+      readForks: new Set([4]),
+      releaseExpandedRepositories: new Set([5]),
+      forkExpandedRepositories: new Set([6]),
+    });
+    const normalized = normalizePersistedState(serialized, useAppStore.getInitialState());
+
+    expect(serialized).toMatchObject({
+      releaseSubscriptions: [1, 2],
+      readReleases: [3],
+      readForks: [4],
+      releaseExpandedRepositories: [5],
+      forkExpandedRepositories: [6],
+    });
+    expect(normalized.releaseSubscriptions).toEqual(new Set([1, 2]));
+    expect(normalized.readReleases).toEqual(new Set([3]));
+    expect(normalized.readForks).toEqual(new Set([4]));
+    expect(normalized.releaseExpandedRepositories).toEqual(new Set([5]));
+    expect(normalized.forkExpandedRepositories).toEqual(new Set([6]));
+  });
+});
+
+describe('useAppStore backend API secret three-store contract', () => {
+  const sessionState = (backendApiSecret: string | null) => ({
+    ...useAppStore.getInitialState(),
+    backendApiSecret,
+  });
+
+  beforeEach(() => {
+    window.localStorage.removeItem('github-stars-manager-auth');
+    window.sessionStorage.removeItem('github-stars-manager-backend-secret');
+  });
+
+  it('uses the IndexedDB snapshot first and realigns the auth mirror after hydration', () => {
+    backendSecretMirror('mirror-secret');
+    window.sessionStorage.setItem('github-stars-manager-backend-secret', 'session-secret');
+    const merged = persistenceOptions().merge(
+      buildPersistedSnapshot({ backendApiSecret: 'idb-secret' }),
+      sessionState('session-secret'),
+    );
+
+    expect(merged.backendApiSecret).toBe('idb-secret');
+    expect(JSON.parse(window.localStorage.getItem('github-stars-manager-auth') || '{}')).toMatchObject({
+      backendApiSecret: 'idb-secret',
+    });
+  });
+
+  it('uses the localStorage auth mirror when IndexedDB lacks the secret', () => {
+    backendSecretMirror('mirror-secret');
+    const normalized = normalizePersistedState(buildPersistedSnapshot(), sessionState('session-secret'));
+
+    expect(normalized.backendApiSecret).toBe('mirror-secret');
+  });
+
+  it('falls back to the session secret when IndexedDB and the mirror are empty', () => {
+    const normalized = normalizePersistedState(buildPersistedSnapshot(), sessionState('session-secret'));
+
+    expect(normalized.backendApiSecret).toBe('session-secret');
+  });
+
+  it('keeps IndexedDB ahead of conflicting mirror and session values', () => {
+    backendSecretMirror('mirror-secret');
+    const normalized = normalizePersistedState(
+      buildPersistedSnapshot({ backendApiSecret: 'idb-secret' }),
+      sessionState('session-secret'),
+    );
+
+    expect(normalized.backendApiSecret).toBe('idb-secret');
+  });
+
+  it('hydrates an empty secret as null and clears the mirror to the same value', () => {
+    const merged = persistenceOptions().merge(buildPersistedSnapshot(), sessionState(null));
+
+    expect(merged.backendApiSecret).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem('github-stars-manager-auth') || '{}')).toMatchObject({
+      backendApiSecret: null,
+    });
+  });
+});
+
+describe('useAppStore persistence asymmetry contracts', () => {
+  it('never serializes discovery runtime repositories or proxy passwords, while retaining the RPC secret', () => {
+    const persisted = partializeState({
+      discoveryRepos: buildTransientDiscoverySnapshot().discoveryRepos as ReturnType<typeof useAppStore.getState>['discoveryRepos'],
+      proxyConfig: { enabled: true, type: 'http', host: 'proxy.example.com', port: 7890, username: 'user', password: 'proxy-password' },
+      rpcDownloadConfig: { enabled: true, host: 'rpc.example.com', port: 6800, secret: 'rpc-secret' },
+    });
+
+    expect(persisted).not.toHaveProperty('discoveryRepos');
+    expect(persisted.proxyConfig).toEqual({
+      enabled: true,
+      type: 'http',
+      host: 'proxy.example.com',
+      port: 7890,
+      username: 'user',
+    });
+    expect(persisted.rpcDownloadConfig).toEqual({
+      enabled: true,
+      host: 'rpc.example.com',
+      port: 6800,
+      secret: 'rpc-secret',
+    });
   });
 });
