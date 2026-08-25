@@ -11,6 +11,23 @@ import { buildCategoryHints, resolveCategoryAssignment } from '../../../utils/ca
 import { getAllCategories } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 
+const getAuthSessionIdentity = () => {
+  const { githubToken, user } = useAppStore.getState();
+  return `${githubToken ?? ''}\u0000${user?.id ?? ''}\u0000${user?.login ?? ''}`;
+};
+
+const isAuthSessionCurrent = (identity: string) => getAuthSessionIdentity() === identity;
+
+const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryViewState>, channelId: DiscoveryChannelId) => {
+  const common = [state.githubToken, state.discoveryPlatform];
+  switch (channelId) {
+    case 'trending': return JSON.stringify([...common, state.trendingTimeRange]);
+    case 'topic': return JSON.stringify([...common, state.discoverySelectedTopic]);
+    case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
+    default: return JSON.stringify(common);
+  }
+};
+
 /**
  * Owns network-backed Discovery loading and AI analysis. UI scrolling and view
  * composition remain in DiscoveryView, while stale topic response protection
@@ -19,17 +36,24 @@ import { useDialog } from '../../../hooks/useDialog';
 export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement | null>) => {
   const state = useAppStore(useShallow(selectDiscoveryViewState));
   const { toast } = useDialog();
+  const { setAnalysisProgress } = state;
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
-  const topicRequestVersionRef = useRef(0);
+  const channelRequestVersionRef = useRef<Partial<Record<DiscoveryChannelId, number>>>({});
+  const channelLoadingVersionRef = useRef<Record<string, number>>({});
   const latestStateRef = useRef(state);
+  const authSessionIdentity = useAppStore(current => `${current.githubToken ?? ''}\u0000${current.user?.id ?? ''}\u0000${current.user?.login ?? ''}`);
   useEffect(() => {
     latestStateRef.current = state;
   }, [state]);
-  useEffect(() => () => {
-    optimizerRef.current?.abort();
-    optimizerRef.current = null;
-  }, []);
+  useEffect(() => {
+    setIsAnalyzing(false);
+    setAnalysisProgress({ current: 0, total: 0 });
+    return () => {
+      optimizerRef.current?.abort();
+      optimizerRef.current = null;
+    };
+  }, [authSessionIdentity, setAnalysisProgress]);
   const t = useCallback((zh: string, en: string) => state.language === 'zh' ? zh : en, [state.language]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page = 1, append = false) => {
@@ -38,18 +62,14 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
-    const topicRequestVersion = channelId === 'topic' ? ++topicRequestVersionRef.current : null;
-    const topicRequestSelection = channelId === 'topic'
-      ? { topic: currentState.discoverySelectedTopic, platform: currentState.discoveryPlatform }
-      : null;
-    const isCurrentTopicRequest = () => {
-      if (topicRequestVersion === null) return true;
-      const current = useAppStore.getState();
-      return topicRequestVersionRef.current === topicRequestVersion
-        && current.discoverySelectedTopic === topicRequestSelection?.topic
-        && current.discoveryPlatform === topicRequestSelection?.platform;
-    };
-    const ownsTopicLoading = () => topicRequestVersion === null || topicRequestVersionRef.current === topicRequestVersion;
+    const requestVersion = (channelRequestVersionRef.current[channelId] ?? 0) + 1;
+    channelRequestVersionRef.current[channelId] = requestVersion;
+    const loadingKey = `${channelId}:${append ? 'append' : 'initial'}`;
+    channelLoadingVersionRef.current[loadingKey] = requestVersion;
+    const requestSignature = getChannelRequestSignature(currentState, channelId);
+    const isCurrentRequest = () => channelRequestVersionRef.current[channelId] === requestVersion
+      && getChannelRequestSignature(useAppStore.getState(), channelId) === requestSignature;
+    const ownsLoading = () => channelLoadingVersionRef.current[loadingKey] === requestVersion;
 
     if (append) {
       currentState.setDiscoveryLoadingMore(channelId, true);
@@ -83,12 +103,12 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         default:
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
-      if (!isCurrentTopicRequest()) return;
+      if (!isCurrentRequest()) return;
       const current = useAppStore.getState();
       const previousCount = current.discoveryRepos[channelId]?.length ?? 0;
       const currentRepos = current.discoveryRepos[channelId] || [];
       const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
-      if (!isCurrentTopicRequest()) return;
+      if (!isCurrentRequest()) return;
       const mergedRepos = result.repos.map((newRepo) => {
         const existing = currentRepos.find(item => item.id === newRepo.id);
         const analysis = existing?.analyzed_at ? existing : persistedAnalyses.get(newRepo.id);
@@ -116,13 +136,15 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         });
       }
     } catch (error) {
-      if (!isCurrentTopicRequest()) return;
+      if (!isCurrentRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
       else toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
     } finally {
-      if (append) currentState.setDiscoveryLoadingMore(channelId, false);
-      else if (ownsTopicLoading()) currentState.setDiscoveryLoading(channelId, false);
+      if (ownsLoading()) {
+        if (append) currentState.setDiscoveryLoadingMore(channelId, false);
+        else currentState.setDiscoveryLoading(channelId, false);
+      }
     }
   }, [scrollContainerRef, t, toast]);
 
@@ -144,6 +166,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       return;
     }
 
+    const analysisSession = getAuthSessionIdentity();
     setIsAnalyzing(true);
     const current = useAppStore.getState();
     const categories = getAllCategories(current.customCategories, current.language, current.hiddenDefaultCategoryIds, current.defaultCategoryOverrides);
@@ -163,16 +186,18 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       const api = new GitHubApiService(state.githubToken);
       const service = new AIService(activeConfig, state.language);
       const readmeCache = await optimizer.prefetchReadmes(unanalyzed, api);
-      if (optimizer.isAborted()) return;
+      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
       const results = await optimizer.analyzeRepositories(
         unanalyzed,
         readmeCache,
         service,
         categoryNames,
         buildCategoryHints(current.customCategories),
-        (progressCurrent, total) => state.setAnalysisProgress({ current: progressCurrent, total }),
+        (progressCurrent, total) => {
+          if (isAuthSessionCurrent(analysisSession)) state.setAnalysisProgress({ current: progressCurrent, total });
+        },
         result => {
-          if (!result.repo) return;
+          if (!isAuthSessionCurrent(analysisSession) || !result.repo) return;
           const analyzedAt = new Date().toISOString();
           if (result.success) {
             const updatedRepo: DiscoveryRepo = {
@@ -198,16 +223,20 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           }
         },
       );
+      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
       const successCount = results.filter(result => result.success).length;
       const failCount = results.length - successCount;
       toast(t(`AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`, `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
     } catch (error) {
+      if (optimizer.isAborted() || !isAuthSessionCurrent(analysisSession)) return;
       console.error('AI analysis error:', error);
       toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
     } finally {
-      optimizerRef.current = null;
-      setIsAnalyzing(false);
-      state.setAnalysisProgress({ current: 0, total: 0 });
+      if (optimizerRef.current === optimizer) optimizerRef.current = null;
+      if (isAuthSessionCurrent(analysisSession)) {
+        setIsAnalyzing(false);
+        state.setAnalysisProgress({ current: 0, total: 0 });
+      }
     }
   }, [state, t, toast]);
 

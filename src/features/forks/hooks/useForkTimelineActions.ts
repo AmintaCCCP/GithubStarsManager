@@ -27,6 +27,7 @@ const isAuthSessionCurrent = (identity: string) => getAuthSessionIdentity() === 
 /** Owns ForkTimeline's remote GitHub workflows while the view remains presentational. */
 export const useForkTimelineActions = () => {
   const state = useAppStore(useShallow(selectForkTimelineState));
+  const { setForkIsRefreshing } = state;
   const { toast } = useDialog();
   const [organizations, setOrganizations] = useState<GitHubOrganization[]>([]);
   const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false);
@@ -37,6 +38,8 @@ export const useForkTimelineActions = () => {
   const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
   const workflowLoadInFlightRef = useRef<Map<number, string>>(new Map());
+  const refreshRequestRef = useRef<{ id: number; session: string } | null>(null);
+  const refreshRequestIdRef = useRef(0);
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
   const [needsSyncMap, setNeedsSyncMap] = useState<Record<number, boolean>>({});
@@ -53,6 +56,14 @@ export const useForkTimelineActions = () => {
     setSelectedForkOwner(personalOwnerLogin);
     setLoadedForkOwners(new Set());
   }, [personalOwnerLogin]);
+
+  const authSessionIdentity = `${state.githubToken ?? ''}\u0000${state.user?.id ?? ''}\u0000${state.user?.login ?? ''}`;
+  useEffect(() => {
+    if (refreshRequestRef.current && refreshRequestRef.current.session !== authSessionIdentity) {
+      refreshRequestRef.current = null;
+      setForkIsRefreshing(false);
+    }
+  }, [authSessionIdentity, setForkIsRefreshing]);
 
   useEffect(() => {
     if (!state.githubToken || !personalOwnerLogin) {
@@ -134,6 +145,8 @@ export const useForkTimelineActions = () => {
       return;
     }
     const requestSession = getAuthSessionIdentity();
+    const refreshRequest = { id: ++refreshRequestIdRef.current, session: requestSession };
+    refreshRequestRef.current = refreshRequest;
     const startTime = Date.now();
     state.setForkIsRefreshing(true);
     try {
@@ -193,7 +206,10 @@ export const useForkTimelineActions = () => {
       logger.error('githubApi', 'Refresh forks failed', { owner: ownerLogin, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startTime });
       toast(t('Fork刷新失败，请检查网络连接。', 'Fork refresh failed. Please check your network connection.'), 'error');
     } finally {
-      if (isAuthSessionCurrent(requestSession)) state.setForkIsRefreshing(false);
+      if (refreshRequestRef.current?.id === refreshRequest.id) {
+        refreshRequestRef.current = null;
+        state.setForkIsRefreshing(false);
+      }
     }
   }, [state, personalOwnerLogin, t, toast]);
 

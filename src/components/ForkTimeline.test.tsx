@@ -237,6 +237,7 @@ describe('ForkTimeline async session and sync contracts', () => {
     resolveForks([personalFork]);
 
     await waitFor(() => expect(storeState.forks).toEqual([]));
+    expect(storeState.forkIsRefreshing).toBe(false);
     expect(toastMock).not.toHaveBeenCalledWith('刷新完成！', expect.anything());
   });
 
