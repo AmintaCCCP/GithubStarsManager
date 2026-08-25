@@ -870,8 +870,12 @@ describe('useAppStore backend API secret three-store contract', () => {
     expect(normalized.backendApiSecret).toBe('idb-secret');
   });
 
-  it('hydrates an empty secret as null and clears the mirror to the same value', () => {
-    const merged = persistenceOptions().merge(buildPersistedSnapshot(), sessionState(null));
+  it('treats an explicitly empty persisted secret as a clear and aligns a stale mirror to null', () => {
+    backendSecretMirror('mirror-secret');
+    const merged = persistenceOptions().merge(
+      buildPersistedSnapshot({ backendApiSecret: '' }),
+      sessionState('session-secret'),
+    );
 
     expect(merged.backendApiSecret).toBeNull();
     expect(JSON.parse(window.localStorage.getItem('github-stars-manager-auth') || '{}')).toMatchObject({

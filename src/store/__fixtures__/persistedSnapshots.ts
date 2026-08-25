@@ -49,6 +49,13 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
 });
 
 export const buildExpectedResetDiscoveryState = () => ({
+  discoveryRepos: {
+    trending: [],
+    'hot-release': [],
+    'most-popular': [],
+    topic: [],
+    search: [],
+  },
   discoveryIsLoading: {
     trending: false,
     'hot-release': false,

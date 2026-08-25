@@ -818,7 +818,7 @@ export const normalizePersistedState = (
       : (authMirror?.githubToken ?? null);
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
-      ? safePersisted.backendApiSecret
+      ? (safePersisted.backendApiSecret || null)
       : (authMirror?.backendApiSecret ?? currentState.backendApiSecret ?? null);
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
@@ -971,20 +971,9 @@ export const normalizePersistedState = (
     };
       });
     })(),
-    discoveryRepos: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedRepos = persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-        return {
-          'trending': persistedRepos['trending'] || [],
-          'hot-release': persistedRepos['hot-release'] || [],
-          'most-popular': persistedRepos['most-popular'] || [],
-          'topic': persistedRepos['topic'] || [],
-          'search': persistedRepos['search'] || [],
-        };
-      }
-      return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-    })(),
+    // discoveryRepos is session-only runtime data. Never revive a stale legacy
+    // cache during hydration, even if a historical snapshot contains the field.
+    discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>,
     discoveryLastRefresh: (() => {
       const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
       if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
