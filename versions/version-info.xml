@@ -553,4 +553,17 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.6</downloadUrl>
   </version>
+  <version>
+    <number>0.7.7</number>
+    <releaseDate>2026-08-26</releaseDate>
+    <changelog>
+      <item>feat: Added multi-theme one-click switching with 12 built-in presets (each with matched light + dark palettes), selectable in Settings &gt; General &gt; Appearance with live previews, and fully tokenized all hardcoded styles (colors, radii, shadows, fonts) onto semantic design tokens so every preset restyles correctly; existing users keep exactly the same default look after upgrade. (PR #289, #290)</item>
+      <item>ci: Lint, typecheck, and tests now run as required quality gates on every pull request and push to main. (PR #291)</item>
+      <item>test: Froze persistence and repository behavior contracts with historical-snapshot fixtures, fixing hydration gaps exposed by the new contracts: backend API secret priority handling, explicit-clear semantics, analyzing-state reset, and stale discovery cache cleanup. (PR #292)</item>
+      <item>perf: Lazy-loaded dormant views (Settings, Discovery/Subscription, Gists, Releases, Forks, README modal) with a deterministic bundle report, shrinking the modern entry from 2,398 KiB to 323 KiB and the largest legacy chunk from 2,762 KiB to 996 KiB. (PR #293)</item>
+      <item>fix: Closing the README modal now restores keyboard focus to the repository card that opened it instead of dropping focus to the page body. (PR #294)</item>
+      <item>refactor: Major architecture refactor of the frontend - repository state transitions centralized as pure commands (PR #295); RepositoryCard operations moved into a domain hook (PR #296); RepositoryList batch AI and bulk workflows moved into job hooks (PR #297); settings-page orchestration moved into focused action hooks (PR #298); the app store modularized behind a single persistence shell with unchanged schema (key github-stars-manager, version 11) (PR #299); untyped store subscriptions replaced with typed shallow selectors app-wide (PR #300); frontend layering boundaries enforced via ESLint with the contract published as ADR 0001 (PR #301). No data migration required.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.7</downloadUrl>
+  </version>
 </versions>
