@@ -24,9 +24,19 @@ const LazyReadmeModal = React.lazy(() =>
   import('./ReadmeModal').then((module) => ({ default: module.ReadmeModal }))
 );
 
-const ReadmeModalLoadingFallback: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+const ReadmeModalLoadingFallback: React.FC<{
+  onClose: () => void;
+  onCloseAutoFocus: () => void;
+}> = ({ onClose, onCloseAutoFocus }) => (
   <Dialog open onOpenChange={(open) => !open && onClose()}>
-    <DialogContent aria-describedby={undefined} className="w-[calc(100%_-_2rem)] max-w-[1130px] p-6">
+    <DialogContent
+      aria-describedby={undefined}
+      className="w-[calc(100%_-_2rem)] max-w-[1130px] p-6"
+      onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        onCloseAutoFocus();
+      }}
+    >
       <DialogTitle className="sr-only">Loading README</DialogTitle>
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
@@ -201,6 +211,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
+
+  const restoreReadmeTriggerFocus = useCallback(() => {
+    cardRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (viewMode !== 'list' || selectionMode) {
@@ -1349,10 +1363,18 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {/* README Modal - lazily loaded and rendered outside the card container */}
       {readmeModalOpen && createPortal(
         <ErrorBoundary>
-          <Suspense fallback={<ReadmeModalLoadingFallback onClose={() => setReadmeModalOpen(false)} />}>
+          <Suspense
+            fallback={
+              <ReadmeModalLoadingFallback
+                onClose={() => setReadmeModalOpen(false)}
+                onCloseAutoFocus={restoreReadmeTriggerFocus}
+              />
+            }
+          >
             <LazyReadmeModal
               isOpen={readmeModalOpen}
               onClose={() => setReadmeModalOpen(false)}
+              onCloseAutoFocus={restoreReadmeTriggerFocus}
               repository={repository}
             />
           </Suspense>
