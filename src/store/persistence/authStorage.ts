@@ -47,14 +47,22 @@ export const clearAuthMirror = (): void => {
 
 export const readSessionBackendSecret = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return window.sessionStorage.getItem(BACKEND_SECRET_SESSION_KEY);
+  try {
+    return window.sessionStorage.getItem(BACKEND_SECRET_SESSION_KEY);
+  } catch {
+    return null;
+  }
 };
 
 export const writeSessionBackendSecret = (secret: string | null): void => {
   if (typeof window === 'undefined') return;
-  if (secret) {
-    window.sessionStorage.setItem(BACKEND_SECRET_SESSION_KEY, secret);
-  } else {
-    window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
+  try {
+    if (secret) {
+      window.sessionStorage.setItem(BACKEND_SECRET_SESSION_KEY, secret);
+    } else {
+      window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
+    }
+  } catch {
+    // Storage may be blocked or unavailable; IndexedDB remains the durable path.
   }
 };
