@@ -9,6 +9,7 @@
     "build": "vite build && npm run check:bundle-size",
     "check:bundle-size": "node scripts/check-bundle-size.cjs",
     "bundle:report": "node scripts/bundle-report.cjs",
+    "check:boundaries": "node scripts/check-boundaries.cjs",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
