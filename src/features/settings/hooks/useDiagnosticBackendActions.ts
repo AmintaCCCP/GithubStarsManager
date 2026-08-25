@@ -22,18 +22,18 @@ export const useDiagnosticBackendActions = ({ selectedScope }: UseDiagnosticBack
   const [backendLogCount, setBackendLogCount] = useState(0);
   const backendAvailable = backend.isAvailable;
 
-  const fetchLogs = useCallback(async (level?: LogLevel): Promise<BackendLogsResponse> => {
-    if (!backendAvailable) return { logs: [], total: 0 };
+  const fetchLogs = useCallback(async (level?: LogLevel): Promise<BackendLogsResponse | null> => {
+    if (!backendAvailable) return null;
     try {
       const query = level ? `?limit=2000&level=${level}` : '?limit=2000';
       const response = await fetch(`/api/logs${query}`, { headers: getHeaders() });
-      if (!response.ok) return { logs: [], total: 0 };
+      if (!response.ok) return null;
       const raw = await response.json();
       const logs = Array.isArray(raw) ? raw as LogEntry[] : [];
       const header = response.headers.get('X-Log-Count');
       return { logs, total: header ? parseInt(header, 10) || 0 : logs.length };
     } catch {
-      return { logs: [], total: 0 };
+      return null;
     }
   }, [backendAvailable]);
 
@@ -55,11 +55,11 @@ export const useDiagnosticBackendActions = ({ selectedScope }: UseDiagnosticBack
 
   const refresh = useCallback(async () => {
     const result = await fetchLogs();
-    if (backendAvailable) {
+    if (backendAvailable && result) {
       setBackendEntries(result.logs);
       setBackendLogCount(result.total);
     }
-    return result.logs;
+    return result?.logs ?? [];
   }, [backendAvailable, fetchLogs]);
 
   useEffect(() => {
