@@ -91,7 +91,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 }`}
               >
                 <span className="flex items-center gap-2.5">
-                  <ChannelIcon className={`w-4 h-4 ${isSelected ? '' : 'text-muted-foreground'}`} />
+                  <ChannelIcon className="w-4 h-4" />
                   <span className="font-medium text-sm">
                     {language === 'zh' ? channel.name : channel.nameEn}
                   </span>
