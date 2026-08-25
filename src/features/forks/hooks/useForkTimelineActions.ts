@@ -6,6 +6,7 @@ import { selectForkTimelineState } from '../../../store/selectors';
 import { GitHubApiService } from '../../../services/githubApi';
 import { logger } from '../../../services/logger';
 import { useDialog } from '../../../hooks/useDialog';
+import { useAuthSessionGeneration, type AuthSessionGeneration } from '../../lifecycle/useAuthSessionGeneration';
 
 interface SyncModalState {
   isOpen: boolean;
@@ -15,14 +16,6 @@ interface SyncModalState {
   branch: string;
   full_name: string;
 }
-
-
-const getAuthSessionIdentity = () => {
-  const { githubToken, user } = useAppStore.getState();
-  return `${githubToken ?? ''}\u0000${user?.id ?? ''}\u0000${user?.login ?? ''}`;
-};
-
-const isAuthSessionCurrent = (identity: string) => getAuthSessionIdentity() === identity;
 
 /** Owns ForkTimeline's remote GitHub workflows while the view remains presentational. */
 export const useForkTimelineActions = () => {
@@ -37,8 +30,8 @@ export const useForkTimelineActions = () => {
   const [expandedWorkflows, setExpandedWorkflows] = useState<Set<number>>(new Set());
   const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
-  const workflowLoadInFlightRef = useRef<Map<number, string>>(new Map());
-  const refreshRequestRef = useRef<{ id: number; session: string } | null>(null);
+  const workflowLoadInFlightRef = useRef<Map<number, AuthSessionGeneration>>(new Map());
+  const refreshRequestRef = useRef<{ id: number; session: AuthSessionGeneration } | null>(null);
   const refreshRequestIdRef = useRef(0);
   const [syncingForks, setSyncingForks] = useState<Set<number>>(new Set());
   const [runningWorkflows, setRunningWorkflows] = useState<Set<number>>(new Set());
@@ -58,12 +51,13 @@ export const useForkTimelineActions = () => {
   }, [personalOwnerLogin]);
 
   const authSessionIdentity = `${state.githubToken ?? ''}\u0000${state.user?.id ?? ''}\u0000${state.user?.login ?? ''}`;
+  const { captureSession, isCurrentSession } = useAuthSessionGeneration(authSessionIdentity);
   useEffect(() => {
-    if (refreshRequestRef.current && refreshRequestRef.current.session !== authSessionIdentity) {
+    if (refreshRequestRef.current && !isCurrentSession(refreshRequestRef.current.session)) {
       refreshRequestRef.current = null;
       setForkIsRefreshing(false);
     }
-  }, [authSessionIdentity, setForkIsRefreshing]);
+  }, [authSessionIdentity, isCurrentSession, setForkIsRefreshing]);
 
   useEffect(() => {
     if (!state.githubToken || !personalOwnerLogin) {
@@ -108,24 +102,24 @@ export const useForkTimelineActions = () => {
   }, [state.forks, organizations, personalOwnerLogin]);
 
   const loadWorkflows = useCallback(async (forkId: number) => {
-    const requestSession = getAuthSessionIdentity();
+    const requestSession = captureSession();
     const fork = useAppStore.getState().forks.find(item => item.id === forkId);
     const githubToken = useAppStore.getState().githubToken;
-    if (!fork || !githubToken || workflowLoadInFlightRef.current.get(forkId) === requestSession) return;
+    if (!fork || !githubToken || workflowLoadInFlightRef.current.get(forkId)?.generation === requestSession.generation) return;
     workflowLoadInFlightRef.current.set(forkId, requestSession);
     setLoadingWorkflows(previous => new Set(previous).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
       const workflows = await new GitHubApiService(githubToken).getRepositoryWorkflows(owner, repo);
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       setWorkflowsMap(previous => ({ ...previous, [forkId]: workflows }));
     } catch (error) {
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       console.error('Failed to load workflows:', error);
     } finally {
-      const isLatestRequest = workflowLoadInFlightRef.current.get(forkId) === requestSession;
+      const isLatestRequest = workflowLoadInFlightRef.current.get(forkId)?.generation === requestSession.generation;
       if (isLatestRequest) workflowLoadInFlightRef.current.delete(forkId);
-      if (isLatestRequest && isAuthSessionCurrent(requestSession)) {
+      if (isLatestRequest && isCurrentSession(requestSession)) {
         setLoadingWorkflows(previous => {
           const next = new Set(previous);
           next.delete(forkId);
@@ -133,7 +127,7 @@ export const useForkTimelineActions = () => {
         });
       }
     }
-  }, []);
+  }, [captureSession, isCurrentSession]);
 
   const loadForksForOwner = useCallback(async (ownerLogin: string) => {
     if (!state.githubToken) {
@@ -144,7 +138,7 @@ export const useForkTimelineActions = () => {
       toast(t('Fork 仓库拥有者未找到，请重新登录。', 'Fork owner not found. Please login again.'), 'error');
       return;
     }
-    const requestSession = getAuthSessionIdentity();
+    const requestSession = captureSession();
     const refreshRequest = { id: ++refreshRequestIdRef.current, session: requestSession };
     refreshRequestRef.current = refreshRequest;
     const startTime = Date.now();
@@ -152,7 +146,7 @@ export const useForkTimelineActions = () => {
     try {
       const api = new GitHubApiService(state.githubToken);
       const fetchedForks = ownerLogin === personalOwnerLogin ? await api.getUserForks() : await api.getOrganizationForks(ownerLogin);
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       const newForks = fetchedForks.filter(fork => fork.fork === true && fork.owner.login === ownerLogin);
       logger.info('githubApi', 'Refresh forks completed', { owner: ownerLogin, forkCount: newForks.length, durationMs: Date.now() - startTime });
       let updatedForks: ForkRepo[] = [];
@@ -182,7 +176,7 @@ export const useForkTimelineActions = () => {
         const [owner, repo] = fork.full_name.split('/');
         try {
           const result = await api.checkForkSyncNeeded(owner, repo, fork.default_branch || 'main', fork.parent?.full_name || fork.source?.full_name);
-          if (!isAuthSessionCurrent(requestSession)) return;
+          if (!isCurrentSession(requestSession)) return;
           setNeedsSyncMap(previous => ({ ...previous, [fork.id]: result.needsSync }));
           if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
             useAppStore.setState(current => ({
@@ -193,15 +187,15 @@ export const useForkTimelineActions = () => {
             }));
           }
         } catch {
-          if (isAuthSessionCurrent(requestSession)) {
+          if (isCurrentSession(requestSession)) {
             setNeedsSyncMap(previous => ({ ...previous, [fork.id]: false }));
           }
         }
       }));
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       toast(newCount > 0 ? t(`刷新完成！发现 ${newCount} 个新Fork。`, `Refresh completed! Found ${newCount} new forks.`) : t('刷新完成！', 'Refresh completed!'), newCount > 0 ? 'success' : 'info');
     } catch (error) {
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       console.error('Fork refresh failed:', error);
       logger.error('githubApi', 'Refresh forks failed', { owner: ownerLogin, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startTime });
       toast(t('Fork刷新失败，请检查网络连接。', 'Fork refresh failed. Please check your network connection.'), 'error');
@@ -211,7 +205,7 @@ export const useForkTimelineActions = () => {
         state.setForkIsRefreshing(false);
       }
     }
-  }, [state, personalOwnerLogin, t, toast]);
+  }, [captureSession, isCurrentSession, state, personalOwnerLogin, t, toast]);
 
   const handleForkOwnerChange = useCallback((ownerLogin: string) => {
     setSelectedForkOwner(ownerLogin);
@@ -236,7 +230,7 @@ export const useForkTimelineActions = () => {
       toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
       return;
     }
-    const requestSession = getAuthSessionIdentity();
+    const requestSession = captureSession();
     const defaultBranch = fork.default_branch || 'main';
     const [owner, repo] = fork.full_name.split('/');
     setSyncModal({ isOpen: true, forkId: fork.id, owner, repo, branch: defaultBranch, full_name: fork.full_name });
@@ -244,19 +238,19 @@ export const useForkTimelineActions = () => {
     setIsFetchingBranches(true);
     try {
       const branches = await new GitHubApiService(state.githubToken).getBranches(owner, repo);
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       setSyncModalBranches(branches);
       if (branches.length > 0 && !branches.includes(defaultBranch)) setSyncModal(previous => ({ ...previous, branch: branches[0] }));
     } catch (error) {
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       logger.error('githubApi', 'Failed to load fork branches for upstream sync', { repo: fork.full_name, error: error instanceof Error ? error.message : String(error) });
       setSyncModal(previous => ({ ...previous, isOpen: false, forkId: null }));
       setSyncModalBranches([]);
       toast(t('加载分支失败，请检查网络连接后重试。', 'Failed to load branches. Please check your network connection and try again.'), 'error');
     } finally {
-      if (isAuthSessionCurrent(requestSession)) setIsFetchingBranches(false);
+      if (isCurrentSession(requestSession)) setIsFetchingBranches(false);
     }
-  }, [state.githubToken, t, toast]);
+  }, [captureSession, isCurrentSession, state.githubToken, t, toast]);
 
   const confirmSyncUpstream = useCallback(async () => {
     const githubToken = useAppStore.getState().githubToken;
@@ -267,9 +261,9 @@ export const useForkTimelineActions = () => {
     setSyncModal(previous => ({ ...previous, isOpen: false }));
     setSyncingForks(previous => new Set(previous).add(fork.id));
     try {
-      const requestSession = getAuthSessionIdentity();
+      const requestSession = captureSession();
       const result = await new GitHubApiService(githubToken).syncFork(syncModal.owner, syncModal.repo, syncModal.branch);
-      if (!isAuthSessionCurrent(requestSession)) return;
+      if (!isCurrentSession(requestSession)) return;
       logger.info('githubApi', 'Sync fork completed', { repo: fork.full_name, mergeType: result.mergeType, durationMs: Date.now() - syncStartTime });
       useAppStore.setState(current => {
         const readForks = new Set(current.readForks);
@@ -298,7 +292,7 @@ export const useForkTimelineActions = () => {
     } finally {
       setSyncingForks(previous => { const next = new Set(previous); next.delete(fork.id); return next; });
     }
-  }, [syncModal, t, toast]);
+  }, [captureSession, isCurrentSession, syncModal, t, toast]);
 
   const handleRunWorkflow = useCallback(async (forkId: number, workflowPath: string, workflowName: string) => {
     const current = useAppStore.getState();
