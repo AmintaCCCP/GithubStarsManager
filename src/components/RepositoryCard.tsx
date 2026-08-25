@@ -3,21 +3,14 @@ import { createPortal } from 'react-dom';
 import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../services/vectorSearchService';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
-import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
-import { forceSyncToBackend } from '../services/autoSync';
-import { GitHubApiService } from '../services/githubApi';
 import { formatDistanceToNow } from 'date-fns';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
-import { shallow } from 'zustand/shallow';
-import { useDialog } from '../hooks/useDialog';
-import { logger } from '../services/logger';
-import { applyAnalysisFailure, applyAnalysisSuccess } from '../features/repositories/application/repositoryPatches';
+import { useRepositoryCardActions } from '../features/repositories/hooks/useRepositoryCardActions';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
@@ -124,91 +117,23 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   allCategories,
   viewMode = 'grid'
 }) => {
-  const repoId = repository.id;
-
-  const isSubscribed = useAppStore(
-    useCallback((state) => state.releaseSubscriptions.has(repoId), [repoId])
-  );
-  const isStoreAnalyzing = useAppStore(
-    useCallback((state) => state.analyzingRepositoryIds.has(repoId), [repoId])
-  );
-
+  const language = useAppStore((state) => state.language);
   const {
+    analyze: handleAIAnalyze,
+    findSimilar: handleFindSimilar,
+    unstar: handleUnstar,
     toggleReleaseSubscription,
-    githubToken,
-    activeAIConfig,
-    setAnalyzingRepository,
-    language,
-    updateRepository,
-    deleteRepository,
-    vectorSearchConfig,
-    vectorSearchStatus,
-    embeddingConfigs,
-    activeEmbeddingConfig,
-    repositories,
-    enterSimilarView
-  } = useAppStore(
-    useCallback(
-      (state) => ({
-        toggleReleaseSubscription: state.toggleReleaseSubscription,
-        githubToken: state.githubToken,
-        activeAIConfig: state.activeAIConfig,
-        setAnalyzingRepository: state.setAnalyzingRepository,
-        language: state.language,
-        updateRepository: state.updateRepository,
-        deleteRepository: state.deleteRepository,
-        vectorSearchConfig: state.vectorSearchConfig,
-        vectorSearchStatus: state.vectorSearchStatus,
-        embeddingConfigs: state.embeddingConfigs,
-        activeEmbeddingConfig: state.activeEmbeddingConfig,
-        repositories: state.repositories,
-        enterSimilarView: state.enterSimilarView
-      }),
-      []
-    ),
-    shallow
-  );
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-      setAnalyzingRepository(repoId, false);
-    };
-  }, [repoId, setAnalyzingRepository]);
-
-  const aiConfigs = useAppStore(state => state.aiConfigs);
-
-  const { toast, confirm } = useDialog();
+    isSubscribed,
+    isAnalyzing,
+    isFindingSimilar,
+    isUnstarring: unstarring,
+    vectorSearchAvailable,
+  } = useRepositoryCardActions({ repository, allCategories });
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
-  const [unstarring, setUnstarring] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isLocallyAnalyzing, setIsLocallyAnalyzing] = useState(false);
-  const isAnalyzing = isLocallyAnalyzing || isStoreAnalyzing;
-
-  // 向量搜索是否可用（开关开启 + Worker 已连接 + 有索引 + Embedding 配置完整）
-  // 仅在可用时显示"查找相似仓库"按钮，避免无效点击
-  const vectorSearchAvailable = useMemo(() => {
-    const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
-    const configComplete = !!activeConfig
-      && !!activeConfig.baseUrl
-      && !!activeConfig.model
-      && (activeConfig.apiType === 'ollama' || !!activeConfig.apiKey);
-    return (
-      vectorSearchConfig.enabled
-      && !!vectorSearchStatus?.connected
-      && (vectorSearchStatus?.vectorCount ?? 0) > 0
-      && configComplete
-      && !!vectorSearchConfig.workerUrl
-      && !!vectorSearchConfig.authToken
-    );
-  }, [embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus]);
-
-  const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
@@ -337,199 +262,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     return platformNameMap[platformLower as keyof typeof platformNameMap] || platform;
   }, [platformNameMap]);
 
-  const handleAIAnalyze = async () => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
-      return;
-    }
-
-    if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
-      return;
-    }
-
-    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
-      return;
-    }
-
-    if (repository.analyzed_at) {
-      const confirmMessage = language === 'zh'
-        ? `此仓库已于 ${new Date(repository.analyzed_at).toLocaleString()} 进行过AI分析。\n\n是否要重新分析？这将覆盖现有的分析结果。`
-        : `This repository was analyzed on ${new Date(repository.analyzed_at).toLocaleString()}.\n\nDo you want to re-analyze? This will overwrite the existing analysis results.`;
-
-      if (!await confirm(t('重新分析确认', 'Re-analyze Confirmation'), confirmMessage, { type: 'warning' })) {
-        return;
-      }
-    }
-
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    const analysisStartedAt = performance.now();
-    setIsLocallyAnalyzing(true);
-    requestAnimationFrame(() => {
-      logger.info('ai.performance', 'Repository card AI spinner painted', {
-        repoId,
-        fullName: repository.full_name,
-        elapsedMs: Math.round(performance.now() - analysisStartedAt),
-      });
-    });
-    setAnalyzingRepository(repoId, true);
-    try {
-      const result = await analyzeRepository({
-        repository,
-        githubToken,
-        aiConfig: activeConfig,
-        language,
-        categories: allCategories,
-        onProgress: (status) => {
-          logger.info('ai.performance', 'Repository card AI analysis step', {
-            repoId,
-            fullName: repository.full_name,
-            status,
-            elapsedMs: Math.round(performance.now() - analysisStartedAt),
-          });
-        },
-        signal: controller.signal,
-      });
-      logger.info('ai.performance', 'Repository card AI request completed', {
-        repoId,
-        fullName: repository.full_name,
-        elapsedMs: Math.round(performance.now() - analysisStartedAt),
-      });
-
-      if (controller.signal.aborted) return;
-
-      const updatedRepo = applyAnalysisSuccess(repository, {
-        summary: result.summary,
-        tags: result.tags,
-        platforms: result.platforms,
-        category: result.custom_category,
-        categoryLocked: result.category_locked,
-        analyzedAt: result.analyzed_at,
-      });
-
-      const updateStartedAt = performance.now();
-      updateRepository(updatedRepo);
-      logger.info('ai.performance', 'Repository card AI result stored', {
-        repoId,
-        fullName: repository.full_name,
-        updateMs: Math.round(performance.now() - updateStartedAt),
-        elapsedMs: Math.round(performance.now() - analysisStartedAt),
-      });
-
-      const successMessage = repository.analyzed_at
-        ? (language === 'zh' ? 'AI重新分析完成！' : 'AI re-analysis completed!')
-        : (language === 'zh' ? 'AI分析完成！' : 'AI analysis completed!');
-
-      toast(successMessage, 'success');
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        console.error('AI analysis failed:', error);
-
-        const errorMsg = error instanceof Error && error.message
-          ? error.message
-          : (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection');
-        const failedResult = createFailedAnalysisResult(errorMsg);
-        const failedRepo = applyAnalysisFailure(repository, {
-          analyzedAt: failedResult.analyzed_at,
-          error: failedResult.analysis_error,
-        });
-
-        const updateStartedAt = performance.now();
-        updateRepository(failedRepo);
-        logger.info('ai.performance', 'Repository card AI failure stored', {
-          repoId,
-          fullName: repository.full_name,
-          updateMs: Math.round(performance.now() - updateStartedAt),
-          elapsedMs: Math.round(performance.now() - analysisStartedAt),
-        });
-
-        toast(language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.', 'error');
-      }
-    } finally {
-      setIsLocallyAnalyzing(false);
-      if (!controller.signal.aborted) {
-        setAnalyzingRepository(repoId, false);
-      }
-    }
-  };
-
   // Convert GitHub URL to DeepWiki URL
   const getDeepWikiUrl = (githubUrl: string) => {
     return githubUrl.replace('github.com', 'deepwiki.com');
-  };
-
-  // 查找相似仓库：利用向量检索匹配语义相关的仓库，并进入相似仓库视图
-  /**
-   * 点击"查找相似仓库"：校验向量搜索就绪后，对源仓库生成 embedding 并在 Worker
-   * 中检索相似仓库，将结果交给 store 进入相似视图。处理加载、空结果与错误态。
-   */
-  const handleFindSimilar = async () => {
-    if (isFindingSimilar) return;
-    if (!vectorSearchAvailable) {
-      toast(
-        language === 'zh'
-          ? '向量搜索未就绪：请先在设置中开启向量搜索并完成索引。'
-          : 'Vector search is not ready. Please enable vector search and build the index in settings first.',
-        'error'
-      );
-      return;
-    }
-
-    const activeConfig = embeddingConfigs.find((c) => c.id === activeEmbeddingConfig);
-    if (!activeConfig) return;
-
-    setIsFindingSimilar(true);
-    try {
-      const embeddingClient = new EmbeddingClient({
-        ...activeConfig,
-        apiType: activeConfig.apiType,
-        baseUrl: activeConfig.baseUrl,
-        apiKey: activeConfig.apiKey,
-        model: activeConfig.model,
-        dimensions: activeConfig.dimensions,
-      });
-      const vectorService = new VectorSearchService({
-        workerUrl: vectorSearchConfig.workerUrl,
-        authToken: vectorSearchConfig.authToken,
-      });
-
-      const similar = await findSimilarRepositories(repository, {
-        embeddingClient,
-        vectorService,
-        allRepos: repositories,
-        topK: vectorSearchConfig.searchTopK ?? 30,
-        threshold: vectorSearchConfig.searchThreshold ?? 0.35,
-      });
-
-      enterSimilarView(similar, repository);
-
-      if (similar.length === 0) {
-        toast(
-          language === 'zh'
-            ? '未找到相似的仓库。'
-            : 'No similar repositories found.',
-          'info'
-        );
-      }
-    } catch (error) {
-      console.error('Find similar repositories failed:', error);
-      const errorMessage = error instanceof Error && error.message
-        ? error.message
-        : (language === 'zh' ? '查找相似仓库失败，请检查向量搜索配置。' : 'Failed to find similar repositories. Please check vector search configuration.');
-      toast(errorMessage, 'error');
-    } finally {
-      setIsFindingSimilar(false);
-    }
   };
 
   // Convert GitHub URL to Zread URL
@@ -694,44 +429,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       return language === 'zh' ? 'AI分析此仓库' : 'Analyze with AI';
     }
   }, [repository.analysis_failed, repository.analyzed_at, language]);
-
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-
-  const handleUnstar = async () => {
-    if (!githubToken) {
-      toast(t('未找到 GitHub Token，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    const confirmMessage = language === 'zh'
-      ? `确定要取消 Star "${repository.full_name}" 吗？\n\n这将会从您的 GitHub 收藏中移除该仓库。`
-      : `Are you sure you want to unstar "${repository.full_name}"?\n\nThis will remove the repository from your GitHub stars.`;
-
-    if (!await confirm(t('取消Star确认', 'Unstar Confirmation'), confirmMessage, { type: 'danger', confirmText: t('取消Star', 'Unstar') })) {
-      return;
-    }
-
-    setUnstarring(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const [owner, repo] = repository.full_name.split('/');
-      await githubApi.unstarRepository(owner, repo);
-      deleteRepository(repository.id);
-      await forceSyncToBackend();
-      const successMessage = language === 'zh'
-        ? '已成功取消 Star'
-        : 'Successfully unstarred';
-      toast(successMessage, 'success');
-    } catch (error) {
-      console.error('Failed to unstar repository:', error);
-      const errorMessage = language === 'zh'
-        ? '取消 Star 失败，请检查网络连接或重新登录。'
-        : 'Failed to unstar repository. Please check your network connection or login again.';
-      toast(errorMessage, 'error');
-    } finally {
-      setUnstarring(false);
-    }
-  };
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
@@ -1017,7 +714,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
                 {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => toggleReleaseSubscription(repository.id)}>
+              <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                 {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
                 {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
               </DropdownMenuItem>
@@ -1107,7 +804,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
           </SelectionAwareButton>
           <SelectionAwareButton
-            onClick={() => toggleReleaseSubscription(repository.id)}
+            onClick={() => toggleReleaseSubscription()}
             selectionMode={selectionMode}
             className={`${isSubscribed
               ? 'bg-primary text-primary-foreground shadow-sm'
