@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
@@ -37,21 +37,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     resetSimilarView,
     repositoryViewMode,
     setRepositoryViewMode,
-  } = useAppStore(
-    useCallback((state) => ({
-      language: state.language,
-      customCategories: state.customCategories,
-      hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
-      defaultCategoryOverrides: state.defaultCategoryOverrides,
-      categoryMatchMode: state.categoryMatchMode,
-      searchFilters: state.searchFilters,
-      similarView: state.similarView,
-      resetSimilarView: state.resetSimilarView,
-      repositoryViewMode: state.repositoryViewMode,
-      setRepositoryViewMode: state.setRepositoryViewMode,
-    }), []),
-    shallow,
-  );
+  } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    categoryMatchMode: state.categoryMatchMode,
+    searchFilters: state.searchFilters,
+    similarView: state.similarView,
+    resetSimilarView: state.resetSimilarView,
+    repositoryViewMode: state.repositoryViewMode,
+    setRepositoryViewMode: state.setRepositoryViewMode,
+  })));
+
 
   const { toast } = useDialog();
 

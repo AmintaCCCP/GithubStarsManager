@@ -1,3 +1,4 @@
+import { StrictMode, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
@@ -247,6 +248,28 @@ describe('useRepositoryAnalysisJob', () => {
 
     expect(mocks.toast).toHaveBeenCalledWith('AI分析失败，请检查AI配置和网络连接。', 'error');
     expect(result.current).toMatchObject({ isRunning: false, isPaused: false, progress: { current: 0, total: 0 } });
+  });
+
+  it('re-enables result writes after StrictMode rehearses the lifecycle cleanup', async () => {
+    const target = repository(1);
+    mocks.analyzeRepositoriesPipelined.mockImplementation(async (...args: unknown[]) => {
+      const onResult = args[6] as (result: Record<string, unknown>) => void;
+      onResult({ success: true, repo: target, summary: 'StrictMode result', tags: [], platforms: [] });
+    });
+
+    const { result } = renderHook(
+      () => useRepositoryAnalysisJob({ allCategories: [] }),
+      { wrapper: ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode> },
+    );
+
+    await act(async () => {
+      await result.current.run(runOptions([target]));
+    });
+
+    expect(storeState.updateRepository).toHaveBeenCalledWith(expect.objectContaining({
+      id: target.id,
+      ai_summary: 'StrictMode result',
+    }));
   });
 
   it('aborts an active job on unmount and prevents further result writes', async () => {

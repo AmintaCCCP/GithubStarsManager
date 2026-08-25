@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
@@ -63,18 +63,16 @@ export const useRepositoryAnalysisJob = ({
     updateRepository,
     setLoading,
     setAnalysisProgress,
-  } = useAppStore(
-    useCallback((state) => ({
-      githubToken: state.githubToken,
-      aiConfigs: state.aiConfigs,
-      activeAIConfig: state.activeAIConfig,
-      language: state.language,
-      updateRepository: state.updateRepository,
-      setLoading: state.setLoading,
-      setAnalysisProgress: state.setAnalysisProgress,
-    }), []),
-    shallow,
-  );
+  } = useAppStore(useShallow((state) => ({
+    githubToken: state.githubToken,
+    aiConfigs: state.aiConfigs,
+    activeAIConfig: state.activeAIConfig,
+    language: state.language,
+    updateRepository: state.updateRepository,
+    setLoading: state.setLoading,
+    setAnalysisProgress: state.setAnalysisProgress,
+  })));
+
   const { toast, confirm } = useDialog();
   const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
   const isRunningRef = useRef(false);
@@ -98,15 +96,18 @@ export const useRepositoryAnalysisJob = ({
     }
   }, [setAnalysisProgress, setLoading]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    optimizerRef.current?.abort();
-    optimizerRef.current = null;
-    isRunningRef.current = false;
-    isPausedRef.current = false;
-    stopRequestedRef.current = false;
-    setLoading(false);
-    setAnalysisProgress({ current: 0, total: 0 });
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      optimizerRef.current?.abort();
+      optimizerRef.current = null;
+      isRunningRef.current = false;
+      isPausedRef.current = false;
+      stopRequestedRef.current = false;
+      setLoading(false);
+      setAnalysisProgress({ current: 0, total: 0 });
+    };
   }, [setAnalysisProgress, setLoading]);
 
   const pause = useCallback(() => {
