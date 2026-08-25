@@ -818,8 +818,8 @@ export const normalizePersistedState = (
       : (authMirror?.githubToken ?? null);
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
-      ? safePersisted.backendApiSecret
-      : (authMirror?.backendApiSecret ?? null);
+      ? (safePersisted.backendApiSecret || null)
+      : (authMirror?.backendApiSecret ?? currentState.backendApiSecret ?? null);
 
   const repositories = Array.isArray(safePersisted.repositories) ? safePersisted.repositories : [];
   const gists = Array.isArray(safePersisted.gists) ? safePersisted.gists : [];
@@ -872,8 +872,8 @@ export const normalizePersistedState = (
     selectedGistCategory: safePersisted.selectedGistCategory === 'starred' || safePersisted.selectedGistCategory === 'mine'
       ? safePersisted.selectedGistCategory
       : 'all',
-    // 不恢复 analyzingGistIds：异步分析任务无法在页面重载后存活，
-    // 恢复会导致 Gist 卡片永久卡在“分析中”状态。
+    // 不恢复分析中状态：异步任务无法在页面重载后存活，恢复会导致卡片永久卡在“分析中”状态。
+    analyzingRepositoryIds: new Set<number>(),
     analyzingGistIds: new Set<string>(),
     releases,
     searchResults: migratedRepositories,
@@ -971,48 +971,11 @@ export const normalizePersistedState = (
     };
       });
     })(),
-    discoveryRepos: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryRepos;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedRepos = persisted as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-        return {
-          'trending': persistedRepos['trending'] || [],
-          'hot-release': persistedRepos['hot-release'] || [],
-          'most-popular': persistedRepos['most-popular'] || [],
-          'topic': persistedRepos['topic'] || [],
-          'search': persistedRepos['search'] || [],
-        };
-      }
-      return { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>;
-    })(),
-    discoveryLastRefresh: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryLastRefresh;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedRefresh = persisted as Record<string, string | null>;
-        return {
-          'trending': persistedRefresh['trending'] || null,
-          'hot-release': persistedRefresh['hot-release'] || null,
-          'most-popular': persistedRefresh['most-popular'] || null,
-          'topic': persistedRefresh['topic'] || null,
-          'search': persistedRefresh['search'] || null,
-        };
-      }
-      return { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null };
-    })(),
-    discoveryTotalCount: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryTotalCount;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedCount = persisted as Record<string, number>;
-        return {
-          'trending': persistedCount['trending'] || 0,
-          'hot-release': persistedCount['hot-release'] || 0,
-          'most-popular': persistedCount['most-popular'] || 0,
-          'topic': persistedCount['topic'] || 0,
-          'search': persistedCount['search'] || 0,
-        };
-      }
-      return { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 };
-    })(),
+    // discoveryRepos is session-only runtime data. Never revive a stale legacy
+    // cache during hydration, even if a historical snapshot contains the field.
+    discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>,
+    discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
+    discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
     selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
       ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
       : 'trending',
@@ -1020,36 +983,8 @@ export const normalizePersistedState = (
     discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
     discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
     discoveryLoadMoreError: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'search': null },
-    // discoveryHasMore 从持久化恢复，确保对象格式
-    discoveryHasMore: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryHasMore;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedHasMore = persisted as Record<string, boolean>;
-        return {
-          'trending': persistedHasMore['trending'] || false,
-          'hot-release': persistedHasMore['hot-release'] || false,
-          'most-popular': persistedHasMore['most-popular'] || false,
-          'topic': persistedHasMore['topic'] || false,
-          'search': persistedHasMore['search'] || false,
-        };
-      }
-      return { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false };
-    })(),
-    // discoveryNextPage 从持久化恢复，确保对象格式
-    discoveryNextPage: (() => {
-      const persisted = (safePersisted as Record<string, unknown>).discoveryNextPage;
-      if (persisted && typeof persisted === 'object' && !Array.isArray(persisted)) {
-        const persistedPage = persisted as Record<string, number>;
-        return {
-          'trending': persistedPage['trending'] || 1,
-          'hot-release': persistedPage['hot-release'] || 1,
-          'most-popular': persistedPage['most-popular'] || 1,
-          'topic': persistedPage['topic'] || 1,
-          'search': persistedPage['search'] || 1,
-        };
-      }
-      return { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 };
-    })(),
+    discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false },
+    discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'search': 1 },
     // discoveryScrollPositions 不持久化，始终重置为 0
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0 },
   trendingTimeRange: 'weekly' as TrendingTimeRange,
