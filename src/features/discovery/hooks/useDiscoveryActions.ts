@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { DiscoveryChannelId, DiscoveryRepo } from '../../../types';
+import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { selectDiscoveryViewState } from '../../../store/selectors';
 import { GitHubApiService } from '../../../services/githubApi';
@@ -23,7 +23,13 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
   const topicRequestVersionRef = useRef(0);
   const latestStateRef = useRef(state);
-  latestStateRef.current = state;
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
+  useEffect(() => () => {
+    optimizerRef.current?.abort();
+    optimizerRef.current = null;
+  }, []);
   const t = useCallback((zh: string, en: string) => state.language === 'zh' ? zh : en, [state.language]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page = 1, append = false) => {
@@ -53,7 +59,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     }
     try {
       const api = new GitHubApiService(currentState.githubToken);
-      let result;
+      let result: PaginatedDiscoveryRepositories;
       switch (channelId) {
         case 'trending':
           result = await api.getTrendingRepositories(currentState.discoveryPlatform, page, 20, currentState.trendingTimeRange);
@@ -83,7 +89,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       const currentRepos = current.discoveryRepos[channelId] || [];
       const persistedAnalyses = await discoveryAnalysisStorage.loadAllAnalyses();
       if (!isCurrentTopicRequest()) return;
-      const mergedRepos = result.repos.map((newRepo: DiscoveryRepo) => {
+      const mergedRepos = result.repos.map((newRepo) => {
         const existing = currentRepos.find(item => item.id === newRepo.id);
         const analysis = existing?.analyzed_at ? existing : persistedAnalyses.get(newRepo.id);
         return analysis?.analyzed_at ? {
