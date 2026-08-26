@@ -284,17 +284,6 @@ const makeFileEvidence = (repository: Repository, sourceRefSha: string, file: { 
   }));
 };
 
-const sourceList = (evidences: ToolEvidence[], language: 'zh' | 'en'): string => {
-  const references = Array.from(new Set(evidences.map(formatSourceReference).filter((reference): reference is string => Boolean(reference))));
-  if (references.length === 0) return language === 'zh'
-    ? '未检索到可引用的仓库文件，因此无法给出可验证的结论。'
-    : 'No citable repository file was retrieved, so a verifiable conclusion cannot be given.';
-  return [
-    language === 'zh' ? '### 核查来源' : '### Verified sources',
-    ...references.map((reference) => `- \`${reference}\``),
-  ].join('\n');
-};
-
 const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[]): string => {
   const references = evidences
     .map(formatSourceReference)
@@ -333,22 +322,9 @@ const hasValidSourceReference = (content: string, evidences: ToolEvidence[]): bo
     .some((reference) => content.includes(`\`${reference}\``));
 };
 
-const deterministicEvidenceDigest = (evidences: ToolEvidence[], language: 'zh' | 'en'): string => {
-  const excerpts = evidences.slice(0, 3).flatMap((evidence) => {
-    if (!evidence.path || !evidence.lineStart) return [];
-    return evidence.excerpt
-      .split('\n')
-      .map((line, index) => ({ text: line.trim(), lineNumber: (evidence.lineStart ?? 1) + index }))
-      .filter(({ text }) => text.length > 0 && text.length <= 240 && !/^---+$|^```/.test(text))
-      .slice(0, 3)
-      .map(({ text, lineNumber }) => `- ${text.replace(/`/g, '′')} \`/${evidence.path} - ${lineNumber}\``);
-  }).slice(0, 8);
-  const heading = language === 'zh' ? '### 已读取文件的确定性原文摘录' : '### Deterministic verbatim excerpts from files read';
-  const limitation = language === 'zh'
-    ? '模型未能把结论关联到已读取文件的精确行号，因此不展示未经核查的结论。以下是少量原文摘录；它们不代表额外推断。'
-    : 'The model did not connect its conclusions to exact lines in the files read, so unverified conclusions are not shown. The following are limited verbatim excerpts and do not represent additional inference.';
-  return `${limitation}\n\n${heading}\n${excerpts.length > 0 ? excerpts.join('\n') : (language === 'zh' ? '- 未能安全提取原文行。' : '- No source lines could be safely excerpted.')}\n\n${sourceList(evidences, language)}`;
-};
+const noVerifiedSummaryResponse = (language: 'zh' | 'en'): string => language === 'zh'
+  ? '本轮已完成只读取证，但未能生成可与精确来源核验的总结性结果。请重试，或把问题缩小到一个具体功能、文件或目标；已读取的文件与证据可在“来源与证据”中展开查看。'
+  : 'This turn completed read-only evidence retrieval but did not produce a source-verifiable summary. Retry, or narrow the question to a specific feature, file, or goal; the retrieved files and evidence remain available under “Sources and evidence”.';
 
 const ensureVerifiableSources = (content: string, evidences: ToolEvidence[], language: 'zh' | 'en'): string => {
   const cleaned = normalizeEvidenceReferences(content, evidences)
@@ -357,10 +333,8 @@ const ensureVerifiableSources = (content: string, evidences: ToolEvidence[], lan
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  if (evidences.length > 0 && !hasValidSourceReference(cleaned, evidences)) {
-    return deterministicEvidenceDigest(evidences, language);
-  }
-  return `${cleaned}\n\n${sourceList(evidences, language)}`.trim();
+  if (evidences.length > 0 && !hasValidSourceReference(cleaned, evidences)) return noVerifiedSummaryResponse(language);
+  return cleaned;
 };
 
 const rankedCandidatePaths = (entries: TreeEntry[], question: string, focus: ResearchFocus): string[] => {
@@ -455,46 +429,7 @@ const runLegacyRepositoryChatTurn = async (input: RepositoryChatTurnInput, strat
       input.signal?.removeEventListener('abort', abortForCaller);
     }
   };
-  const timeoutEvidenceOnlyResponse = () => {
-    const sources = evidences.map(formatSourceReference).filter(Boolean);
-    const rawStepPattern = focus === 'deployment'
-      ? /^(?:\s*(?:\d+[.)]|[-*])\s+|.*\b(?:docker|docker-compose|compose|npm|pnpm|yarn|bun|flyctl|kubectl|helm|terraform|systemctl|export|curl)\b)/i
-      : focus === 'usage'
-        ? /^(?:\s*(?:\d+[.)]|[-*])\s+|.*\b(?:npm|pnpm|yarn|bun|install|run|start|build|clone)\b)/i
-        : /^(?:\s*(?:\d+[.)]|[-*])\s+|.*\b(?:src|app|server|router|route|config|service|api)\b)/i;
-    const extractedLines = evidences.flatMap((evidence) => evidence.excerpt
-      .split('\n')
-      .map((line, index) => ({ line: line.trim(), lineNumber: (evidence.lineStart ?? 1) + index, path: evidence.path }))
-      .filter(({ line }) => line.length > 0 && line.length <= 220 && rawStepPattern.test(line))
-      .slice(0, 2))
-      .filter((candidate, index, candidates) => candidates.findIndex((other) => other.path === candidate.path && other.lineNumber === candidate.lineNumber) === index)
-      .slice(0, 8);
-    const excerpts = extractedLines.map(({ line, lineNumber, path }) => `- \`${line.replace(/`/g, '′')}\` \`/${path} - ${lineNumber}\``).join('\n');
-    if (input.language === 'zh') {
-      const introduction = 'AI 服务在限定时间内未返回结论，因此不会基于猜测作答。以下为从已读取文件逐行确定性摘录的明确步骤或命令；未补全前置条件、顺序或未出现的配置。';
-      return `${introduction}\n\n${excerpts ? `### 已读取的原文摘录\n${excerpts}` : '### 已读取的来源\n未能从已读取片段中安全提取明确步骤或命令。'}\n\n### 可继续核查的来源\n${sources.length > 0 ? sources.map((source) => `- \`${source}\``).join('\n') : '- 未读取到可用文件证据'}`;
-    }
-    const introduction = 'The AI service did not return a conclusion within the time limit, so no inferred answer is shown. The following are deterministic, line-by-line excerpts of explicit steps or commands from the files read; prerequisites, ordering, and unstated configuration are not filled in.';
-    return `${introduction}\n\n${excerpts ? `### Verbatim excerpts from files read\n${excerpts}` : '### Files read\nNo explicit step or command could be safely extracted from the retrieved windows.'}\n\n### Readable sources for a retry\n${sources.length > 0 ? sources.map((source) => `- \`${source}\``).join('\n') : '- No usable file evidence was retrieved'}`;
-  };
-  const deterministicOverviewResponse = () => {
-    const rootEvidence = evidences.find((evidence) => evidence.path && /^readme(?:\.[a-z0-9_-]+)?\.(?:md|mdx|markdown|txt)$/i.test(evidence.path));
-    const overviewEvidence = rootEvidence ?? evidences.find((evidence) => evidence.path && README_CANDIDATE.test(evidence.path)) ?? evidences[0];
-    if (!overviewEvidence?.path || !overviewEvidence.lineStart) return null;
-    const overviewLines = overviewEvidence.excerpt
-      .split('\n')
-      .map((line, index) => ({ text: line.trim(), lineNumber: (overviewEvidence.lineStart ?? 1) + index }))
-      .filter(({ text }) => text.length > 0 && text.length <= 260 && !/^!\[|^<[^>]+>$|^```/.test(text))
-      .slice(0, 5);
-    if (overviewLines.length === 0) return null;
-    const excerpts = overviewLines.map(({ text, lineNumber }) => `- ${text.replace(/`/g, '′')} \`/${overviewEvidence.path} - ${lineNumber}\``).join('\n');
-    const fallbackNotice = rootEvidence ? '' : (input.language === 'zh'
-      ? '根 README 未能通过现有只读文件守卫读取，因此以下仅基于已成功读取的仓库说明文件。\n\n'
-      : 'The root README could not be read through the existing read-only file guard, so the following uses only a successfully retrieved repository documentation file.\n\n');
-    return input.language === 'zh'
-      ? `## 已读取的仓库概览\n\n${fallbackNotice}以下内容为已读取文件的逐行摘录，未补充文档中未出现的产品或实现细节：\n\n${excerpts}\n\n如需架构、部署或具体实现，我会按问题继续读取对应配置与代码文件。`
-      : `## Repository overview from files read\n\n${fallbackNotice}The following is a line-by-line excerpt from a retrieved file; no product or implementation details absent from the document have been added.\n\n${excerpts}\n\nFor architecture, deployment, or implementation details, the next turn will read the relevant configuration and code files.`;
-  };
+  const timeoutEvidenceOnlyResponse = () => noVerifiedSummaryResponse(input.language);
   const maxTools = Math.min(8, Math.max(1, input.maxToolsPerTurn));
   const focus = detectResearchFocus(input.question);
   const evidenceIntent = classifyEvidenceIntent(input.question);
@@ -652,22 +587,6 @@ const runLegacyRepositoryChatTurn = async (input: RepositoryChatTurnInput, strat
         if (toolCount >= maxTools) break;
         await readFile(path);
       }
-    }
-  }
-
-  if (strategy === 'fast' && evidenceIntent.strategy === 'overview') {
-    const overview = deterministicOverviewResponse();
-    if (overview) {
-      emit({
-        toolName: 'verify_evidence',
-        status: 'success',
-        paramSummary: input.language === 'zh' ? '快速概览收敛' : 'Fast overview convergence',
-        stage: 'answer',
-        detail: input.language === 'zh'
-          ? '已读取的仓库文件提供可核查概览，因此不等待模型调用；架构或实现问题会自动升级为代码取证。'
-          : 'The retrieved repository files provide a verifiable overview, so no model call is awaited; architecture or implementation questions automatically escalate to code evidence retrieval.',
-      });
-      return { content: overview, evidences };
     }
   }
 

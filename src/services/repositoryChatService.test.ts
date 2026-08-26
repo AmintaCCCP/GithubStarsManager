@@ -157,7 +157,6 @@ describe('runRepositoryChatTurn', () => {
     expect(repairRequest.user).toContain('BEGIN DRAFT');
     expect(result.content).not.toMatch(/\[\^E\d+\]/);
     expect(result.content).toContain('`/README.md - 1-3`');
-    expect(result.content).toContain('### Verified sources');
     expect(result.content).not.toContain('E2');
     expect(result.evidences.every((evidence) => evidence.refSha === session.sourceRefSha)).toBe(true);
     expect(result.evidences.every((evidence) => evidence.path && evidence.lineStart && evidence.lineEnd)).toBe(true);
@@ -195,13 +194,12 @@ describe('runRepositoryChatTurn', () => {
       onToolEvent: (event) => events.push(event),
     });
 
-    expect(mocks.generateChatText).not.toHaveBeenCalled();
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(1);
     expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ paramSummary: 'Fast evidence plan', detail: expect.stringContaining('overview') }),
-      expect.objectContaining({ paramSummary: 'Fast overview convergence' }),
     ]));
-    expect(result.content).toContain('`/README.md - 1`');
+    expect(result.content).toContain('`/README.md - 1-2`');
   });
 
   it('finds the actual deployment document rather than treating a truncated README as deployment instructions', async () => {
@@ -233,12 +231,12 @@ describe('runRepositoryChatTurn', () => {
     expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/deployment.md', session.sourceRefSha, undefined);
     const deploymentEvidence = result.evidences.find((evidence) => evidence.path === 'docs/deployment.md');
     expect(deploymentEvidence).toBeDefined();
-    expect(result.content).toContain(`\`/docs/deployment.md - ${deploymentEvidence?.lineStart}-${deploymentEvidence?.lineEnd}\``);
+    expect(result.content).toContain('did not produce a source-verifiable summary');
     expect(result.content).not.toContain('reference/FREE_TIERS.md');
     expect(result.content).not.toMatch(/\[\^E\d+\]|\bE[23]\b/);
   });
 
-  it('returns deterministic verbatim excerpts when an unreferenced draft cannot be repaired', async () => {
+  it('returns a concise retry state when an unreferenced draft cannot be repaired', async () => {
     mocks.generateChatText
       .mockReset()
       .mockResolvedValueOnce('{"paths":["README.md"]}')
@@ -247,9 +245,8 @@ describe('runRepositoryChatTurn', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    expect(result.content).toContain('Verbatim excerpts from files read');
-    expect(result.content).toContain('`/README.md - 3`');
-    expect(result.content).toContain('Deployment uses npm run build.');
+    expect(result.content).toContain('did not produce a source-verifiable summary');
+    expect(result.content).not.toContain('Deployment uses npm run build.');
     expect(result.content).not.toContain('Use the documented deployment command without a source.');
   });
 
