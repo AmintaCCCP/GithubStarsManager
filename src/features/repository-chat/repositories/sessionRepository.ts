@@ -69,13 +69,14 @@ const readFallback = (): FallbackSnapshot => {
   }
 };
 
-const writeFallback = (snapshot: FallbackSnapshot): boolean => {
-  if (typeof window === 'undefined') return false;
+const writeFallback = (snapshot: FallbackSnapshot): void => {
+  if (typeof window === 'undefined') {
+    throw new Error('[repository-chat] localStorage is unavailable for fallback persistence');
+  }
   try {
     window.localStorage.setItem(FALLBACK_KEY, JSON.stringify(snapshot));
-    return true;
   } catch {
-    return false;
+    throw new Error('[repository-chat] unable to persist fallback snapshot');
   }
 };
 
@@ -143,12 +144,13 @@ const migrateIndexedDbSnapshotToFallback = async (): Promise<boolean> => {
       evidence: await requestValue(stores.evidence.getAll()) as ToolEvidence[],
     })));
     const fallbackSnapshot = readFallback();
-    return writeFallback({
+    writeFallback({
       sessions: mergeById(fallbackSnapshot.sessions, indexedDbSnapshot.sessions),
       messages: mergeById(fallbackSnapshot.messages, indexedDbSnapshot.messages),
       toolEvents: mergeById(fallbackSnapshot.toolEvents, indexedDbSnapshot.toolEvents),
       evidence: mergeById(fallbackSnapshot.evidence, indexedDbSnapshot.evidence),
     });
+    return true;
   } catch (error) {
     console.warn('[repository-chat] unable to migrate IndexedDB snapshot before fallback', error);
     return false;
