@@ -112,9 +112,12 @@ const storeState = {
 
 const mockUseAppStore = vi.mocked(useAppStore);
 
-const renderRepositoryCard = (viewMode: 'list' | 'grid') => render(
+const renderRepositoryCard = (
+  viewMode: 'list' | 'grid',
+  options: { onAskRepository?: (repository: Repository) => void; selectionMode?: boolean } = {},
+) => render(
   <TooltipProvider>
-    <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} />
+    <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} {...options} />
   </TooltipProvider>
 );
 
@@ -153,6 +156,7 @@ describe('RepositoryCard view modes', () => {
 
     expect(screen.getByText('仓库操作')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'AI 分析' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '查看 Release' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
@@ -250,6 +254,21 @@ describe('RepositoryCard view modes', () => {
     expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
   });
 
+  it('emits a repository-chat intent from both grid and list controls without invoking a service', async () => {
+    const user = userEvent.setup();
+    const onAskRepository = vi.fn();
+    const { unmount } = renderRepositoryCard('grid', { onAskRepository });
+
+    await user.click(screen.getByRole('button', { name: '问答此仓库' }));
+    expect(onAskRepository).toHaveBeenCalledWith(repository);
+    unmount();
+
+    renderRepositoryCard('list', { onAskRepository });
+    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    await user.click(screen.getByRole('menuitem', { name: '问答此仓库' }));
+    expect(onAskRepository).toHaveBeenCalledTimes(2);
+  });
+
   it('opens the release sheet from the grid action immediately before the DeepWiki/Zread action', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('grid');
@@ -295,6 +314,7 @@ describe('RepositoryCard view modes', () => {
 
     expect(screen.queryByRole('button', { name: '更多操作' })).not.toBeInTheDocument();
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
+    expect(screen.getByTitle('问答此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();
     expect(screen.getByTitle('编辑仓库信息')).toBeInTheDocument();
 
@@ -322,5 +342,11 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('menuitem', { name: '在 Zread 中查看' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
+
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 76 });
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
   });
 });

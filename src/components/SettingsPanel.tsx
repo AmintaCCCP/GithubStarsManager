@@ -279,7 +279,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const stored = sessionStorage.getItem('gsm:pending-settings-tab');
     if (stored && VALID_TABS.has(stored)) {
       sessionStorage.removeItem('gsm:pending-settings-tab');
-      handleTabChange(stored as SettingsTab);
+      // Apply a pre-mount navigation synchronously. In React Strict Mode an
+      // animation timer can be cleaned up during the development remount.
+      setActiveTab(stored as SettingsTab);
+      setDisplayTab(stored as SettingsTab);
     } else if (stored) {
       sessionStorage.removeItem('gsm:pending-settings-tab');
     }

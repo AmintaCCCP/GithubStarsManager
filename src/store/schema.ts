@@ -12,7 +12,9 @@ import type {
   SearchFilters,
   VectorSearchConfig,
   VectorSearchStatus,
+  RepositoryChatSettings,
 } from '../types';
+import { defaultRepositoryChatSettings } from '../types/repositoryChat';
 import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
 import { MCP_DEFAULT_HOST, MCP_DEFAULT_PORT, normalizeMcpHost } from '../utils/mcpHost';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -57,6 +59,7 @@ export type PersistedAppState = Partial<
     | 'lastSync'
     | 'aiConfigs'
     | 'activeAIConfig'
+    | 'repositoryChatSettings'
     | 'embeddingConfigs'
     | 'activeEmbeddingConfig'
     | 'vectorSearchConfig'
@@ -128,6 +131,26 @@ export type PersistedAppState = Partial<
   analyzingGistIds?: unknown;
   releaseExpandedRepositories?: unknown;
   forkExpandedRepositories?: unknown;
+};
+
+export const normalizeRepositoryChatSettings = (value: unknown): RepositoryChatSettings => {
+  const record = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const retainSessionDays = typeof record.retainSessionDays === 'number' && Number.isFinite(record.retainSessionDays)
+    ? Math.min(365, Math.max(1, Math.round(record.retainSessionDays)))
+    : defaultRepositoryChatSettings.retainSessionDays;
+  const maxToolsPerTurn = typeof record.maxToolsPerTurn === 'number' && Number.isFinite(record.maxToolsPerTurn)
+    ? Math.min(8, Math.max(1, Math.round(record.maxToolsPerTurn)))
+    : defaultRepositoryChatSettings.maxToolsPerTurn;
+  return {
+    enabled: record.enabled !== false,
+    chatConfigId: typeof record.chatConfigId === 'string' ? record.chatConfigId : null,
+    streamingMode: record.streamingMode === 'off' ? 'off' : 'auto',
+    enableWebTools: record.enableWebTools === true,
+    retainSessionDays,
+    maxToolsPerTurn,
+  };
 };
 
 export const normalizeNumberSet = (value: unknown): Set<number> => {

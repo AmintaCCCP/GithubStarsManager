@@ -1,6 +1,7 @@
 
 import type { AppState, TrendingTimeRange } from '../types';
 import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscriptionChannels } from '../types';
+import { defaultRepositoryChatSettings } from '../types/repositoryChat';
 import { DEFAULT_THEME_PRESET_ID } from '../constants/themePresets';
 import { readSessionBackendSecret } from './persistence/authStorage';
 import {
@@ -35,6 +36,7 @@ export const createInitialState = (): AppState => ({
       analyzingRepositoryIds: new Set<number>(),
       aiConfigs: [],
       activeAIConfig: null,
+      repositoryChatSettings: { ...defaultRepositoryChatSettings },
       embeddingConfigs: [],
       activeEmbeddingConfig: null,
       vectorSearchConfig: { ...defaultVectorSearchConfig },

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
@@ -6,6 +7,7 @@ import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
 import { BulkRestoreModal, RestoreConfig } from './BulkRestoreModal';
+import { ErrorBoundary } from './ErrorBoundary';
 
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
@@ -16,6 +18,10 @@ import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+
+const LazyRepositoryChatSheet = React.lazy(() =>
+  import('./RepositoryChatSheet').then((module) => ({ default: module.default }))
+);
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -66,6 +72,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [isExitingSelection, setIsExitingSelection] = useState(false);
+  const [activeChatRepository, setActiveChatRepository] = useState<Repository | null>(null);
+  const activeChatTriggerRef = useRef<HTMLElement | null>(null);
 
   const allCategories = useMemo(
     () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
@@ -75,6 +83,17 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const bulkActions = useBulkRepositoryActions({ allCategories });
   const isLoading = analysisJob.isRunning;
   const { isPaused, progress: analysisProgress } = analysisJob;
+
+  useEffect(() => {
+    try {
+      const pending = JSON.parse(sessionStorage.getItem('gsm:repository-chat-return') || 'null') as { repoId?: unknown } | null;
+      if (typeof pending?.repoId !== 'number') return;
+      const targetRepository = repositories.find((repository) => repository.id === pending.repoId);
+      if (targetRepository) setActiveChatRepository(targetRepository);
+    } catch {
+      sessionStorage.removeItem('gsm:repository-chat-return');
+    }
+  }, [repositories]);
 
   const filteredRepositories = useMemo(() => {
     if (selectedCategory === 'all') return repositories;
@@ -330,6 +349,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       handleDeselectAll();
     }
   }, [showBulkToolbar, handleDeselectAll]);
+
+  const handleAskRepository = useCallback((repository: Repository) => {
+    const trigger = document.activeElement;
+    activeChatTriggerRef.current = trigger instanceof HTMLElement ? trigger : null;
+    setActiveChatRepository(repository);
+  }, []);
 
   const handleBulkAction = async (action: string, selectedRepositories: Repository[]) => {
     try {
@@ -613,6 +638,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             isExitingSelection={isExitingSelection}
             allCategories={allCategories}
             viewMode={repositoryViewMode}
+            onAskRepository={handleAskRepository}
           />
         ))}
       </div>
@@ -657,6 +683,20 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         repositories={selectedRepositories}
         onRestore={handleBulkRestore}
       />
+
+      {activeChatRepository && createPortal(
+        <ErrorBoundary>
+          <React.Suspense fallback={null}>
+            <LazyRepositoryChatSheet
+              isOpen
+              repository={activeChatRepository}
+              onClose={() => setActiveChatRepository(null)}
+              onCloseAutoFocus={() => activeChatTriggerRef.current?.focus()}
+            />
+          </React.Suspense>
+        </ErrorBoundary>,
+        document.body,
+      )}
     </div>
   );
 };

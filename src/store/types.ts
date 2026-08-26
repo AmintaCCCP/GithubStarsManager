@@ -37,6 +37,7 @@ import type {
   HeaderMenuItem,
   SyncMode,
   TranslationEngine,
+  RepositoryChatSettings,
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
 import type { GitHubListsApiService } from '../services/githubListsApi';
@@ -81,6 +82,7 @@ export interface AppActions {
   deleteAIConfig: (id: string) => void;
   setActiveAIConfig: (id: string | null) => void;
   setAIConfigs: (configs: AIConfig[]) => void;
+  setRepositoryChatSettings: (settings: Partial<RepositoryChatSettings>) => void;
 
   // WebDAV actions
   addWebDAVConfig: (config: WebDAVConfig) => void;
