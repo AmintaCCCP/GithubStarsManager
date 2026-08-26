@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
+import { Copy, ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { useDialog } from '../hooks/useDialog';
+import { safeWriteText } from '../utils/clipboardUtils';
 import { useShallow } from 'zustand/react/shallow';
 import { useRepositoryChatSessions } from '../features/repository-chat/hooks/useRepositoryChatSessions';
 import { useRepositoryChat } from '../features/repository-chat/hooks/useRepositoryChat';
@@ -32,6 +34,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   })));
   const [showHistory, setShowHistory] = useState(false);
   const [draft, setDraft] = useState('');
+  const { toast } = useDialog();
   const messageRegionRef = useRef<HTMLDivElement>(null);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const {
@@ -103,6 +106,14 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     if (!question || !canChat || !activeSession || isSending) return;
     setDraft('');
     void send(question);
+  };
+
+  const handleCopyAnswer = async (content: string) => {
+    const result = await safeWriteText(content);
+    toast(
+      result.success ? t('回答已复制', 'Answer copied') : (result.error || t('复制失败', 'Copy failed')),
+      result.success ? 'success' : 'error'
+    );
   };
 
   return (
@@ -209,10 +220,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   <p className="text-sm font-medium">{t('你可以从这些问题开始：', 'You can start with:')}</p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
-                      t('这个项目怎么部署？给出详细方案。', 'How do I deploy this project?'),
-                      t('画出这个项目的系统架构图。', 'Draw this project’s system architecture.'),
-                      t('这个项目的数据情况怎么样？', 'What data does this project use?'),
-                      t('README 是怎么渲染的？', 'How is the README rendered?'),
+                      t('这个仓库是做什么的？', 'What does this repository do?'),
+                      t('这个项目怎样使用？', 'How do I use this project?'),
                     ].map((prompt) => (
                       <Button key={prompt} type="button" variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left text-xs" onClick={() => setDraft(prompt)}>
                         {prompt}
@@ -230,7 +239,23 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   )}
                   {messages.map((message) => (
                     <article key={message.id} className={`rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
+                        {message.role === 'assistant' && message.content && message.status === 'complete' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => void handleCopyAnswer(message.content)}
+                            aria-label={t('复制回答', 'Copy answer')}
+                            title={t('复制回答', 'Copy answer')}
+                          >
+                            <Copy className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                            {t('复制', 'Copy')}
+                          </Button>
+                        )}
+                      </div>
                       {message.content ? <MarkdownRenderer content={message.content} shouldRender breaks fontSize="small" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('正在生成', 'Generating')} />}
                       {message.evidenceIds.length > 0 && (
                         <div className="mt-3 grid gap-2">

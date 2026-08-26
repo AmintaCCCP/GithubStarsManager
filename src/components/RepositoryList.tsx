@@ -12,6 +12,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { matchesCategory } from '../utils/categoryUtils';
+import { sortRepositories } from '../utils/repoSearch';
 import { useRepositoryAnalysisJob } from '../features/repositories/hooks/useRepositoryAnalysisJob';
 import { useBulkRepositoryActions } from '../features/repositories/hooks/useBulkRepositoryActions';
 import { useDialog } from '../hooks/useDialog';
@@ -96,12 +97,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   }, [repositories]);
 
   const filteredRepositories = useMemo(() => {
-    if (selectedCategory === 'all') return repositories;
-    
-    const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
-    if (!selectedCategoryObj) return [];
-    return repositories.filter(repo => matchesCategory(repo, selectedCategoryObj, categoryMatchMode));
-  }, [repositories, selectedCategory, allCategories, categoryMatchMode]);
+    const categoryRepositories = selectedCategory === 'all'
+      ? repositories
+      : (() => {
+        const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
+        return selectedCategoryObj
+          ? repositories.filter(repo => matchesCategory(repo, selectedCategoryObj, categoryMatchMode))
+          : [];
+      })();
+    return sortRepositories(categoryRepositories, searchFilters.sortBy, searchFilters.sortOrder);
+  }, [repositories, selectedCategory, allCategories, categoryMatchMode, searchFilters.sortBy, searchFilters.sortOrder]);
 
   // 根据当前筛选的仓库中是否有AI分析内容来动态设置默认显示模式
   const hasAnalyzedRepos = useMemo(() => 

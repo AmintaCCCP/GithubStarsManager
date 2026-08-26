@@ -16,6 +16,19 @@ const createId = (prefix: string): string => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+export const repositoryChatErrorMessage = (unknownError: unknown, language: 'zh' | 'en'): string => {
+  const rawMessage = unknownError instanceof Error ? unknownError.message : String(unknownError ?? '');
+  const isTemporaryServiceFailure = /\b(?:5\d\d|429)\b|upstream|timeout|timed?\s*out|network|fetch|do_request_failed|temporarily unavailable/i.test(rawMessage);
+  if (isTemporaryServiceFailure) {
+    return language === 'zh'
+      ? 'AI 服务暂时不可用。问题和已读取的仓库证据已保留，请稍后重试。'
+      : 'The AI service is temporarily unavailable. Your question and retrieved repository evidence have been preserved; please retry shortly.';
+  }
+  return language === 'zh'
+    ? '回答生成失败。请检查 AI 配置后重试。'
+    : 'Answer generation failed. Check the AI configuration and retry.';
+};
+
 interface UseRepositoryChatOptions {
   repository: Repository | null;
   session: RepositoryChatSession | null;
@@ -195,7 +208,7 @@ export const useRepositoryChat = ({
       };
       await repositoryChatSessionRepository.saveMessage(failedAssistant);
       onMessagesChange([...baseMessages, userMessage, failedAssistant]);
-      if (!aborted) setError(unknownError instanceof Error ? unknownError.message : (language === 'zh' ? '回答生成失败。' : 'Answer generation failed.'));
+      if (!aborted) setError(repositoryChatErrorMessage(unknownError, language));
     } finally {
       abortControllerRef.current = null;
       setIsSending(false);
