@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -16,6 +16,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 const LazyReadmeModal = React.lazy(() =>
   import('./ReadmeModal').then((module) => ({ default: module.ReadmeModal }))
+);
+
+const LazyRepositoryReleaseSheet = React.lazy(() =>
+  import('./RepositoryReleaseSheet').then((module) => ({ default: module.RepositoryReleaseSheet }))
 );
 
 const ReadmeModalLoadingFallback: React.FC<{
@@ -35,6 +39,28 @@ const ReadmeModalLoadingFallback: React.FC<{
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
         <p className="text-muted-foreground">Loading README...</p>
+      </div>
+    </DialogContent>
+  </Dialog>
+);
+
+const ReleaseSheetLoadingFallback: React.FC<{
+  onClose: () => void;
+  onCloseAutoFocus: () => void;
+}> = ({ onClose, onCloseAutoFocus }) => (
+  <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <DialogContent
+      aria-describedby={undefined}
+      className="w-[calc(100%_-_2rem)] max-w-sm p-6"
+      onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        onCloseAutoFocus();
+      }}
+    >
+      <DialogTitle className="sr-only">Loading releases</DialogTitle>
+      <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+        <p className="text-muted-foreground">Loading releases...</p>
       </div>
     </DialogContent>
   </Dialog>
@@ -132,6 +158,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
+  const [releaseSheetOpen, setReleaseSheetOpen] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -579,7 +606,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   // 处理键盘事件，使卡片可键盘操作
   // 当编辑模态框或README模态框打开时，禁用卡片键盘事件
-  const isModalOpen = editModalOpen || readmeModalOpen;
+  const isModalOpen = editModalOpen || readmeModalOpen || releaseSheetOpen;
   
   const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     // 仅由卡片自身获得焦点时处理，避免拦截三点菜单等后代控件的原生键盘行为。
@@ -725,6 +752,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
+                <PackageOpen className="mr-2 h-3.5 w-3.5" />
+                {language === 'zh' ? '查看 Release' : 'View releases'}
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <a
                   href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
@@ -824,8 +855,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           </SelectionAwareButton>
         </div>
 
-        {/* Right side: Zread/DeepWiki, GitHub Links, and Unstar */}
+        {/* Right side: Release downloads, Zread/DeepWiki, GitHub Links, and Unstar */}
         <div className="flex items-center gap-1.5">
+          <SelectionAwareButton
+            onClick={() => setReleaseSheetOpen(true)}
+            selectionMode={selectionMode}
+            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            title={language === 'zh' ? '查看 Release' : 'View releases'}
+            aria-label={language === 'zh' ? '查看 Release' : 'View releases'}
+          >
+            <PackageOpen className="w-4 h-4" />
+          </SelectionAwareButton>
           <a
             href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
             target="_blank"
@@ -1067,6 +1107,27 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <LazyReadmeModal
               isOpen={readmeModalOpen}
               onClose={() => setReadmeModalOpen(false)}
+              onCloseAutoFocus={restoreReadmeTriggerFocus}
+              repository={repository}
+            />
+          </Suspense>
+        </ErrorBoundary>,
+        document.body
+      )}
+
+      {releaseSheetOpen && createPortal(
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <ReleaseSheetLoadingFallback
+                onClose={() => setReleaseSheetOpen(false)}
+                onCloseAutoFocus={restoreReadmeTriggerFocus}
+              />
+            }
+          >
+            <LazyRepositoryReleaseSheet
+              isOpen={releaseSheetOpen}
+              onClose={() => setReleaseSheetOpen(false)}
               onCloseAutoFocus={restoreReadmeTriggerFocus}
               repository={repository}
             />

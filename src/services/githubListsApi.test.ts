@@ -51,7 +51,7 @@ function makeService(backendUrl: string | null = null): GitHubListsApiService {
 describe('GitHubListsApiService 后端代理回退直连', () => {
   beforeEach(() => {
     // 退避等待直接完成，避免测试被 1→2→4s 背压拖慢
-    vi.spyOn(GitHubListsApiService.prototype, 'sleep' as never).mockResolvedValue(undefined as never);
+    vi.spyOn(GitHubListsApiService.prototype as unknown as { sleep: () => Promise<void> }, 'sleep').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
