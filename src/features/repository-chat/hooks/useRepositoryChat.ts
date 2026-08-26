@@ -45,6 +45,7 @@ export const useRepositoryChat = ({
     repositoryChatSettings: state.repositoryChatSettings,
   })));
   const abortControllerRef = useRef<AbortController | null>(null);
+  const retryInFlightRef = useRef(false);
   const toolEventIdsRef = useRef<Map<string, string>>(new Map());
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,8 +111,8 @@ export const useRepositoryChat = ({
     await repositoryChatSessionRepository.saveToolEvent(toolEvent);
   }, [session]);
 
-  const send = useCallback(async (question: string, baseMessages = messages) => {
-    if (!repository || !session || !aiConfig || unavailableReason || isSending) {
+  const send = useCallback(async (question: string, baseMessages = messages, isRetry = false) => {
+    if (!repository || !session || !aiConfig || unavailableReason || isSending || (!isRetry && retryInFlightRef.current)) {
       if (unavailableReason) setError(unavailableReason);
       return;
     }
@@ -206,14 +207,20 @@ export const useRepositoryChat = ({
   }, []);
 
   const retry = useCallback(async () => {
+    if (retryInFlightRef.current) return;
     const failedAssistantIndex = [...messages].map((message) => message.role === 'assistant' && (message.status === 'error' || message.status === 'aborted')).lastIndexOf(true);
     const failedAssistant = failedAssistantIndex >= 0 ? messages[failedAssistantIndex] : undefined;
     const failedUser = failedAssistantIndex > 0 ? messages[failedAssistantIndex - 1] : undefined;
     if (!failedAssistant || !failedUser || failedUser.role !== 'user') return;
     const baseMessages = messages.slice(0, failedAssistantIndex - 1);
-    await repositoryChatSessionRepository.permanentlyDeleteMessages([failedUser.id, failedAssistant.id]);
-    onMessagesChange(baseMessages);
-    await send(failedUser.content, baseMessages);
+    retryInFlightRef.current = true;
+    try {
+      await repositoryChatSessionRepository.permanentlyDeleteMessages([failedUser.id, failedAssistant.id]);
+      onMessagesChange(baseMessages);
+      await send(failedUser.content, baseMessages, true);
+    } finally {
+      retryInFlightRef.current = false;
+    }
   }, [messages, onMessagesChange, send]);
 
   return {
