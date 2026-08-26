@@ -8,6 +8,7 @@ export const createConfigurationSlice: AppStoreSlice<Pick<import('../types').App
   | 'deleteAIConfig'
   | 'setActiveAIConfig'
   | 'setAIConfigs'
+  | 'setRepositoryChatSettings'
   | 'addWebDAVConfig'
   | 'updateWebDAVConfig'
   | 'deleteWebDAVConfig'
@@ -39,6 +40,9 @@ export const createConfigurationSlice: AppStoreSlice<Pick<import('../types').App
       })),
       setActiveAIConfig: (activeAIConfig) => set({ activeAIConfig }),
       setAIConfigs: (aiConfigs) => set({ aiConfigs }),
+      setRepositoryChatSettings: (settings) => set((state) => ({
+        repositoryChatSettings: { ...state.repositoryChatSettings, ...settings },
+      })),
 
       // WebDAV actions
       addWebDAVConfig: (config) => set((state) => ({

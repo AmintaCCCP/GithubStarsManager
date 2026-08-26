@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen, MessageSquareText } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -128,6 +128,7 @@ interface RepositoryCardProps {
   isExitingSelection?: boolean;
   allCategories: Category[];
   viewMode?: 'grid' | 'list';
+  onAskRepository?: (repository: Repository) => void;
 }
 
 const MAX_CACHE_SIZE = 500;
@@ -147,7 +148,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   selectionMode = false,
   isExitingSelection = false,
   allCategories,
-  viewMode = 'grid'
+  viewMode = 'grid',
+  onAskRepository,
 }) => {
   const language = useAppStore((state) => state.language);
   const {
@@ -172,7 +174,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const menuDismissedByPointerDownRef = useRef(false);
   const releaseSheetOutsideDismissedAtRef = useRef<number | null>(null);
   const gridActionRowRef = useRef<HTMLDivElement>(null);
-  const [visibleGridActionCount, setVisibleGridActionCount] = useState(7);
+  const [visibleGridActionCount, setVisibleGridActionCount] = useState(8);
 
   const restoreReadmeTriggerFocus = useCallback(() => {
     cardRef.current?.focus();
@@ -193,7 +195,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       // until a real layout measurement is available.
       if (width === 0) return;
       const capacity = Math.max(1, Math.floor((width + 6) / 38));
-      setVisibleGridActionCount(capacity >= 7 ? 7 : Math.max(0, capacity - 1));
+      setVisibleGridActionCount(capacity >= 8 ? 8 : Math.max(0, capacity - 1));
     };
 
     updateVisibleActionCount();
@@ -790,6 +792,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
                 {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onAskRepository?.(repository)}>
+                <MessageSquareText className="mr-2 h-3.5 w-3.5" />
+                {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                 {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
                 {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
@@ -885,6 +891,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           )}
           {visibleGridActionCount >= 2 && (
             <SelectionAwareButton
+              onClick={() => onAskRepository?.(repository)}
+              selectionMode={selectionMode}
+              className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              title={language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+              aria-label={language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+            >
+              <MessageSquareText className="w-4 h-4" />
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount >= 3 && (
+            <SelectionAwareButton
               onClick={() => toggleReleaseSubscription()}
               selectionMode={selectionMode}
               className={`${isSubscribed
@@ -896,7 +913,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount >= 3 && (
+          {visibleGridActionCount >= 4 && (
             <SelectionAwareButton
               onClick={() => setEditModalOpen(true)}
               selectionMode={selectionMode}
@@ -906,7 +923,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <Edit3 className="w-4 h-4" />
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount >= 4 && (
+          {visibleGridActionCount >= 5 && (
             <SelectionAwareButton
               onClick={() => setReleaseSheetOpen(true)}
               selectionMode={selectionMode}
@@ -917,7 +934,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <PackageOpen className="w-4 h-4" />
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount >= 5 && (
+          {visibleGridActionCount >= 6 && (
             <a
               href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
               target="_blank"
@@ -929,7 +946,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <BookOpen className="w-4 h-4" />
             </a>
           )}
-          {visibleGridActionCount >= 6 && (
+          {visibleGridActionCount >= 7 && (
             <a
               href={repository.html_url}
               target="_blank"
@@ -941,7 +958,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <ExternalLink className="w-4 h-4" />
             </a>
           )}
-          {visibleGridActionCount >= 7 && (
+          {visibleGridActionCount >= 8 && (
             <SelectionAwareButton
               onClick={handleUnstar}
               disabled={unstarring}
@@ -952,7 +969,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount < 7 && (
+          {visibleGridActionCount < 8 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -975,24 +992,30 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 2 && (
+                  <DropdownMenuItem onSelect={() => onAskRepository?.(repository)}>
+                    <MessageSquareText className="mr-2 h-3.5 w-3.5" />
+                    {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 3 && (
                   <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                     {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
                     {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 3 && (
+                {visibleGridActionCount < 4 && (
                   <DropdownMenuItem onSelect={() => setEditModalOpen(true)}>
                     <Edit3 className="mr-2 h-3.5 w-3.5" />
                     {language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 4 && (
+                {visibleGridActionCount < 5 && (
                   <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
                     <PackageOpen className="mr-2 h-3.5 w-3.5" />
                     {language === 'zh' ? '查看 Release' : 'View releases'}
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 5 && (
+                {visibleGridActionCount < 6 && (
                   <DropdownMenuItem asChild>
                     <a href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)} target="_blank" rel="noopener noreferrer">
                       <BookOpen className="mr-2 h-3.5 w-3.5" />
@@ -1000,7 +1023,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                     </a>
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 6 && (
+                {visibleGridActionCount < 7 && (
                   <DropdownMenuItem asChild>
                     <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="mr-2 h-3.5 w-3.5" />
@@ -1008,7 +1031,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                     </a>
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 7 && (
+                {visibleGridActionCount < 8 && (
                   <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
                     <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
                     {language === 'zh' ? '取消 Star' : 'Unstar'}
@@ -1297,6 +1320,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.selectionMode === nextProps.selectionMode &&
     prevProps.isExitingSelection === nextProps.isExitingSelection &&
     prevProps.viewMode === nextProps.viewMode &&
+    prevProps.onAskRepository === nextProps.onAskRepository &&
     allCategoriesEqual
   );
 });

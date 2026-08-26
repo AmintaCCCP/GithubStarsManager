@@ -18,6 +18,7 @@ import {
   initialSearchFilters,
   normalizeMcpConfig,
   normalizeNumberSet,
+  normalizeRepositoryChatSettings,
   normalizeVectorSearchConfig,
   normalizeVectorSearchStatus,
   PersistedAppState,
@@ -148,6 +149,7 @@ export const normalizePersistedState = (
 // Persist full mcpConfig including token so Agent configs stay stable across restarts
     // unless the user explicitly resets the token.
     mcpConfig: normalizeMcpConfig((safePersisted as Record<string, unknown>).mcpConfig),
+    repositoryChatSettings: normalizeRepositoryChatSettings((safePersisted as Record<string, unknown>).repositoryChatSettings),
     customCategories: Array.isArray(safePersisted.customCategories) ? safePersisted.customCategories : [],
     hiddenDefaultCategoryIds: (() => {
       const persistedIds = (safePersisted as Record<string, unknown>).hiddenDefaultCategoryIds;

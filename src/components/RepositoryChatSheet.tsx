@@ -1,0 +1,292 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
+import type { Repository } from '../types';
+import { useAppStore } from '../store/useAppStore';
+import { useRepositoryChatSessions } from '../features/repository-chat/hooks/useRepositoryChatSessions';
+import { useRepositoryChat } from '../features/repository-chat/hooks/useRepositoryChat';
+import { RepositoryChatHistoryPanel } from './RepositoryChatHistoryPanel';
+import MarkdownRenderer from './MarkdownRenderer';
+import { Button } from './ui/button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
+import { Textarea } from './ui/textarea';
+
+interface RepositoryChatSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCloseAutoFocus?: () => void;
+  repository: Repository;
+}
+
+const shortSha = (sha: string) => sha.slice(0, 7);
+
+const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
+  isOpen,
+  onClose,
+  onCloseAutoFocus,
+  repository,
+}) => {
+  const { language, setCurrentView } = useAppStore((state) => ({
+    language: state.language,
+    setCurrentView: state.setCurrentView,
+  }));
+  const [showHistory, setShowHistory] = useState(false);
+  const [draft, setDraft] = useState('');
+  const messageRegionRef = useRef<HTMLDivElement>(null);
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const {
+    sessions,
+    activeSession,
+    messages,
+    isLoading,
+    error,
+    createSession,
+    selectSession,
+    deleteSession,
+    updateSession,
+    setMessages,
+  } = useRepositoryChatSessions({ repository, language });
+  const {
+    canChat,
+    unavailableReason,
+    isSending,
+    error: chatError,
+    toolEvents,
+    evidenceById,
+    send,
+    stop,
+    retry,
+  } = useRepositoryChat({
+    repository,
+    session: activeSession,
+    messages,
+    onMessagesChange: setMessages,
+    onSessionChange: updateSession,
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowHistory(false);
+      return;
+    }
+    if (repository) {
+      try {
+        const pending = JSON.parse(sessionStorage.getItem('gsm:repository-chat-return') || 'null') as { repoId?: unknown; draft?: unknown } | null;
+        if (pending?.repoId === repository.id && typeof pending.draft === 'string') {
+          setDraft(pending.draft);
+          sessionStorage.removeItem('gsm:repository-chat-return');
+        }
+      } catch {
+        sessionStorage.removeItem('gsm:repository-chat-return');
+      }
+    }
+    messageRegionRef.current?.scrollTo({ top: messageRegionRef.current.scrollHeight });
+  }, [isOpen, messages.length, repository]);
+
+  const handleCreateSession = () => {
+    void createSession();
+    setShowHistory(false);
+  };
+
+  const navigateToAiSettings = () => {
+    if (repository) {
+      sessionStorage.setItem('gsm:repository-chat-return', JSON.stringify({ repoId: repository.id, draft }));
+    }
+    sessionStorage.setItem('gsm:pending-settings-tab', 'ai');
+    setCurrentView('settings');
+    window.dispatchEvent(new CustomEvent('gsm:navigate-to-settings-tab', { detail: { tab: 'ai' } }));
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!draft.trim()) return;
+    void send(draft).then(() => setDraft(''));
+  };
+
+  return (
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-[min(100vw-1rem,48rem)] sm:max-w-none"
+        closeLabel={t('关闭仓库问答', 'Close repository chat')}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
+          window.setTimeout(onClose, 0);
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          onCloseAutoFocus?.();
+        }}
+      >
+        <SheetHeader>
+          <div className="flex min-w-0 items-start gap-3">
+            <img src={repository.owner.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-md border border-border" />
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="flex items-center gap-2 text-base">
+                <MessageSquareText className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{repository.full_name}</span>
+              </SheetTitle>
+              <SheetDescription className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                {repository.language && <span>{repository.language}</span>}
+                {activeSession?.sourceRefSha ? (
+                  <span>{t(`基于 ${shortSha(activeSession.sourceRefSha)}`, `Based on ${shortSha(activeSession.sourceRefSha)}`)}</span>
+                ) : (
+                  <span>{t('新会话将固定源码版本', 'A new session will pin its source version')}</span>
+                )}
+              </SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="flex items-center gap-2 border-b border-border pb-3">
+          <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
+            {t('基于最新版本新建会话', 'New chat from latest')}
+          </Button>
+          <Button
+            type="button"
+            variant={showHistory ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowHistory((previous) => !previous)}
+            aria-pressed={showHistory}
+          >
+            <History className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            {t('历史', 'History')}
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex flex-1 gap-4 overflow-hidden">
+          {showHistory ? (
+            <div className="min-h-0 w-full max-w-sm border-r border-border pr-3">
+              <RepositoryChatHistoryPanel
+                sessions={sessions}
+                activeSessionId={activeSession?.id}
+                language={language}
+                disabled={isLoading || isSending}
+                onSelect={(sessionId) => {
+                  void selectSession(sessionId);
+                  setShowHistory(false);
+                }}
+                onDelete={(sessionId) => void deleteSession(sessionId)}
+              />
+            </div>
+          ) : (
+            <div ref={messageRegionRef} className="min-h-0 flex-1 overflow-y-auto pr-1" aria-live="polite">
+              {error || chatError ? (
+                <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-destructive/40 bg-muted/20 px-5 text-center">
+                  <p className="text-sm text-destructive">{error || chatError}</p>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void retry()}>{t('重试', 'Retry')}</Button>
+                </div>
+              ) : isLoading ? (
+                <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  {t('正在恢复会话…', 'Restoring conversation…')}
+                </div>
+              ) : !canChat ? (
+                <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-md border border-dashed border-border px-6 text-center">
+                  <MessageSquareText className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{t('仓库问答尚未就绪', 'Repository chat is not ready')}</p>
+                    <p className="text-xs text-muted-foreground">{unavailableReason}</p>
+                  </div>
+                  <Button type="button" onClick={navigateToAiSettings}>{t('配置 AI 服务', 'Configure AI service')}</Button>
+                </div>
+              ) : !activeSession ? (
+                <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-md border border-dashed border-border px-6 text-center">
+                  <MessageSquareText className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{t('开始询问这个仓库', 'Ask this repository')}</p>
+                    <p className="text-xs text-muted-foreground">{t('新会话会固定当前源码版本，并在回答中保留可点击的来源。', 'A new conversation pins the current source version and keeps clickable sources in answers.')}</p>
+                  </div>
+                  <Button type="button" onClick={handleCreateSession}>
+                    <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                    {t('新建会话', 'New conversation')}
+                  </Button>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
+                  <p className="text-sm font-medium">{t('你可以从这些问题开始：', 'You can start with:')}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      t('这个项目怎么部署？给出详细方案。', 'How do I deploy this project?'),
+                      t('画出这个项目的系统架构图。', 'Draw this project’s system architecture.'),
+                      t('这个项目的数据情况怎么样？', 'What data does this project use?'),
+                      t('README 是怎么渲染的？', 'How is the README rendered?'),
+                    ].map((prompt) => (
+                      <Button key={prompt} type="button" variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left text-xs" onClick={() => setDraft(prompt)}>
+                        {prompt}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map((message) => (
+                    <article key={message.id} className={`rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
+                      <p className="mb-1 text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
+                      {message.content ? <MarkdownRenderer content={message.content} shouldRender breaks fontSize="small" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('正在生成', 'Generating')} />}
+                      {message.evidenceIds.length > 0 && (
+                        <div className="mt-3 grid gap-2">
+                          {message.evidenceIds.map((evidenceId) => {
+                            const evidence = evidenceById[evidenceId];
+                            if (!evidence) return null;
+                            return (
+                              <a key={evidence.id} href={evidence.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs hover:bg-muted" aria-label={t(`查看来源：${evidence.path ?? evidence.repoFullName}`, `View source: ${evidence.path ?? evidence.repoFullName}`)}>
+                                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                <span className="min-w-0 flex-1 truncate">{evidence.repoFullName} · {evidence.path ? `${evidence.path}:L${evidence.lineStart ?? 1}-L${evidence.lineEnd ?? 1}` : t('仓库元数据', 'repository metadata')}</span>
+                                {evidence.refSha && <code className="shrink-0 text-muted-foreground">{shortSha(evidence.refSha)}</code>}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                  {toolEvents.length > 0 && (
+                    <details className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+                      <summary className="cursor-pointer font-medium text-muted-foreground">{t('工具步骤', 'Tool steps')} ({toolEvents.length})</summary>
+                      <ul className="mt-2 space-y-1.5 text-muted-foreground">
+                        {toolEvents.map((event) => <li key={event.id} className="flex items-center justify-between gap-3"><span className="truncate">{event.paramSummary}</span><span className="shrink-0">{event.status === 'success' ? t('已获取', 'Retrieved') : event.status === 'running' ? t('正在读取', 'Reading') : event.status === 'error' ? t('失败', 'Failed') : t('准备中', 'Pending')}</span></li>)}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <form
+          className="border-t border-border pt-3"
+          onSubmit={handleSubmit}
+        >
+          <label className="sr-only" htmlFor="repository-chat-draft">{t('问题', 'Question')}</label>
+          <div className="flex items-end gap-2">
+            <Textarea
+              id="repository-chat-draft"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={t('询问实现、部署、架构或创作内容…', 'Ask about implementation, deployment, architecture, or content…')}
+              className="min-h-20 resize-y text-sm"
+              disabled={!activeSession || !canChat || isSending}
+            />
+            {isSending ? (
+              <Button type="button" size="icon" variant="secondary" onClick={stop} aria-label={t('停止生成', 'Stop generating')} title={t('停止生成', 'Stop generating')}>
+                <Square className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button type="submit" size="icon" disabled={!activeSession || !canChat || !draft.trim()} aria-label={t('发送问题', 'Send question')} title={t('发送问题', 'Send question')}>
+                <Send className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p>{t('来源优先：实现事实会附带仓库来源；证据不足时会明确说明。', 'Source-first: implementation claims include repository sources; insufficient evidence is stated clearly.')}</p>
+            {!isSending && messages.some((message) => message.status === 'error' || message.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+export default RepositoryChatSheet;

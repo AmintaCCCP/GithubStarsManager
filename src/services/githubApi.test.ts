@@ -223,3 +223,55 @@ describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
     expect(releases).toEqual([expect.objectContaining({ id: published.id, published_at: published.published_at })]);
   });
 });
+
+
+describe('GitHubApiService repository chat read APIs', () => {
+  it('resolves default branch, immutable head SHA, and a recursive tree through tagged read requests', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({ default_branch: 'main' } as never)
+      .mockResolvedValueOnce({ sha: 'abcdef1234567890' } as never)
+      .mockResolvedValueOnce({ sha: 'tree-sha', truncated: false, tree: [{ path: 'src/App.tsx', type: 'blob', sha: 'file-sha' }] } as never);
+
+    await expect(service.getRepositoryMeta('owner', 'repo')).resolves.toEqual({ defaultBranch: 'main' });
+    await expect(service.getRepositoryHeadSha('owner', 'repo', 'main')).resolves.toBe('abcdef1234567890');
+    await expect(service.getRepositoryTree('owner', 'repo', 'abcdef1234567890')).resolves.toMatchObject({
+      ref: 'abcdef1234567890',
+      sha: 'tree-sha',
+      truncated: false,
+      entries: [{ path: 'src/App.tsx', type: 'blob' }],
+    });
+
+    expect(makeRequestSpy.mock.calls.map((call: unknown[]) => call[1])).toEqual([
+      { operationTag: 'repository-chat:meta' },
+      { operationTag: 'repository-chat:head-sha' },
+      { operationTag: 'repository-chat:tree' },
+    ]);
+  });
+
+  it('reads a text file at the supplied immutable ref and rejects sensitive paths before any request', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({
+        type: 'file',
+        path: 'src/App.tsx',
+        sha: 'file-sha',
+        size: 20,
+        encoding: 'base64',
+        content: btoa('export const App = () => null;'),
+      } as never);
+
+    await expect(service.getRepositoryFile('owner', 'repo', 'src/App.tsx', 'abcdef1234567890')).resolves.toMatchObject({
+      path: 'src/App.tsx',
+      ref: 'abcdef1234567890',
+      sha: 'file-sha',
+      content: 'export const App = () => null;',
+    });
+    const requestCalls = makeRequestSpy.mock.calls as unknown as Array<[string]>;
+    expect(requestCalls[0]?.[0]).toContain('?ref=abcdef1234567890');
+
+    await expect(service.getRepositoryFile('owner', 'repo', '.env.production', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'package-lock.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    expect(makeRequestSpy).toHaveBeenCalledTimes(1);
+  });
+});
