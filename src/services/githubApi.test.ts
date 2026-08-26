@@ -206,3 +206,18 @@ describe('GitHubApiService.getWatchedRepositories', () => {
     ]);
   });
 });
+
+
+describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
+  it('excludes draft releases with null publication times from direct GitHub results', async () => {
+    const service = new GitHubApiService('token');
+    const draft = { ...makeRelease(1, '2026-01-03T00:00:00.000Z'), draft: true, published_at: null };
+    const published = makeRelease(2, '2026-01-02T00:00:00.000Z');
+    vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce([draft, published] as never);
+
+    const releases = await service.getRepositoryReleases('owner', 'repo');
+
+    expect(releases).toEqual([expect.objectContaining({ id: published.id, published_at: published.published_at })]);
+  });
+});

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Release, Repository } from '../types';
@@ -7,6 +7,7 @@ import { RepositoryReleaseSheet } from './RepositoryReleaseSheet';
 const hookMocks = vi.hoisted(() => ({
   loadReleases: vi.fn(),
   sendAssetToRpc: vi.fn(),
+  downloadAsset: vi.fn(),
   generateSummary: vi.fn(),
   cancelPendingRequests: vi.fn(),
   state: {
@@ -28,6 +29,7 @@ vi.mock('../features/repositories/hooks/useRepositoryReleaseSheet', () => ({
     ...hookMocks.state,
     loadReleases: hookMocks.loadReleases,
     sendAssetToRpc: hookMocks.sendAssetToRpc,
+    downloadAsset: hookMocks.downloadAsset,
     generateSummary: hookMocks.generateSummary,
     cancelPendingRequests: hookMocks.cancelPendingRequests,
   }),
@@ -115,7 +117,11 @@ describe('RepositoryReleaseSheet', () => {
 
     expect(screen.getByText('Source code (v1.zip)')).toBeInTheDocument();
     const zipRow = screen.getByText('Source code (v1.zip)').closest('tr');
-    expect(zipRow?.querySelector('a')).toHaveAttribute('href', 'https://api.github.com/repos/owner/example-repository/zipball/v1');
+    expect(zipRow).not.toBeNull();
+    await user.click(within(zipRow!).getByRole('button', { name: '下载' }));
+    expect(hookMocks.downloadAsset).toHaveBeenCalledWith(expect.objectContaining({
+      authenticatedUrl: 'https://api.github.com/repos/owner/example-repository/zipball/v1',
+    }));
     expect(screen.queryByText('Source code (v1.tar.gz)')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'v1 资产分页 next page' }));
@@ -134,7 +140,7 @@ describe('RepositoryReleaseSheet', () => {
     expect(hookMocks.generateSummary).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 
-  it('sends assets through RPC instead of opening a browser link when RPC is enabled', async () => {
+  it('delegates asset download to the authenticated hook action when RPC is enabled', async () => {
     const user = userEvent.setup();
     hookMocks.state.isRpcEnabled = true;
     renderSheet();
@@ -142,7 +148,7 @@ describe('RepositoryReleaseSheet', () => {
     await user.click(screen.getByText('v1').closest('button')!);
     await user.click(screen.getAllByRole('button', { name: '下载' })[0]);
 
-    expect(hookMocks.sendAssetToRpc).toHaveBeenCalledWith(expect.objectContaining({
+    expect(hookMocks.downloadAsset).toHaveBeenCalledWith(expect.objectContaining({
       name: 'asset-1-1.zip',
       url: 'https://example.com/asset-1-1.zip',
     }));
