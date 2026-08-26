@@ -164,6 +164,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
+  const releaseSheetOutsideDismissedAtRef = useRef(0);
 
   const restoreReadmeTriggerFocus = useCallback(() => {
     cardRef.current?.focus();
@@ -543,8 +544,21 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 ref 来跟踪是否已经处理了点击
   const isProcessingClickRef = useRef(false);
 
+  const handleReleaseSheetOutsideDismiss = useCallback(() => {
+    // Radix dismisses on pointerdown. Keep the following click from activating
+    // the card after the portal has unmounted beneath the pointer.
+    releaseSheetOutsideDismissedAtRef.current = Date.now();
+    setReleaseSheetOpen(false);
+  }, []);
+
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (Date.now() - releaseSheetOutsideDismissedAtRef.current < 350) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     // 防止重复处理
     if (isProcessingClickRef.current) {
       event.preventDefault();
@@ -822,7 +836,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       {/* Action Buttons Row - Left and Right Aligned */}
       {viewMode === 'grid' && (
-      <div className="flex items-center justify-between mb-4">
+      <div data-testid="grid-action-row" className="mb-4 flex w-full flex-wrap items-center gap-1.5">
         {/* Left side: AI Analysis, Release Subscription, and Edit */}
         <div className="flex items-center gap-1.5">
           <SelectionAwareButton
@@ -856,7 +870,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Right side: Release downloads, Zread/DeepWiki, GitHub Links, and Unstar */}
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5">
           <SelectionAwareButton
             onClick={() => setReleaseSheetOpen(true)}
             selectionMode={selectionMode}
@@ -1128,6 +1142,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <LazyRepositoryReleaseSheet
               isOpen={releaseSheetOpen}
               onClose={() => setReleaseSheetOpen(false)}
+              onDismissByOutside={handleReleaseSheetOutsideDismiss}
               onCloseAutoFocus={restoreReadmeTriggerFocus}
               repository={repository}
             />
