@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { repositoryChatSessionRepository } from './sessionRepository';
 import type { RepositoryChatMessage, RepositoryChatSession, RepositoryChatToolEvent, ToolEvidence } from '../../../types/repositoryChat';
 
@@ -22,13 +22,14 @@ const createMessage = (id: string, sessionId: string, evidenceIds: string[] = []
   createdAt: '2026-08-26T00:00:00.000Z',
 });
 
-const createToolEvent = (sessionId: string): RepositoryChatToolEvent => ({
+const createToolEvent = (sessionId: string, evidenceId?: string): RepositoryChatToolEvent => ({
   id: `tool-${sessionId}`,
   sessionId,
   messageId: `message-${sessionId}`,
   toolName: 'read_repo_readme',
   status: 'success',
   paramSummary: 'README.md',
+  ...(evidenceId ? { evidenceId } : {}),
   createdAt: '2026-08-26T00:00:00.000Z',
 });
 
@@ -54,6 +55,7 @@ describe('repositoryChatSessionRepository local fallback', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalIndexedDb) Object.defineProperty(window, 'indexedDB', originalIndexedDb);
     else delete (window as { indexedDB?: IDBFactory }).indexedDB;
   });
@@ -89,17 +91,28 @@ describe('repositoryChatSessionRepository local fallback', () => {
 
   it('physically deletes all messages, tool events, and evidence connected to the deleted session', async () => {
     const session = createSession('session-1', 1, '2026-08-26T00:00:00.000Z');
-    const evidence = createEvidence('evidence-1');
+    const messageEvidence = createEvidence('message-evidence');
+    const toolEvidence = createEvidence('tool-evidence');
     await repositoryChatSessionRepository.saveSession(session);
-    await repositoryChatSessionRepository.saveMessage(createMessage('message-1', session.id, [evidence.id]));
-    await repositoryChatSessionRepository.saveToolEvent(createToolEvent(session.id));
-    await repositoryChatSessionRepository.saveEvidence(evidence);
+    await repositoryChatSessionRepository.saveMessage(createMessage('message-1', session.id, [messageEvidence.id]));
+    await repositoryChatSessionRepository.saveToolEvent(createToolEvent(session.id, toolEvidence.id));
+    await repositoryChatSessionRepository.saveEvidence(messageEvidence);
+    await repositoryChatSessionRepository.saveEvidence(toolEvidence);
 
     await repositoryChatSessionRepository.permanentlyDeleteSession(session.id);
 
     await expect(repositoryChatSessionRepository.getSession(session.id)).resolves.toBeNull();
     await expect(repositoryChatSessionRepository.listMessages(session.id)).resolves.toEqual([]);
     await expect(repositoryChatSessionRepository.listToolEvents(session.id)).resolves.toEqual([]);
-    await expect(repositoryChatSessionRepository.listEvidence([evidence.id])).resolves.toEqual([]);
+    await expect(repositoryChatSessionRepository.listEvidence([messageEvidence.id, toolEvidence.id])).resolves.toEqual([]);
+  });
+
+  it('rejects fallback writes when localStorage persistence is unavailable', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('storage is unavailable');
+    });
+
+    await expect(repositoryChatSessionRepository.saveSession(createSession('cannot-persist', 1, '2026-08-26T00:00:00.000Z')))
+      .rejects.toThrow('unable to persist fallback snapshot');
   });
 });
