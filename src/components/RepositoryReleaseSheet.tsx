@@ -20,6 +20,7 @@ interface RepositoryReleaseSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onCloseAutoFocus?: () => void;
+  onDismissByOutside?: () => void;
   repository: Repository;
 }
 
@@ -223,6 +224,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
   isOpen,
   onClose,
   onCloseAutoFocus,
+  onDismissByOutside,
   repository,
 }) => {
   const language = useAppStore((state) => state.language);
@@ -273,6 +275,10 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
       <SheetContent
         side="right"
         closeLabel={t('关闭 Release 侧栏', 'Close release sheet')}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
+          onDismissByOutside?.();
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           onCloseAutoFocus?.();
