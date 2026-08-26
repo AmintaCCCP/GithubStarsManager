@@ -209,6 +209,7 @@ export const useRepositoryChat = ({
   const retry = useCallback(async () => {
     if (retryInFlightRef.current) return;
     const failedAssistantIndex = [...messages].map((message) => message.role === 'assistant' && (message.status === 'error' || message.status === 'aborted')).lastIndexOf(true);
+    if (failedAssistantIndex !== messages.length - 1) return;
     const failedAssistant = failedAssistantIndex >= 0 ? messages[failedAssistantIndex] : undefined;
     const failedUser = failedAssistantIndex > 0 ? messages[failedAssistantIndex - 1] : undefined;
     if (!failedAssistant || !failedUser || failedUser.role !== 'user') return;
