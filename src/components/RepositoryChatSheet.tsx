@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useRepositoryChatSessions } from '../features/repository-chat/hooks/useRepositoryChatSessions';
 import { useRepositoryChat } from '../features/repository-chat/hooks/useRepositoryChat';
 import { RepositoryChatHistoryPanel } from './RepositoryChatHistoryPanel';
@@ -25,10 +26,10 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   onCloseAutoFocus,
   repository,
 }) => {
-  const { language, setCurrentView } = useAppStore((state) => ({
+  const { language, setCurrentView } = useAppStore(useShallow((state) => ({
     language: state.language,
     setCurrentView: state.setCurrentView,
-  }));
+  })));
   const [showHistory, setShowHistory] = useState(false);
   const [draft, setDraft] = useState('');
   const messageRegionRef = useRef<HTMLDivElement>(null);
@@ -98,8 +99,10 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!draft.trim()) return;
-    void send(draft).then(() => setDraft(''));
+    const question = draft.trim();
+    if (!question || !canChat || !activeSession || isSending) return;
+    setDraft('');
+    void send(question);
   };
 
   return (
@@ -171,10 +174,9 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             </div>
           ) : (
             <div ref={messageRegionRef} className="min-h-0 flex-1 overflow-y-auto pr-1" aria-live="polite">
-              {error || chatError ? (
+              {error ? (
                 <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-destructive/40 bg-muted/20 px-5 text-center">
-                  <p className="text-sm text-destructive">{error || chatError}</p>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void retry()}>{t('重试', 'Retry')}</Button>
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
               ) : isLoading ? (
                 <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
@@ -220,6 +222,12 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {chatError && (
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-muted/20 px-3 py-2 text-sm text-destructive">
+                      <span>{chatError}</span>
+                      <Button type="button" variant="secondary" size="sm" onClick={() => void retry()}>{t('重试', 'Retry')}</Button>
+                    </div>
+                  )}
                   {messages.map((message) => (
                     <article key={message.id} className={`rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
                       <p className="mb-1 text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>

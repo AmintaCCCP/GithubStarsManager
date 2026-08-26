@@ -272,6 +272,10 @@ describe('GitHubApiService repository chat read APIs', () => {
 
     await expect(service.getRepositoryFile('owner', 'repo', '.env.production', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
     await expect(service.getRepositoryFile('owner', 'repo', 'package-lock.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'config/secrets.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'config/credentials.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'keys/private_key.txt', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'keys/id_rsa.pub', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
     expect(makeRequestSpy).toHaveBeenCalledTimes(1);
   });
 });

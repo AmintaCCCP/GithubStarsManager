@@ -103,7 +103,7 @@ const REPOSITORY_CHAT_ALLOWED_EXTENSIONS = new Set([
   '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.cs', '.c', '.h', '.cpp', '.hpp', '.vue', '.svelte',
   '.html', '.css', '.scss', '.sql', '.graphql', '.gql', '.sh', '.bash', '.zsh', '.xml', '.ini', '.properties',
 ]);
-const REPOSITORY_CHAT_SENSITIVE_PATH = /(^|\/)(?:\.env(?:\..*)?|.*(?:secret|credential|private[_-]?key|id_rsa|\.pem|\.p12|\.pfx|\.key))(?:$|\/)/i;
+const REPOSITORY_CHAT_SENSITIVE_PATH = /(^|\/)(?:\.env(?:\.[^/]*)?|[^/]*(?:secret|credential|private[_-]?key|id_rsa)[^/]*|[^/]*\.(?:pem|p12|pfx|key))(?:$|\/)/i;
 const REPOSITORY_CHAT_LOCK_FILE = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|composer\.lock|cargo\.lock|poetry\.lock)$/i;
 const REPOSITORY_CHAT_MINIFIED_FILE = /\.min\.(?:js|css)$/i;
 

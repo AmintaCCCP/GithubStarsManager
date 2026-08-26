@@ -792,10 +792,12 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
                 {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onAskRepository?.(repository)}>
-                <MessageSquareText className="mr-2 h-3.5 w-3.5" />
-                {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
-              </DropdownMenuItem>
+              {onAskRepository && (
+                <DropdownMenuItem onSelect={() => onAskRepository(repository)}>
+                  <MessageSquareText className="mr-2 h-3.5 w-3.5" />
+                  {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                 {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
                 {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
@@ -889,9 +891,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount >= 2 && (
+          {onAskRepository && visibleGridActionCount >= 2 && (
             <SelectionAwareButton
-              onClick={() => onAskRepository?.(repository)}
+              onClick={() => onAskRepository(repository)}
               selectionMode={selectionMode}
               className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               title={language === 'zh' ? '问答此仓库' : 'Ask this repository'}
@@ -991,8 +993,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                     {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
                   </DropdownMenuItem>
                 )}
-                {visibleGridActionCount < 2 && (
-                  <DropdownMenuItem onSelect={() => onAskRepository?.(repository)}>
+                {onAskRepository && visibleGridActionCount < 2 && (
+                  <DropdownMenuItem onSelect={() => onAskRepository(repository)}>
                     <MessageSquareText className="mr-2 h-3.5 w-3.5" />
                     {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
                   </DropdownMenuItem>
