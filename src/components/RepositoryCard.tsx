@@ -14,6 +14,10 @@ import { useRepositoryCardActions } from '../features/repositories/hooks/useRepo
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
+type DialogContentPointerDownOutsideHandler = NonNullable<
+  React.ComponentProps<typeof DialogContent>['onPointerDownOutside']
+>;
+
 const LazyReadmeModal = React.lazy(() =>
   import('./ReadmeModal').then((module) => ({ default: module.ReadmeModal }))
 );
@@ -47,11 +51,13 @@ const ReadmeModalLoadingFallback: React.FC<{
 const ReleaseSheetLoadingFallback: React.FC<{
   onClose: () => void;
   onCloseAutoFocus: () => void;
-}> = ({ onClose, onCloseAutoFocus }) => (
+  onPointerDownOutside: DialogContentPointerDownOutsideHandler;
+}> = ({ onClose, onCloseAutoFocus, onPointerDownOutside }) => (
   <Dialog open onOpenChange={(open) => !open && onClose()}>
     <DialogContent
       aria-describedby={undefined}
       className="w-[calc(100%_-_2rem)] max-w-sm p-6"
+      onPointerDownOutside={onPointerDownOutside}
       onCloseAutoFocus={(event) => {
         event.preventDefault();
         onCloseAutoFocus();
@@ -164,6 +170,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
+  const releaseSheetOutsideDismissedAtRef = useRef<number | null>(null);
   const gridActionRowRef = useRef<HTMLDivElement>(null);
   const [visibleGridActionCount, setVisibleGridActionCount] = useState(7);
 
@@ -567,8 +574,26 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 ref 来跟踪是否已经处理了点击
   const isProcessingClickRef = useRef(false);
 
+  const handleReleaseSheetOutsideDismiss = useCallback<DialogContentPointerDownOutsideHandler>((event) => {
+    // Keep the fallback overlay mounted through the current click sequence.
+    // Otherwise, closing it on pointerdown can retarget the browser click to this card.
+    event.preventDefault();
+    releaseSheetOutsideDismissedAtRef.current = Date.now();
+    window.setTimeout(() => setReleaseSheetOpen(false), 0);
+  }, []);
+
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const releaseSheetDismissedAt = releaseSheetOutsideDismissedAtRef.current;
+    if (releaseSheetDismissedAt !== null) {
+      releaseSheetOutsideDismissedAtRef.current = null;
+      if (Date.now() - releaseSheetDismissedAt < 250) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
+
     // 防止重复处理
     if (isProcessingClickRef.current) {
       event.preventDefault();
@@ -1218,6 +1243,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <ReleaseSheetLoadingFallback
                 onClose={() => setReleaseSheetOpen(false)}
                 onCloseAutoFocus={restoreReadmeTriggerFocus}
+                onPointerDownOutside={handleReleaseSheetOutsideDismiss}
               />
             }
           >
