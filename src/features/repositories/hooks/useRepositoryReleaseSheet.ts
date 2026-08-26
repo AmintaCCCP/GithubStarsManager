@@ -155,16 +155,16 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   useEffect(() => cancelPendingRequests, [cancelPendingRequests]);
 
   const fetchAllPages = useCallback(async (
-    getPage: (page: number, signal: AbortSignal) => Promise<Release[]>,
+    getPage: (page: number, signal: AbortSignal) => Promise<{ releases: Release[]; hasMore: boolean }>,
     signal: AbortSignal,
   ): Promise<Release[]> => {
     const collected: Release[] = [];
     let page = 1;
 
     while (collected.length < MAX_LIVE_RELEASES) {
-      const batch = await getPage(page, signal);
-      collected.push(...batch.slice(0, MAX_LIVE_RELEASES - collected.length));
-      if (batch.length < REMOTE_RELEASE_PAGE_SIZE || collected.length >= MAX_LIVE_RELEASES) break;
+      const { releases, hasMore } = await getPage(page, signal);
+      collected.push(...releases.slice(0, MAX_LIVE_RELEASES - collected.length));
+      if (!hasMore || collected.length >= MAX_LIVE_RELEASES) break;
       page += 1;
     }
 
@@ -189,9 +189,12 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         try {
           liveReleases = await fetchAllPages(async (page, signal) => {
             const records = await backend.getRepositoryReleases(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal);
-            return records
-              .filter(isPublishedReleaseRecord)
-              .map((record) => mapBackendRelease(record, repository));
+            return {
+              releases: records
+                .filter(isPublishedReleaseRecord)
+                .map((record) => mapBackendRelease(record, repository)),
+              hasMore: records.length === REMOTE_RELEASE_PAGE_SIZE,
+            };
           }, controller.signal);
         } catch (requestError) {
           if (isAbortError(requestError)) throw requestError;
@@ -205,7 +208,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         }
         const githubApi = new GitHubApiService(githubToken);
         liveReleases = await fetchAllPages(
-          (page, signal) => githubApi.getRepositoryReleases(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal),
+          (page, signal) => githubApi.getRepositoryReleasesPage(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal),
           controller.signal,
         );
       }
@@ -250,25 +253,30 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       return;
     }
 
-    if (!githubToken || !link.authenticatedUrl) {
-      window.open(link.url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     if (downloadStates[link.url] === 'sending') return;
     setDownloadStates((previous) => ({ ...previous, [link.url]: 'sending' }));
 
     try {
-      const response = await fetch(link.authenticatedUrl, {
-        headers: {
-          Accept: 'application/octet-stream',
-          Authorization: `Bearer ${githubToken}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`${t('下载失败', 'Download failed')} (${response.status})`);
+      let blob: Blob;
+      if (githubToken && link.authenticatedUrl) {
+        const response = await fetch(link.authenticatedUrl, {
+          headers: {
+            Accept: 'application/octet-stream',
+            Authorization: `Bearer ${githubToken}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`${t('下载失败', 'Download failed')} (${response.status})`);
+        }
+        blob = await response.blob();
+      } else if (backend.isAvailable && link.authenticatedPath) {
+        blob = await backend.downloadGitHubResource(link.authenticatedPath);
+      } else {
+        window.open(link.url, '_blank', 'noopener,noreferrer');
+        setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+        return;
       }
-      downloadBrowserBlob(await response.blob(), link.name);
+      downloadBrowserBlob(blob, link.name);
       setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
     } catch (downloadError) {
       setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));

@@ -424,6 +424,23 @@ class BackendAdapter {
     return data as Record<string, unknown>[];
   }
 
+  async downloadGitHubResource(path: string, signal?: AbortSignal): Promise<Blob> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    if (!path.startsWith('/repos/')) throw new Error('Invalid GitHub resource path');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github${path}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        method: 'GET',
+        headers: { Accept: 'application/octet-stream' },
+      }),
+      signal,
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy download error');
+    return res.blob();
+  }
+
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 

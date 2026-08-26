@@ -7,12 +7,13 @@ const mocks = vi.hoisted(() => ({
   backend: {
     isAvailable: false,
     getRepositoryReleases: vi.fn(),
+    downloadGitHubResource: vi.fn(),
   },
-  githubGetRepositoryReleases: vi.fn(),
+  githubGetRepositoryReleasesPage: vi.fn(),
   toast: vi.fn(),
   store: {
     language: 'zh' as const,
-    githubToken: 'token',
+    githubToken: 'token' as string | null,
     rpcDownloadConfig: { enabled: false, host: '', port: 6800, secret: '' },
     backendApiSecret: null as string | null,
     aiConfigs: [],
@@ -23,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
 vi.mock('../../../services/githubApi', () => ({
   GitHubApiService: class {
-    getRepositoryReleases = mocks.githubGetRepositoryReleases;
+    getRepositoryReleasesPage = mocks.githubGetRepositoryReleasesPage;
   },
 }));
 vi.mock('../../../hooks/useDialog', () => ({
@@ -78,7 +79,7 @@ describe('useRepositoryReleaseSheet', () => {
     });
 
     expect(mocks.backend.getRepositoryReleases).toHaveBeenCalledWith('owner', 'repo', 1, 100, expect.any(AbortSignal));
-    expect(mocks.githubGetRepositoryReleases).not.toHaveBeenCalled();
+    expect(mocks.githubGetRepositoryReleasesPage).not.toHaveBeenCalled();
     expect(result.current.releases).toEqual([expect.objectContaining({
       id: rawRelease.id,
       repository: { id: repository.id, name: repository.name, full_name: repository.full_name },
@@ -103,14 +104,17 @@ describe('useRepositoryReleaseSheet', () => {
   it('falls back to a fresh token-authenticated GitHub request when the backend proxy fails', async () => {
     mocks.backend.isAvailable = true;
     mocks.backend.getRepositoryReleases.mockRejectedValue(new Error('Proxy unavailable'));
-    mocks.githubGetRepositoryReleases.mockResolvedValue([{ ...rawRelease, repository: { id: 0, name: 'repo', full_name: 'owner/repo' } }]);
+    mocks.githubGetRepositoryReleasesPage.mockResolvedValue({
+      releases: [{ ...rawRelease, repository: { id: 0, name: 'repo', full_name: 'owner/repo' } }],
+      hasMore: false,
+    });
     const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
 
     await act(async () => {
       await result.current.loadReleases();
     });
 
-    expect(mocks.githubGetRepositoryReleases).toHaveBeenCalledWith('owner', 'repo', 1, 100, expect.any(AbortSignal));
+    expect(mocks.githubGetRepositoryReleasesPage).toHaveBeenCalledWith('owner', 'repo', 1, 100, expect.any(AbortSignal));
     expect(result.current.error).toBeNull();
     expect(result.current.releases[0]?.repository.id).toBe(repository.id);
   });
@@ -146,6 +150,32 @@ describe('useRepositoryReleaseSheet', () => {
       },
     });
     expect(createObjectUrl).toHaveBeenCalledWith(blob);
+    expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('uses the authenticated backend proxy for private downloads in backend-only sessions', async () => {
+    mocks.store.githubToken = null;
+    mocks.backend.isAvailable = true;
+    const blob = new Blob(['backend release asset']);
+    mocks.backend.downloadGitHubResource.mockResolvedValue(blob);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:backend-release') });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => {
+      await result.current.downloadAsset({
+        id: 'asset-2',
+        name: 'backend-private.zip',
+        url: 'https://github.com/owner/repo/releases/download/v1/backend-private.zip',
+        authenticatedPath: '/repos/owner/repo/releases/assets/2',
+        size: 10,
+        isSourceCode: false,
+        assetId: 2,
+      });
+    });
+
+    expect(mocks.backend.downloadGitHubResource).toHaveBeenCalledWith('/repos/owner/repo/releases/assets/2');
     expect(clickSpy).toHaveBeenCalledOnce();
   });
 });

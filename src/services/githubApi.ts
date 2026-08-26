@@ -743,6 +743,48 @@ export class GitHubApiService {
     }
   }
 
+  async getRepositoryReleasesPage(
+    owner: string,
+    repo: string,
+    page = 1,
+    perPage = 30,
+    signal?: AbortSignal,
+  ): Promise<{ releases: Release[]; hasMore: boolean }> {
+    try {
+      const rawReleases = await this.makeRequest<Array<Release & { draft?: boolean; published_at: string | null }>>(
+        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`,
+        { operationTag: 'release' },
+        signal,
+      );
+
+      return {
+        releases: rawReleases
+          .filter((release) => release.draft !== true && typeof release.published_at === 'string')
+          .map(release => ({
+            id: release.id,
+            tag_name: release.tag_name,
+            name: release.name || release.tag_name,
+            body: release.body || '',
+            published_at: release.published_at,
+            html_url: release.html_url,
+            assets: release.assets || [],
+            zipball_url: release.zipball_url,
+            tarball_url: release.tarball_url,
+            prerelease: release.prerelease ?? false,
+            repository: {
+              id: 0,
+              full_name: `${owner}/${repo}`,
+              name: repo,
+            },
+          })),
+        hasMore: rawReleases.length === perPage,
+      };
+    } catch (error) {
+      logger.warn('githubApi', `Failed to fetch releases for ${owner}/${repo}`, error);
+      throw error;
+    }
+  }
+
   async getRepositoryReleases(
     owner: string,
     repo: string,
@@ -750,36 +792,8 @@ export class GitHubApiService {
     perPage = 30,
     signal?: AbortSignal,
   ): Promise<Release[]> {
-    try {
-      const releases = await this.makeRequest<Array<Release & { draft?: boolean; published_at: string | null }>>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`,
-        { operationTag: 'release' },
-        signal,
-      );
-
-      return releases
-        .filter((release) => release.draft !== true && typeof release.published_at === 'string')
-        .map(release => ({
-        id: release.id,
-        tag_name: release.tag_name,
-        name: release.name || release.tag_name,
-        body: release.body || '',
-        published_at: release.published_at,
-        html_url: release.html_url,
-        assets: release.assets || [],
-        zipball_url: release.zipball_url,
-        tarball_url: release.tarball_url,
-        prerelease: release.prerelease ?? false,
-        repository: {
-          id: 0,
-          full_name: `${owner}/${repo}`,
-          name: repo,
-        },
-      }));
-    } catch (error) {
-      logger.warn('githubApi', `Failed to fetch releases for ${owner}/${repo}`, error);
-      throw error; // Re-throw to let caller handle
-    }
+    const result = await this.getRepositoryReleasesPage(owner, repo, page, perPage, signal);
+    return result.releases;
   }
 
   /**
@@ -791,34 +805,11 @@ export class GitHubApiService {
     let page = 1;
 
     while (true) {
-      const batch = await this.makeRequest<Release[]>(
-        `/repos/${owner}/${repo}/releases?page=${page}&per_page=30`,
-        { operationTag: 'release' }
-      );
+      const { releases, hasMore } = await this.getRepositoryReleasesPage(owner, repo, page, 30);
 
-      if (batch.length === 0) break;
+      allReleases.push(...releases);
 
-      const mapped = batch.map(release => ({
-        id: release.id,
-        tag_name: release.tag_name,
-        name: release.name || release.tag_name,
-        body: release.body || '',
-        published_at: release.published_at,
-        html_url: release.html_url,
-        assets: release.assets || [],
-        zipball_url: release.zipball_url,
-        tarball_url: release.tarball_url,
-        prerelease: release.prerelease ?? false,
-        repository: {
-          id: 0,
-          full_name: `${owner}/${repo}`,
-          name: repo,
-        },
-      }));
-
-      allReleases.push(...mapped);
-
-      if (batch.length < 30) break;
+      if (!hasMore) break;
       page++;
 
       // Rate limiting protection between pages
@@ -869,9 +860,9 @@ export class GitHubApiService {
             // 不能只看 page=1 就停（否则正式版资产变化会被漏掉）。
             let collectedLatest = false;
             while (true) {
-              const batch = await this.getRepositoryReleases(owner, name, page, 10);
+              const { releases: batch, hasMore } = await this.getRepositoryReleasesPage(owner, name, page, 10);
 
-              if (batch.length === 0) break;
+              if (batch.length === 0 && !hasMore) break;
 
               if (refreshExistingAssets && !collectedLatest && batch.length > 0) {
                 const latest = includePreRelease
@@ -892,7 +883,7 @@ export class GitHubApiService {
 
               // 未收集到符合过滤条件的最新 Release 时，即使已触达水印也继续翻页，
               // 直到找到候选或耗尽分页（避免前 10 条全是预发布时漏掉正式版）。
-              const needMoreForLatest = refreshExistingAssets && !collectedLatest && batch.length >= 10;
+              const needMoreForLatest = refreshExistingAssets && !collectedLatest && hasMore;
               if (needMoreForLatest) {
                 page++;
                 continue;
@@ -900,7 +891,7 @@ export class GitHubApiService {
 
               // Stop if we hit the watermark or ran out of data
               if (
-                batch.length < 10 ||
+                !hasMore ||
                 (sinceTime && batch.some(r => new Date(r.published_at) <= sinceTime))
               ) {
                 break;
