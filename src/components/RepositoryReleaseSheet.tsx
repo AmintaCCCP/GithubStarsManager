@@ -74,11 +74,10 @@ const ReleaseAssetsTable: React.FC<{
   release: Release;
   assetPage: number;
   onAssetPageChange: (page: number) => void;
-  isRpcEnabled: boolean;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
-  onSendToRpc: (link: ReleaseDownloadLink) => void;
+  onDownload: (link: ReleaseDownloadLink) => void;
   language: 'zh' | 'en';
-}> = ({ release, assetPage, onAssetPageChange, isRpcEnabled, downloadStates, onSendToRpc, language }) => {
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, language }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const links = useMemo(() => buildReleaseDownloadLinks(release), [release]);
   const totalPages = Math.max(1, Math.ceil(links.length / ASSETS_PER_PAGE));
@@ -118,26 +117,17 @@ const ReleaseAssetsTable: React.FC<{
                 </TableCell>
                 <TableCell className="text-right text-xs text-muted-foreground">{formatFileSize(link.size)}</TableCell>
                 <TableCell className="text-right">
-                  {isRpcEnabled ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      disabled={isSending || isSent}
-                      onClick={() => onSendToRpc(link)}
-                    >
-                      {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
-                      {isSent ? t('已发送', 'Sent') : t('下载', 'Download')}
-                    </Button>
-                  ) : (
-                    <Button asChild type="button" variant="secondary" size="sm" className="h-7 px-2 text-xs">
-                      <a href={link.url} target="_blank" rel="noopener noreferrer">
-                        <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                        {t('下载', 'Download')}
-                      </a>
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={isSending || isSent}
+                    onClick={() => onDownload(link)}
+                  >
+                    {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
+                    {isSent ? t('已发送', 'Sent') : t('下载', 'Download')}
+                  </Button>
                 </TableCell>
               </TableRow>
             );
@@ -158,13 +148,12 @@ const ReleaseContent: React.FC<{
   release: Release;
   assetPage: number;
   onAssetPageChange: (page: number) => void;
-  isRpcEnabled: boolean;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
-  onSendToRpc: (link: ReleaseDownloadLink) => void;
+  onDownload: (link: ReleaseDownloadLink) => void;
   summary: { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string } | undefined;
   onGenerateSummary: () => void;
   language: 'zh' | 'en';
-}> = ({ release, assetPage, onAssetPageChange, isRpcEnabled, downloadStates, onSendToRpc, summary, onGenerateSummary, language }) => {
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const [activeTab, setActiveTab] = useState('assets');
   const hasBody = Boolean(release.body?.trim());
@@ -186,9 +175,8 @@ const ReleaseContent: React.FC<{
           release={release}
           assetPage={assetPage}
           onAssetPageChange={onAssetPageChange}
-          isRpcEnabled={isRpcEnabled}
           downloadStates={downloadStates}
-          onSendToRpc={onSendToRpc}
+          onDownload={onDownload}
           language={language}
         />
       </TabsContent>
@@ -244,9 +232,8 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
     error,
     summaries,
     downloadStates,
-    isRpcEnabled,
     loadReleases,
-    sendAssetToRpc,
+    downloadAsset,
     generateSummary,
     cancelPendingRequests,
   } = useRepositoryReleaseSheet(repository);
@@ -346,9 +333,8 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
                         release={release}
                         assetPage={assetPages[release.id] ?? 1}
                         onAssetPageChange={(page) => setAssetPages((previous) => ({ ...previous, [release.id]: page }))}
-                        isRpcEnabled={isRpcEnabled}
                         downloadStates={downloadStates}
-                        onSendToRpc={(link) => void sendAssetToRpc(link)}
+                        onDownload={(link) => void downloadAsset(link)}
                         summary={summaries[release.id]}
                         onGenerateSummary={() => void generateSummary(release)}
                         language={language}

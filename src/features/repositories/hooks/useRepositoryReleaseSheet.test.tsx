@@ -85,6 +85,21 @@ describe('useRepositoryReleaseSheet', () => {
     })]);
   });
 
+  it('filters backend draft releases with null publication times before mapping', async () => {
+    mocks.backend.isAvailable = true;
+    mocks.backend.getRepositoryReleases.mockResolvedValue([
+      { ...rawRelease, id: 99, draft: true, published_at: null },
+      rawRelease,
+    ]);
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => {
+      await result.current.loadReleases();
+    });
+
+    expect(result.current.releases).toEqual([expect.objectContaining({ id: rawRelease.id })]);
+  });
+
   it('falls back to a fresh token-authenticated GitHub request when the backend proxy fails', async () => {
     mocks.backend.isAvailable = true;
     mocks.backend.getRepositoryReleases.mockRejectedValue(new Error('Proxy unavailable'));
@@ -98,5 +113,39 @@ describe('useRepositoryReleaseSheet', () => {
     expect(mocks.githubGetRepositoryReleases).toHaveBeenCalledWith('owner', 'repo', 1, 100, expect.any(AbortSignal));
     expect(result.current.error).toBeNull();
     expect(result.current.releases[0]?.repository.id).toBe(repository.id);
+  });
+
+  it('downloads a private asset through its authenticated GitHub API endpoint', async () => {
+    const blob = new Blob(['release asset']);
+    const fetchMock = vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(blob),
+    } as unknown as Response);
+    const createObjectUrl = vi.fn(() => 'blob:release-asset');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => {
+      await result.current.downloadAsset({
+        id: 'asset-1',
+        name: 'private.zip',
+        url: 'https://github.com/owner/repo/releases/download/v1/private.zip',
+        authenticatedUrl: 'https://api.github.com/repos/owner/repo/releases/assets/1',
+        size: 10,
+        isSourceCode: false,
+        assetId: 1,
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('https://api.github.com/repos/owner/repo/releases/assets/1', {
+      headers: {
+        Accept: 'application/octet-stream',
+        Authorization: 'Bearer token',
+      },
+    });
+    expect(createObjectUrl).toHaveBeenCalledWith(blob);
+    expect(clickSpy).toHaveBeenCalledOnce();
   });
 });

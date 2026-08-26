@@ -4,6 +4,7 @@ export interface ReleaseDownloadLink {
   id: string;
   name: string;
   url: string;
+  authenticatedUrl?: string;
   size: number | null;
   isSourceCode: boolean;
   assetId?: number;
@@ -14,6 +15,7 @@ export const buildReleaseDownloadLinks = (release: Release): ReleaseDownloadLink
     id: `asset-${asset.id}`,
     name: asset.name,
     url: asset.browser_download_url,
+    authenticatedUrl: `https://api.github.com/repos/${release.repository.full_name}/releases/assets/${asset.id}`,
     size: asset.size,
     isSourceCode: false,
     assetId: asset.id,
@@ -24,6 +26,7 @@ export const buildReleaseDownloadLinks = (release: Release): ReleaseDownloadLink
       id: `source-zip-${release.id}`,
       name: `Source code (${release.tag_name}.zip)`,
       url: release.zipball_url,
+      authenticatedUrl: release.zipball_url,
       size: null,
       isSourceCode: true,
     });
@@ -34,6 +37,7 @@ export const buildReleaseDownloadLinks = (release: Release): ReleaseDownloadLink
       id: `source-tar-${release.id}`,
       name: `Source code (${release.tag_name}.tar.gz)`,
       url: release.tarball_url,
+      authenticatedUrl: release.tarball_url,
       size: null,
       isSourceCode: true,
     });

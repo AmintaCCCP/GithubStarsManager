@@ -751,13 +751,15 @@ export class GitHubApiService {
     signal?: AbortSignal,
   ): Promise<Release[]> {
     try {
-      const releases = await this.makeRequest<Release[]>(
+      const releases = await this.makeRequest<Array<Release & { draft?: boolean; published_at: string | null }>>(
         `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`,
         { operationTag: 'release' },
         signal,
       );
 
-      return releases.map(release => ({
+      return releases
+        .filter((release) => release.draft !== true && typeof release.published_at === 'string')
+        .map(release => ({
         id: release.id,
         tag_name: release.tag_name,
         name: release.name || release.tag_name,

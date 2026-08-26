@@ -99,6 +99,22 @@ const getErrorMessage = (error: unknown): string => (
   error instanceof Error ? error.message : String(error)
 );
 
+const isPublishedReleaseRecord = (value: Record<string, unknown>): boolean => (
+  value.draft !== true && typeof value.published_at === 'string'
+);
+
+const downloadBrowserBlob = (blob: Blob, fileName: string) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+
 export const useRepositoryReleaseSheet = (repository: Repository) => {
   const {
     language,
@@ -173,7 +189,9 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         try {
           liveReleases = await fetchAllPages(async (page, signal) => {
             const records = await backend.getRepositoryReleases(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal);
-            return records.map((record) => mapBackendRelease(record, repository));
+            return records
+              .filter(isPublishedReleaseRecord)
+              .map((record) => mapBackendRelease(record, repository));
           }, controller.signal);
         } catch (requestError) {
           if (isAbortError(requestError)) throw requestError;
@@ -225,6 +243,38 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       );
     }
   }, [backendApiSecret, downloadStates, rpcDownloadConfig.enabled, t, toast]);
+
+  const downloadAsset = useCallback(async (link: ReleaseDownloadLink) => {
+    if (rpcDownloadConfig.enabled) {
+      await sendAssetToRpc(link);
+      return;
+    }
+
+    if (!githubToken || !link.authenticatedUrl) {
+      window.open(link.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (downloadStates[link.url] === 'sending') return;
+    setDownloadStates((previous) => ({ ...previous, [link.url]: 'sending' }));
+
+    try {
+      const response = await fetch(link.authenticatedUrl, {
+        headers: {
+          Accept: 'application/octet-stream',
+          Authorization: `Bearer ${githubToken}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`${t('下载失败', 'Download failed')} (${response.status})`);
+      }
+      downloadBrowserBlob(await response.blob(), link.name);
+      setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+    } catch (downloadError) {
+      setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+      toast(`${t('下载失败', 'Download failed')}: ${getErrorMessage(downloadError)}`, 'error');
+    }
+  }, [downloadStates, githubToken, rpcDownloadConfig.enabled, sendAssetToRpc, t, toast]);
 
   const generateSummary = useCallback(async (release: Release) => {
     const existing = summaries[release.id];
@@ -278,6 +328,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
     isRpcEnabled: rpcDownloadConfig.enabled,
     loadReleases,
     sendAssetToRpc,
+    downloadAsset,
     generateSummary,
     cancelPendingRequests,
   };
