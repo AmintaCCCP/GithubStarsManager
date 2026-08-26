@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
+import type { RepositoryChatToolEvent } from '../types/repositoryChat';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
 import { safeWriteText } from '../utils/clipboardUtils';
@@ -21,6 +22,78 @@ interface RepositoryChatSheetProps {
 }
 
 const shortSha = (sha: string) => sha.slice(0, 7);
+
+const formatToolDuration = (durationMs?: number): string | null => {
+  if (!durationMs || durationMs < 1) return null;
+  return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
+};
+
+const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | 'en'): string => {
+  const zh = language === 'zh';
+  if (stage === 'context') return zh ? '固定版本上下文' : 'Pinned source context';
+  if (stage === 'planning') return zh ? '取证计划' : 'Evidence plan';
+  if (stage === 'retrieval') return zh ? '文件取证' : 'File retrieval';
+  if (stage === 'verification') return zh ? '证据核验' : 'Evidence verification';
+  if (stage === 'answer') return zh ? '结论收敛' : 'Conclusion synthesis';
+  return zh ? '工具调用' : 'Tool call';
+};
+
+const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: 'zh' | 'en'; isRunning: boolean }> = ({ events, language, isRunning }) => {
+  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const stageOrder: Array<RepositoryChatToolEvent['stage']> = ['context', 'planning', 'retrieval', 'verification', 'answer'];
+  const completed = events.filter((event) => event.status === 'success').length;
+  const failed = events.filter((event) => event.status === 'error').length;
+  const latest = events[events.length - 1];
+  const grouped = stageOrder.map((stage) => ({ stage, events: events.filter((event) => event.stage === stage) })).filter((group) => group.events.length > 0);
+
+  return (
+    <details className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs" open={isRunning}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium text-foreground">
+        <span>{t('Agent 执行记录', 'Agent execution record')}</span>
+        <span className="text-[11px] font-normal text-muted-foreground">
+          {latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}
+        </span>
+      </summary>
+      <p className="mt-1 text-muted-foreground">{t('默认显示本轮摘要；展开阶段可查看任务目标、允许的只读工具、文件选择、取证与来源收敛。不会展示隐藏推理、请求报文或密钥。', 'The summary is shown first. Expand a stage for its task goal, allowed read-only tools, file selection, evidence retrieval, and source convergence. Hidden reasoning, request payloads, and secrets are never shown.')}</p>
+      <div className="mt-3 space-y-2">
+        {grouped.map((group) => {
+          const stageHasRunning = group.events.some((event) => event.status === 'running');
+          const stageErrors = group.events.filter((event) => event.status === 'error').length;
+          return (
+            <details key={group.stage ?? 'other'} className="rounded border border-border/70 bg-background/60 px-2.5 py-2" open={isRunning && stageHasRunning}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+                <span className="font-medium">{stageLabels(group.stage, language)}</span>
+                <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{group.events.length} {t('步', 'step(s)')}{stageErrors > 0 ? ` · ${stageErrors} ${t('项失败', 'failed')}` : ''}</span>
+              </summary>
+              <ol className="mt-2 space-y-2 border-l border-border pl-3">
+                {group.events.map((event) => {
+                  const statusLabel = event.status === 'success'
+                    ? t('完成', 'Done')
+                    : event.status === 'running'
+                      ? t('进行中', 'Running')
+                      : event.status === 'error'
+                        ? t('失败', 'Failed')
+                        : t('准备中', 'Queued');
+                  const duration = formatToolDuration(event.durationMs);
+                  return (
+                    <li key={event.id} className="relative grid gap-1 pb-1 before:absolute before:-left-[1.1rem] before:top-1 before:h-2 before:w-2 before:rounded-full before:border before:border-border before:bg-background">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-medium text-foreground">{event.round ? `${t('第', 'Round ')}${event.round}${t('轮 · ', ' · ')}` : ''}{event.paramSummary}</span>
+                        <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{event.toolName}</code>
+                        <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{duration ? ` · ${duration}` : ''}</span>
+                      </div>
+                      <p className="break-words text-muted-foreground">{event.detail}</p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </details>
+          );
+        })}
+      </div>
+    </details>
+  );
+};
 
 const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   isOpen,
@@ -237,7 +310,9 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                       <Button type="button" variant="secondary" size="sm" onClick={() => void retry()}>{t('重试', 'Retry')}</Button>
                     </div>
                   )}
-                  {messages.map((message) => (
+                  {messages.map((message) => {
+                    const messageToolEvents = toolEvents.filter((event) => event.messageId === message.id);
+                    return (
                     <article key={message.id} className={`rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <p className="text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
@@ -272,16 +347,12 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                           })}
                         </div>
                       )}
+                      {message.role === 'assistant' && messageToolEvents.length > 0 && (
+                        <ExecutionTimeline events={messageToolEvents} language={language} isRunning={message.status === 'streaming'} />
+                      )}
                     </article>
-                  ))}
-                  {toolEvents.length > 0 && (
-                    <details className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
-                      <summary className="cursor-pointer font-medium text-muted-foreground">{t('工具步骤', 'Tool steps')} ({toolEvents.length})</summary>
-                      <ul className="mt-2 space-y-1.5 text-muted-foreground">
-                        {toolEvents.map((event) => <li key={event.id} className="flex items-center justify-between gap-3"><span className="truncate">{event.paramSummary}</span><span className="shrink-0">{event.status === 'success' ? t('已获取', 'Retrieved') : event.status === 'running' ? t('正在读取', 'Reading') : event.status === 'error' ? t('失败', 'Failed') : t('准备中', 'Pending')}</span></li>)}
-                      </ul>
-                    </details>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>

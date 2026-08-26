@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     delete: vi.fn(),
     cleanup: vi.fn(),
   },
+  frameworkFetch: vi.fn(),
 }));
 
 vi.mock('./aiService', () => ({
@@ -68,12 +69,35 @@ const session: RepositoryChatSession = {
 const aiConfig: AIConfig = {
   id: 'ai-1',
   name: 'Test AI',
-  apiType: 'openai-compatible',
+  apiType: 'claude',
   baseUrl: 'https://example.com/v1',
   apiKey: 'test-key',
   model: 'test-model',
   isActive: true,
 };
+
+const frameworkConfig: AIConfig = {
+  ...aiConfig,
+  id: 'framework-ai-1',
+  apiType: 'openai-compatible',
+};
+
+const toolCallResponse = (id: string, name: string, args: Record<string, unknown>) => ({
+  id: `chatcmpl-${id}`,
+  object: 'chat.completion',
+  created: 1,
+  model: 'test-model',
+  choices: [{
+    index: 0,
+    message: {
+      role: 'assistant',
+      content: null,
+      tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
+    },
+    finish_reason: 'tool_calls',
+  }],
+  usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+});
 
 const turnInput = (question = 'How is this project deployed?') => ({
   repository,
@@ -89,6 +113,7 @@ const turnInput = (question = 'How is this project deployed?') => ({
 describe('runRepositoryChatTurn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     mocks.getRepositoryTree.mockResolvedValue({
       ref: session.sourceRefSha,
       truncated: false,
@@ -115,7 +140,7 @@ describe('runRepositoryChatTurn', () => {
   it('uses an LLM-planned read-only evidence loop, bounds untrusted content, and returns fixed-SHA file references', async () => {
     const toolEvents: Array<{ toolName: string; status: string }> = [];
     const result = await runRepositoryChatTurn({
-      ...turnInput(),
+      ...turnInput('Explain the implementation of src/App.tsx in depth.'),
       onToolEvent: (event) => toolEvents.push({ toolName: event.toolName, status: event.status }),
     });
 
@@ -143,6 +168,40 @@ describe('runRepositoryChatTurn', () => {
       expect.objectContaining({ toolName: 'plan_research', status: 'success' }),
       expect.objectContaining({ toolName: 'read_repo_file', status: 'success' }),
     ]));
+  });
+
+  it('classifies overview questions for a fast root-README-first evidence path without a planning model call', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'src/lib/internal/README.md', type: 'blob' },
+        { path: 'package.json', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: path === 'README.md' ? '# Example\nThis is the repository overview.' : 'internal detail',
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('The repository overview is `/README.md - 1-2`.');
+    const events: Array<{ paramSummary: string; detail?: string }> = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput('这个仓库是做什么的？'),
+      onToolEvent: (event) => events.push(event),
+    });
+
+    expect(mocks.generateChatText).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paramSummary: 'Fast evidence plan', detail: expect.stringContaining('overview') }),
+      expect.objectContaining({ paramSummary: 'Fast overview convergence' }),
+    ]));
+    expect(result.content).toContain('`/README.md - 1`');
   });
 
   it('finds the actual deployment document rather than treating a truncated README as deployment instructions', async () => {
@@ -177,6 +236,114 @@ describe('runRepositoryChatTurn', () => {
     expect(result.content).toContain(`\`/docs/deployment.md - ${deploymentEvidence?.lineStart}-${deploymentEvidence?.lineEnd}\``);
     expect(result.content).not.toContain('reference/FREE_TIERS.md');
     expect(result.content).not.toMatch(/\[\^E\d+\]|\bE[23]\b/);
+  });
+
+  it('returns deterministic verbatim excerpts when an unreferenced draft cannot be repaired', async () => {
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["README.md"]}')
+      .mockResolvedValueOnce('Use the documented deployment command without a source.')
+      .mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(result.content).toContain('Verbatim excerpts from files read');
+    expect(result.content).toContain('`/README.md - 3`');
+    expect(result.content).toContain('Deployment uses npm run build.');
+    expect(result.content).not.toContain('Use the documented deployment command without a source.');
+  });
+
+  it('prefers canonical deployment files over translated mirrors and forces implementation evidence for architecture questions', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'docs/deployment.md', type: 'blob' },
+        { path: 'docs/i18n/ar/docs/deployment.md', type: 'blob' },
+        { path: 'package.json', type: 'blob' },
+        { path: 'src/main.tsx', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: path === 'docs/deployment.md' ? '## Deploy\nRun `npm run deploy`.' : 'export const value = true;',
+    }));
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["docs/i18n/ar/docs/deployment.md"]}')
+      .mockResolvedValueOnce('Deploy with `/docs/deployment.md - 1-2`.');
+
+    await runRepositoryChatTurn(turnInput('How is this deployed in production?'));
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/deployment.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'docs/i18n/ar/docs/deployment.md', session.sourceRefSha, undefined);
+
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["docs/deployment.md"]}')
+      .mockResolvedValueOnce('The architecture evidence is `/src/main.tsx - 1`.');
+    await runRepositoryChatTurn(turnInput('Draw the system architecture.'));
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'package.json', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'src/main.tsx', session.sourceRefSha, undefined);
+  });
+
+  it('closes the framework running event before entering compatible evidence retrieval', async () => {
+    mocks.frameworkFetch.mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
+    vi.stubGlobal('fetch', mocks.frameworkFetch);
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["README.md"]}')
+      .mockResolvedValueOnce('The documented build command is `/README.md - 1-3`.');
+    const events: Array<{ toolName: string; status: string; paramSummary: string }> = [];
+
+    await runRepositoryChatTurn({
+      ...turnInput('Explain the implementation architecture in depth.'),
+      aiConfig: frameworkConfig,
+      onToolEvent: (event) => events.push(event),
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ toolName: 'verify_evidence', status: 'error', paramSummary: 'Framework completes the constrained evidence loop and composes conclusions' }),
+      expect.objectContaining({ toolName: 'verify_evidence', status: 'success', paramSummary: 'Compatibility fallback' }),
+    ]));
+  });
+
+  it('runs the framework-owned tool loop with fixed-SHA read-only tools and observable stages', async () => {
+    const responses = [
+      toolCallResponse('context', 'get_source_context', {}),
+      toolCallResponse('select', 'select_evidence_files', { paths: ['README.md', 'src/App.tsx'] }),
+      toolCallResponse('read-readme', 'read_repo_file', { path: 'README.md' }),
+      toolCallResponse('read-app', 'read_repo_file', { path: 'src/App.tsx' }),
+      toolCallResponse('finish', 'finish_with_evidence', { answer: 'The documented build command is available in `/README.md - 1-3`.' }),
+    ];
+    mocks.frameworkFetch.mockImplementation(async () => new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', mocks.frameworkFetch);
+    const toolEvents: Array<{ toolName: string; status: string; stage?: string; detail?: string }> = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput('Explain the implementation architecture in depth.'),
+      aiConfig: frameworkConfig,
+      onToolEvent: (event) => toolEvents.push(event),
+    });
+
+    expect(mocks.frameworkFetch).toHaveBeenCalledTimes(5);
+    expect(mocks.generateChatText).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'src/App.tsx', session.sourceRefSha, undefined);
+    expect(result.content).toContain('`/README.md - 1-3`');
+    expect(result.evidences.every((evidence) => evidence.refSha === session.sourceRefSha)).toBe(true);
+    expect(toolEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ toolName: 'read_repo_tree', stage: 'context', status: 'success' }),
+      expect.objectContaining({ toolName: 'plan_research', stage: 'planning', status: 'success' }),
+      expect.objectContaining({ toolName: 'read_repo_file', stage: 'retrieval', status: 'success' }),
+      expect.objectContaining({ toolName: 'verify_evidence', stage: 'answer', status: 'success' }),
+    ]));
+    expect(toolEvents.some((event) => event.detail?.includes('pinned') || event.detail?.includes('固定'))).toBe(true);
   });
 
   it('never calls legacy vector index write paths during a repository-chat turn', async () => {
