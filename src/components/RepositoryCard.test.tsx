@@ -7,6 +7,9 @@ import { useAppStore } from '../store/useAppStore';
 import type { Repository } from '../types';
 
 const actionMocks = vi.hoisted(() => ({
+  releaseSheet: {
+    suspend: null as Promise<void> | null,
+  },
   actions: {
     analyze: vi.fn(),
     findSimilar: vi.fn(),
@@ -45,9 +48,10 @@ vi.mock('./ReadmeModal', () => ({
 }));
 
 vi.mock('./RepositoryReleaseSheet', () => ({
-  RepositoryReleaseSheet: ({ isOpen }: { isOpen: boolean }) => (
-    isOpen ? <div data-testid="repository-release-sheet" /> : null
-  ),
+  RepositoryReleaseSheet: ({ isOpen }: { isOpen: boolean }) => {
+    if (actionMocks.releaseSheet.suspend) throw actionMocks.releaseSheet.suspend;
+    return isOpen ? <div data-testid="repository-release-sheet" /> : null;
+  },
 }));
 
 const repository: Repository = {
@@ -116,6 +120,7 @@ const renderRepositoryCard = (viewMode: 'list' | 'grid') => render(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  actionMocks.releaseSheet.suspend = null;
   storeState.releaseSubscriptions = new Set<number>([1]);
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
@@ -265,6 +270,23 @@ describe('RepositoryCard view modes', () => {
     await user.click(screen.getByRole('menuitem', { name: '查看 Release' }));
 
     expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
+  it('does not open README when an outside click closes the lazy release-sheet fallback', async () => {
+    const user = userEvent.setup();
+    actionMocks.releaseSheet.suspend = new Promise(() => undefined);
+    const { container } = renderRepositoryCard('grid');
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '查看 Release' }));
+    expect(await screen.findByText('Loading releases...')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+      fireEvent.click(card);
+    });
+
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
   });
 
