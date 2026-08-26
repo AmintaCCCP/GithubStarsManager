@@ -124,6 +124,31 @@ const runTransaction = async <T>(storeNames: StoreName | StoreName[], mode: IDBT
   }
 };
 
+const mergeById = <T extends { id: string }>(fallbackValues: T[], indexedDbValues: T[]): T[] => {
+  return [...new Map([...fallbackValues, ...indexedDbValues].map((value) => [value.id, value])).values()];
+};
+
+const migrateIndexedDbSnapshotToFallback = async (): Promise<void> => {
+  if (!canUseIndexedDb()) return;
+  try {
+    const indexedDbSnapshot = await withTimeout(runTransaction([...STORE_NAMES], 'readonly', async (stores) => ({
+      sessions: await requestValue(stores.sessions.getAll()) as RepositoryChatSession[],
+      messages: await requestValue(stores.messages.getAll()) as RepositoryChatMessage[],
+      toolEvents: await requestValue(stores.toolEvents.getAll()) as RepositoryChatToolEvent[],
+      evidence: await requestValue(stores.evidence.getAll()) as ToolEvidence[],
+    })));
+    const fallbackSnapshot = readFallback();
+    writeFallback({
+      sessions: mergeById(fallbackSnapshot.sessions, indexedDbSnapshot.sessions),
+      messages: mergeById(fallbackSnapshot.messages, indexedDbSnapshot.messages),
+      toolEvents: mergeById(fallbackSnapshot.toolEvents, indexedDbSnapshot.toolEvents),
+      evidence: mergeById(fallbackSnapshot.evidence, indexedDbSnapshot.evidence),
+    });
+  } catch (error) {
+    console.warn('[repository-chat] unable to migrate IndexedDB snapshot before fallback', error);
+  }
+};
+
 const fallbackList = <T extends { sessionId?: string; repoId?: number }>(store: keyof FallbackSnapshot, filter: (value: T) => boolean): T[] => {
   return (readFallback()[store] as unknown as T[]).filter(filter);
 };
@@ -185,6 +210,7 @@ export const repositoryChatSessionRepository = {
       }));
     } catch (error) {
       console.warn('[repository-chat] session write fell back to localStorage', error);
+      await migrateIndexedDbSnapshotToFallback();
       enableFallbackStorage();
       fallback();
     }
