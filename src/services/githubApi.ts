@@ -743,11 +743,18 @@ export class GitHubApiService {
     }
   }
 
-  async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Release[]> {
+  async getRepositoryReleases(
+    owner: string,
+    repo: string,
+    page = 1,
+    perPage = 30,
+    signal?: AbortSignal,
+  ): Promise<Release[]> {
     try {
       const releases = await this.makeRequest<Release[]>(
         `/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`,
-        { operationTag: 'release' }
+        { operationTag: 'release' },
+        signal,
       );
 
       return releases.map(release => ({

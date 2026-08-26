@@ -113,7 +113,7 @@ describe('ForkTimeline owner filtering', () => {
     storeState.setForkIsRefreshing = vi.fn((refreshing: boolean) => {
       storeState.forkIsRefreshing = refreshing;
     });
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([
         {
           id: 10,
@@ -130,7 +130,7 @@ describe('ForkTimeline owner filtering', () => {
       getBranches: vi.fn().mockResolvedValue(['main']),
       syncFork: vi.fn().mockResolvedValue({ hasUpdates: false, sourceUpdatedAt: null, mergeType: 'none' }),
       triggerWorkflowRun: vi.fn().mockResolvedValue(undefined),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
   });
 
   it('shows only personal-account forks by default', async () => {
@@ -172,9 +172,9 @@ describe('ForkTimeline owner filtering', () => {
   });
 
   it('warns when organization owners cannot be loaded', async () => {
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockRejectedValue(new Error('missing scope')),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
 
     render(<ForkTimeline />);
 
@@ -203,7 +203,7 @@ describe('ForkTimeline async session and sync contracts', () => {
     storeState.setForkIsRefreshing = vi.fn((refreshing: boolean) => {
       storeState.forkIsRefreshing = refreshing;
     });
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([]),
@@ -212,7 +212,7 @@ describe('ForkTimeline async session and sync contracts', () => {
       getBranches: vi.fn().mockResolvedValue(['main']),
       syncFork: vi.fn().mockResolvedValue({ hasUpdates: true, sourceUpdatedAt: '2026-02-01T00:00:00.000Z', mergeType: 'fast-forward' }),
       triggerWorkflowRun: vi.fn().mockResolvedValue(undefined),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
   });
 
   it('does not write an old refresh response after logout and same-credential login', async () => {
@@ -222,11 +222,11 @@ describe('ForkTimeline async session and sync contracts', () => {
       resolveForks = resolve;
     });
     const getUserForks = vi.fn().mockReturnValue(pendingForks);
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks,
       getOrganizationForks: vi.fn(),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
 
     const { rerender } = render(<ForkTimeline />);
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
@@ -247,10 +247,10 @@ describe('ForkTimeline async session and sync contracts', () => {
   });
 
   it('closes the upstream-sync modal and reports a localized error when branches cannot load', async () => {
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getBranches: vi.fn().mockRejectedValue(new Error('network unavailable')),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
 
     render(<ForkTimeline />);
     fireEvent.click(await screen.findByRole('button', { name: '更新分支' }));
@@ -293,12 +293,12 @@ describe('ForkTimeline branch request ordering', () => {
         }
       }),
     });
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
       checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
   });
 
   it('ignores an earlier branch-load failure after a later fork request owns the modal', async () => {
@@ -312,13 +312,13 @@ describe('ForkTimeline branch request ordering', () => {
       .mockReturnValueOnce(firstRequest)
       .mockReturnValueOnce(secondRequest);
     const checkForkSyncNeeded = vi.fn().mockResolvedValue({ needsSync: true });
-    MockGitHubApiService.mockImplementation(() => ({
+    MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
       checkForkSyncNeeded,
       getBranches,
-    } as unknown as GitHubApiService));
+    } as unknown as GitHubApiService; });
 
     render(<ForkTimeline />);
     fireEvent.click(await screen.findByRole('button', { name: '刷新' }));

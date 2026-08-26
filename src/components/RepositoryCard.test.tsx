@@ -44,6 +44,12 @@ vi.mock('./ReadmeModal', () => ({
   ),
 }));
 
+vi.mock('./RepositoryReleaseSheet', () => ({
+  RepositoryReleaseSheet: ({ isOpen }: { isOpen: boolean }) => (
+    isOpen ? <div data-testid="repository-release-sheet" /> : null
+  ),
+}));
+
 const repository: Repository = {
   id: 1,
   name: 'example-repository',
@@ -143,6 +149,7 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByText('仓库操作')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'AI 分析' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '查看 Release' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
     await user.keyboard('{Escape}');
@@ -236,6 +243,29 @@ describe('RepositoryCard view modes', () => {
 
     expect(actionMocks.actions.analyze).toHaveBeenCalledOnce();
     expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
+  });
+
+  it('opens the release sheet from the grid action immediately before the DeepWiki/Zread action', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+
+    const releaseButton = screen.getByRole('button', { name: '查看 Release' });
+    const zreadLink = screen.getByTitle('在Zread中查看');
+    expect(releaseButton.compareDocumentPosition(zreadLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(releaseButton);
+    expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+  });
+
+  it('opens the release sheet from the list action menu without opening README', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('list');
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    await user.click(screen.getByRole('menuitem', { name: '查看 Release' }));
+
+    expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
   });
 
   it('retains the existing quick action row in grid mode', () => {
