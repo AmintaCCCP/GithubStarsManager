@@ -20,7 +20,6 @@ interface RepositoryReleaseSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onCloseAutoFocus?: () => void;
-  onDismissByOutside?: () => void;
   repository: Repository;
 }
 
@@ -224,7 +223,6 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
   isOpen,
   onClose,
   onCloseAutoFocus,
-  onDismissByOutside,
   repository,
 }) => {
   const language = useAppStore((state) => state.language);
@@ -276,8 +274,10 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
         side="right"
         closeLabel={t('关闭 Release 侧栏', 'Close release sheet')}
         onPointerDownOutside={(event) => {
+          // Keep the overlay mounted through the current click sequence. Closing
+          // immediately can retarget the browser click to the card beneath it.
           event.preventDefault();
-          onDismissByOutside?.();
+          window.setTimeout(onClose, 0);
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();

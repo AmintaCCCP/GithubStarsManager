@@ -11,13 +11,18 @@ const SheetPortal = DialogPrimitive.Portal;
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
+>(({ className, onClick, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
+    data-slot="sheet-overlay"
     className={cn(
       'fixed inset-0 z-50 bg-overlay/80 data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className,
     )}
+    onClick={(event) => {
+      event.stopPropagation();
+      onClick?.(event);
+    }}
     {...props}
   />
 ));
@@ -39,7 +44,7 @@ const SheetContent = React.forwardRef<
     showClose?: boolean;
     closeLabel?: string;
   }
->(({ side = 'right', showClose = true, closeLabel = 'Close', className, children, ...props }, ref) => (
+>(({ side = 'right', showClose = true, closeLabel = 'Close', className, children, onPointerDown, onClick, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
@@ -49,6 +54,14 @@ const SheetContent = React.forwardRef<
         sideClasses[side],
         className,
       )}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        onPointerDown?.(event);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick?.(event);
+      }}
       {...props}
     >
       {children}

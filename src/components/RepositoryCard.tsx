@@ -164,7 +164,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
-  const releaseSheetOutsideDismissedAtRef = useRef(0);
+  const gridActionRowRef = useRef<HTMLDivElement>(null);
+  const [visibleGridActionCount, setVisibleGridActionCount] = useState(7);
 
   const restoreReadmeTriggerFocus = useCallback(() => {
     cardRef.current?.focus();
@@ -175,6 +176,28 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       setIsActionsMenuOpen(false);
     }
   }, [viewMode, selectionMode]);
+
+  useEffect(() => {
+    if (viewMode !== 'grid') return;
+
+    const updateVisibleActionCount = () => {
+      const width = gridActionRowRef.current?.clientWidth ?? 0;
+      // A zero width occurs during hidden/JSDOM rendering; retain all actions
+      // until a real layout measurement is available.
+      if (width === 0) return;
+      const capacity = Math.max(1, Math.floor((width + 6) / 38));
+      setVisibleGridActionCount(capacity >= 7 ? 7 : Math.max(0, capacity - 1));
+    };
+
+    updateVisibleActionCount();
+    const observer = new ResizeObserver(updateVisibleActionCount);
+    if (gridActionRowRef.current) observer.observe(gridActionRowRef.current);
+    window.addEventListener('resize', updateVisibleActionCount);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateVisibleActionCount);
+    };
+  }, [viewMode]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -544,21 +567,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 ref 来跟踪是否已经处理了点击
   const isProcessingClickRef = useRef(false);
 
-  const handleReleaseSheetOutsideDismiss = useCallback(() => {
-    // Radix dismisses on pointerdown. Keep the following click from activating
-    // the card after the portal has unmounted beneath the pointer.
-    releaseSheetOutsideDismissedAtRef.current = Date.now();
-    setReleaseSheetOpen(false);
-  }, []);
-
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (Date.now() - releaseSheetOutsideDismissedAtRef.current < 350) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-
     // 防止重复处理
     if (isProcessingClickRef.current) {
       event.preventDefault();
@@ -834,83 +844,155 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         )}
       </div>
 
-      {/* Action Buttons Row - Left and Right Aligned */}
+      {/* Grid actions occupy equal slots from the left; tail actions collapse into a menu when space is constrained. */}
       {viewMode === 'grid' && (
-      <div data-testid="grid-action-row" className="mb-4 flex w-full flex-wrap items-center gap-1.5">
-        {/* Left side: AI Analysis, Release Subscription, and Edit */}
-        <div className="flex items-center gap-1.5">
-          <SelectionAwareButton
-            onClick={handleAIAnalyze}
-            disabled={isAnalyzing}
-            selectionMode={selectionMode}
-            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            title={aiButtonTitle}
-          >
-            {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
-          </SelectionAwareButton>
-          <SelectionAwareButton
-            onClick={() => toggleReleaseSubscription()}
-            selectionMode={selectionMode}
-            className={`${isSubscribed
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
-            }`}
-            title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
-          >
-            {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-          </SelectionAwareButton>
-          <SelectionAwareButton
-            onClick={() => setEditModalOpen(true)}
-            selectionMode={selectionMode}
-            variant="edit"
-            title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
-          >
-            <Edit3 className="w-4 h-4" />
-          </SelectionAwareButton>
+        <div ref={gridActionRowRef} data-testid="grid-action-row" className="mb-4 flex w-full items-center justify-start gap-1.5 overflow-hidden">
+          {visibleGridActionCount >= 1 && (
+            <SelectionAwareButton
+              onClick={handleAIAnalyze}
+              disabled={isAnalyzing}
+              selectionMode={selectionMode}
+              className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              title={aiButtonTitle}
+            >
+              {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount >= 2 && (
+            <SelectionAwareButton
+              onClick={() => toggleReleaseSubscription()}
+              selectionMode={selectionMode}
+              className={`${isSubscribed
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
+              }`}
+              title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
+            >
+              {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount >= 3 && (
+            <SelectionAwareButton
+              onClick={() => setEditModalOpen(true)}
+              selectionMode={selectionMode}
+              variant="edit"
+              title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+            >
+              <Edit3 className="w-4 h-4" />
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount >= 4 && (
+            <SelectionAwareButton
+              onClick={() => setReleaseSheetOpen(true)}
+              selectionMode={selectionMode}
+              className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              title={language === 'zh' ? '查看 Release' : 'View releases'}
+              aria-label={language === 'zh' ? '查看 Release' : 'View releases'}
+            >
+              <PackageOpen className="w-4 h-4" />
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount >= 5 && (
+            <a
+              href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => selectionMode && event.preventDefault()}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+              title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
+            >
+              <BookOpen className="w-4 h-4" />
+            </a>
+          )}
+          {visibleGridActionCount >= 6 && (
+            <a
+              href={repository.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => selectionMode && event.preventDefault()}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+              title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+          {visibleGridActionCount >= 7 && (
+            <SelectionAwareButton
+              onClick={handleUnstar}
+              disabled={unstarring}
+              selectionMode={selectionMode}
+              variant="unstar"
+              title={language === 'zh' ? '取消 Star' : 'Unstar'}
+            >
+              <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
+            </SelectionAwareButton>
+          )}
+          {visibleGridActionCount < 7 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={selectionMode}
+                  className="h-8 w-8 shrink-0 rounded-md bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  aria-label={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
+                  title={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52" onClick={(event) => event.stopPropagation()}>
+                {visibleGridActionCount < 1 && (
+                  <DropdownMenuItem disabled={isAnalyzing} onSelect={() => void handleAIAnalyze()}>
+                    {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
+                    {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 2 && (
+                  <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
+                    {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
+                    {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 3 && (
+                  <DropdownMenuItem onSelect={() => setEditModalOpen(true)}>
+                    <Edit3 className="mr-2 h-3.5 w-3.5" />
+                    {language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 4 && (
+                  <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
+                    <PackageOpen className="mr-2 h-3.5 w-3.5" />
+                    {language === 'zh' ? '查看 Release' : 'View releases'}
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 5 && (
+                  <DropdownMenuItem asChild>
+                    <a href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)} target="_blank" rel="noopener noreferrer">
+                      <BookOpen className="mr-2 h-3.5 w-3.5" />
+                      {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
+                    </a>
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 6 && (
+                  <DropdownMenuItem asChild>
+                    <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                      {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
+                    </a>
+                  </DropdownMenuItem>
+                )}
+                {visibleGridActionCount < 7 && (
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
+                    <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
+                    {language === 'zh' ? '取消 Star' : 'Unstar'}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
-
-        {/* Right side: Release downloads, Zread/DeepWiki, GitHub Links, and Unstar */}
-        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5">
-          <SelectionAwareButton
-            onClick={() => setReleaseSheetOpen(true)}
-            selectionMode={selectionMode}
-            className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            title={language === 'zh' ? '查看 Release' : 'View releases'}
-            aria-label={language === 'zh' ? '查看 Release' : 'View releases'}
-          >
-            <PackageOpen className="w-4 h-4" />
-          </SelectionAwareButton>
-          <a
-            href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
-            title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
-          >
-            <BookOpen className="w-4 h-4" />
-          </a>
-          <a
-            href={repository.html_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => selectionMode && e.preventDefault()}
-            className={`flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
-            title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-          <SelectionAwareButton
-            onClick={handleUnstar}
-            disabled={unstarring}
-            selectionMode={selectionMode}
-            variant="unstar"
-            title={language === 'zh' ? '取消 Star' : 'Unstar'}
-          >
-            <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
-          </SelectionAwareButton>
-        </div>
-      </div>
       )}
 
       {/* Description with shared Tooltip */}
@@ -1142,7 +1224,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <LazyRepositoryReleaseSheet
               isOpen={releaseSheetOpen}
               onClose={() => setReleaseSheetOpen(false)}
-              onDismissByOutside={handleReleaseSheetOutsideDismiss}
               onCloseAutoFocus={restoreReadmeTriggerFocus}
               repository={repository}
             />
