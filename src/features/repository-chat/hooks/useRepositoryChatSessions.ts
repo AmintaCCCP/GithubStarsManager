@@ -72,6 +72,7 @@ export const useRepositoryChatSessions = ({
   }, [refresh]);
 
   const createSession = useCallback(async () => {
+    const operationId = ++operationIdRef.current;
     if (!repository) return null;
     setIsLoading(true);
     setError(null);
@@ -81,6 +82,7 @@ export const useRepositoryChatSessions = ({
         return resolveRepositoryChatHeadSha(targetRepository, githubToken);
       });
       const sourceRefSha = await resolveSha(repository);
+      if (operationId !== operationIdRef.current) return null;
       const now = new Date().toISOString();
       const session: RepositoryChatSession = {
         id: createId(),
@@ -92,15 +94,16 @@ export const useRepositoryChatSessions = ({
         updatedAt: now,
       };
       await repositoryChatSessionRepository.saveSession(session);
+      if (operationId !== operationIdRef.current) return null;
       setSessions((previous) => [session, ...previous]);
       setActiveSession(session);
       setMessages([]);
       return session;
     } catch (unknownError) {
-      setError(unknownError instanceof Error ? unknownError.message : 'Unable to create a repository chat session');
+      if (operationId === operationIdRef.current) setError(unknownError instanceof Error ? unknownError.message : 'Unable to create a repository chat session');
       return null;
     } finally {
-      setIsLoading(false);
+      if (operationId === operationIdRef.current) setIsLoading(false);
     }
   }, [githubToken, language, repository, resolveSourceRefSha]);
 
@@ -112,19 +115,21 @@ export const useRepositoryChatSessions = ({
   }, [loadSessionMessages, sessions]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
+    const operationId = ++operationIdRef.current;
     setIsLoading(true);
     setError(null);
     try {
       await repositoryChatSessionRepository.permanentlyDeleteSession(sessionId);
+      if (operationId !== operationIdRef.current) return;
       const nextSessions = sessions.filter((session) => session.id !== sessionId);
       setSessions(nextSessions);
       const nextActive = activeSession?.id === sessionId ? (nextSessions[0] ?? null) : activeSession;
       setActiveSession(nextActive);
-      await loadSessionMessages(nextActive, operationIdRef.current);
+      await loadSessionMessages(nextActive, operationId);
     } catch (unknownError) {
-      setError(unknownError instanceof Error ? unknownError.message : 'Unable to delete the repository chat session');
+      if (operationId === operationIdRef.current) setError(unknownError instanceof Error ? unknownError.message : 'Unable to delete the repository chat session');
     } finally {
-      setIsLoading(false);
+      if (operationId === operationIdRef.current) setIsLoading(false);
     }
   }, [activeSession, loadSessionMessages, sessions]);
 
