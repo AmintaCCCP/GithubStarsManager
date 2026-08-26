@@ -333,19 +333,23 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                       </div>
                       {message.content ? <MarkdownRenderer content={message.content} shouldRender breaks fontSize="small" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('正在生成', 'Generating')} />}
                       {message.evidenceIds.length > 0 && (
-                        <div className="mt-3 grid gap-2">
-                          {message.evidenceIds.map((evidenceId) => {
-                            const evidence = evidenceById[evidenceId];
-                            if (!evidence) return null;
-                            return (
-                              <a key={evidence.id} href={evidence.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs hover:bg-muted" aria-label={t(`查看来源：${evidence.path ?? evidence.repoFullName}`, `View source: ${evidence.path ?? evidence.repoFullName}`)}>
-                                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                                <span className="min-w-0 flex-1 truncate">{evidence.repoFullName} · {evidence.path ? `${evidence.path}:L${evidence.lineStart ?? 1}-L${evidence.lineEnd ?? 1}` : t('仓库元数据', 'repository metadata')}</span>
-                                {evidence.refSha && <code className="shrink-0 text-muted-foreground">{shortSha(evidence.refSha)}</code>}
-                              </a>
-                            );
-                          })}
-                        </div>
+                        <details className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+                          <summary className="cursor-pointer font-medium text-foreground">{t(`来源与证据 (${message.evidenceIds.length})`, `Sources and evidence (${message.evidenceIds.length})`)}</summary>
+                          <p className="mt-1 text-muted-foreground">{t('展开后可查看本轮已读取文件的固定版本、行号与原始证据窗口。', 'Expand to inspect this turn’s pinned versions, line ranges, and retrieved evidence windows.')}</p>
+                          <div className="mt-2 grid gap-2">
+                            {message.evidenceIds.map((evidenceId) => {
+                              const evidence = evidenceById[evidenceId];
+                              if (!evidence) return null;
+                              return (
+                                <a key={evidence.id} href={evidence.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/60 px-2.5 py-2 text-xs hover:bg-muted" aria-label={t(`查看来源：${evidence.path ?? evidence.repoFullName}`, `View source: ${evidence.path ?? evidence.repoFullName}`)}>
+                                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                  <span className="min-w-0 flex-1 truncate">{evidence.repoFullName} · {evidence.path ? `${evidence.path}:L${evidence.lineStart ?? 1}-L${evidence.lineEnd ?? 1}` : t('仓库元数据', 'repository metadata')}</span>
+                                  {evidence.refSha && <code className="shrink-0 text-muted-foreground">{shortSha(evidence.refSha)}</code>}
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </details>
                       )}
                       {message.role === 'assistant' && messageToolEvents.length > 0 && (
                         <ExecutionTimeline events={messageToolEvents} language={language} isRunning={message.status === 'streaming'} />
