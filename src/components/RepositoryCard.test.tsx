@@ -7,6 +7,9 @@ import { useAppStore } from '../store/useAppStore';
 import type { Repository } from '../types';
 
 const actionMocks = vi.hoisted(() => ({
+  releaseSheet: {
+    suspend: null as Promise<void> | null,
+  },
   actions: {
     analyze: vi.fn(),
     findSimilar: vi.fn(),
@@ -42,6 +45,13 @@ vi.mock('./ReadmeModal', () => ({
   ReadmeModal: ({ isOpen }: { isOpen: boolean }) => (
     isOpen ? <div data-testid="readme-modal" /> : null
   ),
+}));
+
+vi.mock('./RepositoryReleaseSheet', () => ({
+  RepositoryReleaseSheet: ({ isOpen }: { isOpen: boolean }) => {
+    if (actionMocks.releaseSheet.suspend) throw actionMocks.releaseSheet.suspend;
+    return isOpen ? <div data-testid="repository-release-sheet" /> : null;
+  },
 }));
 
 const repository: Repository = {
@@ -110,6 +120,7 @@ const renderRepositoryCard = (viewMode: 'list' | 'grid') => render(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  actionMocks.releaseSheet.suspend = null;
   storeState.releaseSubscriptions = new Set<number>([1]);
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
@@ -143,6 +154,7 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByText('仓库操作')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'AI 分析' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '查看 Release' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
     await user.keyboard('{Escape}');
@@ -238,6 +250,46 @@ describe('RepositoryCard view modes', () => {
     expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
   });
 
+  it('opens the release sheet from the grid action immediately before the DeepWiki/Zread action', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+
+    const releaseButton = screen.getByRole('button', { name: '查看 Release' });
+    const zreadLink = screen.getByTitle('在Zread中查看');
+    expect(releaseButton.compareDocumentPosition(zreadLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(releaseButton);
+    expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+  });
+
+  it('opens the release sheet from the list action menu without opening README', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('list');
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    await user.click(screen.getByRole('menuitem', { name: '查看 Release' }));
+
+    expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
+  it('does not open README when an outside click closes the lazy release-sheet fallback', async () => {
+    const user = userEvent.setup();
+    actionMocks.releaseSheet.suspend = new Promise(() => undefined);
+    const { container } = renderRepositoryCard('grid');
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '查看 Release' }));
+    expect(await screen.findByText('Loading releases...')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+      fireEvent.click(card);
+    });
+
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
   it('retains the existing quick action row in grid mode', () => {
     renderRepositoryCard('grid');
 
@@ -246,7 +298,29 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();
     expect(screen.getByTitle('编辑仓库信息')).toBeInTheDocument();
 
+    const actionRow = screen.getByTestId('grid-action-row');
+    expect(actionRow).toHaveClass('w-full', 'justify-start', 'overflow-hidden');
+
     const footer = screen.getByText(/最近提交/).closest('.border-t');
     expect(footer?.parentElement).toHaveClass('mt-4');
+  });
+
+  it('collapses trailing grid actions into a more-actions menu when the card is narrow', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+    const actionRow = screen.getByTestId('grid-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 190 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.queryByTitle('在Zread中查看')).not.toBeInTheDocument();
+    const moreActions = screen.getByRole('button', { name: '更多仓库操作' });
+    await user.click(moreActions);
+
+    expect(screen.getByRole('menuitem', { name: '在 Zread 中查看' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
   });
 });

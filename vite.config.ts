@@ -18,12 +18,7 @@ export default defineConfig({
   build: {
     // Warn before the 3,000 KiB hard budget enforced by check:bundle-size.
     chunkSizeWarningLimit: 2900,
-    rolldownOptions: {
-      checks: {
-        // The legacy plugin dominates production build time by design; this diagnostic
-        // is useful when profiling, but too noisy for normal release builds.
-        pluginTimings: false,
-      },
+    rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
