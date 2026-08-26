@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, CircleDot, Copy, ExternalLink, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
 import type { RepositoryChatToolEvent } from '../types/repositoryChat';
 import { useAppStore } from '../store/useAppStore';
@@ -47,42 +47,40 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
   const grouped = stageOrder.map((stage) => ({ stage, events: events.filter((event) => event.stage === stage) })).filter((group) => group.events.length > 0);
 
   return (
-    <details className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs" open={isRunning}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium text-foreground">
-        <span>{t('Agent 执行记录', 'Agent execution record')}</span>
-        <span className="text-[11px] font-normal text-muted-foreground">
-          {latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}
-        </span>
-      </summary>
-      <p className="mt-1 text-muted-foreground">{t('默认显示本轮摘要；展开阶段可查看任务目标、允许的只读工具、文件选择、取证与来源收敛。不会展示隐藏推理、请求报文或密钥。', 'The summary is shown first. Expand a stage for its task goal, allowed read-only tools, file selection, evidence retrieval, and source convergence. Hidden reasoning, request payloads, and secrets are never shown.')}</p>
-      <div className="mt-3 space-y-2">
+    <section className="mt-4 rounded-lg border border-border bg-muted/15 p-3 text-xs" aria-label={t('Agent 执行摘要', 'Agent execution summary')}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
+          <p className="mt-0.5 text-muted-foreground">{t('默认显示阶段状态；展开单项可查看对应的只读工具、文件与证据。不会展示隐藏推理、请求报文或密钥。', 'Stage status is shown by default. Expand an item to inspect its read-only tools, files, and evidence. Hidden reasoning, request payloads, and secrets are never shown.')}</p>
+        </div>
+        <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
+      </div>
+      <div className="mt-3 divide-y divide-border/70">
         {grouped.map((group) => {
           const stageHasRunning = group.events.some((event) => event.status === 'running');
           const stageErrors = group.events.filter((event) => event.status === 'error').length;
+          const duration = group.events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
+          const Icon = stageErrors > 0 ? AlertCircle : stageHasRunning ? CircleDot : CheckCircle2;
           return (
-            <details key={group.stage ?? 'other'} className="rounded border border-border/70 bg-background/60 px-2.5 py-2" open={isRunning && stageHasRunning}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
-                <span className="font-medium">{stageLabels(group.stage, language)}</span>
-                <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{group.events.length} {t('步', 'step(s)')}{stageErrors > 0 ? ` · ${stageErrors} ${t('项失败', 'failed')}` : ''}</span>
+            <details key={group.stage ?? 'other'} className="group py-2" open={isRunning && stageHasRunning}>
+              <summary className="flex cursor-pointer list-none items-center gap-2">
+                <Icon className={`h-4 w-4 shrink-0 ${stageErrors > 0 ? 'text-destructive' : stageHasRunning ? 'animate-pulse text-primary' : 'text-emerald-500'}`} aria-hidden="true" />
+                <span className="min-w-0 flex-1 font-medium text-foreground">{stageLabels(group.stage, language)}</span>
+                <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{stageErrors > 0 ? t('需注意', 'Needs attention') : stageHasRunning ? t('进行中', 'In progress') : t('已完成', 'Completed')}{duration > 0 ? ` · ${formatToolDuration(duration)}` : ''}</span>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
               </summary>
-              <ol className="mt-2 space-y-2 border-l border-border pl-3">
+              <ol className="mt-2 ml-2 space-y-2 border-l border-border pl-3">
                 {group.events.map((event) => {
-                  const statusLabel = event.status === 'success'
-                    ? t('完成', 'Done')
-                    : event.status === 'running'
-                      ? t('进行中', 'Running')
-                      : event.status === 'error'
-                        ? t('失败', 'Failed')
-                        : t('准备中', 'Queued');
-                  const duration = formatToolDuration(event.durationMs);
+                  const statusLabel = event.status === 'success' ? t('完成', 'Done') : event.status === 'running' ? t('进行中', 'Running') : event.status === 'error' ? t('失败', 'Failed') : t('准备中', 'Queued');
+                  const eventDuration = formatToolDuration(event.durationMs);
                   return (
-                    <li key={event.id} className="relative grid gap-1 pb-1 before:absolute before:-left-[1.1rem] before:top-1 before:h-2 before:w-2 before:rounded-full before:border before:border-border before:bg-background">
+                    <li key={event.id} className="grid gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="font-medium text-foreground">{event.round ? `${t('第', 'Round ')}${event.round}${t('轮 · ', ' · ')}` : ''}{event.paramSummary}</span>
                         <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{event.toolName}</code>
-                        <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{duration ? ` · ${duration}` : ''}</span>
+                        <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                       </div>
-                      <p className="break-words text-muted-foreground">{event.detail}</p>
+                      {event.detail && <p className="break-words text-muted-foreground">{event.detail}</p>}
                     </li>
                   );
                 })}
@@ -91,7 +89,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
           );
         })}
       </div>
-    </details>
+    </section>
   );
 };
 
@@ -331,7 +329,12 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                           </Button>
                         )}
                       </div>
-                      {message.content ? <MarkdownRenderer content={message.content} shouldRender breaks fontSize="small" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('正在生成', 'Generating')} />}
+                      {message.role === 'assistant' && messageToolEvents.length > 0 && (
+                        <ExecutionTimeline events={messageToolEvents} language={language} isRunning={message.status === 'streaming'} />
+                      )}
+                      <div className={message.role === 'assistant' && messageToolEvents.length > 0 ? 'mt-4' : ''}>
+                        {message.content ? <MarkdownRenderer content={message.content} shouldRender breaks fontSize="small" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('正在生成', 'Generating')} />}
+                      </div>
                       {message.evidenceIds.length > 0 && (
                         <details className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
                           <summary className="cursor-pointer font-medium text-foreground">{t(`来源与证据 (${message.evidenceIds.length})`, `Sources and evidence (${message.evidenceIds.length})`)}</summary>
@@ -350,9 +353,6 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                             })}
                           </div>
                         </details>
-                      )}
-                      {message.role === 'assistant' && messageToolEvents.length > 0 && (
-                        <ExecutionTimeline events={messageToolEvents} language={language} isRunning={message.status === 'streaming'} />
                       )}
                     </article>
                     );
