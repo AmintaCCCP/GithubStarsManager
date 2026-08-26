@@ -84,7 +84,7 @@ describe('ReadmeModal multilingual README switching', () => {
       { path: 'README.md', type: 'blob' },
       { path: 'README_zh.md', type: 'blob' },
     ]);
-    mockedGitHubApiService.mockImplementation(() => mockGitHubApi);
+    mockedGitHubApiService.mockImplementation(function () { return mockGitHubApi; });
     (backend.getRepositoryReadme as ReturnType<typeof vi.fn>).mockResolvedValue('Default README content');
     (backend.getRepositoryReadmeByPath as ReturnType<typeof vi.fn>).mockResolvedValue('中文 README 内容');
     (backend.listRepositoryReadmeCandidates as ReturnType<typeof vi.fn>).mockResolvedValue([

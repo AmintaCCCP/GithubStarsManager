@@ -400,20 +400,45 @@ class BackendAdapter {
     return this.decodeContentResponse(data);
   }
 
-  async getRepositoryReleases(owner: string, repo: string, page = 1, perPage = 30): Promise<Record<string, unknown>[]> {
+  async getRepositoryReleases(
+    owner: string,
+    repo: string,
+    page = 1,
+    perPage = 30,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    try {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ method: 'GET' })
-      });
-      if (!res.ok) return [];
-      return res.json() as Promise<Record<string, unknown>[]>;
-    } catch {
-      return [];
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/releases?page=${page}&per_page=${perPage}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ method: 'GET' }),
+      signal,
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy error');
+
+    const data = await res.json() as unknown;
+    if (!Array.isArray(data)) {
+      throw new Error('Backend proxy returned an invalid releases response');
     }
+    return data as Record<string, unknown>[];
+  }
+
+  async downloadGitHubResource(path: string, signal?: AbortSignal): Promise<Blob> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+    if (!path.startsWith('/repos/')) throw new Error('Invalid GitHub resource path');
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github${path}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        method: 'GET',
+        headers: { Accept: 'application/octet-stream' },
+      }),
+      signal,
+    });
+    if (!res.ok) await this.throwTranslatedError(res, 'Backend proxy download error');
+    return res.blob();
   }
 
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
