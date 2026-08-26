@@ -46,6 +46,8 @@ const makeRelease = (id: number, publishedAt: string, overrides: Partial<Release
   ...overrides,
 });
 
+const releasePage = (releases: Release[], hasMore = false) => ({ releases, hasMore });
+
 describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
   it('collects the latest release per already-synced repo when refreshExistingAssets is enabled', async () => {
     const service = new GitHubApiService('token');
@@ -53,8 +55,8 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     const older = makeRelease(2, '2026-01-01T00:00:00.000Z');
 
     // 已同步仓库：水印在 01-02，最新 Release(01-03) 在水印之后（fresh），老 Release 在水印前。
-    vi.spyOn(service, 'getRepositoryReleases').mockResolvedValueOnce(
-      [latest, older] as never
+    vi.spyOn(service, 'getRepositoryReleasesPage').mockResolvedValueOnce(
+      releasePage([latest, older]) as never
     );
     vi.spyOn(service, 'fetchAllReleasesForRepo').mockResolvedValueOnce([] as never);
 
@@ -79,8 +81,8 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     const older = makeRelease(2, '2025-12-01T00:00:00.000Z');
 
     // 返回一页包含两条，都在水印之前，故 releases 为空，但最新条仍应被收集
-    vi.spyOn(service, 'getRepositoryReleases').mockResolvedValueOnce(
-      [latest, older] as never
+    vi.spyOn(service, 'getRepositoryReleasesPage').mockResolvedValueOnce(
+      releasePage([latest, older]) as never
     );
 
     const repo = makeRepository(10, 'owner/repo', { has_fetched_releases: true, last_release_fetch_time: '2026-01-02T00:00:00.000Z' });
@@ -100,7 +102,7 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     const service = new GitHubApiService('token');
     const latest = makeRelease(1, '2026-01-03T00:00:00.000Z');
 
-    vi.spyOn(service, 'getRepositoryReleases').mockResolvedValueOnce([latest] as never);
+    vi.spyOn(service, 'getRepositoryReleasesPage').mockResolvedValueOnce(releasePage([latest]) as never);
 
     const repo = makeRepository(10, 'owner/repo', { has_fetched_releases: true, last_release_fetch_time: '2026-01-02T00:00:00.000Z' });
 
@@ -118,8 +120,8 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     const stable = makeRelease(2, '2026-01-04T00:00:00.000Z');
 
     // 第一页第一条是新发布（预发布），其下才是最新的正式发行
-    vi.spyOn(service, 'getRepositoryReleases').mockResolvedValueOnce(
-      [prerelease, stable] as never
+    vi.spyOn(service, 'getRepositoryReleasesPage').mockResolvedValueOnce(
+      releasePage([prerelease, stable]) as never
     );
 
     const repo = makeRepository(10, 'owner/repo', { has_fetched_releases: true, last_release_fetch_time: '2026-01-02T00:00:00.000Z' });
@@ -144,9 +146,9 @@ describe('GitHubApiService.getMultipleRepositoryReleases asset refresh', () => {
     const stable = makeRelease(50, '2026-01-05T00:00:00.000Z');
     const older = makeRelease(40, '2025-12-01T00:00:00.000Z');
 
-    vi.spyOn(service, 'getRepositoryReleases')
-      .mockResolvedValueOnce(page1 as never)
-      .mockResolvedValueOnce([stable, older] as never);
+    vi.spyOn(service, 'getRepositoryReleasesPage')
+      .mockResolvedValueOnce(releasePage(page1, true) as never)
+      .mockResolvedValueOnce(releasePage([stable, older]) as never);
 
     const repo = makeRepository(10, 'owner/repo', {
       has_fetched_releases: true,
