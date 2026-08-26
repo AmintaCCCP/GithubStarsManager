@@ -22,6 +22,8 @@ export interface RepositoryChatMessage {
   createdAt: string;
 }
 
+export type RepositoryChatExecutionStage = 'context' | 'planning' | 'retrieval' | 'verification' | 'answer';
+
 export interface RepositoryChatToolEvent {
   id: string;
   sessionId: string;
@@ -29,6 +31,9 @@ export interface RepositoryChatToolEvent {
   toolName: string;
   status: 'pending' | 'running' | 'success' | 'error';
   paramSummary: string;
+  stage?: RepositoryChatExecutionStage;
+  round?: number;
+  detail?: string;
   durationMs?: number;
   resultSize?: number;
   evidenceId?: string;
