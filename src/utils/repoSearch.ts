@@ -37,18 +37,27 @@ export function performBasicTextSearch<T extends Repository>(repos: T[], query: 
   });
 }
 
+const toSortableTimestamp = (value?: string): number => {
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number | string {
   switch (sortBy) {
-    case 'stars':
-      return repo.stargazers_count;
+    case 'stars': {
+      const stars = Number(repo.stargazers_count);
+      return Number.isFinite(stars) ? stars : 0;
+    }
     case 'updated':
-      return new Date(repo.pushed_at || repo.updated_at).getTime();
+      // The control is labelled “recently updated”, so use GitHub's updated_at
+      // rather than pushed_at (which drives the separate “last pushed” card label).
+      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
     case 'name':
-      return repo.name.toLowerCase();
+      return repo.name.toLocaleLowerCase();
     case 'starred':
-      return repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
+      return toSortableTimestamp(repo.starred_at);
     default:
-      return new Date(repo.pushed_at || repo.updated_at).getTime();
+      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
   }
 }
 
@@ -63,7 +72,7 @@ export function sortRepositories<T extends Repository>(
     const bValue = getSortValue(b, sortBy);
     if (aValue < bValue) return sortOrder === 'desc' ? 1 : -1;
     if (aValue > bValue) return sortOrder === 'desc' ? -1 : 1;
-    return 0;
+    return a.full_name.localeCompare(b.full_name);
   });
   return sorted;
 }

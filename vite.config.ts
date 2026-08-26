@@ -13,7 +13,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    include: ['lucide-react'],
   },
   build: {
     // Warn before the 3,000 KiB hard budget enforced by check:bundle-size.
