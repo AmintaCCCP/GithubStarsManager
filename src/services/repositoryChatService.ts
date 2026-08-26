@@ -66,8 +66,9 @@ const splitOwnerAndRepo = (fullName: string): [string, string] => {
 };
 
 const sourceUrl = (repository: Repository, sha: string, path?: string, lineStart?: number, lineEnd?: number): string => {
+  const encodedPath = path?.split('/').map(encodeURIComponent).join('/');
   const base = path
-    ? `https://github.com/${repository.full_name}/blob/${sha}/${path}`
+    ? `https://github.com/${repository.full_name}/blob/${sha}/${encodedPath}`
     : `https://github.com/${repository.full_name}/tree/${sha}`;
   return lineStart && lineEnd ? `${base}#L${lineStart}-L${lineEnd}` : base;
 };

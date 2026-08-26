@@ -56,6 +56,8 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
     return groups;
   }, [query, sessions]);
 
+  const hasVisibleSessions = Object.values(groupedSessions).some((group) => group.length > 0);
+
   const groupLabels: Record<HistoryGroup, string> = {
     today: t('今天', 'Today'),
     week: t('最近 7 天', 'Last 7 days'),
@@ -75,10 +77,12 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        {sessions.length === 0 ? (
+        {!hasVisibleSessions ? (
           <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
             <History className="h-5 w-5" aria-hidden="true" />
-            <p>{t('这个仓库还没有保存的对话。', 'There are no saved conversations for this repository yet.')}</p>
+            <p>{sessions.length === 0
+              ? t('这个仓库还没有保存的对话。', 'There are no saved conversations for this repository yet.')
+              : t('没有匹配的会话。', 'No matching conversations found.')}</p>
           </div>
         ) : (
           (Object.keys(groupedSessions) as HistoryGroup[]).map((group) => groupedSessions[group].length > 0 && (

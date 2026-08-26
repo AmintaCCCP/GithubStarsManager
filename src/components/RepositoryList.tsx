@@ -416,13 +416,28 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     }
   };
 
+  const chatPortal = activeChatRepository && createPortal(
+    <ErrorBoundary>
+      <React.Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 text-sm text-muted-foreground" role="status">{t('正在打开仓库问答…', 'Opening repository chat…')}</div>}>
+        <LazyRepositoryChatSheet
+          isOpen
+          repository={activeChatRepository}
+          onClose={() => setActiveChatRepository(null)}
+          onCloseAutoFocus={() => activeChatTriggerRef.current?.focus()}
+        />
+      </React.Suspense>
+    </ErrorBoundary>,
+    document.body,
+  );
+
   if (filteredRepositories.length === 0) {
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     const categoryName = selectedCategoryObj?.name || selectedCategory;
     
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground dark:text-muted-foreground mb-4">
+      <>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground dark:text-muted-foreground mb-4">
           {searchFilters.query ? (
             language === 'zh' 
               ? `未找到与"${searchFilters.query}"相关的仓库。`
@@ -446,8 +461,10 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <li>• {language === 'zh' ? '检查拼写或尝试英文/中文关键词' : 'Check spelling or try English/Chinese keywords'}</li>
             </ul>
           </div>
-        )}
-      </div>
+          )}
+        </div>
+        {chatPortal}
+      </>
     );
   }
 
@@ -684,19 +701,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         onRestore={handleBulkRestore}
       />
 
-      {activeChatRepository && createPortal(
-        <ErrorBoundary>
-          <React.Suspense fallback={null}>
-            <LazyRepositoryChatSheet
-              isOpen
-              repository={activeChatRepository}
-              onClose={() => setActiveChatRepository(null)}
-              onCloseAutoFocus={() => activeChatTriggerRef.current?.focus()}
-            />
-          </React.Suspense>
-        </ErrorBoundary>,
-        document.body,
-      )}
+      {chatPortal}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { resolveRepositoryChatHeadSha } from '../../../services/repositoryChatService';
@@ -30,16 +30,19 @@ export const useRepositoryChatSessions = ({
   const [messages, setMessages] = useState<RepositoryChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const operationIdRef = useRef(0);
 
-  const loadSessionMessages = useCallback(async (session: RepositoryChatSession | null) => {
+  const loadSessionMessages = useCallback(async (session: RepositoryChatSession | null, operationId: number) => {
     if (!session) {
-      setMessages([]);
+      if (operationId === operationIdRef.current) setMessages([]);
       return;
     }
-    setMessages(await repositoryChatSessionRepository.listMessages(session.id));
+    const nextMessages = await repositoryChatSessionRepository.listMessages(session.id);
+    if (operationId === operationIdRef.current) setMessages(nextMessages);
   }, []);
 
   const refresh = useCallback(async () => {
+    const operationId = ++operationIdRef.current;
     if (!repository) {
       setSessions([]);
       setActiveSession(null);
@@ -52,14 +55,15 @@ export const useRepositoryChatSessions = ({
     try {
       await repositoryChatSessionRepository.purgeExpiredSessions(repository.id, retainSessionDays);
       const nextSessions = await repositoryChatSessionRepository.listSessionsByRepository(repository.id);
+      if (operationId !== operationIdRef.current) return;
       setSessions(nextSessions);
       const mostRecent = nextSessions[0] ?? null;
       setActiveSession(mostRecent);
-      await loadSessionMessages(mostRecent);
+      await loadSessionMessages(mostRecent, operationId);
     } catch (unknownError) {
-      setError(unknownError instanceof Error ? unknownError.message : 'Unable to load repository chat sessions');
+      if (operationId === operationIdRef.current) setError(unknownError instanceof Error ? unknownError.message : 'Unable to load repository chat sessions');
     } finally {
-      setIsLoading(false);
+      if (operationId === operationIdRef.current) setIsLoading(false);
     }
   }, [loadSessionMessages, repository, retainSessionDays]);
 
@@ -101,9 +105,10 @@ export const useRepositoryChatSessions = ({
   }, [githubToken, language, repository, resolveSourceRefSha]);
 
   const selectSession = useCallback(async (sessionId: string) => {
+    const operationId = ++operationIdRef.current;
     const session = sessions.find((item) => item.id === sessionId) ?? null;
     setActiveSession(session);
-    await loadSessionMessages(session);
+    await loadSessionMessages(session, operationId);
   }, [loadSessionMessages, sessions]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
@@ -115,7 +120,7 @@ export const useRepositoryChatSessions = ({
       setSessions(nextSessions);
       const nextActive = activeSession?.id === sessionId ? (nextSessions[0] ?? null) : activeSession;
       setActiveSession(nextActive);
-      await loadSessionMessages(nextActive);
+      await loadSessionMessages(nextActive, operationIdRef.current);
     } catch (unknownError) {
       setError(unknownError instanceof Error ? unknownError.message : 'Unable to delete the repository chat session');
     } finally {

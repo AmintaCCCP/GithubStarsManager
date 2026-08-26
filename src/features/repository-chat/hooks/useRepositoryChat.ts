@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { Repository } from '../../../types';
 import type {
   RepositoryChatMessage,
@@ -36,13 +37,13 @@ export const useRepositoryChat = ({
     aiConfigs,
     activeAIConfig,
     repositoryChatSettings,
-  } = useAppStore((state) => ({
+  } = useAppStore(useShallow((state) => ({
     language: state.language,
     githubToken: state.githubToken,
     aiConfigs: state.aiConfigs,
     activeAIConfig: state.activeAIConfig,
     repositoryChatSettings: state.repositoryChatSettings,
-  }));
+  })));
   const abortControllerRef = useRef<AbortController | null>(null);
   const toolEventIdsRef = useRef<Map<string, string>>(new Map());
   const [isSending, setIsSending] = useState(false);
@@ -109,7 +110,7 @@ export const useRepositoryChat = ({
     await repositoryChatSessionRepository.saveToolEvent(toolEvent);
   }, [session]);
 
-  const send = useCallback(async (question: string) => {
+  const send = useCallback(async (question: string, baseMessages = messages) => {
     if (!repository || !session || !aiConfig || unavailableReason || isSending) {
       if (unavailableReason) setError(unavailableReason);
       return;
@@ -142,7 +143,7 @@ export const useRepositoryChat = ({
       evidenceIds: [],
       createdAt: now,
     };
-    const nextMessages = [...messages, userMessage, assistantMessage];
+    const nextMessages = [...baseMessages, userMessage, assistantMessage];
     onMessagesChange(nextMessages);
     await Promise.all([
       repositoryChatSessionRepository.saveMessage(userMessage),
@@ -153,7 +154,7 @@ export const useRepositoryChat = ({
       const result = await runRepositoryChatTurn({
         repository,
         session,
-        messages: [...messages, userMessage],
+        messages: [...baseMessages, userMessage],
         question: normalizedQuestion,
         githubToken: githubToken ?? '',
         aiConfig,
@@ -172,7 +173,7 @@ export const useRepositoryChat = ({
         evidenceIds: result.evidences.map((evidence) => evidence.id),
       };
       await repositoryChatSessionRepository.saveMessage(completedAssistant);
-      onMessagesChange([...messages, userMessage, completedAssistant]);
+      onMessagesChange([...baseMessages, userMessage, completedAssistant]);
       await onSessionChange({
         ...session,
         title: session.title === (language === 'zh' ? '新对话' : 'New conversation')
@@ -192,7 +193,7 @@ export const useRepositoryChat = ({
         status: aborted ? 'aborted' : 'error',
       };
       await repositoryChatSessionRepository.saveMessage(failedAssistant);
-      onMessagesChange([...messages, userMessage, failedAssistant]);
+      onMessagesChange([...baseMessages, userMessage, failedAssistant]);
       if (!aborted) setError(unknownError instanceof Error ? unknownError.message : (language === 'zh' ? '回答生成失败。' : 'Answer generation failed.'));
     } finally {
       abortControllerRef.current = null;
@@ -205,9 +206,15 @@ export const useRepositoryChat = ({
   }, []);
 
   const retry = useCallback(async () => {
-    const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user');
-    if (latestUserMessage) await send(latestUserMessage.content);
-  }, [messages, send]);
+    const failedAssistantIndex = [...messages].map((message) => message.role === 'assistant' && (message.status === 'error' || message.status === 'aborted')).lastIndexOf(true);
+    const failedAssistant = failedAssistantIndex >= 0 ? messages[failedAssistantIndex] : undefined;
+    const failedUser = failedAssistantIndex > 0 ? messages[failedAssistantIndex - 1] : undefined;
+    if (!failedAssistant || !failedUser || failedUser.role !== 'user') return;
+    const baseMessages = messages.slice(0, failedAssistantIndex - 1);
+    await repositoryChatSessionRepository.permanentlyDeleteMessages([failedUser.id, failedAssistant.id]);
+    onMessagesChange(baseMessages);
+    await send(failedUser.content, baseMessages);
+  }, [messages, onMessagesChange, send]);
 
   return {
     canChat: !unavailableReason,

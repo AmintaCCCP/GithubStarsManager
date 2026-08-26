@@ -21,6 +21,7 @@ type FallbackSnapshot = {
 const emptySnapshot = (): FallbackSnapshot => ({ sessions: [], messages: [], toolEvents: [], evidence: [] });
 
 const canUseIndexedDb = () => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
+let useFallbackStorage = !canUseIndexedDb();
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 2000): Promise<T> => {
   return await Promise.race([
@@ -115,7 +116,10 @@ const byUpdatedAtDescending = <T extends { updatedAt: string }>(left: T, right: 
 export const repositoryChatSessionRepository = {
   async listSessionsByRepository(repoId: number): Promise<RepositoryChatSession[]> {
     const fallback = () => fallbackList<RepositoryChatSession>('sessions', (session) => session.repoId === repoId && !session.deletedAt).sort(byUpdatedAtDescending);
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       return await withTimeout(runTransaction('sessions', 'readonly', async (stores) => {
         const records = await requestValue(stores.sessions.index('repoId').getAll(repoId));
@@ -123,19 +127,24 @@ export const repositoryChatSessionRepository = {
       }));
     } catch (error) {
       console.warn('[repository-chat] session list fell back to localStorage', error);
+      useFallbackStorage = true;
       return fallback();
     }
   },
 
   async getSession(sessionId: string): Promise<RepositoryChatSession | null> {
     const fallback = () => readFallback().sessions.find((session) => session.id === sessionId) ?? null;
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       return await withTimeout(runTransaction('sessions', 'readonly', async (stores) => {
         return (await requestValue(stores.sessions.get(sessionId)) as RepositoryChatSession | undefined) ?? null;
       }));
     } catch (error) {
       console.warn('[repository-chat] session read fell back to localStorage', error);
+      useFallbackStorage = true;
       return fallback();
     }
   },
@@ -148,13 +157,17 @@ export const repositoryChatSessionRepository = {
       else snapshot.sessions.push(session);
       writeFallback(snapshot);
     };
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       await withTimeout(runTransaction('sessions', 'readwrite', async (stores) => {
         await requestValue(stores.sessions.put(session));
       }));
     } catch (error) {
       console.warn('[repository-chat] session write fell back to localStorage', error);
+      useFallbackStorage = true;
       fallback();
     }
   },
@@ -185,7 +198,10 @@ export const repositoryChatSessionRepository = {
       snapshot.evidence = snapshot.evidence.filter((item) => !evidenceIds.has(item.id));
       writeFallback(snapshot);
     };
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       await withTimeout(runTransaction(['sessions', 'messages', 'toolEvents', 'evidence'], 'readwrite', async (stores) => {
         const messages = await requestValue(stores.messages.index('sessionId').getAll(sessionId)) as RepositoryChatMessage[];
@@ -198,19 +214,24 @@ export const repositoryChatSessionRepository = {
       }));
     } catch (error) {
       console.warn('[repository-chat] permanent deletion fell back to localStorage', error);
+      useFallbackStorage = true;
       fallback();
     }
   },
 
   async listMessages(sessionId: string): Promise<RepositoryChatMessage[]> {
     const fallback = () => fallbackList<RepositoryChatMessage>('messages', (message) => message.sessionId === sessionId).sort(byCreatedAt);
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       return await withTimeout(runTransaction('messages', 'readonly', async (stores) => {
         return (await requestValue(stores.messages.index('sessionId').getAll(sessionId)) as RepositoryChatMessage[]).sort(byCreatedAt);
       }));
     } catch (error) {
       console.warn('[repository-chat] message list fell back to localStorage', error);
+      useFallbackStorage = true;
       return fallback();
     }
   },
@@ -223,26 +244,65 @@ export const repositoryChatSessionRepository = {
       else snapshot.messages.push(message);
       writeFallback(snapshot);
     };
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       await withTimeout(runTransaction('messages', 'readwrite', async (stores) => {
         await requestValue(stores.messages.put(message));
       }));
     } catch (error) {
       console.warn('[repository-chat] message write fell back to localStorage', error);
+      useFallbackStorage = true;
+      fallback();
+    }
+  },
+
+  async permanentlyDeleteMessages(messageIds: string[]): Promise<void> {
+    if (messageIds.length === 0) return;
+    const messageIdSet = new Set(messageIds);
+    const fallback = () => {
+      const snapshot = readFallback();
+      const evidenceIds = new Set(snapshot.messages.filter((message) => messageIdSet.has(message.id)).flatMap((message) => message.evidenceIds));
+      snapshot.messages = snapshot.messages.filter((message) => !messageIdSet.has(message.id));
+      snapshot.toolEvents = snapshot.toolEvents.filter((event) => !messageIdSet.has(event.messageId));
+      snapshot.evidence = snapshot.evidence.filter((evidence) => !evidenceIds.has(evidence.id));
+      writeFallback(snapshot);
+    };
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
+    try {
+      await withTimeout(runTransaction(['messages', 'toolEvents', 'evidence'], 'readwrite', async (stores) => {
+        const messages = (await Promise.all(messageIds.map(async (id) => await requestValue(stores.messages.get(id)) as RepositoryChatMessage | undefined))).filter((message): message is RepositoryChatMessage => Boolean(message));
+        await Promise.all(messageIds.map((id) => requestValue(stores.messages.delete(id))));
+        const toolEvents = (await Promise.all(messageIds.map(async (id) => await requestValue(stores.toolEvents.index('messageId').getAllKeys(id)) as IDBValidKey[]))).flat();
+        await Promise.all(toolEvents.map((id) => requestValue(stores.toolEvents.delete(id))));
+        const evidenceIds = new Set(messages.flatMap((message) => message.evidenceIds));
+        await Promise.all([...evidenceIds].map((id) => requestValue(stores.evidence.delete(id))));
+      }));
+    } catch (error) {
+      console.warn('[repository-chat] message deletion fell back to localStorage', error);
+      useFallbackStorage = true;
       fallback();
     }
   },
 
   async listToolEvents(sessionId: string): Promise<RepositoryChatToolEvent[]> {
     const fallback = () => fallbackList<RepositoryChatToolEvent>('toolEvents', (event) => event.sessionId === sessionId).sort(byCreatedAt);
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       return await withTimeout(runTransaction('toolEvents', 'readonly', async (stores) => {
         return (await requestValue(stores.toolEvents.index('sessionId').getAll(sessionId)) as RepositoryChatToolEvent[]).sort(byCreatedAt);
       }));
     } catch (error) {
       console.warn('[repository-chat] tool event list fell back to localStorage', error);
+      useFallbackStorage = true;
       return fallback();
     }
   },
@@ -255,13 +315,17 @@ export const repositoryChatSessionRepository = {
       else snapshot.toolEvents.push(event);
       writeFallback(snapshot);
     };
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       await withTimeout(runTransaction('toolEvents', 'readwrite', async (stores) => {
         await requestValue(stores.toolEvents.put(event));
       }));
     } catch (error) {
       console.warn('[repository-chat] tool event write fell back to localStorage', error);
+      useFallbackStorage = true;
       fallback();
     }
   },
@@ -274,13 +338,17 @@ export const repositoryChatSessionRepository = {
       else snapshot.evidence.push(evidence);
       writeFallback(snapshot);
     };
-    if (!canUseIndexedDb()) return fallback();
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      useFallbackStorage = true;
+      return fallback();
+    }
     try {
       await withTimeout(runTransaction('evidence', 'readwrite', async (stores) => {
         await requestValue(stores.evidence.put(evidence));
       }));
     } catch (error) {
       console.warn('[repository-chat] evidence write fell back to localStorage', error);
+      useFallbackStorage = true;
       fallback();
     }
   },
@@ -288,7 +356,10 @@ export const repositoryChatSessionRepository = {
   async listEvidence(ids: string[]): Promise<ToolEvidence[]> {
     const idSet = new Set(ids);
     const fallback = () => readFallback().evidence.filter((evidence) => idSet.has(evidence.id));
-    if (!canUseIndexedDb() || ids.length === 0) return fallback();
+    if (ids.length === 0 || useFallbackStorage || !canUseIndexedDb()) {
+      if (!canUseIndexedDb()) useFallbackStorage = true;
+      return fallback();
+    }
     try {
       return await withTimeout(runTransaction('evidence', 'readonly', async (stores) => {
         const values = await Promise.all(ids.map(async (id) => await requestValue(stores.evidence.get(id)) as ToolEvidence | undefined));
@@ -296,6 +367,7 @@ export const repositoryChatSessionRepository = {
       }));
     } catch (error) {
       console.warn('[repository-chat] evidence list fell back to localStorage', error);
+      useFallbackStorage = true;
       return fallback();
     }
   },

@@ -239,12 +239,14 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       };
       addAIConfig(config);
       if (!activeAIConfig) setActiveAIConfig(config.id);
+      resetForm();
+      if (sessionStorage.getItem('gsm:repository-chat-return')) {
+        setCurrentView('repositories');
+      }
+      return;
     }
 
     resetForm();
-    if (sessionStorage.getItem('gsm:repository-chat-return')) {
-      setCurrentView('repositories');
-    }
   };
 
   const handleEdit = (config: AIConfig) => {
@@ -764,6 +766,7 @@ Repository information:
                     );
                     if (confirmed) {
                       if (config.id) {
+                        if (repositoryChatSettings.chatConfigId === config.id) setRepositoryChatSettings({ chatConfigId: null });
                         deleteAIConfig(config.id);
                       } else {
                         toast(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'), 'error');
@@ -812,8 +815,11 @@ Repository information:
             <p className="mt-1 text-xs text-muted-foreground">{t('仅保存配置 ID，不会复制 API Key、Base URL 或模型凭据。', 'Only the configuration ID is saved; no API key, base URL, or credential is copied.')}</p>
           </div>
           <div>
-            <label id="repository-chat-retention-label" className="mb-1 block text-sm font-medium text-foreground">{t('保留本机会话（天）', 'Retain local conversations (days)')}</label>
-            <Input id="repository-chat-retention-label" type="number" min={1} max={365} value={repositoryChatSettings.retainSessionDays} onChange={(event) => setRepositoryChatSettings({ retainSessionDays: Number(event.target.value) || 90 })} />
+            <label htmlFor="repository-chat-retention-days" className="mb-1 block text-sm font-medium text-foreground">{t('保留本机会话（天）', 'Retain local conversations (days)')}</label>
+            <Input id="repository-chat-retention-days" type="number" min={1} max={365} value={repositoryChatSettings.retainSessionDays} onChange={(event) => {
+              const parsed = Number(event.target.value);
+              setRepositoryChatSettings({ retainSessionDays: Number.isFinite(parsed) ? Math.min(365, Math.max(1, parsed)) : 90 });
+            }} />
             <p className="mt-1 text-xs text-muted-foreground">{t('删除单个会话始终立即生效。', 'Deleting an individual conversation always takes effect immediately.')}</p>
           </div>
         </div>

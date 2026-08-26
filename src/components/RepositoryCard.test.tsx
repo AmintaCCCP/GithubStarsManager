@@ -141,7 +141,7 @@ beforeEach(() => {
 describe('RepositoryCard view modes', () => {
   it('moves single-card actions into an accessible more-actions menu in list mode', async () => {
     const user = userEvent.setup();
-    renderRepositoryCard('list');
+    renderRepositoryCard('list', { onAskRepository: vi.fn() });
 
     const lastPushed = screen.getByText(/最近提交/);
     expect(lastPushed).toBeInTheDocument();
@@ -310,7 +310,7 @@ describe('RepositoryCard view modes', () => {
   });
 
   it('retains the existing quick action row in grid mode', () => {
-    renderRepositoryCard('grid');
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
 
     expect(screen.queryByRole('button', { name: '更多操作' })).not.toBeInTheDocument();
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
@@ -327,7 +327,7 @@ describe('RepositoryCard view modes', () => {
 
   it('collapses trailing grid actions into a more-actions menu when the card is narrow', async () => {
     const user = userEvent.setup();
-    renderRepositoryCard('grid');
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
     const actionRow = screen.getByTestId('grid-action-row');
     Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 190 });
 
