@@ -33,11 +33,14 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 | **Semantic Search** | Find repos by intent, not exact names |
 | **Vector Semantic Search** | Embed repo descriptions/READMEs into a Cloudflare Vectorize index; query with natural language for high-precision semantic matching |
 | **MCP Server** | Optional Streamable HTTP / SSE endpoint so agents (Claude Code, Cursor, etc.) can search AI-enriched stars; requires backend or Electron/desktop (hidden on pure frontend); toggle in Settings, no extra install |
+| **Repository Q&A Assistant (Early Access)** | Ask simple, focused questions about one repository with commit-pinned, read-only evidence, traceable sources, and local session history. It does not index every repository file, so use a mature local coding agent for complex code analysis. |
+| **Repository Release Downloads** | Open a repository's current releases from its card; browse paginated assets, release notes, source archives, and optional AI summaries, then download in the browser or through a configured RPC downloader. |
 | **Release Tracking** | Subscribe to repos and see new versions in one unified timeline |
 | **One‑click Downloads** | Expand release assets and download instantly |
 | **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
 | **Fork Management** | View, sync upstream, and trigger GitHub Actions workflows on forked repos |
 | **Gist Management** | Browse, create, edit, and delete Gists; AI-powered summaries and semantic search |
+| **12 Theme Presets** | Switch instantly between 12 built-in palettes, each with coordinated light and dark variants, from Settings with live previews. |
 | **Network Proxy** | HTTP / SOCKS5 proxy with protocol-level connection testing |
 | **Remote Download (aria2)** | Send release assets to aria2 for download via JSON-RPC |
 | **Diagnostic Logs** | Unified frontend/backend log viewer with debug capture mode |
@@ -74,7 +77,24 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 2. Release Timeline (`Releases` View)
+### 2. Repository Q&A Assistant (Early Access)
+
+Ask concise questions about a single repository directly from its card. Each conversation is tied to a specific commit and shows the evidence used to produce the answer.
+
+**Features:**
+- **Commit-pinned, read-only evidence** — Sources remain tied to the repository revision selected when the conversation starts.
+- **Traceable answers** — Inspect source links and the assistant's retrieval activity alongside each response.
+- **Local session history** — Revisit, search, and manage conversations independently for each repository.
+- **Configurable retrieval budgets** — Control limits for turns, tool calls, document/code reads, and response duration in AI settings.
+
+> **Early-access notice:** This feature is designed for simple repository questions and may fail, return incomplete evidence, or be unable to answer. It does not index every file in the queried repository. For complex, whole-codebase analysis, multi-file reasoning, debugging, or code changes, clone the repository locally and use a mature coding agent.
+
+**Screenshot:**
+![Repository Q&A Assistant](upload/copilot.png)
+
+---
+
+### 3. Release Timeline (`Releases` View)
 
 **Features:**
 - **Release Subscription Management** — Subscribe/unsubscribe to repo releases; supports bulk unsubscribe
@@ -92,7 +112,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 3. Discovery / Trending (`Discover` View)
+### 4. Discovery / Trending (`Discover` View)
 
 **Features:**
 - **Five Discovery Channels** — Trending / Hot Release / Most Popular / Topic / Search
@@ -112,7 +132,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 4. Fork Management (`Forks` View)
+### 5. Fork Management (`Forks` View)
 
 **Features:**
 - **Fork Listing** — Automatically fetches all your forked repos with upstream update detection
@@ -126,7 +146,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 5. Gist Management (`Gist` View)
+### 6. Gist Management (`Gist` View)
 
 **Features:**
 - **Gist Listing** — Automatically syncs all your Gists and starred Gists with category filtering (All / Mine / Starred)
@@ -142,7 +162,7 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 6. Search & Filters
+### 7. Search & Filters
 
 **Features:**
 - **Multi-dimensional Search** — Keyword search, repo status filter, tag filter, language filter, platform filter
@@ -158,13 +178,13 @@ Deploy an Express + SQLite backend for:
 
 ---
 
-### 7. Settings Panel
+### 8. Settings Panel
 
 **Settings Groups:**
 
 | Group | Features |
 |-------|----------|
-| **General** | Language toggle (ZH/EN), theme settings |
+| **General** | Language toggle (ZH/EN), light/dark mode, and live-preview switching among 12 built-in theme presets |
 | **AI Config** | Configure OpenAI / Anthropic / Ollama / compatible APIs; supports custom endpoints and keys |
 | **WebDAV** | Backup config for Jianguoyun, Nextcloud, ownCloud, and standard WebDAV services |
 | **Backup** | Backup history, manual backup/restore, incremental backup |
@@ -178,9 +198,11 @@ Deploy an Express + SQLite backend for:
 **Screenshot:**
 ![Settings Panel Interface](upload/settings.png)
 
+**Appearance:** Select any of the 12 built-in theme presets in **Settings → General → Appearance**. Every preset includes coordinated light and dark palettes and applies immediately across the application.
+
 ---
 
-### 8. Custom AI Models
+### 9. Custom AI Models
 
 **Features:**
 - **Multi AI Provider Support** — OpenAI (GPT-3.5/GPT-4), Anthropic (Claude), Ollama (local models), any OpenAI-compatible API
