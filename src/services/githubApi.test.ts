@@ -223,3 +223,90 @@ describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
     expect(releases).toEqual([expect.objectContaining({ id: published.id, published_at: published.published_at })]);
   });
 });
+
+
+describe('GitHubApiService repository chat read APIs', () => {
+  it('resolves default branch, immutable head SHA, and a recursive tree through tagged read requests', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({ default_branch: 'main' } as never)
+      .mockResolvedValueOnce({ sha: 'abcdef1234567890' } as never)
+      .mockResolvedValueOnce({ sha: 'tree-sha', truncated: false, tree: [{ path: 'src/App.tsx', type: 'blob', sha: 'file-sha' }] } as never);
+
+    await expect(service.getRepositoryMeta('owner', 'repo')).resolves.toEqual({ defaultBranch: 'main' });
+    await expect(service.getRepositoryHeadSha('owner', 'repo', 'main')).resolves.toBe('abcdef1234567890');
+    await expect(service.getRepositoryTree('owner', 'repo', 'abcdef1234567890')).resolves.toMatchObject({
+      ref: 'abcdef1234567890',
+      sha: 'tree-sha',
+      truncated: false,
+      entries: [{ path: 'src/App.tsx', type: 'blob' }],
+    });
+
+    expect(makeRequestSpy.mock.calls.map((call: unknown[]) => call[1])).toEqual([
+      { operationTag: 'repository-chat:meta' },
+      { operationTag: 'repository-chat:head-sha' },
+      { operationTag: 'repository-chat:tree' },
+    ]);
+  });
+
+  it('reads a text file at the supplied immutable ref and rejects sensitive paths before any request', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({
+        type: 'file',
+        path: 'src/App.tsx',
+        sha: 'file-sha',
+        size: 20,
+        encoding: 'base64',
+        content: btoa('export const App = () => null;'),
+      } as never);
+
+    await expect(service.getRepositoryFile('owner', 'repo', 'src/App.tsx', 'abcdef1234567890')).resolves.toMatchObject({
+      path: 'src/App.tsx',
+      ref: 'abcdef1234567890',
+      sha: 'file-sha',
+      content: 'export const App = () => null;',
+    });
+    const requestCalls = makeRequestSpy.mock.calls as unknown as Array<[string]>;
+    expect(requestCalls[0]?.[0]).toContain('?ref=abcdef1234567890');
+
+    await expect(service.getRepositoryFile('owner', 'repo', '.env.production', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'package-lock.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'config/secrets.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'config/credentials.json', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'keys/private_key.txt', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryFile('owner', 'repo', 'keys/id_rsa.pub', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    expect(makeRequestSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows a bounded Markdown evidence file at the pinned SHA without weakening the normal file limit or sensitive-path guard', async () => {
+    const service = new GitHubApiService('token');
+    const largeMarkdown = `# Deployment\n\n${'documented content\n'.repeat(8_000)}`;
+    expect(new TextEncoder().encode(largeMarkdown).byteLength).toBeGreaterThan(96 * 1024);
+    expect(new TextEncoder().encode(largeMarkdown).byteLength).toBeLessThan(512 * 1024);
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValue({
+        type: 'file',
+        path: 'docs/deployment.markdown',
+        sha: 'markdown-sha',
+        size: new TextEncoder().encode(largeMarkdown).byteLength,
+        encoding: 'base64',
+        content: btoa(largeMarkdown),
+      } as never);
+
+    await expect(service.getRepositoryFile('owner', 'repo', 'docs/deployment.markdown', 'abcdef1234567890')).rejects.toThrow(/96 KB/i);
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'docs/deployment.markdown', 'abcdef1234567890')).resolves.toMatchObject({
+      path: 'docs/deployment.markdown',
+      ref: 'abcdef1234567890',
+      sha: 'markdown-sha',
+      content: largeMarkdown,
+    });
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'docs/credentials.md', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'src/main.ts', 'abcdef1234567890')).rejects.toThrow(/not Markdown/i);
+
+    const requestCalls = makeRequestSpy.mock.calls as unknown as Array<[string, { operationTag?: string } | undefined]>;
+    expect(requestCalls).toHaveLength(2);
+    expect(requestCalls[1]?.[0]).toContain('?ref=abcdef1234567890');
+    expect(requestCalls[1]?.[1]).toEqual({ operationTag: 'repository-chat:markdown-evidence' });
+  });
+});

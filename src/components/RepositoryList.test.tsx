@@ -83,6 +83,7 @@ const mockUseAppStore = vi.mocked(useAppStore);
 beforeEach(() => {
   vi.clearAllMocks();
   storeState.repositoryViewMode = 'grid';
+  Object.assign(searchFilters, { sortBy: 'stars', sortOrder: 'desc' });
   mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
   Object.assign(mockUseAppStore, {
     getState: () => storeState,
@@ -90,6 +91,19 @@ beforeEach(() => {
 });
 
 describe('RepositoryList view mode controls', () => {
+  it('sorts the raw default repository list by stars before rendering cards', () => {
+    const lowerStarRepository = { ...repository, id: 2, name: 'lower-star', full_name: 'owner/lower-star', stargazers_count: 1 };
+    const higherStarRepository = { ...repository, id: 3, name: 'higher-star', full_name: 'owner/higher-star', stargazers_count: 999 };
+
+    render(<RepositoryList repositories={[lowerStarRepository, higherStarRepository, repository]} selectedCategory="all" />);
+
+    expect(screen.getAllByTestId(/repository-card-/).map((card) => card.textContent)).toEqual([
+      'higher-star',
+      'repository-one',
+      'lower-star',
+    ]);
+  });
+
   it('keeps the established grid as default and switches cards to the compact list mode', () => {
     const { rerender } = render(<RepositoryList repositories={[repository]} selectedCategory="all" />);
 

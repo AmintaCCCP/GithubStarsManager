@@ -2,12 +2,14 @@
 import type { PersistOptions, PersistStorage } from 'zustand/middleware';
 import type { Repository, SubscriptionChannel } from '../../types';
 import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscriptionChannels } from '../../types';
+import { defaultRepositoryChatSettings } from '../../types/repositoryChat';
 import { logger } from '../../services/logger';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import type { AppStoreState } from '../types';
 import {
   defaultDiscoveryChannels,
   normalizeMcpConfig,
+  normalizeRepositoryChatSettings,
   normalizeVectorSearchConfig,
   normalizeVectorSearchStatus,
   PersistedAppState,
@@ -18,7 +20,7 @@ import { debouncedPersistStorage } from './storage';
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
-  version: 11,
+  version: 12,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
   // 持久化用户信息和认证状态
@@ -43,6 +45,7 @@ sortOrder: state.gistSearchFilters.sortOrder,
   // 持久化AI配置
   aiConfigs: state.aiConfigs,
   activeAIConfig: state.activeAIConfig,
+  repositoryChatSettings: state.repositoryChatSettings,
 
   // 持久化Embedding配置
   embeddingConfigs: state.embeddingConfigs,
@@ -321,6 +324,14 @@ state.discoverySortOrder = 'Descending';
   // v9→v10: 初始化 backendApiSecret（旧版仅存 sessionStorage；migrate 前置为 null）
   if (state && typeof (state as Record<string, unknown>).backendApiSecret !== 'string') {
 (state as Record<string, unknown>).backendApiSecret = null;
+  }
+
+  // v11→v12: 仓库问答设置只存非敏感字段；旧快照使用安全默认值。
+  if (state) {
+    const stateRecord = state as Record<string, unknown>;
+    stateRecord.repositoryChatSettings = normalizeRepositoryChatSettings(
+      stateRecord.repositoryChatSettings ?? defaultRepositoryChatSettings,
+    );
   }
 
   // 初始化 embeddingConfigs

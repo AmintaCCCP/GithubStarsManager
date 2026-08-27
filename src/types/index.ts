@@ -1,5 +1,8 @@
 import type { ThemePresetId } from '../constants/themePresets';
 
+import type { RepositoryChatSettings } from './repositoryChat';
+export type { RepositoryChatSettings } from './repositoryChat';
+
 export interface Repository {
   id: number;
   name: string;
@@ -422,6 +425,7 @@ export interface AppState {
   // AI
   aiConfigs: AIConfig[];
   activeAIConfig: string | null;
+  repositoryChatSettings: RepositoryChatSettings;
 
   // Embedding
   embeddingConfigs: EmbeddingConfig[];

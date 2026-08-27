@@ -85,21 +85,27 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     activeAIConfig,
     language,
     translationEngine,
+    repositoryChatSettings,
     setTranslationEngine,
+    setRepositoryChatSettings,
     addAIConfig,
     updateAIConfig,
     deleteAIConfig,
     setActiveAIConfig,
+    setCurrentView,
   } = useAppStore(useShallow((state) => ({
     aiConfigs: state.aiConfigs,
     activeAIConfig: state.activeAIConfig,
     language: state.language,
     translationEngine: state.translationEngine,
+    repositoryChatSettings: state.repositoryChatSettings,
     setTranslationEngine: state.setTranslationEngine,
+    setRepositoryChatSettings: state.setRepositoryChatSettings,
     addAIConfig: state.addAIConfig,
     updateAIConfig: state.updateAIConfig,
     deleteAIConfig: state.deleteAIConfig,
     setActiveAIConfig: state.setActiveAIConfig,
+    setCurrentView: state.setCurrentView,
   })));
 
   const { toast, confirm } = useDialog();
@@ -232,6 +238,12 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
         mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
       };
       addAIConfig(config);
+      if (!activeAIConfig) setActiveAIConfig(config.id);
+      resetForm();
+      if (sessionStorage.getItem('gsm:repository-chat-return')) {
+        setCurrentView('repositories');
+      }
+      return;
     }
 
     resetForm();
@@ -754,6 +766,7 @@ Repository information:
                     );
                     if (confirmed) {
                       if (config.id) {
+                        if (repositoryChatSettings.chatConfigId === config.id) setRepositoryChatSettings({ chatConfigId: null });
                         deleteAIConfig(config.id);
                       } else {
                         toast(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'), 'error');
@@ -777,6 +790,63 @@ Repository information:
             <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>
           </div>
         )}
+
+      <section className="mt-6 rounded-lg border border-border bg-background p-4 dark:border-border dark:bg-muted/40" aria-labelledby="repository-chat-settings-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 id="repository-chat-settings-heading" className="text-sm font-medium text-foreground">{t('仓库问答', 'Repository chat')}</h4>
+            <p className="mt-1 text-xs text-muted-foreground">{t('按需读取固定版本源码并保留本机对话；不会更新或重建既有向量索引。', 'Reads pinned source on demand and keeps local conversations; it never updates or rebuilds the existing vector index.')}</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox checked={repositoryChatSettings.enabled} onCheckedChange={(checked) => setRepositoryChatSettings({ enabled: checked === true })} />
+            {t('启用仓库问答', 'Enable repository chat')}
+          </label>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label id="repository-chat-model-label" className="mb-1 block text-sm font-medium text-foreground">{t('问答模型', 'Chat model')}</label>
+            <Select value={repositoryChatSettings.chatConfigId ?? '__active__'} onValueChange={(value) => setRepositoryChatSettings({ chatConfigId: value === '__active__' ? null : value })}>
+              <SelectTrigger aria-labelledby="repository-chat-model-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__active__">{t('跟随当前 AI 配置', 'Use active AI configuration')}</SelectItem>
+                {aiConfigs.map((config) => <SelectItem key={config.id} value={config.id}>{config.name} · {config.model}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">{t('仅保存配置 ID，不会复制 API Key、Base URL 或模型凭据。', 'Only the configuration ID is saved; no API key, base URL, or credential is copied.')}</p>
+          </div>
+          <div>
+            <label htmlFor="repository-chat-retention-days" className="mb-1 block text-sm font-medium text-foreground">{t('保留本机会话（天）', 'Retain local conversations (days)')}</label>
+            <Input id="repository-chat-retention-days" type="number" min={1} max={365} value={repositoryChatSettings.retainSessionDays} onChange={(event) => {
+              const parsed = Number(event.target.value);
+              setRepositoryChatSettings({ retainSessionDays: Number.isFinite(parsed) ? Math.min(365, Math.max(1, parsed)) : 90 });
+            }} />
+            <p className="mt-1 text-xs text-muted-foreground">{t('删除单个会话始终立即生效。', 'Deleting an individual conversation always takes effect immediately.')}</p>
+          </div>
+        </div>
+        <details className="mt-4 rounded-md border border-border px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">{t('高级设置', 'Advanced settings')}</summary>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('外部网页搜索与抓取', 'External web search and fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('默认关闭；当前版本不会将其暴露为工具。', 'Disabled by default; the current version does not expose it as a tool.')}</span></span></label>
+            <div>
+              <label id="repository-chat-streaming-label" className="mb-1 block text-sm font-medium text-foreground">{t('流式回答', 'Streaming answers')}</label>
+              <Select value={repositoryChatSettings.streamingMode} onValueChange={(value) => setRepositoryChatSettings({ streamingMode: value === 'off' ? 'off' : 'auto' })}>
+                <SelectTrigger aria-labelledby="repository-chat-streaming-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t('自动（当前浏览器模式自动降级）', 'Auto (browser mode falls back automatically)')}</SelectItem>
+                  <SelectItem value="off">{t('关闭', 'Off')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具上限', 'Per-turn tool limit')}</label>
+              <Input id="repository-chat-tool-limit" type="number" min={1} max={8} value={repositoryChatSettings.maxToolsPerTurn} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                setRepositoryChatSettings({ maxToolsPerTurn: Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 6 });
+              }} />
+            </div>
+          </div>
+        </details>
+      </section>
 
       <div className="mt-6 p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <div className="flex items-center space-x-2 mb-3">

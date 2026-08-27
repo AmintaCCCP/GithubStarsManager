@@ -27,11 +27,42 @@ import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/
 interface GitHubContentResponse {
   content?: string;
   encoding?: string;
+  path?: string;
+  sha?: string;
+  size?: number;
+  type?: string;
+}
+
+export interface GitHubRepositoryTreeEntry {
+  path: string;
+  type?: string;
+  sha?: string;
+  size?: number;
 }
 
 interface GitHubTreeResponse {
-  tree?: GitHubReadmeCandidateItem[];
+  sha?: string;
+  tree?: GitHubRepositoryTreeEntry[];
   truncated?: boolean;
+}
+
+export interface RepositoryMetaRead {
+  defaultBranch: string;
+}
+
+export interface RepositoryTreeRead {
+  ref: string;
+  sha?: string;
+  truncated: boolean;
+  entries: GitHubRepositoryTreeEntry[];
+}
+
+export interface RepositoryFileRead {
+  path: string;
+  ref: string;
+  sha?: string;
+  size: number;
+  content: string;
 }
 
 interface GitHubStarredItem {
@@ -66,6 +97,32 @@ interface GitHubRateLimitResponse {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+const REPOSITORY_CHAT_MAX_FILE_BYTES = 96 * 1024;
+// Larger Markdown files are common repository documentation. This bounded exception is
+// deliberately narrower than the normal chat-file reader: only non-sensitive Markdown
+// can use it, it remains pinned to the caller's SHA, and repository chat exposes only
+// line-ranged excerpts to the model.
+const REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES = 512 * 1024;
+const REPOSITORY_CHAT_MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown', '.txt']);
+const REPOSITORY_CHAT_ALLOWED_EXTENSIONS = new Set([
+  '.md', '.mdx', '.markdown', '.txt', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.toml',
+  '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.cs', '.c', '.h', '.cpp', '.hpp', '.vue', '.svelte',
+  '.html', '.css', '.scss', '.sql', '.graphql', '.gql', '.sh', '.bash', '.zsh', '.xml', '.ini', '.properties',
+]);
+const REPOSITORY_CHAT_SENSITIVE_PATH = /(^|\/)(?:\.env(?:\.[^/]*)?|[^/]*(?:secret|credential|private[_-]?key|id_rsa)[^/]*|[^/]*\.(?:pem|p12|pfx|key))(?:$|\/)/i;
+const REPOSITORY_CHAT_LOCK_FILE = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|composer\.lock|cargo\.lock|poetry\.lock)$/i;
+const REPOSITORY_CHAT_MINIFIED_FILE = /\.min\.(?:js|css)$/i;
+
+const isRepositoryChatSensitivePath = (path: string): boolean => {
+  const pathSegments = path.split('/');
+  const fileName = pathSegments[pathSegments.length - 1] || path;
+  const fileNameSegments = fileName.split('.');
+  const extension = fileName.includes('.') ? `.${fileNameSegments[fileNameSegments.length - 1]}`.toLowerCase() : '';
+  return REPOSITORY_CHAT_SENSITIVE_PATH.test(path)
+    || REPOSITORY_CHAT_LOCK_FILE.test(path)
+    || REPOSITORY_CHAT_MINIFIED_FILE.test(path)
+    || !REPOSITORY_CHAT_ALLOWED_EXTENSIONS.has(extension);
+};
 
 interface GitHubSearchRepoResponse {
   items: (Repository & { forks_count?: number })[];
@@ -655,6 +712,119 @@ export class GitHubApiService {
 
   private encodeContentPath(path: string): string {
     return path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  async getRepositoryMeta(owner: string, repo: string, signal?: AbortSignal): Promise<RepositoryMetaRead> {
+    const response = await this.makeRequest<{ default_branch?: unknown }>(
+      `/repos/${owner}/${repo}`,
+      { operationTag: 'repository-chat:meta' },
+      signal,
+    );
+    if (typeof response.default_branch !== 'string' || !response.default_branch.trim()) {
+      throw new Error('GitHub did not return a default branch for this repository');
+    }
+    return { defaultBranch: response.default_branch };
+  }
+
+  async getRepositoryHeadSha(owner: string, repo: string, branch: string, signal?: AbortSignal): Promise<string> {
+    const response = await this.makeRequest<{ sha?: unknown }>(
+      `/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`,
+      { operationTag: 'repository-chat:head-sha' },
+      signal,
+    );
+    if (typeof response.sha !== 'string' || !response.sha.trim()) {
+      throw new Error('GitHub did not return a commit SHA for the default branch');
+    }
+    return response.sha;
+  }
+
+  async getRepositoryTree(owner: string, repo: string, ref: string, signal?: AbortSignal): Promise<RepositoryTreeRead> {
+    const response = await this.makeRequest<GitHubTreeResponse>(
+      `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
+      { operationTag: 'repository-chat:tree' },
+      signal,
+    );
+    return {
+      ref,
+      sha: response.sha,
+      truncated: response.truncated === true,
+      entries: Array.isArray(response.tree) ? response.tree.filter((entry) => typeof entry.path === 'string') : [],
+    };
+  }
+
+  async getRepositoryFile(owner: string, repo: string, path: string, ref: string, signal?: AbortSignal): Promise<RepositoryFileRead> {
+    const normalizedPath = path.replace(/^\/+/, '');
+    if (!normalizedPath || normalizedPath.includes('..') || normalizedPath.includes('\\')) {
+      throw new Error('Invalid repository file path');
+    }
+    if (isRepositoryChatSensitivePath(normalizedPath)) {
+      throw new Error('This file is excluded from repository chat for safety');
+    }
+
+    const response = await this.makeRequest<GitHubContentResponse>(
+      `/repos/${owner}/${repo}/contents/${this.encodeContentPath(normalizedPath)}?ref=${encodeURIComponent(ref)}`,
+      { operationTag: 'repository-chat:file' },
+      signal,
+    );
+    if (response.type && response.type !== 'file') {
+      throw new Error('The requested repository path is not a text file');
+    }
+    if (typeof response.size === 'number' && response.size > REPOSITORY_CHAT_MAX_FILE_BYTES) {
+      throw new Error('The requested file exceeds the 96 KB repository chat limit');
+    }
+
+    const content = this.decodeContentResponse(response);
+    const contentSize = new TextEncoder().encode(content).byteLength;
+    if (contentSize > REPOSITORY_CHAT_MAX_FILE_BYTES) {
+      throw new Error('The requested file exceeds the 96 KB repository chat limit');
+    }
+    return {
+      path: response.path || normalizedPath,
+      ref,
+      sha: response.sha,
+      size: typeof response.size === 'number' ? response.size : contentSize,
+      content,
+    };
+  }
+
+  async getRepositoryMarkdownEvidenceFile(owner: string, repo: string, path: string, ref: string, signal?: AbortSignal): Promise<RepositoryFileRead> {
+    const normalizedPath = path.replace(/^\/+/, '');
+    if (!normalizedPath || normalizedPath.includes('..') || normalizedPath.includes('\\')) {
+      throw new Error('Invalid repository file path');
+    }
+    if (isRepositoryChatSensitivePath(normalizedPath)) {
+      throw new Error('This file is excluded from repository chat for safety');
+    }
+    const fileName = normalizedPath.split('/').pop() || normalizedPath;
+    const extension = fileName.includes('.') ? `.${fileName.split('.').pop()}`.toLowerCase() : '';
+    if (!REPOSITORY_CHAT_MARKDOWN_EXTENSIONS.has(extension)) {
+      throw new Error('The requested repository evidence path is not Markdown text');
+    }
+
+    const response = await this.makeRequest<GitHubContentResponse>(
+      `/repos/${owner}/${repo}/contents/${this.encodeContentPath(normalizedPath)}?ref=${encodeURIComponent(ref)}`,
+      { operationTag: 'repository-chat:markdown-evidence' },
+      signal,
+    );
+    if (response.type && response.type !== 'file') {
+      throw new Error('The requested repository path is not a text file');
+    }
+    if (typeof response.size === 'number' && response.size > REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES) {
+      throw new Error('The requested Markdown file exceeds the 512 KB repository chat evidence limit');
+    }
+
+    const content = this.decodeContentResponse(response);
+    const contentSize = new TextEncoder().encode(content).byteLength;
+    if (contentSize > REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES) {
+      throw new Error('The requested Markdown file exceeds the 512 KB repository chat evidence limit');
+    }
+    return {
+      path: response.path || normalizedPath,
+      ref,
+      sha: response.sha,
+      size: typeof response.size === 'number' ? response.size : contentSize,
+      content,
+    };
   }
 
   async getRepositoryReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string> {
