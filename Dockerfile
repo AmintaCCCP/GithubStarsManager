@@ -1,5 +1,7 @@
-# Build stage
-FROM node:22-alpine AS build
+# syntax=docker/dockerfile:1
+# `dist` only contains static assets, so build it once on the native builder.
+# The final nginx stage remains target-platform aware for amd64 and arm64.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /app
 

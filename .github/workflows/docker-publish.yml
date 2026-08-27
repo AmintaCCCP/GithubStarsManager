@@ -6,6 +6,12 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# Keep only the newest run for each branch or tag, while allowing release tags
+# and main to publish independently.
+concurrency:
+  group: server-image-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-server
@@ -13,6 +19,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Avoid an unbounded blocked cache or registry operation.
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -59,5 +67,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Do not share the default `buildkit` scope with the frontend image.
+          cache-from: type=gha,scope=github-stars-manager-server-${{ github.ref_type }},timeout=5m
+          cache-to: type=gha,scope=github-stars-manager-server-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true
