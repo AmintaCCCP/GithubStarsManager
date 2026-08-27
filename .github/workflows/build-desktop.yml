@@ -475,9 +475,11 @@ jobs:
         if-no-files-found: ignore
 
   release:
-    needs: build
+    needs: [verify-release-version, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && always()
+    # Keep partial platform releases possible, but never publish when the tag
+    # does not match the root package.json client version.
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
     permissions:
       contents: write
     
