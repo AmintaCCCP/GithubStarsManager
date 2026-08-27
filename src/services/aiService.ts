@@ -560,6 +560,22 @@ ${options.user}` : options.user;
     throw new Error('No content received from AI service');
   }
 
+  async generateChatText(options: {
+    system: string;
+    user: string;
+    temperature?: number;
+    maxTokens?: number;
+    signal?: AbortSignal;
+  }): Promise<string> {
+    return await this.requestText({
+      system: options.system,
+      user: options.user,
+      temperature: options.temperature ?? 0.2,
+      maxTokens: options.maxTokens ?? 4000,
+      signal: options.signal,
+    });
+  }
+
   async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string, signal?: AbortSignal): Promise<RepositoryAnalysisResult> {
     const startTime = Date.now();
     const configId = this.config.id;

@@ -95,6 +95,16 @@ describe('applyRepoFilters', () => {
     expect(hits.map((r) => r.id)).toEqual([1, 3, 2]);
   });
 
+  it('sorts recently updated repositories by GitHub updated_at rather than last pushed_at', () => {
+    const repositories = [
+      makeRepo({ id: 10, name: 'older-update', full_name: 'acme/older-update', updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-06-01T00:00:00Z' }),
+      makeRepo({ id: 11, name: 'newer-update', full_name: 'acme/newer-update', updated_at: '2026-05-01T00:00:00Z', pushed_at: '2026-02-01T00:00:00Z' }),
+    ];
+
+    const hits = applyRepoFilters(repositories, { sortBy: 'updated', sortOrder: 'desc' });
+    expect(hits.map((repository) => repository.id)).toEqual([11, 10]);
+  });
+
   it('filters by SPDX id license', () => {
     const hits = applyRepoFilters(sample, { licenses: ['MIT'] });
     expect(hits.map((r) => r.id)).toEqual([1]);
