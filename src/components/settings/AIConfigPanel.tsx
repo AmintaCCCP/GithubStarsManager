@@ -839,7 +839,10 @@ Repository information:
             </div>
             <div>
               <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具上限', 'Per-turn tool limit')}</label>
-              <Input id="repository-chat-tool-limit" type="number" min={1} max={8} value={repositoryChatSettings.maxToolsPerTurn} onChange={(event) => setRepositoryChatSettings({ maxToolsPerTurn: Number(event.target.value) || 6 })} />
+              <Input id="repository-chat-tool-limit" type="number" min={1} max={8} value={repositoryChatSettings.maxToolsPerTurn} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                setRepositoryChatSettings({ maxToolsPerTurn: Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 6 });
+              }} />
             </div>
           </div>
         </details>

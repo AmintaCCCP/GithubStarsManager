@@ -105,7 +105,7 @@ const REPOSITORY_CHAT_MAX_FILE_BYTES = 96 * 1024;
 const REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES = 512 * 1024;
 const REPOSITORY_CHAT_MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown', '.txt']);
 const REPOSITORY_CHAT_ALLOWED_EXTENSIONS = new Set([
-  '.md', '.mdx', '.txt', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.toml',
+  '.md', '.mdx', '.markdown', '.txt', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.toml',
   '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.cs', '.c', '.h', '.cpp', '.hpp', '.vue', '.svelte',
   '.html', '.css', '.scss', '.sql', '.graphql', '.gql', '.sh', '.bash', '.zsh', '.xml', '.ini', '.properties',
 ]);

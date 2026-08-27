@@ -307,16 +307,18 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
     .map(formatSourceReference)
     .filter((reference): reference is string => Boolean(reference));
   const normalizedReferences = new Map(references.map((reference) => [reference.replace(/^\//, ''), reference]));
-  const normalizePathAndLine = (whole: string, rawPath: string, start: string, end?: string): string => {
+  const normalizePathAndLine = (whole: string, leading: string, rawPath: string, start: string, end?: string): string => {
     const matchingReference = normalizedReferences.get(rawPath.replace(/^\//, ''));
     if (!matchingReference) return whole;
     const expectedRange = end ? `${start}-${end}` : start;
     const expectedReference = matchingReference.match(/ - (\d+(?:-\d+)?)$/)?.[1];
-    return expectedReference === expectedRange ? `\`${matchingReference}\`` : whole;
+    return expectedReference === expectedRange ? `${leading}\`${matchingReference}\`` : whole;
   };
 
+  // Capture (rather than look behind for) a permissible leading character so the
+  // static bundle remains parseable in the configured Safari 12 target.
   const withNormalizedBareReferences = content.replace(
-    /(?<![\w`])((?:\.?[\w@-]+\/)+[\w@.-]+\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|json|ya?ml|toml|sh|py|go|rs|java|rb|php|cs|html|css|scss|sql))\s*-\s*(\d+)(?:\s*-\s*(\d+))?/gi,
+    /(^|[^\w`])((?:\.?[\w@-]+\/)+[\w@.-]+\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|json|ya?ml|toml|sh|py|go|rs|java|rb|php|cs|html|css|scss|sql))\s*-\s*(\d+)(?:\s*-\s*(\d+))?/gim,
     normalizePathAndLine
   );
 
@@ -395,6 +397,7 @@ const operationalFallback = (input: RepositoryChatTurnInput, focus: ResearchFocu
   if ((focus !== 'deployment' && focus !== 'usage') || evidences.length === 0) return null;
   const asksForConfiguration = isOperationalConfigurationQuestion(input.question);
   const matches: Array<{ command: string; evidence: ToolEvidence }> = [];
+  const evidenceAdditions: ToolEvidence[] = [];
   for (const evidence of evidences) {
     if (!evidence.path || !evidence.lineStart || !evidence.contentHash) continue;
     for (const { command, lineOffset } of markdownCodeCommands(evidence.excerpt)) {
@@ -412,7 +415,7 @@ const operationalFallback = (input: RepositoryChatTurnInput, focus: ResearchFocu
         contentHash: evidence.contentHash,
         excerpt: command,
       });
-      if (!existing) evidences.push(lineEvidence);
+      if (!existing) evidenceAdditions.push(lineEvidence);
       if (!matches.some((match) => match.command === command && match.evidence.path === lineEvidence.path && match.evidence.lineStart === lineEvidence.lineStart)) {
         matches.push({ command, evidence: lineEvidence });
       }
@@ -420,6 +423,7 @@ const operationalFallback = (input: RepositoryChatTurnInput, focus: ResearchFocu
     }
     if (matches.length >= 3) break;
   }
+  evidences.push(...evidenceAdditions);
   if (matches.length > 0) {
     const heading = input.language === 'zh'
       ? asksForConfiguration ? '### 已证实的配置命令' : '### 已证实的操作步骤'
@@ -898,7 +902,7 @@ const frameworkAgentFetch = (input: RepositoryChatTurnInput): typeof fetch => as
   const signal = init?.signal as AbortSignal | undefined;
   const abortForCaller = () => controller.abort(signal?.reason);
   signal?.addEventListener('abort', abortForCaller, { once: true });
-  const timeoutId = window.setTimeout(() => controller.abort(new DOMException('Framework model step timed out.', 'TimeoutError')), FRAMEWORK_STEP_TIMEOUT_MS);
+  const timeoutId = globalThis.setTimeout(() => controller.abort(new DOMException('Framework model step timed out.', 'TimeoutError')), FRAMEWORK_STEP_TIMEOUT_MS);
   try {
     if (backend.isAvailable) {
       const rawBody = init?.body;
@@ -917,7 +921,7 @@ const frameworkAgentFetch = (input: RepositoryChatTurnInput): typeof fetch => as
     }
     return await fetch(request, { ...init, signal: controller.signal });
   } finally {
-    window.clearTimeout(timeoutId);
+    globalThis.clearTimeout(timeoutId);
     signal?.removeEventListener('abort', abortForCaller);
   }
 };
@@ -1059,7 +1063,10 @@ const runFrameworkRepositoryChatTurn = async (input: RepositoryChatTurnInput): P
       execute: async ({ path }) => {
         const paramSummary = path;
         if (!selectedPaths.has(path)) {
-          return { error: 'This path was not selected from the fixed-SHA candidate list.' };
+          return {
+            error: 'This path was not selected from the fixed-SHA candidate list.',
+            selectedPaths: Array.from(selectedPaths).filter((candidate) => !readPaths.has(candidate)),
+          };
         }
         emit({
           toolName: 'read_repo_file',
@@ -1114,7 +1121,9 @@ const runFrameworkRepositoryChatTurn = async (input: RepositoryChatTurnInput): P
     model: provider(input.aiConfig.model),
     instructions: frameworkAgentInstructions(input, focus),
     tools: frameworkTools,
-    stopWhen: isStepCount(maxFiles + 3),
+    // Reserve correction steps for rejected paths so a malformed read cannot
+    // consume the required finish_with_evidence step.
+    stopWhen: isStepCount(maxFiles + 6),
     prepareStep: ({ stepNumber }) => {
       if (stepNumber === 0) return { activeTools: ['get_source_context'], toolChoice: { type: 'tool', toolName: 'get_source_context' }, temperature: 0 };
       if (candidatePaths.length === 0) return { activeTools: ['get_source_context'], toolChoice: { type: 'tool', toolName: 'get_source_context' }, temperature: 0 };
