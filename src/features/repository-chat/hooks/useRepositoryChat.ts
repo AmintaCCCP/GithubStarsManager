@@ -177,6 +177,7 @@ export const useRepositoryChat = ({
         aiConfig,
         language,
         maxToolsPerTurn: repositoryChatSettings.maxToolsPerTurn,
+        agentBudget: repositoryChatSettings.agentBudget,
         signal: controller.signal,
         onToolEvent: (event) => {
           void persistToolEvent(event, assistantMessage.id);
@@ -222,7 +223,7 @@ export const useRepositoryChat = ({
       abortControllerRef.current = null;
       setIsSending(false);
     }
-  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.maxToolsPerTurn, session, unavailableReason]);
+  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.maxToolsPerTurn, session, unavailableReason]);
 
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();
