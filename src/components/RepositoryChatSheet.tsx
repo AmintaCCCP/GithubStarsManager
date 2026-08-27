@@ -158,6 +158,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   }, [isOpen, messages.length, repository]);
 
   const handleCreateSession = () => {
+    if (isLoading || isSending) return;
     void createSession();
     setShowHistory(false);
   };
@@ -223,7 +224,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         </SheetHeader>
 
         <div className="flex items-center gap-2 border-b border-border pb-3">
-          <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading}>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading || isSending}>
             {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
             {t('基于最新版本新建会话', 'New chat from latest')}
           </Button>
@@ -281,7 +282,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                     <p className="text-sm font-medium">{t('开始询问这个仓库', 'Ask this repository')}</p>
                     <p className="text-xs text-muted-foreground">{t('新会话会固定当前源码版本，并在回答中保留可点击的来源。', 'A new conversation pins the current source version and keeps clickable sources in answers.')}</p>
                   </div>
-                  <Button type="button" onClick={handleCreateSession}>
+                  <Button type="button" onClick={handleCreateSession} disabled={isLoading || isSending}>
                     <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     {t('新建会话', 'New conversation')}
                   </Button>

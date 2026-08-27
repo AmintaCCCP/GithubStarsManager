@@ -741,6 +741,42 @@ describe('runRepositoryChatTurn', () => {
     expect(toolEvents.some((event) => event.detail?.includes('pinned') || event.detail?.includes('固定'))).toBe(true);
   });
 
+  it('keeps a completion step available after the framework rejects an evicted selected path', async () => {
+    const responses = [
+      toolCallResponse('context', 'get_source_context', {}),
+      toolCallResponse('select', 'select_evidence_files', { paths: ['src/other.ts'] }),
+      toolCallResponse('rejected-read', 'read_repo_file', { path: 'src/other.ts' }),
+      toolCallResponse('read-architecture', 'read_repo_file', { path: 'docs/architecture/overview.md' }),
+      toolCallResponse('read-design', 'read_repo_file', { path: 'docs/design/router.md' }),
+      toolCallResponse('read-main', 'read_repo_file', { path: 'src/main.ts' }),
+      toolCallResponse('finish', 'finish_with_evidence', { answer: 'The documented architecture path is `/docs/architecture/overview.md - 1`.' }),
+    ];
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'docs/architecture/overview.md', type: 'blob' },
+        { path: 'docs/design/router.md', type: 'blob' },
+        { path: 'src/main.ts', type: 'blob' },
+        { path: 'src/other.ts', type: 'blob' },
+      ],
+    });
+    mocks.frameworkFetch.mockImplementation(async () => new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', mocks.frameworkFetch);
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput('Explain the architecture and system flow.'),
+      aiConfig: { ...frameworkConfig, baseUrl: 'https://example.com/v1/chat/completions' },
+    });
+
+    expect(mocks.frameworkFetch).toHaveBeenCalledTimes(7);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'src/other.ts', session.sourceRefSha, undefined);
+    expect(result.content).toContain('`/docs/architecture/overview.md - 1`');
+  });
+
   it('never calls legacy vector index write paths during a repository-chat turn', async () => {
     await runRepositoryChatTurn(turnInput('Explain the README'));
 

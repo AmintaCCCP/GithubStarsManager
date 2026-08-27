@@ -162,12 +162,12 @@ export const useRepositoryChat = ({
     };
     const nextMessages = [...baseMessages, userMessage, assistantMessage];
     onMessagesChange(nextMessages);
-    await Promise.all([
-      repositoryChatSessionRepository.saveMessage(userMessage),
-      repositoryChatSessionRepository.saveMessage(assistantMessage),
-    ]);
 
     try {
+      await Promise.all([
+        repositoryChatSessionRepository.saveMessage(userMessage),
+        repositoryChatSessionRepository.saveMessage(assistantMessage),
+      ]);
       const result = await runRepositoryChatTurn({
         repository,
         session,
@@ -209,8 +209,14 @@ export const useRepositoryChat = ({
           : (language === 'zh' ? '回答生成失败，请重试。' : 'Answer generation failed. Please retry.'),
         status: aborted ? 'aborted' : 'error',
       };
-      await repositoryChatSessionRepository.saveMessage(failedAssistant);
+      // The visible transcript must always settle, even if the persistence backend
+      // is unavailable and cannot record the terminal failure state.
       onMessagesChange([...baseMessages, userMessage, failedAssistant]);
+      try {
+        await repositoryChatSessionRepository.saveMessage(failedAssistant);
+      } catch {
+        // The original error is already represented in the transcript and banner.
+      }
       if (!aborted) setError(repositoryChatErrorMessage(unknownError, language));
     } finally {
       abortControllerRef.current = null;
