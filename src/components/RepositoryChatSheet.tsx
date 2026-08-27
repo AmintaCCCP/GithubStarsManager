@@ -90,7 +90,6 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                     <li key={event.id} className="grid gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="font-medium text-foreground">{event.paramSummary}</span>
-                        <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{event.toolName}</code>
                         <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                       </div>
                       {event.detail && <p className="break-words text-muted-foreground">{event.detail}</p>}

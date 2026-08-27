@@ -67,6 +67,8 @@ export interface RepositoryChatAgentBudget {
   maxToolCalls: number;
   maxReadFiles: number;
   maxCodeReads: number;
+  /** Consecutive rounds that add no new cited evidence before bounded stop. */
+  maxNoProgressRounds: number;
   maxDurationMs: number;
 }
 
@@ -86,9 +88,10 @@ export interface RepositoryChatSettings {
 
 export const defaultRepositoryChatAgentBudget: RepositoryChatAgentBudget = {
   maxTurns: 4,
-  maxToolCalls: 8,
-  maxReadFiles: 6,
+  maxToolCalls: 20,
+  maxReadFiles: 8,
   maxCodeReads: 3,
+  maxNoProgressRounds: 2,
   maxDurationMs: 90_000,
 };
 
