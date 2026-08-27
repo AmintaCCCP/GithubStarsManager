@@ -8,6 +8,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Pull requests and ordinary builds receive only repository read access. The
+# release job elevates this explicitly when it creates a tagged GitHub release.
+permissions:
+  contents: read
+
 jobs:
   verify-release-version:
     name: Verify release tag matches client version
@@ -15,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Verify tagged release version
         if: github.ref_type == 'tag'
@@ -33,6 +40,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        persist-credentials: false
       
     - name: Setup Node.js
       uses: actions/setup-node@v6
@@ -399,7 +408,9 @@ jobs:
     - name: Build Electron app
       run: npm run dist
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Only tagged release builds receive a token; PR and branch builds never
+        # expose a credential to package scripts or electron-builder hooks.
+        GH_TOKEN: ${{ github.ref_type == 'tag' && secrets.GITHUB_TOKEN || '' }}
         CI: true
         DEBUG: electron-builder
         # Linux 特定环境变量

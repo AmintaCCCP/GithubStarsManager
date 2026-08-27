@@ -108,6 +108,8 @@ docker run -d \
   --name github-stars-manager-fullstack \
   -p 8080:3000 \
   -v github-stars-data:/app/data \
+  -e API_SECRET="your-api-secret" \
+  -e ENCRYPTION_KEY="your-encryption-key" \
   github-stars-manager-fullstack:local
 ```
 
