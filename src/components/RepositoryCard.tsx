@@ -173,6 +173,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
   const releaseSheetOutsideDismissedAtRef = useRef<number | null>(null);
+  const editModalOutsideDismissedAtRef = useRef<number | null>(null);
   const gridActionRowRef = useRef<HTMLDivElement>(null);
   const [visibleGridActionCount, setVisibleGridActionCount] = useState(8);
 
@@ -584,12 +585,26 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     window.setTimeout(() => setReleaseSheetOpen(false), 0);
   }, []);
 
+  const handleEditModalOutsideDismiss = useCallback(() => {
+    editModalOutsideDismissedAtRef.current = Date.now();
+  }, []);
+
   // 使用 useCallback 优化事件处理函数
   const handleCardClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const releaseSheetDismissedAt = releaseSheetOutsideDismissedAtRef.current;
     if (releaseSheetDismissedAt !== null) {
       releaseSheetOutsideDismissedAtRef.current = null;
       if (Date.now() - releaseSheetDismissedAt < 250) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
+
+    const editModalDismissedAt = editModalOutsideDismissedAtRef.current;
+    if (editModalDismissedAt !== null) {
+      editModalOutsideDismissedAtRef.current = null;
+      if (Date.now() - editModalDismissedAt < 250) {
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -1234,6 +1249,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <RepositoryEditModal
           isOpen={editModalOpen}
           onClose={() => setEditModalOpen(false)}
+          onOutsideDismiss={handleEditModalOutsideDismiss}
           repository={repository}
         />,
         document.body
