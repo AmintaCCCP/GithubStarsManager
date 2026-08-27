@@ -274,8 +274,8 @@ To customize, create a `.env` file:
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=0.6.2   # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.6.2  # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.7.8   # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.7.8  # pin frontend image version (default: latest)
 ```
 
 #### Backend only (docker run)
