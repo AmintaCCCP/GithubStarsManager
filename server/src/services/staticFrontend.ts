@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const backendPathPrefixes = ['/api', '/mcp', '/sse', '/messages'];
 
+/** Returns true when a URL belongs to an API, MCP, or SSE endpoint namespace. */
 function isBackendPath(requestPath: string): boolean {
   return backendPathPrefixes.some(
     (prefix) => requestPath === prefix || requestPath.startsWith(`${prefix}/`)

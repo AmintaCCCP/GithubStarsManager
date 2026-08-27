@@ -8,6 +8,7 @@ import { mountStaticFrontend } from '../../src/services/staticFrontend.js';
 
 const temporaryDirectories: string[] = [];
 
+/** Creates a temporary SPA distribution that also contains an API-path collision. */
 function createStaticDirectory(): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-static-'));
   temporaryDirectories.push(directory);

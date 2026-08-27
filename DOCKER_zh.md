@@ -40,8 +40,8 @@ docker compose up -d
 ```bash
 API_SECRET=your-api-secret
 ENCRYPTION_KEY=your-encryption-key
-BACKEND_IMAGE_TAG=0.7.0
-FRONTEND_IMAGE_TAG=0.7.0
+BACKEND_IMAGE_TAG=0.7.8
+FRONTEND_IMAGE_TAG=0.7.8
 # BACKEND_HOST=backend:3000
 ```
 
@@ -83,7 +83,7 @@ curl http://localhost:8080/api/health
 如需固定版本，在 `.env` 中设置：
 
 ```bash
-IMAGE_TAG=0.7.0
+IMAGE_TAG=0.7.8
 API_SECRET=your-api-secret
 ENCRYPTION_KEY=your-encryption-key
 ```
@@ -123,9 +123,16 @@ docker run -d \
 docker volume ls
 ```
 
-将下方的 `<existing-backend-data-volume>` 替换为实际卷名。以下命令会在当前目录创建一个同时包含 SQLite 数据库和 `.encryption-key` 的归档：
+将下方的 `<existing-backend-data-volume>` 替换为实际卷名。请先停止所有 SQLite 写入，再创建包含数据库和 `.encryption-key` 的归档；这样不会在写入期间复制数据库与 WAL/journal 文件。
 
 ```bash
+# 停止分离部署，但不要添加 -v；该参数会删除具名数据卷。
+# 默认 Compose 项目名：
+docker compose down
+# 如原部署使用自定义项目名，后续所有命令均使用同一项目名：
+# docker compose -p <project-name> down
+
+# 数据库静止后创建可移植备份。
 docker run --rm \
   -v <existing-backend-data-volume>:/data:ro \
   -v "$PWD":/backup \
@@ -134,19 +141,12 @@ docker run --rm \
 
 请确认 `github-stars-manager-data-backup.tgz` 已生成，再继续下一步。
 
-### 2. 停止分离部署，但不要删除卷
-
-```bash
-# 不要添加 -v；该参数会删除具名数据卷。
-docker compose down
-```
-
 ### 3. 使用相同 Compose 项目名启动全栈容器
 
 两个 Compose 文件都声明了 `backend-data` 卷。只要在**同一目录**下执行，并沿用相同的 Compose 项目名，全栈部署会复用原有 SQLite 数据和加密密钥。
 
 ```bash
-# 默认项目名
+# 先在 .env 设置 API_SECRET。默认项目名：
 docker compose -f docker-compose.fullstack.yml up -d
 
 # 如原部署使用自定义项目名，请保持一致
@@ -171,14 +171,23 @@ MCP Token 和 `API_SECRET` 仍是两个独立的凭据。迁移只更换容器�
 
 ## 回滚到前后端分离部署
 
-如果需要回滚，停止全栈容器后重新启动原有 Compose 服务即可。不要使用 `-v`，这样同一数据卷仍会被保留。
+如果全栈服务通过 Compose 启动，停止该服务后重新启动原有 Compose 服务即可。如果全栈服务通过直接 `docker run` 创建，则先停止并删除该容器，再启动 Compose。不要使用 `-v`，这样同一数据卷仍会被保留。
 
 ```bash
+# 通过 Compose 启动的全栈服务：
 docker compose -f docker-compose.fullstack.yml down
+# 自定义项目名：docker compose -p <project-name> -f docker-compose.fullstack.yml down
+
+# 通过直接 docker run 启动的全栈服务（使用本组命令替代上面的 Compose down）：
+# docker stop github-stars-manager-fullstack
+# docker rm github-stars-manager-fullstack
+
+# 恢复原有前后端分离部署：
 docker compose up -d
+# 自定义项目名：docker compose -p <project-name> up -d
 ```
 
-若部署时使用了自定义 Compose 项目名，请在两条命令中都添加同一个 `-p <project-name>`。只要保留 `/app/data` 对应的具名卷，回滚后现有数据、加密密钥与 MCP 配置都会继续可用。
+只要保留 `/app/data` 对应的具名卷，回滚后现有数据、加密密钥与 MCP 配置都会继续可用。
 
 ## 环境变量
 

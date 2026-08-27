@@ -74,7 +74,7 @@ Add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
 
 ```bash
 API_SECRET=replace-with-a-long-random-secret
-IMAGE_TAG=0.7.0
+IMAGE_TAG=0.7.8
 ```
 
 ### Migrate an Existing Docker Compose Deployment
@@ -82,18 +82,22 @@ IMAGE_TAG=0.7.0
 Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. To migrate, first back up the current Docker volume. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
 
 ```bash
-# Create a portable backup of the SQLite database and encryption key.
+# Stop all SQLite writers without deleting the named data volume.
+# Default Compose project name:
+docker compose down
+# If you use a custom project name, use it for every command below instead:
+# docker compose -p <project-name> down
+
+# Create a portable backup only after the database is quiesced.
 docker run --rm \
   -v <existing-backend-data-volume>:/data:ro \
   -v "$PWD":/backup \
   alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
 
-# Stop the split deployment without deleting its named volume.
-docker compose down
-
 # Set API_SECRET in .env before starting the new network-facing service.
 # Reuse the same Compose project directory and volume name.
 docker compose -f docker-compose.fullstack.yml up -d
+# For a custom project: docker compose -p <project-name> -f docker-compose.fullstack.yml up -d
 
 # Verify the UI, API, and persisted data.
 curl http://localhost:8080/api/health
@@ -101,19 +105,28 @@ curl http://localhost:8080/api/health
 
 Both Compose files declare the same `backend-data` volume key. When they run from the same directory with the same Compose project name, the full-stack deployment reuses the existing SQLite database and `.encryption-key`. If you normally use `docker compose -p <project>`, pass the same `-p <project>` value for the migration command.
 
-To roll back, stop the full-stack container and start the original split deployment again. Do not add `-v` to either command, because that would delete the persisted data volume.
+To roll back from a Compose deployment, stop the full-stack service and start the original split deployment again. If the full-stack service was created with direct `docker run`, stop and remove that container instead before starting Compose. Do not add `-v` to any of these commands, because that would delete the persisted data volume.
 
 ```bash
+# Full-stack service started by Compose:
 docker compose -f docker-compose.fullstack.yml down
+# For a custom project: docker compose -p <project-name> -f docker-compose.fullstack.yml down
+
+# Full-stack service started by direct docker run (use this instead of Compose down):
+# docker stop github-stars-manager-fullstack
+# docker rm github-stars-manager-fullstack
+
+# Restore the existing split deployment.
 docker compose up -d
+# For a custom project: docker compose -p <project-name> up -d
 ```
 
 To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
 `FRONTEND_IMAGE_TAG` in your `.env` file:
 
 ```bash
-BACKEND_IMAGE_TAG=0.6.2
-FRONTEND_IMAGE_TAG=0.6.2
+BACKEND_IMAGE_TAG=0.7.8
+FRONTEND_IMAGE_TAG=0.7.8
 ```
 
 ## Backend Server (docker run)
@@ -170,8 +183,8 @@ To customize secrets and image versions, create a `.env` file in the project roo
 ```bash
 API_SECRET=my-strong-secret
 ENCRYPTION_KEY=my-encryption-key
-BACKEND_IMAGE_TAG=0.6.2    # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.6.2   # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.7.8    # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.7.8   # pin frontend image version (default: latest)
 # BACKEND_HOST=backend:3000 # target for the frontend's /api proxy (default: backend:3000)
 ```
 
