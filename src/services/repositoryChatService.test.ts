@@ -210,6 +210,19 @@ describe('runRepositoryChatTurn evidence-driven loop', () => {
     expect(result.content).toContain('`/README.md - 1-3`');
   });
 
+  it('removes an uncited factual section instead of returning an unsupported claim', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`\n\nIt guarantees an uncited production deployment workflow.');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('`/README.md - 1-3`');
+    expect(result.content).not.toContain('uncited production deployment');
+  });
+
   it('normalizes a readable source reference without triggering an extra synthesis call', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
