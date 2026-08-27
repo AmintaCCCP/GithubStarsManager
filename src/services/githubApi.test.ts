@@ -278,4 +278,35 @@ describe('GitHubApiService repository chat read APIs', () => {
     await expect(service.getRepositoryFile('owner', 'repo', 'keys/id_rsa.pub', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
     expect(makeRequestSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('allows a bounded Markdown evidence file at the pinned SHA without weakening the normal file limit or sensitive-path guard', async () => {
+    const service = new GitHubApiService('token');
+    const largeMarkdown = `# Deployment\n\n${'documented content\n'.repeat(8_000)}`;
+    expect(new TextEncoder().encode(largeMarkdown).byteLength).toBeGreaterThan(96 * 1024);
+    expect(new TextEncoder().encode(largeMarkdown).byteLength).toBeLessThan(512 * 1024);
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValue({
+        type: 'file',
+        path: 'docs/deployment.md',
+        sha: 'markdown-sha',
+        size: new TextEncoder().encode(largeMarkdown).byteLength,
+        encoding: 'base64',
+        content: btoa(largeMarkdown),
+      } as never);
+
+    await expect(service.getRepositoryFile('owner', 'repo', 'docs/deployment.md', 'abcdef1234567890')).rejects.toThrow(/96 KB/i);
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'docs/deployment.md', 'abcdef1234567890')).resolves.toMatchObject({
+      path: 'docs/deployment.md',
+      ref: 'abcdef1234567890',
+      sha: 'markdown-sha',
+      content: largeMarkdown,
+    });
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'docs/credentials.md', 'abcdef1234567890')).rejects.toThrow(/excluded/i);
+    await expect(service.getRepositoryMarkdownEvidenceFile('owner', 'repo', 'src/main.ts', 'abcdef1234567890')).rejects.toThrow(/not Markdown/i);
+
+    const requestCalls = makeRequestSpy.mock.calls as unknown as Array<[string, { operationTag?: string } | undefined]>;
+    expect(requestCalls).toHaveLength(2);
+    expect(requestCalls[1]?.[0]).toContain('?ref=abcdef1234567890');
+    expect(requestCalls[1]?.[1]).toEqual({ operationTag: 'repository-chat:markdown-evidence' });
+  });
 });
