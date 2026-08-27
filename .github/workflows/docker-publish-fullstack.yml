@@ -20,18 +20,52 @@ on:
       - 'server/**'
   workflow_dispatch:
 
-# Keep only the newest full-stack build for a branch or tag. This group is
-# deliberately independent from the existing frontend and backend workflows.
+# A semver publication updates shared tags (for example 1 and 1.2), so tag
+# releases use one group. Branches and pull requests remain independent.
 concurrency:
-  group: fullstack-image-${{ github.ref }}
-  cancel-in-progress: true
+  group: fullstack-image-${{ github.ref_type == 'tag' && 'release' || github.ref }}
+  # Keep the newest branch/PR build, but finish every release tag in order so
+  # shared major/minor tags cannot race or leave an older version unpublished.
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager
+  IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-fullstack
 
 jobs:
-  build-and-push:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # PR validation does not authenticate to GHCR and cannot publish packages.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Validate full-stack multi-architecture image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile.fullstack
+          platforms: linux/amd64,linux/arm64
+          push: false
+          # The cache remains isolated from the frontend and backend image workflows.
+          cache-from: type=gha,scope=github-stars-manager-fullstack-pr,timeout=5m
+          cache-to: type=gha,scope=github-stars-manager-fullstack-pr,mode=max,timeout=5m,ignore-error=true
+
+  publish:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # A cache or registry outage must not leave a publishing run blocked forever.
     timeout-minutes: 30
@@ -44,6 +78,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Verify release tag matches client version
+        if: github.ref_type == 'tag'
+        run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -67,6 +105,7 @@ jobs:
             # branch push → "latest"
             type=raw,value=latest,enable={{is_default_branch}}
             # tag push → "v1.2.3", "1.2.3", "1.2", "1"
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -79,10 +118,9 @@ jobs:
           context: .
           file: ./Dockerfile.fullstack
           platforms: linux/amd64,linux/arm64
-          # PRs validate the complete multi-architecture build but never publish an image.
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Keep this cache independent from frontend and server image builds.
-          cache-from: type=gha,scope=github-stars-manager-fullstack-${{ github.ref_type }},timeout=5m
-          cache-to: type=gha,scope=github-stars-manager-fullstack-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true
+          cache-from: type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},timeout=5m
+          cache-to: type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true

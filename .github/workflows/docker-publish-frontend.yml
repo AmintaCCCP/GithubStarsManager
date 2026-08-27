@@ -31,6 +31,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify release tag matches client version
+        if: github.ref_type == 'tag'
+        run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
@@ -53,6 +57,7 @@ jobs:
             # branch push → "latest"
             type=raw,value=latest,enable={{is_default_branch}}
             # tag push → "v1.2.3", "1.2.3", "1.2", "1"
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}

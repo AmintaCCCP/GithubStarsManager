@@ -398,13 +398,13 @@ docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
-此外，项目新增了一个**可选的全栈单镜像**，适合希望只运行一个容器、一个镜像标签和一个数据卷的用户。它在同一来源下提供网页、`/api` 和 MCP 端点：
+此外，项目新增了一个**可选的全栈单镜像**（`ghcr.io/amintacccp/github-stars-manager-fullstack`），适合希望只运行一个容器、一个镜像标签和一个数据卷的用户。它在同一来源下提供网页、`/api` 和 MCP 端点：
 
 ```bash
 docker compose -f docker-compose.fullstack.yml up -d
 ```
 
-新增方式不会替换或修改现有的前端镜像、后端镜像、`docker-compose.yml`、桌面客户端或 API 路径。完整的中文部署、数据备份、从分离部署迁移和回滚说明请参阅 [DOCKER_zh.md](DOCKER_zh.md)。英文说明请参阅 [DOCKER.md](DOCKER.md)。
+新增方式不会替换或修改现有的前端镜像、后端镜像、`docker-compose.yml`、桌面客户端或 API 路径。规范名称以角色结尾：`-frontend`、`-backend` 与 `-fullstack`；已有用户使用的 `-server` 后端镜像会继续作为兼容别名发布。正式的 `vX.Y.Z` Docker 标签必须与根目录 `package.json` 的客户端版本一致，`latest` 与 `sha-*` 则分别用于开发和提交追溯。完整的中文部署、数据备份、从分离部署迁移和回滚说明请参阅 [DOCKER_zh.md](DOCKER_zh.md)。英文说明请参阅 [DOCKER.md](DOCKER.md)。
 
 > 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
 

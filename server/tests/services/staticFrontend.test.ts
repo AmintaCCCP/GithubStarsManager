@@ -13,6 +13,8 @@ function createStaticDirectory(): string {
   temporaryDirectories.push(directory);
   fs.writeFileSync(path.join(directory, 'index.html'), '<!doctype html><title>GithubStarsManager</title>');
   fs.writeFileSync(path.join(directory, 'app.js'), 'window.appLoaded = true;');
+  fs.mkdirSync(path.join(directory, 'api'));
+  fs.writeFileSync(path.join(directory, 'api', 'not-found'), 'must not shadow an API path');
   return directory;
 }
 
