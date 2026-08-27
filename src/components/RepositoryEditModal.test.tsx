@@ -125,6 +125,31 @@ describe("RepositoryEditModal", () => {
     }
   });
 
+  it("clears pending scroll state when the modal closes and reopens", () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <RepositoryEditModal isOpen onClose={vi.fn()} repository={repository} />,
+      );
+      const scrollArea = screen.getByTestId("modal-scroll-area");
+      fireEvent.scroll(scrollArea);
+      expect(scrollArea).toHaveClass("scrolling");
+
+      rerender(
+        <RepositoryEditModal isOpen={false} onClose={vi.fn()} repository={repository} />,
+      );
+      rerender(
+        <RepositoryEditModal isOpen onClose={vi.fn()} repository={repository} />,
+      );
+
+      expect(screen.getByTestId("modal-scroll-area")).not.toHaveClass("scrolling");
+      act(() => vi.runOnlyPendingTimers());
+      expect(screen.getByTestId("modal-scroll-area")).not.toHaveClass("scrolling");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the overlay mounted until its outside-click sequence finishes", () => {
     vi.useFakeTimers();
     try {
