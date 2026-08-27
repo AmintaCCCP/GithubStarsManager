@@ -223,6 +223,34 @@ describe('runRepositoryChatTurn evidence-driven loop', () => {
     expect(result.content).not.toContain('uncited production deployment');
   });
 
+  it('never returns raw evidence excerpts when synthesis remains uncited after one repair', async () => {
+    configureTreeAndFiles({ 'README.md': '# Example\n\nSECRET_SHOULD_NOT_BE_ECHOED=not-a-real-secret' });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('This answer has no usable source reference.')
+      .mockResolvedValueOnce('This repair is still unsupported.');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(result.content).toContain('### Verified sources');
+    expect(result.content).toContain('`/README.md - 1-3`');
+    expect(result.content).not.toContain('SECRET_SHOULD_NOT_BE_ECHOED');
+  });
+
+  it('does not treat a heading plus uncited body as an evidence-bound section', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('# Installation\n\nRun an unsupported command without a source.')
+      .mockResolvedValueOnce('Install from the README. `/README.md - 1-3`');
+
+    const result = await runRepositoryChatTurn(turnInput('How do I install this project?'));
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain('`/README.md - 1-3`');
+  });
+
   it('normalizes a readable source reference without triggering an extra synthesis call', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())

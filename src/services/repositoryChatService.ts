@@ -309,20 +309,22 @@ const sourceReferences = (evidences: ToolEvidence[]): string[] => evidences
 const hasValidSourceReference = (content: string, evidences: ToolEvidence[]): boolean => sourceReferences(evidences)
   .some((reference) => content.includes(`\`${reference}\``));
 
+const isStandaloneHeading = (section: string): boolean => /^#{1,6}\s+[^\n]+$/.test(section.trim());
+
 const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
   const references = sourceReferences(evidences);
   if (references.length === 0) return false;
   const factualSections = content
     .split(/\n{2,}/)
     .map((section) => section.trim())
-    .filter((section) => section.length > 0 && !/^#{1,6}\s+[^\n]+$/m.test(section));
+    .filter((section) => section.length > 0 && !isStandaloneHeading(section));
   return factualSections.length > 0 && factualSections.every((section) => references.some((reference) => section.includes(`\`${reference}\``)));
 };
 
 const removeUncitedSections = (content: string, evidences: ToolEvidence[]): string => {
   const references = sourceReferences(evidences);
   const sections = content.split(/\n{2,}/).map((section) => section.trim()).filter(Boolean);
-  const kept = sections.filter((section) => /^#{1,6}\s+[^\n]+$/m.test(section)
+  const kept = sections.filter((section) => isStandaloneHeading(section)
     || references.some((reference) => section.includes(`\`${reference}\``)));
   // Empty headings remaining after pruning are harmless presentation noise; an
   // evidence digest below is used if pruning leaves no factual statement.
@@ -330,16 +332,17 @@ const removeUncitedSections = (content: string, evidences: ToolEvidence[]): stri
 };
 
 const sourceBoundEvidenceDigest = (input: RepositoryChatTurnInput, evidences: ToolEvidence[]): string => {
-  const heading = input.language === 'zh' ? '### 已验证信息' : '### Verified information';
-  const lines = evidences
-    .map((evidence) => {
-      const reference = formatSourceReference(evidence);
-      const excerpt = evidence.excerpt.replace(/\s+/g, ' ').trim().slice(0, 360);
-      return reference && excerpt ? `- ${excerpt}${excerpt.length >= 360 ? '…' : ''} \`${reference}\`` : null;
-    })
-    .filter((line): line is string => Boolean(line))
-    .slice(0, 3);
-  return lines.length > 0 ? `${heading}\n\n${lines.join('\n')}` : noVerifiedSummaryResponse(input.language);
+  const heading = input.language === 'zh' ? '### 已验证来源' : '### Verified sources';
+  const references = Array.from(new Set(sourceReferences(evidences))).slice(0, 3);
+  // Do not interpolate raw repository excerpts into a fallback answer: repository
+  // content can contain secrets or prompt-like text. The existing evidence panel
+  // lets users open each fixed-SHA source safely.
+  const intro = input.language === 'zh'
+    ? '已完成取证，但模型回答未能可靠绑定到来源。以下为本轮已验证的固定版本来源：'
+    : 'Evidence retrieval completed, but the model answer could not be reliably source-bound. These fixed-version sources were verified:';
+  return references.length > 0
+    ? `${heading}\n\n${intro}\n\n${references.map((reference) => `- \`${reference}\``).join('\n')}`
+    : noVerifiedSummaryResponse(input.language);
 };
 
 const noVerifiedSummaryResponse = (language: 'zh' | 'en'): string => language === 'zh'
