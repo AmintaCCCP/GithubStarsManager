@@ -237,13 +237,21 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ### 🐳 Run With Docker
 
-Pre-built backend **and frontend** images are available on GHCR — no local build required:
+Pre-built backend **and frontend** images are available on GHCR — no local build required. Existing Docker users should continue to use the unchanged two-service Compose deployment:
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
+
+An additional **optional full-stack image** is available for users who prefer one container, one image tag, and one persistent data volume. It serves the same web UI, `/api`, and MCP endpoints from one origin:
+
+```bash
+docker compose -f docker-compose.fullstack.yml up -d
+```
+
+This new option does not replace or modify the existing frontend image, backend image, `docker-compose.yml`, or desktop clients. See [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment) for full-stack deployment, migration, backup, and rollback instructions.
 
 > If the package is private, run `docker login ghcr.io` first (use a [PAT](https://github.com/settings/tokens) with `read:packages` scope).
 
@@ -260,7 +268,7 @@ The app works fully without a backend (pure frontend, localStorage). An optional
 ```bash
 docker-compose up -d
 ```
-Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
+Frontend on port 8080, backend on port 3000. Data is persisted in a Docker volume. This existing split deployment remains the recommended option when you need to version, operate, or scale the frontend and backend independently; the optional single-container alternative is documented in [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment).
 
 To customize, create a `.env` file:
 ```bash

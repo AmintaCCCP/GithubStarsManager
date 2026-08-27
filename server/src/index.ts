@@ -6,6 +6,7 @@ import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger, morganLoggerStream } from './services/logger.js';
+import { mountStaticFrontend } from './services/staticFrontend.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
 import healthRouter from './routes/health.js';
@@ -76,6 +77,10 @@ export function createApp(): express.Express {
   // MCP Streamable HTTP + legacy SSE (own token auth; not under /api)
   // Mount always; each request is gated on live SQLite settings (no write on mount).
   mountMcpRoutes(app);
+
+  // Full-stack images opt in through STATIC_DIR. Standalone backend deployments
+  // leave it unset, preserving the previous API-only behavior.
+  mountStaticFrontend(app);
 
   // Global error handler
   app.use(errorHandler);
