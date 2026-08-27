@@ -85,7 +85,7 @@ IMAGE_TAG=0.7.8
 
 ### Migrate an Existing Docker Compose Deployment
 
-Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. Before migration, preserve the exact existing `API_SECRET` in the full-stack `.env`; this keeps current browser, API, and MCP clients authenticated without reconfiguration. If the existing service explicitly sets `ENCRYPTION_KEY`, copy the **same value** into the full-stack `.env` as well. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
+Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. If the current backend has an `API_SECRET`, preserve the exact value in the full-stack `.env`; this keeps current browser, API, and MCP clients authenticated without reconfiguration. If the existing backend has no `API_SECRET`, generate a strong new value in the full-stack `.env` and configure every direct API and MCP client with it after cutover; the full-stack Compose file intentionally does not start unauthenticated. If the existing service explicitly sets `ENCRYPTION_KEY`, copy the **same value** into the full-stack `.env` as well. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
 
 ```bash
 # Stop all SQLite writers without deleting the named data volume.
