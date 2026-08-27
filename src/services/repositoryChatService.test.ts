@@ -202,6 +202,225 @@ describe('runRepositoryChatTurn', () => {
     expect(result.content).toContain('`/README.md - 1-2`');
   });
 
+  it('refuses a zero-evidence answer instead of asking the model to infer from repository metadata or the tree', async () => {
+    mocks.getRepositoryFile.mockRejectedValue(new Error('Every candidate file is blocked by the file guard'));
+    mocks.generateChatText.mockReset();
+    const events: Array<{ toolName: string; status: string; detail?: string }> = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput('What is this repository for?'),
+      onToolEvent: (event) => events.push(event),
+    });
+
+    expect(mocks.generateChatText).not.toHaveBeenCalled();
+    expect(result.evidences).toEqual([]);
+    expect(result.content).toContain('verifiable determination cannot be made');
+    expect(result.content).not.toContain('Example repository');
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ toolName: 'verify_evidence', status: 'error', detail: expect.stringContaining('No file content was read successfully') }),
+    ]));
+  });
+
+  it('reserves a larger completion budget for creative repository requests on the fast evidence path', async () => {
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('A source-grounded WeChat article. `/README.md - 1-3`');
+
+    const result = await runRepositoryChatTurn(turnInput('基于这个仓库写一篇适合公众号发布的文章'));
+
+    expect(result.content).toContain('`/README.md - 1-3`');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(1);
+    expect(mocks.generateChatText.mock.calls[0][0]).toMatchObject({ maxTokens: 3_000 });
+    expect(mocks.generateChatText.mock.calls[0][0].system).toMatch(/creative work|创作成品本身必须是首要交付物/i);
+    expect(mocks.generateChatText.mock.calls[0][0].user).toMatch(/complete requested article|请直接交付完整文章/i);
+    expect(mocks.generateChatText.mock.calls[0][0].user).not.toMatch(/Start with “Verified conclusions|先写“已证实的结论或步骤”/);
+  });
+
+  it('does not treat an ordinary request for documented steps as a creative writing task', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'docs/deployment.md', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: '# Deployment\n\n```sh\nnpm run deploy\n```',
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('Run the documented deployment command. `/docs/deployment.md - 1-5`');
+    const events: Array<{ paramSummary: string }> = [];
+
+    await runRepositoryChatTurn({
+      ...turnInput('这个仓库如何部署到生产环境？请给出仓库明确写出的步骤。'),
+      language: 'zh',
+      onToolEvent: (event) => events.push(event),
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paramSummary: expect.stringMatching(/^deployment:/) }),
+    ]));
+    expect(events.some((event) => event.paramSummary.startsWith('creative:'))).toBe(false);
+  });
+
+  it('prioritizes product documentation over a large root README for creative requests', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'docs/architecture/OVERVIEW.md', type: 'blob' },
+        { path: 'docs/guides/FEATURES.md', type: 'blob' },
+        { path: 'docs/a2a/README.md', type: 'blob' },
+        { path: 'src/internal.ts', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: `# ${path}\nDocumented capability.`,
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('# Developer article\n\nA complete article. `/docs/architecture/OVERVIEW.md - 1-2`\n\n## 事实依据\n`/docs/architecture/OVERVIEW.md - 1-2`');
+
+    await runRepositoryChatTurn(turnInput('基于该仓库写一篇公众号推文，介绍已确认的能力'));
+
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/architecture/OVERVIEW.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/a2a/README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'src/internal.ts', session.sourceRefSha, undefined);
+  });
+
+  it('limits an explicit README follow-up to README evidence instead of unrelated implementation assets', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'package.json', type: 'blob' },
+        { path: 'src/assets/icon.tsx', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: path === 'README.md' ? '# Example\nPrerequisites are documented here.' : 'unrelated',
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('The README documents the prerequisite. `/README.md - 1-2`');
+
+    await runRepositoryChatTurn({
+      ...turnInput('According to the README, what installation and usage prerequisites are documented?'),
+      messages: [{
+        id: 'prior-answer',
+        sessionId: session.id,
+        role: 'assistant',
+        content: 'Earlier answer',
+        status: 'complete',
+        evidenceIds: [],
+        createdAt: '2026-08-26T00:00:00.000Z',
+      }],
+    });
+
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'package.json', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'src/assets/icon.tsx', session.sourceRefSha, undefined);
+  });
+
+  it('allows a contextual follow-up more time than a fast first turn to finish its source-bound conclusion', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('A verified follow-up. `/README.md - 1-3`');
+
+    await runRepositoryChatTurn({
+      ...turnInput('What else is documented in the README?'),
+      messages: [{
+        id: 'prior-answer',
+        sessionId: session.id,
+        role: 'assistant',
+        content: 'Earlier answer',
+        status: 'complete',
+        evidenceIds: [],
+        createdAt: '2026-08-26T00:00:00.000Z',
+      }],
+    });
+
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    timeoutSpy.mockRestore();
+  });
+
+  it('uses an explicit Markdown deployment command when a fast-path model summary has no valid source', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [{ path: 'docs/deployment.md', type: 'blob' }],
+    });
+    mocks.getRepositoryFile.mockResolvedValue({
+      path: 'docs/deployment.md',
+      ref: session.sourceRefSha,
+      sha: 'file-deployment',
+      size: 100,
+      content: '# Deploy\n\n```sh\nnpm run deploy\n```',
+    });
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('Deploy after confirming your release checklist.');
+
+    const result = await runRepositoryChatTurn(turnInput('How is this deployed in production?'));
+
+    expect(result.content).toContain('`npm run deploy`');
+    expect(result.content).toContain('`/docs/deployment.md - 4`');
+    expect(result.evidences.some((evidence) => evidence.path === 'docs/deployment.md' && evidence.lineStart === 4 && evidence.lineEnd === 4)).toBe(true);
+  });
+
+  it('does not mistake prose that names a command for an executable operational instruction', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [{ path: 'docs/deployment.md', type: 'blob' }],
+    });
+    mocks.getRepositoryFile.mockResolvedValue({
+      path: 'docs/deployment.md',
+      ref: session.sourceRefSha,
+      sha: 'file-deployment',
+      size: 100,
+      content: '# Deploy\n\nRun npm run deploy after reviewing the release checklist.',
+    });
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('Deploy after reviewing the checklist.');
+
+    const result = await runRepositoryChatTurn(turnInput('How is this deployed in production?'));
+
+    expect(result.content).toContain('do not contain the requested operational step');
+    expect(result.content).not.toContain('npm run deploy');
+  });
+
+  it('does not substitute an unrelated install command when asked for Fly secrets or configuration', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'fly.toml', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: path === 'README.md' ? '# Setup\n\n```sh\nnpm install\n```' : 'app = "example"',
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('Use the service configuration from the deployment manifest.');
+
+    const result = await runRepositoryChatTurn(turnInput('Which Fly secrets or configuration command must I run before deployment?'));
+
+    expect(result.content).toContain('do not contain the requested secrets or configuration command');
+    expect(result.content).not.toContain('npm install');
+  });
+
   it('finds the actual deployment document rather than treating a truncated README as deployment instructions', async () => {
     mocks.getRepositoryTree.mockResolvedValue({
       ref: session.sourceRefSha,
@@ -231,7 +450,8 @@ describe('runRepositoryChatTurn', () => {
     expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/deployment.md', session.sourceRefSha, undefined);
     const deploymentEvidence = result.evidences.find((evidence) => evidence.path === 'docs/deployment.md');
     expect(deploymentEvidence).toBeDefined();
-    expect(result.content).toContain('did not produce a source-verifiable summary');
+    expect(result.content).toContain('`npm run deploy`');
+    expect(result.content).toContain('`/docs/deployment.md - 5`');
     expect(result.content).not.toContain('reference/FREE_TIERS.md');
     expect(result.content).not.toMatch(/\[\^E\d+\]|\bE[23]\b/);
   });
@@ -245,7 +465,7 @@ describe('runRepositoryChatTurn', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    expect(result.content).toContain('did not produce a source-verifiable summary');
+    expect(result.content).toContain('do not contain the requested operational step');
     expect(result.content).not.toContain('Deployment uses npm run build.');
     expect(result.content).not.toContain('Use the documented deployment command without a source.');
   });
@@ -324,11 +544,13 @@ describe('runRepositoryChatTurn', () => {
 
     const result = await runRepositoryChatTurn({
       ...turnInput('Explain the implementation architecture in depth.'),
-      aiConfig: frameworkConfig,
+      aiConfig: { ...frameworkConfig, baseUrl: 'https://example.com/v1/chat/completions' },
       onToolEvent: (event) => toolEvents.push(event),
     });
 
     expect(mocks.frameworkFetch).toHaveBeenCalledTimes(5);
+    const firstFrameworkRequest = mocks.frameworkFetch.mock.calls[0][0] as Request | string;
+    expect(firstFrameworkRequest instanceof Request ? firstFrameworkRequest.url : String(firstFrameworkRequest)).toBe('https://example.com/v1/chat/completions');
     expect(mocks.generateChatText).not.toHaveBeenCalled();
     expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
     expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'src/App.tsx', session.sourceRefSha, undefined);
