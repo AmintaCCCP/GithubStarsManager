@@ -390,7 +390,7 @@ npm run build
 
 ### Docker 部署
 
-GHCR 上提供预构建的**后端和前端**镜像，无需本地构建：
+GHCR 上提供预构建的**后端和前端**镜像，无需本地构建。现有 Docker 用户可继续使用完全不变的前后端分离 Compose 部署：
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
@@ -398,9 +398,15 @@ docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
-> 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
+此外，项目新增了一个**可选的全栈单镜像**，适合希望只运行一个容器、一个镜像标签和一个数据卷的用户。它在同一来源下提供网页、`/api` 和 MCP 端点：
 
-请参阅 [DOCKER.md](DOCKER.md) 获取详细的构建和部署说明。Docker 设置正确处理了 CORS，并允许您直接在应用程序中配置任何 AI 或 WebDAV 服务 URL。
+```bash
+docker compose -f docker-compose.fullstack.yml up -d
+```
+
+新增方式不会替换或修改现有的前端镜像、后端镜像、`docker-compose.yml`、桌面客户端或 API 路径。完整的中文部署、数据备份、从分离部署迁移和回滚说明请参阅 [DOCKER_zh.md](DOCKER_zh.md)。英文说明请参阅 [DOCKER.md](DOCKER.md)。
+
+> 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
 
 ### 🖥️ 后端服务器（可选）
 
@@ -414,7 +420,7 @@ docker-compose up -d
 ```bash
 docker-compose up -d
 ```
-前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。
+前端运行在 8080 端口，后端运行在 3000 端口。数据持久化存储在 Docker 卷中。该现有分离部署方式不会因全栈镜像而变化；需要独立升级、运维或扩缩容前后端时，仍建议继续使用它。若希望简化为单容器部署，请参阅 [DOCKER_zh.md](DOCKER_zh.md)。
 
 自定义配置，创建 `.env` 文件：
 ```bash
