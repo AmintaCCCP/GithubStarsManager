@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile.fullstack'
+      - 'Dockerfile.fullstack.dockerignore'
+      - 'docker-compose.fullstack.yml'
+      - '.github/workflows/docker-publish-fullstack.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
+      - 'public/**'
+      - 'vite.config.ts'
+      - 'nginx.conf.template'
+      - 'server/**'
   workflow_dispatch:
 
 # Keep only the newest full-stack build for a branch or tag. This group is
@@ -65,7 +79,8 @@ jobs:
           context: .
           file: ./Dockerfile.fullstack
           platforms: linux/amd64,linux/arm64
-          push: true
+          # PRs validate the complete multi-architecture build but never publish an image.
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Keep this cache independent from frontend and server image builds.
