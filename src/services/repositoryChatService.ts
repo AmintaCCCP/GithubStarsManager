@@ -673,7 +673,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   const hasTime = () => elapsed() < budget.maxDurationMs;
   const remainingMs = () => Math.max(1_000, budget.maxDurationMs - elapsed());
   const failBudget = (summary: string, stage: RepositoryChatExecutionStage, round?: number): AgentToolResult<never> => {
-    const message = !hasTime
+    const message = !hasTime()
       ? (input.language === 'zh' ? '已达到本轮时间预算。' : 'The turn time budget was reached.')
       : (input.language === 'zh' ? '已达到本轮工具或读取预算。' : 'The turn tool or read budget was reached.');
     emit({ toolName: 'evidence_gate', status: 'error', paramSummary: summary, stage, round, detail: message });

@@ -33,8 +33,8 @@ const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | '
   if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
   if (stage === 'context') return zh ? '固定版本上下文' : 'Pinned source context';
   if (stage === 'planning') return zh ? '检索计划' : 'Retrieval plan';
-  if (stage === 'retrieval') return zh ? '第 N 轮取证' : 'Evidence retrieval round';
-  if (stage === 'verification') return zh ? 'Evidence Gate' : 'Evidence Gate';
+  if (stage === 'retrieval') return zh ? '取证轮次' : 'Evidence retrieval rounds';
+  if (stage === 'verification') return 'Evidence Gate';
   if (stage === 'replanning') return zh ? '继续检索' : 'Continue retrieval';
   if (stage === 'escalation') return zh ? '升级到代码' : 'Escalate to code';
   if (stage === 'answer') return zh ? '最终回答' : 'Final answer';
