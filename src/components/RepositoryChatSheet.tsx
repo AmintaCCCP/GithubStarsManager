@@ -43,32 +43,42 @@ const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | '
 
 const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: 'zh' | 'en'; isRunning: boolean }> = ({ events, language, isRunning }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-  const stageOrder: Array<RepositoryChatToolEvent['stage']> = ['understanding', 'context', 'planning', 'retrieval', 'verification', 'replanning', 'escalation', 'answer'];
   const completed = events.filter((event) => event.status === 'success').length;
   const failed = events.filter((event) => event.status === 'error').length;
   const latest = events[events.length - 1];
-  const grouped = stageOrder.map((stage) => ({ stage, events: events.filter((event) => event.stage === stage) })).filter((group) => group.events.length > 0);
+  const grouped = events.reduce<Array<{ stage: RepositoryChatToolEvent['stage']; round?: number; events: RepositoryChatToolEvent[] }>>((groups, event) => {
+    const previous = groups[groups.length - 1];
+    if (previous && previous.stage === event.stage && previous.round === event.round) {
+      previous.events.push(event);
+    } else {
+      groups.push({ stage: event.stage, round: event.round, events: [event] });
+    }
+    return groups;
+  }, []);
 
   return (
     <section className="mt-4 rounded-lg border border-border bg-muted/15 p-3 text-xs" aria-label={t('Agent 执行摘要', 'Agent execution summary')}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
-          <p className="mt-0.5 text-muted-foreground">{t('按“理解问题 → 检索计划 → 第 N 轮取证 → Evidence Gate → 继续检索/升级代码/已足够 → 最终回答”展示。展开单项可了解读取原因、证据缺口与决策，不会展示隐藏推理、请求报文或密钥。', 'Shown as “Understand → Plan → Evidence round N → Evidence Gate → Continue / escalate / sufficient → Answer”. Expand an item to inspect why a file was read, what evidence was missing, and the decision; hidden reasoning, payloads, and secrets are never shown.')}</p>
+          <p className="mt-0.5 text-muted-foreground">{t('按“理解问题 → 检索计划 → 按需多轮取证 → Evidence Gate → 继续检索/升级代码/已足够 → 最终回答”展示。每轮均按真实执行顺序编号；展开单项可了解读取原因、证据缺口与决策，不会展示隐藏推理、请求报文或密钥。', 'Shown as “Understand → Plan → evidence rounds as needed → Evidence Gate → Continue / escalate / sufficient → Answer”. Every round is numbered in actual execution order. Expand an item to inspect why a file was read, what evidence was missing, and the decision; hidden reasoning, payloads, and secrets are never shown.')}</p>
         </div>
         <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
       </div>
       <div className="mt-3 divide-y divide-border/70">
-        {grouped.map((group) => {
+        {grouped.map((group, groupIndex) => {
           const stageHasRunning = group.events.some((event) => event.status === 'running');
           const stageErrors = group.events.filter((event) => event.status === 'error').length;
           const duration = group.events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
           const Icon = stageErrors > 0 ? AlertCircle : stageHasRunning ? CircleDot : CheckCircle2;
+          const label = group.round && ['planning', 'retrieval', 'verification', 'replanning'].includes(group.stage ?? '')
+            ? `${t('第', 'Round ')}${group.round}${t('轮 · ', ' · ')}${stageLabels(group.stage, language)}`
+            : stageLabels(group.stage, language);
           return (
-            <details key={group.stage ?? 'other'} className="group py-2" open={isRunning && stageHasRunning}>
+            <details key={`${group.stage ?? 'other'}-${group.round ?? 'global'}-${groupIndex}`} className="group py-2" open={isRunning && stageHasRunning}>
               <summary className="flex cursor-pointer list-none items-center gap-2">
                 <Icon className={`h-4 w-4 shrink-0 ${stageErrors > 0 ? 'text-destructive' : stageHasRunning ? 'animate-pulse text-primary' : 'text-emerald-500'}`} aria-hidden="true" />
-                <span className="min-w-0 flex-1 font-medium text-foreground">{stageLabels(group.stage, language)}</span>
+                <span className="min-w-0 flex-1 font-medium text-foreground">{label}</span>
                 <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{stageErrors > 0 ? t('需注意', 'Needs attention') : stageHasRunning ? t('进行中', 'In progress') : t('已完成', 'Completed')}{duration > 0 ? ` · ${formatToolDuration(duration)}` : ''}</span>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
               </summary>
@@ -79,7 +89,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                   return (
                     <li key={event.id} className="grid gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium text-foreground">{event.round ? `${t('第', 'Round ')}${event.round}${t('轮 · ', ' · ')}` : ''}{event.paramSummary}</span>
+                        <span className="font-medium text-foreground">{event.paramSummary}</span>
                         <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{event.toolName}</code>
                         <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                       </div>

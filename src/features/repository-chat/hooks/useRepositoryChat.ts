@@ -59,7 +59,13 @@ export const useRepositoryChat = ({
   })));
   const abortControllerRef = useRef<AbortController | null>(null);
   const retryInFlightRef = useRef(false);
-  const toolEventIdsRef = useRef<Map<string, string>>(new Map());
+  const toolEventIdsRef = useRef<Map<string, { id: string; createdAt: string }>>(new Map());
+  const timelineTimestampRef = useRef(0);
+  const nextTimelineTimestamp = (): string => {
+    const timestamp = Math.max(Date.now(), timelineTimestampRef.current + 1);
+    timelineTimestampRef.current = timestamp;
+    return new Date(timestamp).toISOString();
+  };
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toolEvents, setToolEvents] = useState<RepositoryChatToolEvent[]>([]);
@@ -103,10 +109,13 @@ export const useRepositoryChat = ({
 
   const persistToolEvent = useCallback(async (event: Omit<RepositoryChatToolEvent, 'id' | 'sessionId' | 'messageId' | 'createdAt'> & { toolName: string }, activeMessageId: string) => {
     if (!session) return;
-    const eventKey = `${activeMessageId}:${event.toolName}:${event.paramSummary}`;
-    const existingId = toolEventIdsRef.current.get(eventKey);
+    // A tool's running and terminal event share one identity, while repeated
+    // actions in later Agent rounds must remain distinct timeline entries.
+    const eventKey = `${activeMessageId}:${event.stage ?? 'other'}:${event.round ?? 'global'}:${event.toolName}:${event.paramSummary}`;
+    const existing = toolEventIdsRef.current.get(eventKey);
+    const createdAt = existing?.createdAt ?? nextTimelineTimestamp();
     const toolEvent: RepositoryChatToolEvent = {
-      id: existingId ?? createId('tool-event'),
+      id: existing?.id ?? createId('tool-event'),
       sessionId: session.id,
       messageId: activeMessageId,
       toolName: event.toolName,
@@ -118,11 +127,11 @@ export const useRepositoryChat = ({
       durationMs: event.durationMs,
       resultSize: event.resultSize,
       evidenceId: event.evidenceId,
-      createdAt: new Date().toISOString(),
+      createdAt,
     };
-    toolEventIdsRef.current.set(eventKey, toolEvent.id);
-    setToolEvents((previous) => existingId
-      ? previous.map((item) => item.id === existingId ? toolEvent : item)
+    toolEventIdsRef.current.set(eventKey, { id: toolEvent.id, createdAt });
+    setToolEvents((previous) => existing
+      ? previous.map((item) => item.id === existing.id ? toolEvent : item)
       : [...previous, toolEvent]);
     await repositoryChatSessionRepository.saveToolEvent(toolEvent);
   }, [session]);
@@ -141,7 +150,8 @@ export const useRepositoryChat = ({
     setError(null);
     toolEventIdsRef.current.clear();
     setToolEvents([]);
-    const now = new Date().toISOString();
+    const userCreatedAt = nextTimelineTimestamp();
+    const assistantCreatedAt = nextTimelineTimestamp();
     const userMessage: RepositoryChatMessage = {
       id: createId('message'),
       sessionId: session.id,
@@ -149,7 +159,8 @@ export const useRepositoryChat = ({
       content: normalizedQuestion,
       status: 'complete',
       evidenceIds: [],
-      createdAt: now,
+      // Keep a strict chronological order even after a persistence reload.
+      createdAt: userCreatedAt,
     };
     const assistantMessage: RepositoryChatMessage = {
       id: createId('message'),
@@ -158,7 +169,7 @@ export const useRepositoryChat = ({
       content: '',
       status: 'streaming',
       evidenceIds: [],
-      createdAt: now,
+      createdAt: assistantCreatedAt,
     };
     const nextMessages = [...baseMessages, userMessage, assistantMessage];
     onMessagesChange(nextMessages);

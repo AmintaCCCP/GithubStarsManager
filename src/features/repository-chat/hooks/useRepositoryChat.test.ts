@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listToolEvents: vi.fn(),
   saveMessage: vi.fn(),
   saveToolEvent: vi.fn(),
+  saveEvidence: vi.fn(),
   appState: {} as Record<string, unknown>,
 }));
 
@@ -26,6 +27,7 @@ vi.mock('../repositories/sessionRepository', () => ({
     listToolEvents: mocks.listToolEvents,
     saveMessage: mocks.saveMessage,
     saveToolEvent: mocks.saveToolEvent,
+    saveEvidence: mocks.saveEvidence,
   },
 }));
 
@@ -110,6 +112,39 @@ describe('useRepositoryChat persistence failures', () => {
       activeAIConfig: aiConfig.id,
       repositoryChatSettings,
     };
+  });
+
+  it('persists distinct events for repeated Agent rounds and orders the user before the assistant', async () => {
+    mocks.saveMessage.mockResolvedValue(undefined);
+    mocks.saveToolEvent.mockResolvedValue(undefined);
+    mocks.saveEvidence.mockResolvedValue(undefined);
+    mocks.runRepositoryChatTurn.mockImplementation(async (input: { onToolEvent?: (event: Record<string, unknown>) => void }) => {
+      input.onToolEvent?.({ toolName: 'read_repo_file', status: 'running', paramSummary: 'README.md', stage: 'retrieval', round: 1 });
+      input.onToolEvent?.({ toolName: 'read_repo_file', status: 'success', paramSummary: 'README.md', stage: 'retrieval', round: 1, resultSize: 1 });
+      input.onToolEvent?.({ toolName: 'read_repo_file', status: 'running', paramSummary: 'docs/usage.md', stage: 'retrieval', round: 2 });
+      input.onToolEvent?.({ toolName: 'read_repo_file', status: 'success', paramSummary: 'docs/usage.md', stage: 'retrieval', round: 2, resultSize: 1 });
+      return { content: 'Verified answer. `/README.md - 1`', evidences: [] };
+    });
+    const onSessionChange = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => {
+      const [messages, setMessages] = useState<RepositoryChatMessage[]>([]);
+      const chat = useRepositoryChat({ repository, session, messages, onMessagesChange: setMessages, onSessionChange });
+      return { chat, messages };
+    });
+
+    await act(async () => {
+      await result.current.chat.send('How do I use this project?');
+    });
+    await waitFor(() => expect(result.current.chat.isSending).toBe(false));
+
+    const [userMessage, assistantMessage] = result.current.messages;
+    expect(userMessage.role).toBe('user');
+    expect(assistantMessage.role).toBe('assistant');
+    expect(userMessage.createdAt < assistantMessage.createdAt).toBe(true);
+    await waitFor(() => expect(mocks.saveToolEvent).toHaveBeenCalledTimes(4));
+    const savedEvents = mocks.saveToolEvent.mock.calls.map((call: unknown[]) => call[0] as { id: string; round?: number; status: string });
+    expect(savedEvents.filter((event) => event.status === 'success').map((event) => event.round)).toEqual([1, 2]);
+    expect(new Set(savedEvents.map((event) => event.id)).size).toBe(2);
   });
 
   it('settles the transcript and sending state when initial message persistence fails', async () => {
