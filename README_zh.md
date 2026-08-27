@@ -398,9 +398,10 @@ docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
-此外，项目新增了一个**可选的全栈单镜像**（`ghcr.io/amintacccp/github-stars-manager-fullstack`），适合希望只运行一个容器、一个镜像标签和一个数据卷的用户。它在同一来源下提供网页、`/api` 和 MCP 端点：
+此外，项目新增了一个**可选的全栈单镜像**（`ghcr.io/amintacccp/github-stars-manager-fullstack`），适合希望只运行一个容器、一个镜像标签和一个数据卷的用户。它在同一来源下提供网页、`/api` 和 MCP 端点。先在仓库根目录的 `.env` 设置 `API_SECRET`，全栈 Compose 会拒绝在无认证配置下启动：
 
 ```bash
+API_SECRET=替换为足够长的随机密钥
 docker compose -f docker-compose.fullstack.yml up -d
 ```
 

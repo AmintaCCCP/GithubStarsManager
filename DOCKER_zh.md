@@ -88,17 +88,21 @@ API_SECRET=your-api-secret
 ENCRYPTION_KEY=your-encryption-key
 ```
 
-不使用 Compose 时，可直接运行镜像：
+不使用 Compose 时，可直接运行镜像。直接执行 `docker run` 不会读取 Compose 的 `.env`，请导出 `IMAGE_TAG`（或在命令中直接替换）以固定镜像版本：
 
 ```bash
+# 固定到客户端同版本的镜像；也可以改为 latest 使用 main 的最新构建。
+export IMAGE_TAG=0.7.8
+
 docker run -d \
   --name github-stars-manager-fullstack \
   -p 8080:3000 \
   -v github-stars-data:/app/data \
   -e API_SECRET="your-api-secret" \
-  -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager-fullstack:latest
+  ghcr.io/amintacccp/github-stars-manager-fullstack:${IMAGE_TAG}
 ```
+
+新部署可以不传 `ENCRYPTION_KEY`，服务会在持久化数据卷中生成并保存密钥。如果已有部署显式设置了 `ENCRYPTION_KEY`，每次重建和迁移时都必须传入**完全相同的值**；环境变量密钥优先于数据卷内的文件密钥，变更它会导致原先加密的凭据无法读取。
 
 本地构建全栈镜像时，请明确指定新的 Dockerfile：
 
@@ -115,7 +119,7 @@ docker run -d \
 
 ## 从现有 Compose 部署迁移到单容器
 
-迁移是**可选的**。如果当前前后端分离部署运行正常，您无需执行任何操作。只有在希望简化为一个容器时才迁移。
+迁移是**可选的**。如果当前前后端分离部署运行正常，您无需执行任何操作。只有在希望简化为一个容器时才迁移。迁移前，请将当前的 `API_SECRET` 原样写入全栈 `.env`，这样现有浏览器、API 与 MCP 客户端无需重新配置；如果旧服务显式设置过 `ENCRYPTION_KEY`，也必须在全栈 `.env` 中写入**完全相同的值**。
 
 ### 1. 识别并备份现有数据卷
 
@@ -148,7 +152,8 @@ docker run --rm \
 两个 Compose 文件都声明了 `backend-data` 卷。只要在**同一目录**下执行，并沿用相同的 Compose 项目名，全栈部署会复用原有 SQLite 数据和加密密钥。
 
 ```bash
-# 先在 .env 设置 API_SECRET。默认项目名：
+# 在 .env 中原样保留现有 API_SECRET；如旧服务显式设置了 ENCRYPTION_KEY，也原样保留。
+# 默认项目名：
 docker compose -f docker-compose.fullstack.yml up -d
 
 # 如原部署使用自定义项目名，请保持一致
