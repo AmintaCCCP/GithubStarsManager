@@ -11,10 +11,12 @@ import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { forceSyncToBackend } from '../services/autoSync';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
+import { deferOutsideDismiss } from './modalDismiss';
 
 interface RepositoryEditModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOutsideDismiss?: () => void;
   repository: Repository | null;
 }
 
@@ -58,6 +60,7 @@ interface SourceInfo {
 export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   isOpen,
   onClose,
+  onOutsideDismiss,
   repository
 }) => {
   const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore(useShallow((state) => ({
@@ -99,8 +102,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     tags: 'keep-custom',
     category: 'keep-custom'
   });
-
-
+  const initializedRepositoryIdRef = useRef<number | null>(null);
 
   const allCategories = useMemo(() => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides), [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]);
 
@@ -216,8 +218,17 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    * 当模态框打开时，根据仓库当前状态初始化表单
    */
   useEffect(() => {
-    if (repository && isOpen) {
-      const currentCategory = getCurrentCategory(repository);
+    if (!repository || !isOpen) {
+      initializedRepositoryIdRef.current = null;
+      return;
+    }
+
+    // Polling replaces repository object references every few seconds. Preserve the
+    // user's in-progress draft when that happens; initialize only once per open.
+    if (initializedRepositoryIdRef.current === repository.id) return;
+    initializedRepositoryIdRef.current = repository.id;
+
+    const currentCategory = getCurrentCategory(repository);
       const source = determineSource(repository);
 
       // 获取当前实际显示的内容
@@ -251,7 +262,6 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
       setFormData(initialData);
       initialDataRef.current = JSON.parse(JSON.stringify(initialData));
-    }
   }, [repository, isOpen, allCategories, determineSource, getEffectiveDisplayContent, getCurrentCategory]);
 
   /**
@@ -618,12 +628,35 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       onClose={handleClose}
       title={t('编辑仓库信息', 'Edit Repository Info')}
       maxWidth="max-w-2xl"
+      scrollable
+      onOverlayPointerDown={onOutsideDismiss}
+      onPointerDownOutside={(event) => {
+        // Keep the overlay mounted through this click sequence. Otherwise the
+        // follow-up click can be retargeted to the repository card and open README.
+        onOutsideDismiss?.();
+        deferOutsideDismiss(event, handleClose);
+      }}
+      footer={(
+        <div className="flex justify-end space-x-3">
+          <Button
+            onClick={handleCloseWithConfirm}
+            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm"
+          >
+            <X className="w-4 h-4" />
+            <span className="font-medium">{t('取消', 'Cancel')}</span>
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!hasChanges}
+            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium"
+          >
+            <Save className="w-4 h-4" />
+            <span>{t('保存', 'Save')}</span>
+          </Button>
+        </div>
+      )}
     >
-      <div
-        className="space-y-5"
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
+      <div className="space-y-5">
         {/* Repository Info Header */}
         <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-accent/60 to-background dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-primary/20">
           <img
@@ -1173,30 +1206,6 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
         </div>
 
-        {/* Action Buttons - Enhanced */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-border dark:border-border">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCloseWithConfirm();
-            }}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm"
-          >
-            <X className="w-4 h-4" />
-            <span className="font-medium">{t('取消', 'Cancel')}</span>
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              void handleSave();
-            }}
-            disabled={!hasChanges}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium"
-          >
-            <Save className="w-4 h-4" />
-            <span>{t('保存', 'Save')}</span>
-          </Button>
-        </div>
       </div>
     </Modal>
   );

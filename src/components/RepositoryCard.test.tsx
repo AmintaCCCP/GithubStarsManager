@@ -36,8 +36,14 @@ vi.mock('./FloatingTooltip', () => ({
 }));
 
 vi.mock('./RepositoryEditModal', () => ({
-  RepositoryEditModal: ({ isOpen }: { isOpen: boolean }) => (
-    isOpen ? <div data-testid="repository-edit-modal" /> : null
+  RepositoryEditModal: ({
+    isOpen,
+    onOutsideDismiss,
+  }: {
+    isOpen: boolean;
+    onOutsideDismiss?: () => void;
+  }) => (
+    isOpen ? <div data-testid="repository-edit-modal" onPointerDown={onOutsideDismiss} /> : null
   ),
 }));
 
@@ -303,6 +309,22 @@ describe('RepositoryCard view modes', () => {
 
     await act(async () => {
       fireEvent.pointerDown(document.body);
+      fireEvent.click(card);
+    });
+
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
+  it('does not open README when an outside click closes the edit modal', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRepositoryCard('grid');
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByTitle('编辑仓库信息'));
+    const editModal = screen.getByTestId('repository-edit-modal');
+
+    await act(async () => {
+      fireEvent.pointerDown(editModal);
       fireEvent.click(card);
     });
 
