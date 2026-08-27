@@ -60,6 +60,7 @@ export const useRepositoryChat = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const retryInFlightRef = useRef(false);
   const toolEventIdsRef = useRef<Map<string, { id: string; createdAt: string }>>(new Map());
+  const toolEventWriteChainsRef = useRef<Map<string, Promise<void>>>(new Map());
   const timelineTimestampRef = useRef(0);
   const nextTimelineTimestamp = (): string => {
     const timestamp = Math.max(Date.now(), timelineTimestampRef.current + 1);
@@ -133,7 +134,20 @@ export const useRepositoryChat = ({
     setToolEvents((previous) => existing
       ? previous.map((item) => item.id === existing.id ? toolEvent : item)
       : [...previous, toolEvent]);
-    await repositoryChatSessionRepository.saveToolEvent(toolEvent);
+    // Running and terminal states arrive asynchronously. Serialize writes for
+    // one event ID so an older delayed running write cannot overwrite success.
+    const previousWrite = toolEventWriteChainsRef.current.get(toolEvent.id) ?? Promise.resolve();
+    const write = previousWrite.catch(() => undefined).then(async () => {
+      await repositoryChatSessionRepository.saveToolEvent(toolEvent);
+    });
+    toolEventWriteChainsRef.current.set(toolEvent.id, write);
+    try {
+      await write;
+    } finally {
+      if (toolEventWriteChainsRef.current.get(toolEvent.id) === write) {
+        toolEventWriteChainsRef.current.delete(toolEvent.id);
+      }
+    }
   }, [session]);
 
   const send = useCallback(async (question: string, baseMessages = messages, isRetry = false) => {
@@ -149,6 +163,7 @@ export const useRepositoryChat = ({
     setIsSending(true);
     setError(null);
     toolEventIdsRef.current.clear();
+    toolEventWriteChainsRef.current.clear();
     setToolEvents([]);
     const userCreatedAt = nextTimelineTimestamp();
     const assistantCreatedAt = nextTimelineTimestamp();
