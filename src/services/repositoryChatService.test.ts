@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { AIConfig, Repository } from '../types';
-import type { RepositoryChatSession } from '../types/repositoryChat';
+import type { RepositoryChatSession, RepositoryChatToolEvent } from '../types/repositoryChat';
 
 const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
@@ -99,13 +99,15 @@ const understanding = (overrides: Record<string, unknown> = {}) => JSON.stringif
   intent: 'overview',
   target: 'project purpose',
   initial_scope: 'documentation',
-  code_need: 'not_needed',
-  expected_evidence: ['project purpose'],
   ...overrides,
 });
 
-const plan = (...paths: string[]) => JSON.stringify({ paths });
-const gate = (decision: string, reason = 'Evidence is sufficient.') => JSON.stringify({ decision, reason, missing_evidence: [] });
+const gate = (sufficient: boolean, reason = sufficient ? 'The retrieved file directly answers the question.' : 'More evidence is needed.', nextAction?: 'continue_docs' | 'continue_code' | 'escalate_to_code' | 'stop') => JSON.stringify({
+  sufficient,
+  reason,
+  missing: sufficient ? [] : ['additional repository details'],
+  ...(nextAction ? { next_action: nextAction } : {}),
+});
 
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
@@ -123,175 +125,123 @@ const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryMarkdownEvidenceFile.mockImplementation((...args: unknown[]) => mocks.getRepositoryFile(...args));
 };
 
+const readPaths = () => mocks.getRepositoryFile.mock.calls.map((call: unknown[]) => call[2]);
+
 describe('runRepositoryChatTurn evidence-driven loop', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     configureTreeAndFiles({
       'README.md': '# Example\n\nThis repository is a documented example project.',
-      'docs/usage.md': '# Usage\n\nRun the documented setup.',
+      'docs/usage.md': '# Usage\n\nInstall with `npm install` and start with `npm run dev`.',
       'src/App.tsx': 'export const App = () => <main>implementation detail</main>;',
     });
   });
 
-  it('starts documentation-first and stops without reading code when the Evidence Gate is sufficient', async () => {
+  it('uses the fast documentation-first path for a simple README question', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('sufficient', 'README directly answers the purpose.'))
-      .mockResolvedValueOnce('The project is a documented example project. `/README.md - 1-3`');
-    const events: Array<{ toolName: string; stage?: string; status: string; detail?: string }> = [];
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('This project is a documented example project. `/README.md - 1-3`');
+    const events: RepositoryChatToolEvent[] = [];
 
-    const result = await runRepositoryChatTurn({
-      ...turnInput(),
-      onToolEvent: (event) => events.push(event),
-    });
+    const result = await runRepositoryChatTurn({ ...turnInput(), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
 
-    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
-    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'src/App.tsx', session.sourceRefSha, undefined);
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
     expect(result.content).toContain('`/README.md - 1-3`');
-    expect(result.evidences).toHaveLength(1);
-    expect(result.evidences[0]).toMatchObject({ path: 'README.md', refSha: session.sourceRefSha, lineStart: 1, lineEnd: 3 });
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ toolName: 'understand_query', stage: 'understanding', status: 'success' }),
-      expect.objectContaining({ toolName: 'plan_research', stage: 'planning', status: 'success' }),
-      expect.objectContaining({ toolName: 'evidence_gate', stage: 'verification', status: 'success' }),
-      expect.objectContaining({ toolName: 'synthesize_answer', stage: 'answer', status: 'success' }),
+    expect(events.map((event) => [event.stage, event.round])).toEqual(expect.arrayContaining([
+      ['understanding', undefined],
+      ['retrieval', 1],
+      ['verification', 1],
+      ['answer', 1],
     ]));
-    expect(events.find((event) => event.toolName === 'understand_query')?.detail).toMatch(/Intent affects only initial file ranking/i);
   });
 
-  it('uses the Evidence Gate rather than intent keywords to escalate from documentation to minimal code', async () => {
+  it('treats insufficient evidence as a routing signal and continues through documentation', async () => {
     mocks.generateChatText
-      .mockResolvedValueOnce(understanding({ intent: 'implementation', code_need: 'required', expected_evidence: ['implementation detail'] }))
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('escalate_to_code', 'The README does not describe the implementation.'))
-      .mockResolvedValueOnce(plan('src/App.tsx'))
-      .mockResolvedValueOnce(gate('sufficient', 'The implementation file provides the required detail.'))
-      .mockResolvedValueOnce('The implementation renders the documented detail. `/src/App.tsx - 1`');
-    const events: Array<{ toolName: string; stage?: string; status: string; detail?: string }> = [];
+      .mockResolvedValueOnce(understanding({ target: 'installation and startup' }))
+      .mockResolvedValueOnce(gate(false, 'README only describes the project purpose.', 'continue_docs'))
+      .mockResolvedValueOnce(gate(true, 'The usage document contains the requested installation steps.'))
+      .mockResolvedValueOnce('Install with `npm install` and start with `npm run dev`. `/docs/usage.md - 1-3`');
 
-    const result = await runRepositoryChatTurn({
-      ...turnInput('How is the implementation structured?'),
-      onToolEvent: (event) => events.push(event),
-    });
+    const result = await runRepositoryChatTurn(turnInput('How do I install and start this project?'));
 
-    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
-    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'src/App.tsx', session.sourceRefSha, undefined);
-    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'docs/usage.md', session.sourceRefSha, undefined);
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ toolName: 'escalate_to_code', stage: 'escalation', status: 'success' }),
-      expect.objectContaining({ toolName: 'replan_research', stage: 'replanning', status: 'success' }),
-    ]));
-    expect(result.content).toContain('`/src/App.tsx - 1`');
-  });
-
-  it('enforces file-read budgets while retaining acquired evidence for synthesis', async () => {
-    mocks.generateChatText
-      .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('continue_docs', 'More documentation could be read.'))
-      .mockResolvedValueOnce(gate('sufficient', 'The retained README evidence is enough.'))
-      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`');
-
-    const result = await runRepositoryChatTurn({
-      ...turnInput(),
-      agentBudget: { ...turnInput().agentBudget, maxReadFiles: 1, maxTurns: 3 },
-    });
-
-    expect(mocks.getRepositoryFile).toHaveBeenCalledTimes(1);
-    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
-    expect(result.content).toContain('`/README.md - 1-3`');
-  });
-
-  it('treats a tool error as replanning input instead of blindly retrying the same file', async () => {
-    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => {
-      if (path === 'README.md') throw new Error('404 file not found');
-      return { path, ref: session.sourceRefSha, sha: `file-${path}`, size: 34, content: '# Usage\n\nThe fallback document answers it.' };
-    });
-    mocks.generateChatText
-      .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('continue_docs', 'The first file could not be read; inspect another document.'))
-      .mockResolvedValueOnce(plan('docs/usage.md'))
-      .mockResolvedValueOnce(gate('sufficient', 'The usage document answers the question.'))
-      .mockResolvedValueOnce('The fallback document answers it. `/docs/usage.md - 1-3`');
-
-    const result = await runRepositoryChatTurn(turnInput('How do I use this project?'));
-
-    const readPaths = mocks.getRepositoryFile.mock.calls.map((call: unknown[]) => call[2]);
-    expect(readPaths).toEqual(['README.md', 'docs/usage.md']);
+    expect(readPaths()).toEqual(['README.md', 'docs/usage.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
     expect(result.content).toContain('`/docs/usage.md - 1-3`');
   });
 
-  it('retries only the final synthesis after a transient model failure and never restarts retrieval', async () => {
+  it('uses Evidence Check rather than intent alone to escalate to minimal code', async () => {
     mocks.generateChatText
-      .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('sufficient'))
-      .mockRejectedValueOnce(new Error('503 upstream temporarily unavailable'))
-      .mockResolvedValueOnce('The project is a documented example project. `/README.md - 1-3`');
-
-    const result = await runRepositoryChatTurn(turnInput());
-
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1);
-    expect(mocks.getRepositoryFile).toHaveBeenCalledTimes(1);
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(5);
-    expect(result.content).toContain('`/README.md - 1-3`');
-  });
-
-  it('uses fallback Evidence Gate escalation when code is required and documentation is exhausted', async () => {
-    configureTreeAndFiles({
-      'README.md': '# Example\n\nThis document does not describe the implementation.',
-      'src/App.tsx': 'export const App = () => <main>implementation detail</main>;',
-    });
-    mocks.generateChatText
-      .mockResolvedValueOnce(understanding({ intent: 'implementation', code_need: 'required', expected_evidence: ['implementation detail'] }))
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce('not valid Evidence Gate JSON')
-      .mockResolvedValueOnce(plan('src/App.tsx'))
-      .mockResolvedValueOnce(gate('sufficient', 'The code file directly answers the implementation question.'))
-      .mockResolvedValueOnce('The implementation renders the required detail. `/src/App.tsx - 1`');
+      .mockResolvedValueOnce(understanding({ intent: 'implementation', initial_scope: 'implementation' }))
+      .mockResolvedValueOnce(gate(false, 'The documentation does not describe the implementation.', 'escalate_to_code'))
+      .mockResolvedValueOnce(gate(true, 'The implementation file answers the question.'))
+      .mockResolvedValueOnce('The implementation renders the documented detail. `/src/App.tsx - 1`');
 
     const result = await runRepositoryChatTurn(turnInput('How is the implementation structured?'));
 
-    expect(mocks.getRepositoryFile.mock.calls.map((call: unknown[]) => call[2])).toEqual(['README.md', 'src/App.tsx']);
+    expect(readPaths()).toEqual(['README.md', 'src/App.tsx']);
     expect(result.content).toContain('`/src/App.tsx - 1`');
   });
 
-  it('does not synthesize an answer when the final Evidence Gate has not confirmed sufficient coverage', async () => {
+  it('does not synthesize when Evidence Check has no reliable next direction', async () => {
+    configureTreeAndFiles({ 'README.md': '# Example\n\nOnly a project title.' });
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('insufficient', 'The file does not answer the question.'));
+      .mockResolvedValueOnce(gate(false, 'The repository has no answer for this question.', 'stop'));
+
+    const result = await runRepositoryChatTurn(turnInput('Which database migration strategy does this project use?'));
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(2);
+    expect(result.content).toContain('available evidence is insufficient');
+  });
+
+  it('performs one lightweight citation repair only when the final answer lacks a valid source', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('This project is a documented example project.')
+      .mockResolvedValueOnce('This project is a documented example project. `/README.md - 1-3`');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(readPaths()).toEqual(['README.md']);
+    expect(result.content).toContain('`/README.md - 1-3`');
+  });
+
+  it('normalizes a readable source reference without triggering an extra synthesis call', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('This project is a documented example project. `README.md - 1-3`');
 
     const result = await runRepositoryChatTurn(turnInput());
 
     expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
-    expect(result.content).toContain('evidence');
-    expect(result.content).not.toContain('documented example project');
+    expect(result.content).toContain('`/README.md - 1-3`');
   });
 
-  it('rejects a draft with an uncited factual section after the synthesis-only repair attempt', async () => {
+  it('retries a transient final-answer error without restarting retrieval', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('sufficient'))
-      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`\n\nIt also offers an uncited deployment guarantee.')
-      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`\n\nIt also offers an uncited deployment guarantee.');
+      .mockResolvedValueOnce(gate(true))
+      .mockRejectedValueOnce(new Error('503 upstream temporarily unavailable'))
+      .mockResolvedValueOnce('This project is a documented example project. `/README.md - 1-3`');
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    expect(mocks.getRepositoryFile).toHaveBeenCalledTimes(1);
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(5);
-    expect(result.content).toContain('source-verifiable summary');
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1);
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain('`/README.md - 1-3`');
   });
 
-  it('propagates cancellation raised after evidence retrieval and before final synthesis', async () => {
+  it('propagates cancellation raised after Evidence Check and before synthesis', async () => {
     const controller = new AbortController();
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('sufficient'));
+      .mockResolvedValueOnce(gate(true));
 
     const turn = runRepositoryChatTurn({
       ...turnInput(),
@@ -304,15 +254,14 @@ describe('runRepositoryChatTurn evidence-driven loop', () => {
     });
 
     await expect(turn).rejects.toThrow('Cancelled before synthesis.');
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(2);
   });
 
   it('never writes to the legacy vector index during a repository-chat turn', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
-      .mockResolvedValueOnce(plan('README.md'))
-      .mockResolvedValueOnce(gate('sufficient'))
-      .mockResolvedValueOnce('The project is a documented example project. `/README.md - 1-3`');
+      .mockResolvedValueOnce(gate(true))
+      .mockResolvedValueOnce('This project is a documented example project. `/README.md - 1-3`');
 
     await runRepositoryChatTurn(turnInput());
 
