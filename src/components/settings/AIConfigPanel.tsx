@@ -838,10 +838,45 @@ Repository information:
               </Select>
             </div>
             <div>
-              <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具上限', 'Per-turn tool limit')}</label>
-              <Input id="repository-chat-tool-limit" type="number" min={1} max={8} value={repositoryChatSettings.maxToolsPerTurn} onChange={(event) => {
+              <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具调用上限', 'Maximum tool calls per turn')}</label>
+              <Input id="repository-chat-tool-limit" type="number" min={1} max={24} value={repositoryChatSettings.agentBudget.maxToolCalls} onChange={(event) => {
                 const parsed = Number(event.target.value);
-                setRepositoryChatSettings({ maxToolsPerTurn: Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 6 });
+                const maxToolCalls = Number.isFinite(parsed) ? Math.min(24, Math.max(1, Math.trunc(parsed))) : 8;
+                setRepositoryChatSettings({ maxToolsPerTurn: maxToolCalls, agentBudget: { ...repositoryChatSettings.agentBudget, maxToolCalls } });
+              }} />
+              <p className="mt-1 text-xs text-muted-foreground">{t('限制只读工具总调用次数，防止无边界检索。', 'Limits all read-only tool calls to prevent unbounded retrieval.')}</p>
+            </div>
+            <div>
+              <label htmlFor="repository-chat-turn-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大取证轮数', 'Maximum evidence rounds')}</label>
+              <Input id="repository-chat-turn-limit" type="number" min={1} max={8} value={repositoryChatSettings.agentBudget.maxTurns} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const maxTurns = Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 4;
+                setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxTurns } });
+              }} />
+            </div>
+            <div>
+              <label htmlFor="repository-chat-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大文件读取数', 'Maximum files read')}</label>
+              <Input id="repository-chat-read-limit" type="number" min={1} max={16} value={repositoryChatSettings.agentBudget.maxReadFiles} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const maxReadFiles = Number.isFinite(parsed) ? Math.min(16, Math.max(1, Math.trunc(parsed))) : 6;
+                setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxReadFiles, maxCodeReads: Math.min(repositoryChatSettings.agentBudget.maxCodeReads, maxReadFiles) } });
+              }} />
+            </div>
+            <div>
+              <label htmlFor="repository-chat-code-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大代码文件读取数', 'Maximum code files read')}</label>
+              <Input id="repository-chat-code-read-limit" type="number" min={0} max={12} value={repositoryChatSettings.agentBudget.maxCodeReads} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const maxCodeReads = Number.isFinite(parsed) ? Math.min(repositoryChatSettings.agentBudget.maxReadFiles, Math.min(12, Math.max(0, Math.trunc(parsed)))) : 3;
+                setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxCodeReads } });
+              }} />
+              <p className="mt-1 text-xs text-muted-foreground">{t('代码只会在文档证据不足且 Evidence Gate 明确要求时读取。', 'Code is read only when documentation evidence is insufficient and the Evidence Gate requests it.')}</p>
+            </div>
+            <div>
+              <label htmlFor="repository-chat-duration-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最长执行时间（秒）', 'Maximum execution time (seconds)')}</label>
+              <Input id="repository-chat-duration-limit" type="number" min={15} max={300} value={Math.round(repositoryChatSettings.agentBudget.maxDurationMs / 1000)} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const maxDurationMs = (Number.isFinite(parsed) ? Math.min(300, Math.max(15, Math.trunc(parsed))) : 90) * 1000;
+                setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxDurationMs } });
               }} />
             </div>
           </div>

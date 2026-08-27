@@ -14,7 +14,7 @@ import type {
   VectorSearchStatus,
   RepositoryChatSettings,
 } from '../types';
-import { defaultRepositoryChatSettings } from '../types/repositoryChat';
+import { defaultRepositoryChatAgentBudget, defaultRepositoryChatSettings } from '../types/repositoryChat';
 import { EMBEDDING_FORMAT_VERSION } from '../services/vectorSearchService';
 import { MCP_DEFAULT_HOST, MCP_DEFAULT_PORT, normalizeMcpHost } from '../utils/mcpHost';
 import { PRESET_FILTERS } from '../constants/presetFilters';
@@ -140,16 +140,34 @@ export const normalizeRepositoryChatSettings = (value: unknown): RepositoryChatS
   const retainSessionDays = typeof record.retainSessionDays === 'number' && Number.isFinite(record.retainSessionDays)
     ? Math.min(365, Math.max(1, Math.round(record.retainSessionDays)))
     : defaultRepositoryChatSettings.retainSessionDays;
-  const maxToolsPerTurn = typeof record.maxToolsPerTurn === 'number' && Number.isFinite(record.maxToolsPerTurn)
-    ? Math.min(8, Math.max(1, Math.round(record.maxToolsPerTurn)))
+  const legacyMaxToolsPerTurn = typeof record.maxToolsPerTurn === 'number' && Number.isFinite(record.maxToolsPerTurn)
+    ? Math.min(24, Math.max(1, Math.round(record.maxToolsPerTurn)))
     : defaultRepositoryChatSettings.maxToolsPerTurn;
+  const rawBudget = record.agentBudget && typeof record.agentBudget === 'object' && !Array.isArray(record.agentBudget)
+    ? record.agentBudget as Record<string, unknown>
+    : {};
+  const inRange = (value: unknown, fallback: number, min: number, max: number): number => (
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.min(max, Math.max(min, Math.round(value)))
+      : fallback
+  );
+  const maxToolCalls = inRange(rawBudget.maxToolCalls, legacyMaxToolsPerTurn, 1, 24);
+  const maxReadFiles = inRange(rawBudget.maxReadFiles, defaultRepositoryChatAgentBudget.maxReadFiles, 1, 16);
+  const agentBudget = {
+    maxTurns: inRange(rawBudget.maxTurns, defaultRepositoryChatAgentBudget.maxTurns, 1, 8),
+    maxToolCalls,
+    maxReadFiles,
+    maxCodeReads: Math.min(maxReadFiles, inRange(rawBudget.maxCodeReads, defaultRepositoryChatAgentBudget.maxCodeReads, 0, 12)),
+    maxDurationMs: inRange(rawBudget.maxDurationMs, defaultRepositoryChatAgentBudget.maxDurationMs, 15_000, 300_000),
+  };
   return {
     enabled: record.enabled !== false,
     chatConfigId: typeof record.chatConfigId === 'string' ? record.chatConfigId : null,
     streamingMode: record.streamingMode === 'off' ? 'off' : 'auto',
     enableWebTools: record.enableWebTools === true,
     retainSessionDays,
-    maxToolsPerTurn,
+    maxToolsPerTurn: maxToolCalls,
+    agentBudget,
   };
 };
 

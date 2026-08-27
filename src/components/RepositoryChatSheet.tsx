@@ -30,17 +30,20 @@ const formatToolDuration = (durationMs?: number): string | null => {
 
 const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | 'en'): string => {
   const zh = language === 'zh';
+  if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
   if (stage === 'context') return zh ? '固定版本上下文' : 'Pinned source context';
-  if (stage === 'planning') return zh ? '取证计划' : 'Evidence plan';
-  if (stage === 'retrieval') return zh ? '文件取证' : 'File retrieval';
-  if (stage === 'verification') return zh ? '证据核验' : 'Evidence verification';
-  if (stage === 'answer') return zh ? '结论收敛' : 'Conclusion synthesis';
+  if (stage === 'planning') return zh ? '检索计划' : 'Retrieval plan';
+  if (stage === 'retrieval') return zh ? '第 N 轮取证' : 'Evidence retrieval round';
+  if (stage === 'verification') return zh ? 'Evidence Gate' : 'Evidence Gate';
+  if (stage === 'replanning') return zh ? '继续检索' : 'Continue retrieval';
+  if (stage === 'escalation') return zh ? '升级到代码' : 'Escalate to code';
+  if (stage === 'answer') return zh ? '最终回答' : 'Final answer';
   return zh ? '工具调用' : 'Tool call';
 };
 
 const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: 'zh' | 'en'; isRunning: boolean }> = ({ events, language, isRunning }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-  const stageOrder: Array<RepositoryChatToolEvent['stage']> = ['context', 'planning', 'retrieval', 'verification', 'answer'];
+  const stageOrder: Array<RepositoryChatToolEvent['stage']> = ['understanding', 'context', 'planning', 'retrieval', 'verification', 'replanning', 'escalation', 'answer'];
   const completed = events.filter((event) => event.status === 'success').length;
   const failed = events.filter((event) => event.status === 'error').length;
   const latest = events[events.length - 1];
@@ -51,7 +54,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
-          <p className="mt-0.5 text-muted-foreground">{t('默认显示阶段状态；展开单项可查看对应的只读工具、文件与证据。不会展示隐藏推理、请求报文或密钥。', 'Stage status is shown by default. Expand an item to inspect its read-only tools, files, and evidence. Hidden reasoning, request payloads, and secrets are never shown.')}</p>
+          <p className="mt-0.5 text-muted-foreground">{t('按“理解问题 → 检索计划 → 第 N 轮取证 → Evidence Gate → 继续检索/升级代码/已足够 → 最终回答”展示。展开单项可了解读取原因、证据缺口与决策，不会展示隐藏推理、请求报文或密钥。', 'Shown as “Understand → Plan → Evidence round N → Evidence Gate → Continue / escalate / sufficient → Answer”. Expand an item to inspect why a file was read, what evidence was missing, and the decision; hidden reasoning, payloads, and secrets are never shown.')}</p>
         </div>
         <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
       </div>
@@ -226,12 +229,13 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading || isSending}>
             {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
-            {t('基于最新版本新建会话', 'New chat from latest')}
+            {t('新建会话', 'New chat')}
           </Button>
           <Button
             type="button"
             variant={showHistory ? 'secondary' : 'ghost'}
             size="sm"
+            className="ml-auto"
             onClick={() => setShowHistory((previous) => !previous)}
             aria-pressed={showHistory}
           >
@@ -293,7 +297,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       t('这个仓库是做什么的？', 'What does this repository do?'),
-                      t('这个项目怎样使用？', 'How do I use this project?'),
+                      t('如何安装并开始使用这个项目？', 'How do I install and get started with this project?'),
                     ].map((prompt) => (
                       <Button key={prompt} type="button" variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left text-xs" onClick={() => setDraft(prompt)}>
                         {prompt}
@@ -374,7 +378,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               id="repository-chat-draft"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={t('询问实现、部署、架构或创作内容…', 'Ask about implementation, deployment, architecture, or content…')}
+              placeholder={t('例如：这个仓库是做什么的？如何安装和使用？', 'For example: What does this repository do? How do I install and use it?')}
               className="min-h-20 resize-y text-sm"
               disabled={!activeSession || !canChat || isSending}
             />
@@ -389,7 +393,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             )}
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>{t('来源优先：实现事实会附带仓库来源；证据不足时会明确说明。', 'Source-first: implementation claims include repository sources; insufficient evidence is stated clearly.')}</p>
+            <p>{t('适合围绕仓库文档、功能和使用方式进行简明问答；复杂代码分析、跨文件改造或调试建议先克隆代码到本地，再使用专业 Coding Agent 完成。', 'Best for concise questions about a repository’s documentation, features, and usage. For complex code analysis, cross-file changes, or debugging, clone the repository locally and use a dedicated coding agent.')}</p>
             {!isSending && messages.some((message) => message.status === 'error' || message.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
           </div>
         </form>
