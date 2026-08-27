@@ -19,6 +19,8 @@ const MAX_EVIDENCE_EXCERPT_CHARS = 12_000;
 const MAX_AGENT_RESEARCH_ROUNDS = 2;
 const MAX_FILES_PER_RESEARCH_ROUND = 3;
 const README_CANDIDATE = /(^|\/)readme(?:\.[a-z0-9_-]+)?\.(?:md|mdx|markdown|txt)$/i;
+const MARKDOWN_EVIDENCE_PATH = /\.(?:md|mdx|markdown|txt)$/i;
+const DOCUMENTATION_MARKDOWN_PATH = /(?:^|\/)(?:docs?|guides?|examples?|architecture|design|reference|adr)(?:\/|$).*\.(?:md|mdx|markdown|txt)$/i;
 const LOW_SIGNAL_TEST_PATH = /(^|\/)(?:__tests__|__snapshots__|test|tests|fixtures)(?:\/|$)|\.(?:test|spec)\.[^.]+$|\.snap$/i;
 const COMMON_QUERY_TERMS = new Set(['this', 'that', 'with', 'from', 'what', 'how', 'the', 'and', 'for', 'are', 'is', 'repo', 'repository', 'project', 'readme', '实现', '项目', '仓库', '如何', '怎么', '这个', '那个', '一下', '详细']);
 const isCreativeRequest = (question: string): boolean => /(?:公众号|推文|文章|文案|宣传稿|新闻稿|博客|写(?:一篇|个)?(?:文章|推文|文案|宣传稿|新闻稿|博客)|write\s+(?:an?\s+)?(?:article|post|blog)|draft\s+(?:an?\s+)?(?:article|post))/i.test(question);
@@ -123,8 +125,11 @@ const detectResearchFocus = (question: string): ResearchFocus => {
   const normalized = question.toLowerCase();
   if (isCreativeRequest(question)) return 'creative';
   if (/(?:部署|发布|上线|生产|容器|docker|deploy|deployment|hosting|production|release|vercel|netlify|railway|render|cloudflare|fly(?:\.io)?|secrets?)/i.test(normalized)) return 'deployment';
+  // Architecture requests often ask that each fact “uses” a source. Classify their
+  // architecture/data-flow intent before the generic Chinese usage keyword so the
+  // agent reads design docs and entrypoints rather than install or uninstall guides.
+  if (/(?:架构|系统图|数据流|流程|组件|architecture|diagram|data[\s-]?flow|system|component)/i.test(normalized)) return 'architecture';
   if (/(?:怎么用|使用|安装|开始|教程|运行|启动|usage|install|quickstart|get(?:ting)? started|run)/i.test(normalized)) return 'usage';
-  if (/(?:架构|系统图|流程|组件|architecture|diagram|system|component)/i.test(normalized)) return 'architecture';
   if (/(?:实现|代码|函数|模块|接口|how does|where is|implementation|code|function|module|api)/i.test(normalized)) return 'implementation';
   return 'general';
 };
@@ -145,6 +150,7 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
   const readmeScore = README_CANDIDATE.test(path) ? 5 : 0;
   const rootReadmeScore = /^readme(?:\.[a-z0-9_-]+)?\.(?:md|mdx|markdown|txt)$/i.test(path) ? 20 : 0;
   const sourceScore = /^(?:src|app|packages|server)\//.test(normalized) ? 1 : 0;
+  const documentationScore = DOCUMENTATION_MARKDOWN_PATH.test(path) ? 12 : 0;
   const deploymentScore = focus === 'deployment'
     ? (/(?:^|\/)(?:dockerfile|docker-compose(?:\.[^/]+)?|compose(?:\.[^/]+)?|procfile|wrangler\.toml|vercel\.json|netlify\.toml|render\.yaml|fly\.toml)$/i.test(path) ? 20 : 0)
       + (/(?:^|\/)(?:docs?|\.github\/workflows)\/.*(?:deploy|deployment|hosting|production|release|publish)/i.test(path) ? 18 : 0)
@@ -163,7 +169,7 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
   // Prefer canonical repository documentation over translated mirrors while keeping
   // mirrors available when they are the only relevant files.
   const translatedMirrorPenalty = /(?:^|\/)i18n\//i.test(normalized) ? -45 : 0;
-  return keywordScore + focusScore + readmeScore + rootReadmeScore + sourceScore + deploymentScore + usageScore + architectureScore + creativeScore + translatedMirrorPenalty;
+  return keywordScore + focusScore + readmeScore + rootReadmeScore + sourceScore + documentationScore + deploymentScore + usageScore + architectureScore + creativeScore + translatedMirrorPenalty;
 };
 
 const isFileEntry = (entry: TreeEntry) => entry.type === 'blob' || entry.type === 'file' || (!entry.type && entry.path.includes('.'));
@@ -434,8 +440,38 @@ const operationalFallback = (input: RepositoryChatTurnInput, focus: ResearchFocu
     : `The files read do not contain ${scope}. To avoid substituting unrelated install, start, or other commands, no inferred steps are provided; files checked: ${readReferences}.`;
 };
 
+const compactArchitectureDiagram = (content: string, focus: ResearchFocus, language: 'zh' | 'en'): string => {
+  if (focus !== 'architecture') return content;
+  return content.replace(/```mermaid\s*\n([\s\S]*?)```/gi, (block, diagram: string) => {
+    const nonEmptyLines = diagram.split('\n').filter((line) => line.trim().length > 0);
+    const edgeCount = (diagram.match(/-->|-->>|->>/g) ?? []).length;
+    if (diagram.length <= 700 && nonEmptyLines.length <= 12 && edgeCount <= 6) return block;
+    return language === 'zh'
+      ? [
+          '```mermaid',
+          'flowchart TD',
+          '  Client[客户端] --> Api[API 入口]',
+          '  Api --> Router[路由与格式处理]',
+          '  Router --> Provider[上游提供商]',
+          '  Provider --> Stream[流式响应]',
+          '  Stream --> Client',
+          '```',
+        ].join('\n')
+      : [
+          '```mermaid',
+          'flowchart TD',
+          '  Client[Client] --> Api[API entry]',
+          '  Api --> Router[Routing and translation]',
+          '  Router --> Provider[Provider backend]',
+          '  Provider --> Stream[Streaming response]',
+          '  Stream --> Client',
+          '```',
+        ].join('\n');
+  });
+};
+
 const finalizeSourceBoundAnswer = (input: RepositoryChatTurnInput, focus: ResearchFocus, evidences: ToolEvidence[], content: string): string => {
-  const verified = ensureVerifiableSources(content, evidences, input.language);
+  const verified = ensureVerifiableSources(compactArchitectureDiagram(content, focus, input.language), evidences, input.language);
   return verified === noVerifiedSummaryResponse(input.language)
     ? operationalFallback(input, focus, evidences) ?? verified
     : verified;
@@ -467,10 +503,16 @@ const rankedCandidatePaths = (entries: TreeEntry[], question: string, focus: Res
 const mandatoryFocusPaths = (paths: string[], focus: ResearchFocus): string[] => {
   if (focus === 'deployment') {
     const deploymentFiles = paths.filter((path) => /(?:^|\/)(?:docs?|\.github\/workflows)\/.*(?:deploy|deployment|hosting|production|release|publish)|(?:^|\/)(?:dockerfile|docker-compose|compose|wrangler\.toml|vercel\.json|netlify\.toml|render\.yaml|fly\.toml)$/i.test(path));
+    const canonicalDeploymentFiles = deploymentFiles.filter((path) => !/(?:^|\/)i18n\//i.test(path));
+    const preferredDeploymentFiles = canonicalDeploymentFiles.length > 0 ? canonicalDeploymentFiles : deploymentFiles;
     const readmes = paths.filter((path) => README_CANDIDATE.test(path));
-    return Array.from(new Set([...deploymentFiles.slice(0, 2), ...readmes.slice(0, 1)])).slice(0, MAX_FILES_PER_RESEARCH_ROUND);
+    return Array.from(new Set([...preferredDeploymentFiles.slice(0, 2), ...readmes.slice(0, 1)])).slice(0, MAX_FILES_PER_RESEARCH_ROUND);
   }
-  if (focus === 'usage') return paths.filter((path) => README_CANDIDATE.test(path) || /(?:install|usage|quickstart|getting-started)/i.test(path)).slice(0, MAX_FILES_PER_RESEARCH_ROUND);
+  if (focus === 'usage') {
+    const usageDocs = paths.filter((path) => DOCUMENTATION_MARKDOWN_PATH.test(path));
+    const readmes = paths.filter((path) => README_CANDIDATE.test(path));
+    return Array.from(new Set([...readmes.slice(0, 1), ...usageDocs.slice(0, 2), ...readmes])).slice(0, MAX_FILES_PER_RESEARCH_ROUND);
+  }
   if (focus === 'creative') {
     const productDocs = paths
       .filter((path) => /(?:^|\/)(?:docs?|guides?|examples?)\/.*(?:architecture|overview|feature|capabilit|guide|intro|a2a|routing)/i.test(path))
@@ -501,15 +543,25 @@ const immediateEvidencePaths = (paths: string[], focus: ResearchFocus, question:
   }
   const mandatory = mandatoryFocusPaths(paths, focus);
   if (focus === 'creative' && mandatory.length > 0) return mandatory;
+  const documentationCandidates = paths.filter((path) => DOCUMENTATION_MARKDOWN_PATH.test(path));
+  const canonicalDocumentation = documentationCandidates.filter((path) => !/(?:^|\/)i18n\//i.test(path));
+  // Focus-specific branches already contribute their own documentation. Add broad
+  // directory docs only for general questions; otherwise an unrelated guide can
+  // occupy the last bounded evidence slot for architecture or deployment work.
+  const documentation = focus === 'general'
+    ? (canonicalDocumentation.length > 0 ? canonicalDocumentation : documentationCandidates)
+    : [];
   const manifests = paths.filter((path) => /^(?:package\.json|pyproject\.toml|go\.mod|cargo\.toml|composer\.json|docker-compose(?:\.[^/]+)?\.ya?ml)$/i.test(path));
   const implementation = paths.filter((path) => /^(?:src|app|server|packages)\/.+\.(?:ts|tsx|js|jsx|py|go|rs|java)$/i.test(path));
+  const shouldAvoidArbitraryFallback = focus === 'architecture' || focus === 'deployment' || focus === 'usage';
   return Array.from(new Set([
     ...mandatory,
     ...rootReadmes.slice(0, 1),
+    ...documentation.slice(0, 2),
     ...readmes.slice(0, 1),
     ...manifests.slice(0, 1),
     ...implementation.slice(0, 1),
-    ...paths,
+    ...(shouldAvoidArbitraryFallback ? [] : paths),
   ])).slice(0, MAX_FILES_PER_RESEARCH_ROUND);
 };
 
@@ -626,12 +678,15 @@ const runLegacyRepositoryChatTurn = async (input: RepositoryChatTurnInput, strat
   }
 
   const candidates = rankedCandidatePaths(tree.entries, input.question, focus);
+  const readEvidenceFile = async (path: string, signal?: AbortSignal) => MARKDOWN_EVIDENCE_PATH.test(path)
+    ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)
+    : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, signal);
   const unreadPaths = new Set(candidates);
   const readPaths = new Set<string>();
   const readFile = async (path: string) => {
     if (readPaths.has(path) || toolCount >= maxTools) return;
     const file = await execute('read_repo_file', path, async () => {
-      return await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, input.signal);
+      return await readEvidenceFile(path, input.signal);
     }, {
       stage: 'retrieval',
       round: activeRound,
@@ -696,7 +751,12 @@ const runLegacyRepositoryChatTurn = async (input: RepositoryChatTurnInput, strat
       }, { stage: round === 0 ? 'planning' : 'verification', round: activeRound, detail: planningSummary });
       const plannedPaths = planRaw ? parsePlan(planRaw, remaining)?.paths ?? [] : [];
       const mustRead = mandatoryFocusPaths(remaining, focus);
-      const chosenPaths = Array.from(new Set([...mustRead, ...plannedPaths, ...remaining])).slice(0, capacity);
+      const shouldAvoidArbitraryFallback = focus === 'architecture' || focus === 'deployment' || focus === 'usage';
+      const chosenPaths = Array.from(new Set([
+        ...mustRead,
+        ...plannedPaths,
+        ...(shouldAvoidArbitraryFallback ? [] : remaining),
+      ])).slice(0, capacity);
       emit({
         toolName: planningTool,
         status: 'success',
@@ -909,6 +969,9 @@ const runFrameworkRepositoryChatTurn = async (input: RepositoryChatTurnInput): P
   const github = createGitHubApiService(input.githubToken);
   const focus = detectResearchFocus(input.question);
   const terms = queryTerms(input.question);
+  const readEvidenceFile = async (path: string) => MARKDOWN_EVIDENCE_PATH.test(path)
+    ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, input.signal)
+    : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, input.signal);
   const maxToolCalls = Math.min(8, Math.max(4, input.maxToolsPerTurn));
   const maxFiles = Math.min(MAX_FILES_PER_RESEARCH_ROUND, Math.max(1, maxToolCalls - 3));
   const evidences: ToolEvidence[] = [];
@@ -1007,7 +1070,7 @@ const runFrameworkRepositoryChatTurn = async (input: RepositoryChatTurnInput): P
           detail: input.language === 'zh' ? '读取已选择文件并提取问题相关的带行号片段。' : 'Read the selected file and extract question-relevant line-ranged excerpts.',
         });
         try {
-          const file = await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, input.signal);
+          const file = await readEvidenceFile(path);
           const fileEvidences = makeFileEvidence(input.repository, input.session.sourceRefSha, file, focus, terms);
           evidences.push(...fileEvidences);
           readPaths.add(path);

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
   getRepositoryTree: vi.fn(),
   getRepositoryFile: vi.fn(),
+  getRepositoryMarkdownEvidenceFile: vi.fn(),
   vectorWrites: {
     indexAllRepos: vi.fn(),
     upsert: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('./githubApiFactory', () => ({
   createGitHubApiService: () => ({
     getRepositoryTree: mocks.getRepositoryTree,
     getRepositoryFile: mocks.getRepositoryFile,
+    getRepositoryMarkdownEvidenceFile: mocks.getRepositoryMarkdownEvidenceFile,
   }),
 }));
 
@@ -114,6 +116,7 @@ describe('runRepositoryChatTurn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    mocks.getRepositoryMarkdownEvidenceFile.mockImplementation((...args: unknown[]) => mocks.getRepositoryFile(...args));
     mocks.getRepositoryTree.mockResolvedValue({
       ref: session.sourceRefSha,
       truncated: false,
@@ -202,6 +205,70 @@ describe('runRepositoryChatTurn', () => {
     expect(result.content).toContain('`/README.md - 1-2`');
   });
 
+  it('prioritizes high-signal Markdown guides under documentation directories for usage questions', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'README.md', type: 'blob' },
+        { path: 'docs/guides/getting-started.md', type: 'blob' },
+        { path: 'docs/reference/configuration.md', type: 'blob' },
+        { path: 'src/internal.ts', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryMarkdownEvidenceFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `markdown-${path}`,
+      size: 400,
+      content: `# ${path}\n\nDocumented installation and configuration instructions.`,
+    }));
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('Use the documented guide. `/docs/guides/getting-started.md - 1-3`');
+
+    await runRepositoryChatTurn(turnInput('How do I install and use this project?'));
+
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'docs/guides/getting-started.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'docs/reference/configuration.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'src/internal.ts', session.sourceRefSha, undefined);
+  });
+
+  it('reads a large Markdown README through the bounded fixed-SHA evidence path and only supplies line-ranged excerpts to the model', async () => {
+    const largeReadme = [
+      '# Example',
+      ...Array.from({ length: 7_300 }, (_, index) => `Background line ${index + 1}: ordinary documentation.`),
+      '## Production deployment',
+      'Use `npm run deploy` after the documented review.',
+      ...Array.from({ length: 1_000 }, (_, index) => `Appendix line ${index + 1}: additional documentation.`),
+    ].join('\n');
+    expect(new TextEncoder().encode(largeReadme).byteLength).toBeGreaterThan(96 * 1024);
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [{ path: 'README.md', type: 'blob' }],
+    });
+    mocks.getRepositoryFile.mockRejectedValue(new Error('The normal reader must not receive this Markdown file'));
+    mocks.getRepositoryMarkdownEvidenceFile.mockResolvedValue({
+      path: 'README.md',
+      ref: session.sourceRefSha,
+      sha: 'large-readme-sha',
+      size: new TextEncoder().encode(largeReadme).byteLength,
+      content: largeReadme,
+    });
+    mocks.generateChatText.mockReset().mockResolvedValueOnce('The documented step is `npm run deploy`. `/README.md - 7290-7338`');
+
+    const result = await runRepositoryChatTurn(turnInput('How is this deployed in production?'));
+
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'README.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalled();
+    expect(result.evidences).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'README.md', lineStart: expect.any(Number), lineEnd: expect.any(Number), refSha: session.sourceRefSha }),
+    ]));
+    const answerRequest = mocks.generateChatText.mock.calls[0][0] as { user: string };
+    expect(answerRequest.user).toContain('SOURCE: /README.md -');
+    expect(answerRequest.user.length).toBeLessThan(20_000);
+  });
+
   it('refuses a zero-evidence answer instead of asking the model to infer from repository metadata or the tree', async () => {
     mocks.getRepositoryFile.mockRejectedValue(new Error('Every candidate file is blocked by the file guard'));
     mocks.generateChatText.mockReset();
@@ -265,6 +332,42 @@ describe('runRepositoryChatTurn', () => {
       expect.objectContaining({ paramSummary: expect.stringMatching(/^deployment:/) }),
     ]));
     expect(events.some((event) => event.paramSummary.startsWith('creative:'))).toBe(false);
+  });
+
+  it('keeps an architecture data-flow request on architecture evidence when it asks to use source citations', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'docs/architecture/REQUEST_FLOW.md', type: 'blob' },
+        { path: 'src/server/router.ts', type: 'blob' },
+        { path: 'docs/guides/UNINSTALL.md', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: '# Architecture\nRequest routing and streaming response flow.',
+    }));
+    mocks.generateChatText.mockReset()
+      .mockResolvedValueOnce('{"paths":["docs/architecture/REQUEST_FLOW.md","src/server/router.ts"]}')
+      .mockResolvedValueOnce('The request flow is documented. `/docs/architecture/REQUEST_FLOW.md - 1-2`');
+    const events: Array<{ paramSummary: string }> = [];
+
+    await runRepositoryChatTurn({
+      ...turnInput('请解释整体架构并画出请求数据流；每个事实使用仓库精确来源。'),
+      language: 'zh',
+      onToolEvent: (event) => events.push(event),
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paramSummary: expect.stringMatching(/^architecture:/) }),
+    ]));
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'docs/architecture/REQUEST_FLOW.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'src/server/router.ts', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryMarkdownEvidenceFile).not.toHaveBeenCalledWith('owner', 'example', 'docs/guides/UNINSTALL.md', session.sourceRefSha, undefined);
   });
 
   it('prioritizes product documentation over a large root README for creative requests', async () => {
@@ -456,6 +559,79 @@ describe('runRepositoryChatTurn', () => {
     expect(result.content).not.toMatch(/\[\^E\d+\]|\bE[23]\b/);
   });
 
+  it('returns a transparent retry state when an unreferenced architecture draft cannot be repaired', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'docs/architecture/REQUEST_FLOW.md', type: 'blob' },
+        { path: 'src/server/router.ts', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: '# Request flow\nClient requests are routed to provider backends and responses stream back.',
+    }));
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["docs/architecture/REQUEST_FLOW.md","src/server/router.ts"]}')
+      .mockResolvedValueOnce('The architecture has a client, router, provider, and stream.')
+      .mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
+
+    const result = await runRepositoryChatTurn(turnInput('Explain the architecture and request data flow.'));
+
+    expect(result.content).toContain('did not produce a source-verifiable summary');
+    expect(result.content).not.toContain('```mermaid');
+    expect(result.content).not.toContain('The architecture has a client');
+  });
+
+  it('compacts an oversized architecture Mermaid diagram without removing the verified narrative or source reference', async () => {
+    mocks.getRepositoryTree.mockResolvedValue({
+      ref: session.sourceRefSha,
+      truncated: false,
+      entries: [
+        { path: 'docs/architecture/REQUEST_FLOW.md', type: 'blob' },
+        { path: 'src/server/router.ts', type: 'blob' },
+      ],
+    });
+    mocks.getRepositoryFile.mockImplementation(async (_owner: string, _repo: string, path: string) => ({
+      path,
+      ref: session.sourceRefSha,
+      sha: `file-${path}`,
+      size: 100,
+      content: '# Request flow\nClient requests are routed to provider backends and responses stream back.',
+    }));
+    mocks.generateChatText
+      .mockReset()
+      .mockResolvedValueOnce('{"paths":["docs/architecture/REQUEST_FLOW.md","src/server/router.ts"]}')
+      .mockResolvedValueOnce([
+        '## Flow',
+        '',
+        '```mermaid',
+        'sequenceDiagram',
+        '  Client->>Api: request',
+        '  Api->>Auth: validate',
+        '  Auth->>Router: normalized request',
+        '  Router->>Policy: score',
+        '  Policy->>Provider: selected backend',
+        '  Provider->>Stream: chunks',
+        '  Stream->>Client: response',
+        '```',
+        '',
+        'The request flow is documented. `/docs/architecture/REQUEST_FLOW.md - 1-2`',
+      ].join('\n'));
+
+    const result = await runRepositoryChatTurn(turnInput('Explain the architecture and request data flow.'));
+
+    expect(result.content).toContain('## Flow');
+    expect(result.content).toContain('flowchart TD');
+    expect(result.content).not.toContain('sequenceDiagram');
+    expect(result.content).toContain('`/docs/architecture/REQUEST_FLOW.md - 1-2`');
+  });
+
   it('returns a concise retry state when an unreferenced draft cannot be repaired', async () => {
     mocks.generateChatText
       .mockReset()
@@ -494,8 +670,8 @@ describe('runRepositoryChatTurn', () => {
       .mockResolvedValueOnce('Deploy with `/docs/deployment.md - 1-2`.');
 
     await runRepositoryChatTurn(turnInput('How is this deployed in production?'));
-    expect(mocks.getRepositoryFile).toHaveBeenCalledWith('owner', 'example', 'docs/deployment.md', session.sourceRefSha, undefined);
-    expect(mocks.getRepositoryFile).not.toHaveBeenCalledWith('owner', 'example', 'docs/i18n/ar/docs/deployment.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryMarkdownEvidenceFile).toHaveBeenCalledWith('owner', 'example', 'docs/deployment.md', session.sourceRefSha, undefined);
+    expect(mocks.getRepositoryMarkdownEvidenceFile).not.toHaveBeenCalledWith('owner', 'example', 'docs/i18n/ar/docs/deployment.md', session.sourceRefSha, undefined);
 
     mocks.generateChatText
       .mockReset()

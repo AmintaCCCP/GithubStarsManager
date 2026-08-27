@@ -98,6 +98,12 @@ interface GitHubRateLimitResponse {
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const REPOSITORY_CHAT_MAX_FILE_BYTES = 96 * 1024;
+// Larger Markdown files are common repository documentation. This bounded exception is
+// deliberately narrower than the normal chat-file reader: only non-sensitive Markdown
+// can use it, it remains pinned to the caller's SHA, and repository chat exposes only
+// line-ranged excerpts to the model.
+const REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES = 512 * 1024;
+const REPOSITORY_CHAT_MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown', '.txt']);
 const REPOSITORY_CHAT_ALLOWED_EXTENSIONS = new Set([
   '.md', '.mdx', '.txt', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.toml',
   '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.cs', '.c', '.h', '.cpp', '.hpp', '.vue', '.svelte',
@@ -771,6 +777,46 @@ export class GitHubApiService {
     const contentSize = new TextEncoder().encode(content).byteLength;
     if (contentSize > REPOSITORY_CHAT_MAX_FILE_BYTES) {
       throw new Error('The requested file exceeds the 96 KB repository chat limit');
+    }
+    return {
+      path: response.path || normalizedPath,
+      ref,
+      sha: response.sha,
+      size: typeof response.size === 'number' ? response.size : contentSize,
+      content,
+    };
+  }
+
+  async getRepositoryMarkdownEvidenceFile(owner: string, repo: string, path: string, ref: string, signal?: AbortSignal): Promise<RepositoryFileRead> {
+    const normalizedPath = path.replace(/^\/+/, '');
+    if (!normalizedPath || normalizedPath.includes('..') || normalizedPath.includes('\\')) {
+      throw new Error('Invalid repository file path');
+    }
+    if (isRepositoryChatSensitivePath(normalizedPath)) {
+      throw new Error('This file is excluded from repository chat for safety');
+    }
+    const fileName = normalizedPath.split('/').pop() || normalizedPath;
+    const extension = fileName.includes('.') ? `.${fileName.split('.').pop()}`.toLowerCase() : '';
+    if (!REPOSITORY_CHAT_MARKDOWN_EXTENSIONS.has(extension)) {
+      throw new Error('The requested repository evidence path is not Markdown text');
+    }
+
+    const response = await this.makeRequest<GitHubContentResponse>(
+      `/repos/${owner}/${repo}/contents/${this.encodeContentPath(normalizedPath)}?ref=${encodeURIComponent(ref)}`,
+      { operationTag: 'repository-chat:markdown-evidence' },
+      signal,
+    );
+    if (response.type && response.type !== 'file') {
+      throw new Error('The requested repository path is not a text file');
+    }
+    if (typeof response.size === 'number' && response.size > REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES) {
+      throw new Error('The requested Markdown file exceeds the 512 KB repository chat evidence limit');
+    }
+
+    const content = this.decodeContentResponse(response);
+    const contentSize = new TextEncoder().encode(content).byteLength;
+    if (contentSize > REPOSITORY_CHAT_MAX_MARKDOWN_EVIDENCE_BYTES) {
+      throw new Error('The requested Markdown file exceeds the 512 KB repository chat evidence limit');
     }
     return {
       path: response.path || normalizedPath,
