@@ -168,7 +168,15 @@ const fallbackList = <T extends { sessionId?: string; repoId?: number }>(store: 
   return (readFallback()[store] as unknown as T[]).filter(filter);
 };
 
-const byCreatedAt = <T extends { createdAt: string }>(left: T, right: T) => left.createdAt.localeCompare(right.createdAt);
+const byCreatedAt = <T extends { id: string; createdAt: string; role?: 'user' | 'assistant' | 'system' }>(left: T, right: T) => {
+  const timestampOrder = left.createdAt.localeCompare(right.createdAt);
+  if (timestampOrder !== 0) return timestampOrder;
+  // Legacy turns may share a timestamp because their user and assistant records
+  // were written concurrently. Preserve the conversational order on reload.
+  const roleOrder = (role: T['role']) => role === 'user' ? 0 : role === 'assistant' ? 1 : 2;
+  const byRole = roleOrder(left.role) - roleOrder(right.role);
+  return byRole !== 0 ? byRole : left.id.localeCompare(right.id);
+};
 const byUpdatedAtDescending = <T extends { updatedAt: string }>(left: T, right: T) => right.updatedAt.localeCompare(left.updatedAt);
 
 export const repositoryChatSessionRepository = {

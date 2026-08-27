@@ -22,7 +22,15 @@ export interface RepositoryChatMessage {
   createdAt: string;
 }
 
-export type RepositoryChatExecutionStage = 'context' | 'planning' | 'retrieval' | 'verification' | 'answer';
+export type RepositoryChatExecutionStage =
+  | 'understanding'
+  | 'context'
+  | 'planning'
+  | 'retrieval'
+  | 'verification'
+  | 'replanning'
+  | 'escalation'
+  | 'answer';
 
 export interface RepositoryChatToolEvent {
   id: string;
@@ -54,14 +62,38 @@ export interface ToolEvidence {
   retrievedAt: string;
 }
 
+export interface RepositoryChatAgentBudget {
+  maxTurns: number;
+  maxToolCalls: number;
+  maxReadFiles: number;
+  maxCodeReads: number;
+  /** Consecutive rounds that add no new cited evidence before bounded stop. */
+  maxNoProgressRounds: number;
+  maxDurationMs: number;
+}
+
 export interface RepositoryChatSettings {
   enabled: boolean;
   chatConfigId: string | null;
   streamingMode: 'auto' | 'off';
   enableWebTools: boolean;
   retainSessionDays: number;
+  /**
+   * Kept for persisted configurations created before the evidence-driven loop.
+   * New callers should use agentBudget.maxToolCalls.
+   */
   maxToolsPerTurn: number;
+  agentBudget: RepositoryChatAgentBudget;
 }
+
+export const defaultRepositoryChatAgentBudget: RepositoryChatAgentBudget = {
+  maxTurns: 4,
+  maxToolCalls: 20,
+  maxReadFiles: 8,
+  maxCodeReads: 3,
+  maxNoProgressRounds: 2,
+  maxDurationMs: 90_000,
+};
 
 export const defaultRepositoryChatSettings: RepositoryChatSettings = {
   enabled: true,
@@ -69,5 +101,6 @@ export const defaultRepositoryChatSettings: RepositoryChatSettings = {
   streamingMode: 'auto',
   enableWebTools: false,
   retainSessionDays: 90,
-  maxToolsPerTurn: 6,
+  maxToolsPerTurn: defaultRepositoryChatAgentBudget.maxToolCalls,
+  agentBudget: { ...defaultRepositoryChatAgentBudget },
 };
