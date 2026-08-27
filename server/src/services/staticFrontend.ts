@@ -27,7 +27,15 @@ export function mountStaticFrontend(app: Express, staticDir = process.env.STATIC
     return false;
   }
 
-  app.use(express.static(resolvedStaticDir, { index: false }));
+  const serveStatic = express.static(resolvedStaticDir, { index: false });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (isBackendPath(req.path)) {
+      next();
+      return;
+    }
+
+    serveStatic(req, res, next);
+  });
 
   // Register this after all API and MCP routes. Keep their unknown paths as 404s
   // instead of returning the SPA shell.

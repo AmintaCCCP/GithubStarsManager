@@ -9,7 +9,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify-release-version:
+    name: Verify release tag matches client version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Verify tagged release version
+        if: github.ref_type == 'tag'
+        run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
+
   build:
+    needs: verify-release-version
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     

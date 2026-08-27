@@ -24,23 +24,33 @@ docker-compose up -d
 > ```
 > Use a [Personal Access Token](https://github.com/settings/tokens) (with `read:packages` scope) as the password.
 
-Available image tags (both images share the same tagging scheme):
+Available image tags (all role-specific images share the same tagging scheme):
 - `latest` — latest build from the `main` branch
-- `0.6.2`, `0.6`, `0` — specific version tags (semver, `v` prefix stripped)
+- `v0.7.8` — the exact release tag; it must match the root `package.json` client version
+- `0.7.8`, `0.7`, `0` — convenience semver tags derived from the same `v0.7.8` release
 - `sha-abc1234` — specific commit builds
 
+The root `package.json` is the single version source for desktop clients and Docker releases. A release workflow rejects a Git tag unless it is exactly `v` plus that file's `version`, so matching release image tags and client versions are published together.
+
 Published images:
-- Backend: `ghcr.io/amintacccp/github-stars-manager-server`
 - Frontend: `ghcr.io/amintacccp/github-stars-manager-frontend`
-- Full stack (optional): `ghcr.io/amintacccp/github-stars-manager`
+- Backend (canonical): `ghcr.io/amintacccp/github-stars-manager-backend`
+- Full stack (optional): `ghcr.io/amintacccp/github-stars-manager-fullstack`
+- Backend legacy compatibility alias: `ghcr.io/amintacccp/github-stars-manager-server`
+
+The `-frontend`, `-backend`, and `-fullstack` names identify the image role consistently. The existing `-server` backend alias continues to receive the same tags so current `docker-compose.yml` and direct `docker run` deployments remain unchanged.
 
 ## Optional Single-Container Full-Stack Deployment
 
 The full-stack image is an additional deployment option. It runs one Node/Express process that serves the web application, `/api`, and MCP endpoints from the same origin. It does **not** replace the standalone backend image, frontend image, or existing `docker-compose.yml` workflow.
 
-Use the dedicated Compose file for the simplest setup:
+Use the dedicated Compose file for the simplest setup. Before starting, create a `.env` file with an API secret; the full-stack Compose file refuses to start without it so a new network-facing deployment is not accidentally unauthenticated.
 
 ```bash
+API_SECRET=replace-with-a-long-random-secret
+# Optional: set this to keep a chosen encryption key rather than generating one in the data volume.
+# ENCRYPTION_KEY=replace-with-your-encryption-key
+
 # This leaves docker-compose.yml unchanged for existing deployments.
 docker compose -f docker-compose.fullstack.yml up -d
 
@@ -57,12 +67,13 @@ docker run -d \
   -v github-stars-data:/app/data \
   -e API_SECRET="your-secret-here" \
   -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager:latest
+  ghcr.io/amintacccp/github-stars-manager-fullstack:latest
 ```
 
-Set `IMAGE_TAG` in a `.env` file to pin a full-stack version:
+Add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
 
 ```bash
+API_SECRET=replace-with-a-long-random-secret
 IMAGE_TAG=0.7.0
 ```
 
@@ -80,6 +91,7 @@ docker run --rm \
 # Stop the split deployment without deleting its named volume.
 docker compose down
 
+# Set API_SECRET in .env before starting the new network-facing service.
 # Reuse the same Compose project directory and volume name.
 docker compose -f docker-compose.fullstack.yml up -d
 
@@ -106,7 +118,7 @@ FRONTEND_IMAGE_TAG=0.6.2
 
 ## Backend Server (docker run)
 
-The backend image is published to GHCR and can be run standalone:
+The backend image is published to GHCR and can be run standalone. New standalone deployments should use the canonical `-backend` image. The legacy `-server` image remains published with identical tags exclusively for existing `docker-compose.yml` and direct deployments, so no current user must change an image reference.
 
 ```bash
 # Basic — no auth, port 3000, data persisted in volume
@@ -114,7 +126,7 @@ docker run -d \
   --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
-  ghcr.io/amintacccp/github-stars-manager-server:latest
+  ghcr.io/amintacccp/github-stars-manager-backend:latest
 
 # With custom API secret and encryption key
 docker run -d \
@@ -123,7 +135,7 @@ docker run -d \
   -p 3000:3000 \
   -e API_SECRET="your-secret-here" \
   -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager-server:latest
+  ghcr.io/amintacccp/github-stars-manager-backend:latest
 
 # Map to a different host port (e.g. 8080)
 docker run -d \
@@ -131,14 +143,14 @@ docker run -d \
   -v github-stars-data:/app/data \
   -p 8080:3000 \
   -e API_SECRET="your-secret-here" \
-  ghcr.io/amintacccp/github-stars-manager-server:latest
+  ghcr.io/amintacccp/github-stars-manager-backend:latest
 ```
 
 ### Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `API_SECRET` | No | `null` (auth disabled) | Bearer token for API authentication |
+| `API_SECRET` | Optional for standalone backend | `null` (auth disabled) | Bearer token for API authentication. It is required by `docker-compose.fullstack.yml` so the new single-container web service cannot start unauthenticated. |
 | `ENCRYPTION_KEY` | No | Auto-generated (saved to `data/.encryption-key`) | AES-256 key for encrypting stored secrets. Accepts any format — 64-char hex, shorter hex, base64, or plain text (all normalized via SHA-256) |
 | `PORT` | No | `3000` | Server listening port |
 | `DB_PATH` | No | `data/data.db` | Path to SQLite database file |

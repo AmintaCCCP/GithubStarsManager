@@ -5,7 +5,9 @@ GithubStarsManager 提供两种 Docker 部署方式。原有的前后端分离�
 | 部署方式 | 使用的镜像 / 文件 | 适用场景 | 兼容性 |
 |---|---|---|---|
 | 前后端分离（现有） | `github-stars-manager-frontend`、`github-stars-manager-server`、`docker-compose.yml` | 需要独立升级、独立部署或自行配置前端反向代理的用户 | **保持不变** |
-| 全栈单容器（可选） | `github-stars-manager`、`docker-compose.fullstack.yml` | 希望只运行一个容器、一个镜像标签和一个数据卷的个人服务器、Mac 或 homelab 用户 | 新增，不影响现有方式 |
+| 全栈单容器（可选） | `github-stars-manager-fullstack`、`docker-compose.fullstack.yml` | 希望只运行一个容器、一个镜像标签和一个数据卷的个人服务器、Mac 或 homelab 用户 | 新增，不影响现有方式 |
+
+规范镜像名称使用明确的角色后缀：`-frontend`、`-backend` 与 `-fullstack`。原有 `-server` 后端镜像会继续发布同样的标签，作为现有 `docker-compose.yml` 和直接部署用户的兼容别名。
 
 ## 准备条件
 
@@ -19,7 +21,7 @@ docker login ghcr.io -u YOUR_GITHUB_USERNAME
 
 密码应使用具有 `read:packages` 权限的 [GitHub Personal Access Token](https://github.com/settings/tokens)。
 
-所有镜像均使用相同的标签语义：`latest` 表示 `main` 的最新构建；`0.7.0`、`0.7`、`0` 表示发布版本；`sha-abc1234` 表示指定提交。发布镜像同时包含 `linux/amd64` 与 `linux/arm64` 变体，Docker 会根据宿主机架构自动选择 x86_64 或 ARM64 版本。
+所有角色镜像均使用相同的标签语义：`latest` 表示 `main` 的最新构建；`v0.7.8` 表示与客户端完全一致的正式发布标签；`0.7.8`、`0.7`、`0` 是由该正式标签派生的便捷标签；`sha-abc1234` 表示指定提交。根目录 `package.json` 的 `version` 是客户端和 Docker 正式发布的唯一版本来源；只有与该版本完全匹配的 `v<version>` Git 标签才能发布正式镜像。发布镜像同时包含 `linux/amd64` 与 `linux/arm64` 变体，Docker 会根据宿主机架构自动选择 x86_64 或 ARM64 版本。
 
 ## 方式一：继续使用现有前后端分离部署
 
@@ -43,7 +45,7 @@ FRONTEND_IMAGE_TAG=0.7.0
 # BACKEND_HOST=backend:3000
 ```
 
-也可以单独运行后端，适用于自行部署前端或只需要 API/MCP 的场景：
+也可以单独运行后端，适用于自行部署前端或只需要 API/MCP 的场景。新部署建议使用规范的 `-backend` 镜像；原有的 `-server` 镜像仍会同步发布相同标签，因此现有用户不需要修改部署：
 
 ```bash
 docker run -d \
@@ -52,19 +54,24 @@ docker run -d \
   -v github-stars-data:/app/data \
   -e API_SECRET="your-api-secret" \
   -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager-server:latest
+  ghcr.io/amintacccp/github-stars-manager-backend:latest
 ```
 
 `/app/data` 中保存 SQLite 数据库和自动生成的 `.encryption-key`。请始终挂载此卷；不要在升级或清理容器时删除它。
 
 ## 方式二：可选的全栈单容器部署
 
-全栈镜像 `ghcr.io/amintacccp/github-stars-manager` 在**一个 Node/Express 进程**中提供前端页面、`/api`、MCP 和 SSE 端点。它不在一个容器中并行管理 nginx 和 Node，因此无需额外的进程管理器。浏览器仍通过同源 `/api` 访问服务端，MCP 地址也保持为 `http://localhost:8080/mcp`。
+全栈镜像 `ghcr.io/amintacccp/github-stars-manager-fullstack` 在**一个 Node/Express 进程**中提供前端页面、`/api`、MCP 和 SSE 端点。它不在一个容器中并行管理 nginx 和 Node，因此无需额外的进程管理器。浏览器仍通过同源 `/api` 访问服务端，MCP 地址也保持为 `http://localhost:8080/mcp`。
 
-最简单的部署方式是使用新增的 Compose 文件。该文件与原来的 `docker-compose.yml` 并列存在，不会覆盖或修改原文件：
+最简单的部署方式是使用新增的 Compose 文件。该文件与原来的 `docker-compose.yml` 并列存在，不会覆盖或修改原文件。为避免新增的网络服务意外以无认证状态启动，Compose 会要求先在 `.env` 设置 `API_SECRET`：
 
 ```bash
-# 在仓库根目录执行
+# 在仓库根目录的 .env 中设置
+API_SECRET=替换为足够长的随机密钥
+# 可选：不设置时会在数据卷中自动生成并保存。
+# ENCRYPTION_KEY=替换为你的加密密钥
+
+# 启动全栈单容器
 docker compose -f docker-compose.fullstack.yml up -d
 
 # 验证健康检查
@@ -90,18 +97,18 @@ docker run -d \
   -v github-stars-data:/app/data \
   -e API_SECRET="your-api-secret" \
   -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager:latest
+  ghcr.io/amintacccp/github-stars-manager-fullstack:latest
 ```
 
 本地构建全栈镜像时，请明确指定新的 Dockerfile：
 
 ```bash
-docker build -f Dockerfile.fullstack -t github-stars-manager:local .
+docker build -f Dockerfile.fullstack -t github-stars-manager-fullstack:local .
 docker run -d \
   --name github-stars-manager-fullstack \
   -p 8080:3000 \
   -v github-stars-data:/app/data \
-  github-stars-manager:local
+  github-stars-manager-fullstack:local
 ```
 
 ## 从现有 Compose 部署迁移到单容器
@@ -177,7 +184,7 @@ docker compose up -d
 
 | 变量 | 分离部署 | 全栈部署 | 说明 |
 |---|---:|---:|---|
-| `API_SECRET` | 可选 | 可选 | 后端 API 的 Bearer Token；未设置时禁用 API 认证。 |
+| `API_SECRET` | 可选 | 全栈 Compose 必填 | 后端 API 的 Bearer Token；独立后端未设置时禁用认证。全栈 Compose 必须设置，以避免新服务无认证启动。 |
 | `ENCRYPTION_KEY` | 可选 | 可选 | 用于加密服务端保存的密钥；未设置时生成并保存至数据卷。 |
 | `DB_PATH` | 可选 | 可选 | SQLite 文件路径，默认位于 `data/data.db`。 |
 | `PORT` | 可选 | 可选 | Node 服务端口，默认 3000；全栈 Compose 默认将宿主机 8080 映射至容器 3000。 |
