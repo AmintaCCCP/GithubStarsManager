@@ -31,13 +31,13 @@ const formatToolDuration = (durationMs?: number): string | null => {
 const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | 'en'): string => {
   const zh = language === 'zh';
   if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
-  if (stage === 'context') return zh ? '固定版本上下文' : 'Pinned source context';
-  if (stage === 'planning') return zh ? '检索计划' : 'Retrieval plan';
-  if (stage === 'retrieval') return zh ? '取证轮次' : 'Evidence retrieval rounds';
-  if (stage === 'verification') return 'Evidence Gate';
-  if (stage === 'replanning') return zh ? '继续检索' : 'Continue retrieval';
-  if (stage === 'escalation') return zh ? '升级到代码' : 'Escalate to code';
-  if (stage === 'answer') return zh ? '最终回答' : 'Final answer';
+  if (stage === 'context') return zh ? '查看项目结构' : 'Inspect repository structure';
+  if (stage === 'planning') return zh ? '制定阅读计划' : 'Plan what to read';
+  if (stage === 'retrieval') return zh ? '阅读相关资料' : 'Read relevant sources';
+  if (stage === 'verification') return zh ? '检查信息是否完整' : 'Check answer completeness';
+  if (stage === 'replanning') return zh ? '补充阅读计划' : 'Plan additional reading';
+  if (stage === 'escalation') return zh ? '补充实现细节' : 'Inspect implementation details';
+  if (stage === 'answer') return zh ? '整理最终回答' : 'Prepare final answer';
   return zh ? '工具调用' : 'Tool call';
 };
 
@@ -61,7 +61,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
-          <p className="mt-0.5 text-muted-foreground">{t('按“理解问题 → 检索计划 → 按需多轮取证 → Evidence Gate → 继续检索/升级代码/已足够 → 最终回答”展示。每轮均按真实执行顺序编号；展开单项可了解读取原因、证据缺口与决策，不会展示隐藏推理、请求报文或密钥。', 'Shown as “Understand → Plan → evidence rounds as needed → Evidence Gate → Continue / escalate / sufficient → Answer”. Every round is numbered in actual execution order. Expand an item to inspect why a file was read, what evidence was missing, and the decision; hidden reasoning, payloads, and secrets are never shown.')}</p>
+          <p className="mt-0.5 text-muted-foreground">{t('这里会展示为回答问题实际查阅的文档、章节和补充资料。信息尚不完整时，助手会根据缺口继续阅读；展开单项可查看读取原因、已覆盖内容和仍需确认的信息。', 'This shows the documents, sections, and supplementary sources actually read to answer your question. When information is incomplete, the assistant continues reading from the gaps. Expand an item to see why it was read, what is covered, and what still needs confirmation.')}</p>
         </div>
         <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
       </div>
