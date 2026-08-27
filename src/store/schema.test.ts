@@ -9,8 +9,9 @@ describe('normalizeRepositoryChatSettings', () => {
     expect(settings.agentBudget).toMatchObject({
       maxTurns: 4,
       maxToolCalls: 7,
-      maxReadFiles: 6,
+      maxReadFiles: 8,
       maxCodeReads: 3,
+      maxNoProgressRounds: 2,
       maxDurationMs: 90_000,
     });
   });
@@ -23,16 +24,18 @@ describe('normalizeRepositoryChatSettings', () => {
         maxToolCalls: 99,
         maxReadFiles: 2,
         maxCodeReads: 12,
+        maxNoProgressRounds: 99,
         maxDurationMs: 999_999,
       },
     });
 
-    expect(settings.maxToolsPerTurn).toBe(24);
+    expect(settings.maxToolsPerTurn).toBe(48);
     expect(settings.agentBudget).toEqual({
       maxTurns: 8,
-      maxToolCalls: 24,
+      maxToolCalls: 48,
       maxReadFiles: 2,
       maxCodeReads: 2,
+      maxNoProgressRounds: 4,
       maxDurationMs: 300_000,
     });
   });

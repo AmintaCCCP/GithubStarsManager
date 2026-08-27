@@ -839,9 +839,9 @@ Repository information:
             </div>
             <div>
               <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具调用上限', 'Maximum tool calls per turn')}</label>
-              <Input id="repository-chat-tool-limit" type="number" min={1} max={24} value={repositoryChatSettings.agentBudget.maxToolCalls} onChange={(event) => {
+              <Input id="repository-chat-tool-limit" type="number" min={1} max={48} value={repositoryChatSettings.agentBudget.maxToolCalls} onChange={(event) => {
                 const parsed = Number(event.target.value);
-                const maxToolCalls = Number.isFinite(parsed) ? Math.min(24, Math.max(1, Math.trunc(parsed))) : 8;
+                const maxToolCalls = Number.isFinite(parsed) ? Math.min(48, Math.max(1, Math.trunc(parsed))) : 20;
                 setRepositoryChatSettings({ maxToolsPerTurn: maxToolCalls, agentBudget: { ...repositoryChatSettings.agentBudget, maxToolCalls } });
               }} />
               <p className="mt-1 text-xs text-muted-foreground">{t('限制只读工具总调用次数，防止无边界检索。', 'Limits all read-only tool calls to prevent unbounded retrieval.')}</p>
@@ -853,6 +853,15 @@ Repository information:
                 const maxTurns = Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 4;
                 setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxTurns } });
               }} />
+            </div>
+            <div>
+              <label htmlFor="repository-chat-no-progress-limit" className="mb-1 block text-sm font-medium text-foreground">{t('连续无进展轮次上限', 'Maximum consecutive no-progress rounds')}</label>
+              <Input id="repository-chat-no-progress-limit" type="number" min={1} max={4} value={repositoryChatSettings.agentBudget.maxNoProgressRounds} onChange={(event) => {
+                const parsed = Number(event.target.value);
+                const maxNoProgressRounds = Number.isFinite(parsed) ? Math.min(4, Math.max(1, Math.trunc(parsed))) : 2;
+                setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxNoProgressRounds } });
+              }} />
+              <p className="mt-1 text-xs text-muted-foreground">{t('连续轮次未取得新的可引用来源时停止，避免重复读取。标准值为 2。', 'Stops repeated retrieval after consecutive rounds without new citable sources. Standard: 2.')}</p>
             </div>
             <div>
               <label htmlFor="repository-chat-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大文件读取数', 'Maximum files read')}</label>

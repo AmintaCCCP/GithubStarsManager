@@ -84,7 +84,7 @@ const turnInput = (question = 'What does this project do?') => ({
   aiConfig,
   language: 'en' as const,
   maxToolsPerTurn: 12,
-  agentBudget: { maxTurns: 4, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxDurationMs: 90_000 },
+  agentBudget: { maxTurns: 4, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
 });
 
 const README = [
@@ -193,6 +193,109 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
     expect(result.content).toContain(overviewRef);
     expect(events.some((event) => event.paramSummary.includes('README.md · Overview'))).toBe(true);
+  });
+
+  it('uses LLM semantic concepts to make differently named retrieval documentation a viable target', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/retrieval-options.md': '# Embedding configuration\n\nSet `searchTopK` and the similarity threshold for semantic retrieval.',
+      'docs/changelog.md': '# Changelog\n\nRelease notes.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        intent: 'usage',
+        entities: ['vector retrieval'],
+        search_concepts: ['semantic search', 'embedding', 'similarity', 'topK'],
+        likely_document_topics: ['embedding configuration', 'retrieval options'],
+        expected_answer: ['how to configure vector retrieval'],
+        target: 'vector retrieval configuration',
+      }))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        expect(user).toContain('Semantic concepts: semantic search, embedding, similarity, topK');
+        expect(user).toContain('Likely document topics: embedding configuration, retrieval options');
+        expect(user).toContain('docs/retrieval-options.md');
+        return plan(target('docs/retrieval-options.md', ['Embedding configuration'], 'vector retrieval configuration'));
+      })
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('how to configure vector retrieval', 'verified', ['/docs/retrieval-options.md - 1-3'])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('Configure the retrieval result count and similarity threshold.', '/docs/retrieval-options.md - 1-3', 'Vector retrieval'));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I use the vector search feature?'));
+
+    expect(readPaths()).toEqual(['README.md', 'docs/retrieval-options.md']);
+    expect(result.content).toContain('/docs/retrieval-options.md - 1-3');
+  });
+
+  it('stops after the configured consecutive no-progress rounds while preserving the insufficient-evidence outcome', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find missing feature documentation')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+        recommendedTargets: [target('README.md', ['Not a real heading'], 'recheck missing feature documentation')],
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck missing feature documentation')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput('Where is the missing feature documented?'),
+      agentBudget: { maxTurns: 4, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(5);
+    expect(result.content).toContain('2 consecutive rounds');
+  });
+
+  it('honors the configured maximum evidence rounds before starting another retrieval plan', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('project overview', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      agentBudget: { maxTurns: 1, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('insufficient');
+  });
+
+  it('honors a configured tool-call budget before issuing an additional repository file read', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('project overview', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+    const events: RepositoryChatToolEvent[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      agentBudget: { maxTurns: 4, maxToolCalls: 1, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 1, maxDurationMs: 90_000 },
+      onToolEvent: (event) => events.push(event as RepositoryChatToolEvent),
+    });
+
+    expect(readPaths()).toEqual([]);
+    expect(events.some((event) => event.status === 'error' && event.detail?.includes('tool or read budget'))).toBe(true);
+    expect(result.content).toContain('insufficient');
   });
 
   it('keeps reading relevant README sections until installation, setup, startup and usage are all verified', async () => {

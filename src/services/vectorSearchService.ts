@@ -5,7 +5,7 @@
  * 2. VectorSearchService — 与 Cloudflare Worker 通信（存/查/删向量）
  */
 
-import type { EmbeddingConfig, VectorSearchConfig, Repository } from '../types';
+import type { EmbeddingConfig, VectorSearchConfig, Repository, VectorIndexMode } from '../types';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 
 // ============================================================
@@ -690,41 +690,78 @@ export async function findSimilarRepositories(
     allRepos: Repository[];
     topK: number;
     threshold: number;
+    /** Fetches the source README when the index itself was built in README mode. */
+    readmeFetcher?: (owner: string, repo: string, signal?: AbortSignal) => Promise<string>;
+    indexMode?: VectorIndexMode;
+    readmeMaxChars?: number;
     signal?: AbortSignal;
   }
 ): Promise<Repository[]> {
-  const { embeddingClient, vectorService, allRepos, topK, threshold, signal } = opts;
+  const {
+    embeddingClient,
+    vectorService,
+    allRepos,
+    topK,
+    threshold,
+    readmeFetcher,
+    indexMode = 'readme',
+    readmeMaxChars = 6000,
+    signal,
+  } = opts;
 
-  // 1. 生成源仓库查询向量
-  const text = buildEmbeddingText(sourceRepo);
+  // An index created from README-enriched documents must be queried with the same
+  // representation. Embedding only the card metadata made the source vector a
+  // different semantic object from every indexed repository and caused relevance
+  // to collapse for feature-rich repositories.
+  let sourceReadme = '';
+  if (indexMode === 'readme' && readmeFetcher) {
+    const [owner, repo] = sourceRepo.full_name.split('/');
+    if (owner && repo) {
+      try {
+        sourceReadme = await readmeFetcher(owner, repo, signal);
+      } catch {
+        // README enrichment improves quality but must not make a usable vector
+        // index unavailable. The metadata representation remains a safe fallback.
+        sourceReadme = '';
+      }
+    }
+  }
+
+  // 1. Generate the source query vector from the same text schema and truncation
+  // policy used during index construction.
+  const text = buildEmbeddingText(sourceRepo, sourceReadme, readmeMaxChars);
   const vectors = await embeddingClient.embed([text], 'query', signal);
   if (!vectors || vectors.length === 0 || !Array.isArray(vectors[0])) {
     throw new Error('Failed to generate embedding for source repository');
   }
   const queryVector = vectors[0];
 
-  // 2. 向量检索（多取 1 个以容纳源仓库自身，随后过滤）
-  //    请求的 topK 需要带上源仓库的 +1 余量，但不超过 Vectorize 的 50 上限。
-  const matches = await vectorService.query(
-    queryVector,
-    { topK: Math.min(topK + 1, VECTORIZE_QUERY_TOPK_LIMIT), threshold },
-    signal
-  );
+  // 2. Over-fetch modestly so the source vector, stale IDs, or duplicate matches
+  // cannot consume the user's requested result count. Results are then restored to
+  // the worker's explicit cosine score order below.
+  const requestedTopK = Math.min(Math.max(topK + 8, topK + 1), VECTORIZE_QUERY_TOPK_LIMIT);
+  const matches = await vectorService.query(queryVector, { topK: requestedTopK, threshold }, signal);
 
-  // 3. 映射回 Repository，建立 id -> repo 索引
+  // 3. Map valid local repositories and sort explicitly by the worker's score.
+  // Relying on incidental response order makes card results change when a Worker
+  // implementation, metadata filter, or stale vector changes its output order.
   const repoById = new Map<number, Repository>();
-  for (const repo of allRepos) {
-    repoById.set(repo.id, repo);
-  }
+  for (const repo of allRepos) repoById.set(repo.id, repo);
 
   const sourceId = String(sourceRepo.id);
-  const results: Repository[] = [];
+  const bestMatchById = new Map<string, { repo: Repository; score: number }>();
   for (const match of matches) {
-    // 过滤掉源仓库自身
     if (match.id === sourceId) continue;
-    const repo = repoById.get(parseInt(match.id, 10));
-    if (repo) results.push(repo);
+    const repositoryId = Number(match.id);
+    if (!Number.isInteger(repositoryId)) continue;
+    const matchedRepository = repoById.get(repositoryId);
+    if (!matchedRepository) continue;
+    const score = Number.isFinite(match.score) ? match.score : Number.NEGATIVE_INFINITY;
+    const current = bestMatchById.get(match.id);
+    if (!current || score > current.score) bestMatchById.set(match.id, { repo: matchedRepository, score });
   }
-
-  return results;
+  return Array.from(bestMatchById.values())
+    .sort((left, right) => right.score - left.score || left.repo.full_name.localeCompare(right.repo.full_name))
+    .slice(0, Math.max(1, topK))
+    .map(({ repo }) => repo);
 }
