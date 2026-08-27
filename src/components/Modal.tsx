@@ -41,6 +41,15 @@ export const Modal: React.FC<ModalProps> = ({
     if (scrollStopTimerRef.current) window.clearTimeout(scrollStopTimerRef.current);
   }, []);
 
+  React.useEffect(() => {
+    if (isOpen) return;
+    if (scrollStopTimerRef.current) {
+      window.clearTimeout(scrollStopTimerRef.current);
+      scrollStopTimerRef.current = null;
+    }
+    setIsScrolling(false);
+  }, [isOpen]);
+
   const handleScroll = () => {
     setIsScrolling(true);
     if (scrollStopTimerRef.current) window.clearTimeout(scrollStopTimerRef.current);
