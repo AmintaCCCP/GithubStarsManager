@@ -144,6 +144,11 @@ const answer = (text: string, source: string, heading = 'Verified answer') => JS
   not_found: [],
 });
 
+const notFoundAnswer = (text: string, source: string) => JSON.stringify({
+  items: [],
+  not_found: [{ text, sources: [source] }],
+});
+
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
     ref: session.sourceRefSha,
@@ -298,6 +303,124 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain('insufficient');
   });
 
+  it('answers vector-search usage after its explicit steps are evidenced and ignores optional tuning invented by the gate', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Vector search',
+        'Open Search, choose AI vector search, and enter a natural-language query.',
+        '',
+        '## Advanced tuning',
+        'Tune threshold and topK only when refining search results.',
+      ].join('\n'),
+    });
+    const vectorUsageRef = '/README.md - 3-5';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        intent: 'usage',
+        explicit_requirements: ['how to use vector search'],
+        necessary_requirements: ['the basic vector-search steps'],
+        optional_enrichment: ['threshold and topK tuning', 'MCP connection details', 'source implementation'],
+        target: 'vector-search usage',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Vector search'], 'basic vector-search steps')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [
+          requirement('how to use vector search', 'verified', [vectorUsageRef]),
+          requirement('the basic vector-search steps', 'verified', [vectorUsageRef]),
+          requirement('threshold and topK tuning', 'missing'),
+        ],
+        missing: ['threshold and topK tuning', 'MCP connection details'],
+        nextAction: 'retrieve_more',
+        recommendedTargets: [target('README.md', ['Advanced tuning'], 'threshold and topK tuning')],
+      }))
+      .mockResolvedValueOnce(answer('Open Search, select AI vector search, then enter a natural-language query.', vectorUsageRef, 'Using vector search'));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I use vector search in this project?'));
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain(vectorUsageRef);
+    expect(result.content).not.toContain('insufficient');
+  });
+
+  it('answers installation and first run without pursuing an optional quick-validation method', async () => {
+    const installationRef = installRef;
+    const startRef = quickStartRef;
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        intent: 'installation',
+        explicit_requirements: ['how to install and start using the project'],
+        necessary_requirements: ['installation command', 'first-run command'],
+        optional_enrichment: ['quick validation method', 'all environment variables', 'troubleshooting'],
+        target: 'installation and first run',
+      }))
+      .mockResolvedValueOnce(plan(
+        target('README.md', ['Installation'], 'installation command'),
+        target('README.md', ['Quick Start'], 'first-run command'),
+      ))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [
+          requirement('how to install and start using the project', 'verified', [installationRef, startRef]),
+          requirement('installation command', 'verified', [installationRef]),
+          requirement('first-run command', 'verified', [startRef]),
+          requirement('quick validation method', 'missing'),
+        ],
+        missing: ['quick validation method'],
+        nextAction: 'retrieve_more',
+        recommendedTargets: [target('docs/configuration.md', ['Environment'], 'quick validation method')],
+      }))
+      .mockResolvedValueOnce(answer('Install dependencies, then create the environment file and run the development command.', startRef, 'Getting started'));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I install and get started with this project?'));
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain(startRef);
+  });
+
+  it('treats threshold and topK configuration as blocking only when the user explicitly asks for them', async () => {
+    configureTreeAndFiles({
+      'README.md': '# Example Project\n\n## Vector search\n\nUse AI vector search from the Search view.',
+      'docs/vector-search.md': '# Configuration\n\nSet `searchThreshold` and `searchTopK` in vector search settings.',
+      'src/vector.ts': 'export const internalVectorImplementation = true;',
+    });
+    const overviewRef = '/README.md - 3-4';
+    const configurationRef = '/docs/vector-search.md - 1-3';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        intent: 'configuration',
+        explicit_requirements: ['how to configure vector-search threshold and topK'],
+        necessary_requirements: [],
+        optional_enrichment: ['internal vector-search implementation'],
+        target: 'vector-search threshold and topK configuration',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Vector search'], 'locate vector-search documentation')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('how to configure vector-search threshold and topK', 'missing')],
+        nextAction: 'retrieve_more',
+        recommendedTargets: [target('docs/vector-search.md', ['Configuration'], 'threshold and topK configuration')],
+      }))
+      .mockResolvedValueOnce(plan(target('docs/vector-search.md', ['Configuration'], 'threshold and topK configuration')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('how to configure vector-search threshold and topK', 'verified', [configurationRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('Set searchThreshold and searchTopK in vector search settings.', configurationRef, 'Vector search configuration'));
+
+    const result = await runRepositoryChatTurn(turnInput('How are vector-search threshold and topK configured?'));
+
+    expect(readPaths()).toEqual(['README.md', 'docs/vector-search.md']);
+    expect(readPaths()).not.toContain('src/vector.ts');
+    expect(result.content).toContain(configurationRef);
+    expect(result.content).not.toContain(overviewRef);
+  });
+
   it('keeps reading relevant README sections until installation, setup, startup and usage are all verified', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ intent: 'installation', expected_answer: ['installation', 'initialization and configuration', 'startup', 'usage entry point'], target: 'installation and getting started' }))
@@ -384,12 +507,15 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
         missing: ['Kubernetes automatic deployment'],
         nextAction: 'stop',
         reason: 'No Kubernetes deployment source was found in the repository.',
-      }));
+      }))
+      .mockResolvedValueOnce(notFoundAnswer('Automatic Kubernetes deployment was not confirmed in the files read.', overviewRef));
 
     const result = await runRepositoryChatTurn(turnInput('Does this project support automatic Kubernetes deployment?'));
 
-    expect(result.content).toContain('insufficient');
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('Automatic Kubernetes deployment was not confirmed');
+    expect(result.content).toContain(overviewRef);
+    expect(result.content).not.toContain('insufficient');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 
   it('repairs invalid structured synthesis once without re-running retrieval', async () => {

@@ -34,7 +34,7 @@ const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | '
   if (stage === 'context') return zh ? '查看项目结构' : 'Inspect repository structure';
   if (stage === 'planning') return zh ? '制定阅读计划' : 'Plan what to read';
   if (stage === 'retrieval') return zh ? '阅读相关资料' : 'Read relevant sources';
-  if (stage === 'verification') return zh ? '检查信息是否完整' : 'Check answer completeness';
+  if (stage === 'verification') return zh ? '评估问题是否已可回答' : 'Assess whether the question is answerable';
   if (stage === 'replanning') return zh ? '补充阅读计划' : 'Plan additional reading';
   if (stage === 'escalation') return zh ? '补充实现细节' : 'Inspect implementation details';
   if (stage === 'answer') return zh ? '整理最终回答' : 'Prepare final answer';
@@ -61,7 +61,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
-          <p className="mt-0.5 text-muted-foreground">{t('这里会展示为回答问题实际查阅的文档、章节和补充资料。信息尚不完整时，助手会根据缺口继续阅读；展开单项可查看读取原因、已覆盖内容和仍需确认的信息。', 'This shows the documents, sections, and supplementary sources actually read to answer your question. When information is incomplete, the assistant continues reading from the gaps. Expand an item to see why it was read, what is covered, and what still needs confirmation.')}</p>
+          <p className="mt-0.5 text-muted-foreground">{t('这里会展示为回答问题实际查阅的文档、章节和补充资料。只有用户问题仍缺少必要来源时，助手才会继续阅读；展开单项可查看读取原因、已确认内容和仍需确认的信息。', 'This shows the documents, sections, and supplementary sources actually read to answer your question. The assistant continues only when a necessary part of your question still lacks evidence. Expand an item to see why it was read, what is confirmed, and what still needs confirmation.')}</p>
         </div>
         <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
       </div>
