@@ -314,7 +314,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                     <article key={message.id} className={`rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <p className="text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
-                        {message.role === 'assistant' && message.content && message.status === 'complete' && (
+                        {message.role === 'assistant' && message.content && message.status === 'complete' && !/未能生成可与精确来源核验的总结性结果|无法完成可验证的判断|did not produce a source-verifiable summary|a verifiable determination cannot be made/i.test(message.content) && (
                           <Button
                             type="button"
                             variant="ghost"
