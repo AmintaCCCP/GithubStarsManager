@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   findSimilarRepositories: vi.fn(),
   forceSyncToBackend: vi.fn(),
   unstarRepository: vi.fn(),
+  getRepositoryReadme: vi.fn(),
   loggerInfo: vi.fn(),
 }));
 
@@ -45,6 +46,7 @@ vi.mock('../../../services/autoSync', () => ({
 vi.mock('../../../services/githubApi', () => ({
   GitHubApiService: class {
     unstarRepository = mocks.unstarRepository;
+    getRepositoryReadme = mocks.getRepositoryReadme;
   },
 }));
 
@@ -251,7 +253,7 @@ describe('useRepositoryCardActions', () => {
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
   });
 
-  it('enters the similar view without triggering a backend sync', async () => {
+  it('enters the similar view with a README-symmetric card query and without triggering a backend sync', async () => {
     mocks.findSimilarRepositories.mockResolvedValue([]);
     const { result } = renderActions();
 
@@ -259,6 +261,12 @@ describe('useRepositoryCardActions', () => {
       await result.current.findSimilar();
     });
 
+    expect(mocks.findSimilarRepositories).toHaveBeenCalledWith(repository, expect.objectContaining({
+      indexMode: 'readme',
+      readmeMaxChars: 6000,
+      readmeFetcher: expect.any(Function),
+      allRepos: storeState.repositories,
+    }));
     expect(storeState.enterSimilarView).toHaveBeenCalledWith([], repository);
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith('未找到相似的仓库。', 'info');

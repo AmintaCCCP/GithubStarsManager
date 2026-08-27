@@ -105,8 +105,12 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           ? repositories.filter(repo => matchesCategory(repo, selectedCategoryObj, categoryMatchMode))
           : [];
       })();
+    // Similar results arrive pre-ranked by the vector worker's cosine score.
+    // Do not let the normal list preference (stars/updated/name) overwrite that
+    // relevance ordering after the card action has entered similar-view mode.
+    if (similarView?.active) return categoryRepositories;
     return sortRepositories(categoryRepositories, searchFilters.sortBy, searchFilters.sortOrder);
-  }, [repositories, selectedCategory, allCategories, categoryMatchMode, searchFilters.sortBy, searchFilters.sortOrder]);
+  }, [repositories, selectedCategory, allCategories, categoryMatchMode, searchFilters.sortBy, searchFilters.sortOrder, similarView?.active]);
 
   // 根据当前筛选的仓库中是否有AI分析内容来动态设置默认显示模式
   const hasAnalyzedRepos = useMemo(() => 

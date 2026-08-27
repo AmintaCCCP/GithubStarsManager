@@ -307,12 +307,21 @@ export const useRepositoryCardActions = ({
         workerUrl: vectorSearchConfig.workerUrl,
         authToken: vectorSearchConfig.authToken,
       });
+      // Indexing enriches documents with README text in readme mode. Mirror that
+      // source representation for card-level similarity without changing SearchBar.
+      const githubApi = githubToken ? new GitHubApiService(githubToken) : null;
+      const readmeFetcher = githubApi
+        ? (owner: string, repo: string, signal?: AbortSignal) => githubApi.getRepositoryReadme(owner, repo, signal)
+        : undefined;
       const similar = await findSimilarRepositories(repository, {
         embeddingClient,
         vectorService,
         allRepos: repositories,
         topK: vectorSearchConfig.searchTopK ?? 30,
         threshold: vectorSearchConfig.searchThreshold ?? 0.35,
+        readmeFetcher,
+        indexMode: vectorSearchConfig.indexMode,
+        readmeMaxChars: vectorSearchConfig.readmeMaxChars,
       });
 
       enterSimilarView(similar, repository);
@@ -335,6 +344,7 @@ export const useRepositoryCardActions = ({
     activeEmbeddingConfig,
     embeddingConfigs,
     enterSimilarView,
+    githubToken,
     isFindingSimilar,
     language,
     repositories,

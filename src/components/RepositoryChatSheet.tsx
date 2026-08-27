@@ -30,42 +30,55 @@ const formatToolDuration = (durationMs?: number): string | null => {
 
 const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | 'en'): string => {
   const zh = language === 'zh';
-  if (stage === 'context') return zh ? '固定版本上下文' : 'Pinned source context';
-  if (stage === 'planning') return zh ? '取证计划' : 'Evidence plan';
-  if (stage === 'retrieval') return zh ? '文件取证' : 'File retrieval';
-  if (stage === 'verification') return zh ? '证据核验' : 'Evidence verification';
-  if (stage === 'answer') return zh ? '结论收敛' : 'Conclusion synthesis';
+  if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
+  if (stage === 'context') return zh ? '查看项目结构' : 'Inspect repository structure';
+  if (stage === 'planning') return zh ? '制定阅读计划' : 'Plan what to read';
+  if (stage === 'retrieval') return zh ? '阅读相关资料' : 'Read relevant sources';
+  if (stage === 'verification') return zh ? '评估问题是否已可回答' : 'Assess whether the question is answerable';
+  if (stage === 'replanning') return zh ? '补充阅读计划' : 'Plan additional reading';
+  if (stage === 'escalation') return zh ? '补充实现细节' : 'Inspect implementation details';
+  if (stage === 'answer') return zh ? '整理最终回答' : 'Prepare final answer';
   return zh ? '工具调用' : 'Tool call';
 };
 
 const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: 'zh' | 'en'; isRunning: boolean }> = ({ events, language, isRunning }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
-  const stageOrder: Array<RepositoryChatToolEvent['stage']> = ['context', 'planning', 'retrieval', 'verification', 'answer'];
   const completed = events.filter((event) => event.status === 'success').length;
   const failed = events.filter((event) => event.status === 'error').length;
   const latest = events[events.length - 1];
-  const grouped = stageOrder.map((stage) => ({ stage, events: events.filter((event) => event.stage === stage) })).filter((group) => group.events.length > 0);
+  const grouped = events.reduce<Array<{ stage: RepositoryChatToolEvent['stage']; round?: number; events: RepositoryChatToolEvent[] }>>((groups, event) => {
+    const previous = groups[groups.length - 1];
+    if (previous && previous.stage === event.stage && previous.round === event.round) {
+      previous.events.push(event);
+    } else {
+      groups.push({ stage: event.stage, round: event.round, events: [event] });
+    }
+    return groups;
+  }, []);
 
   return (
     <section className="mt-4 rounded-lg border border-border bg-muted/15 p-3 text-xs" aria-label={t('Agent 执行摘要', 'Agent execution summary')}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</h4>
-          <p className="mt-0.5 text-muted-foreground">{t('默认显示阶段状态；展开单项可查看对应的只读工具、文件与证据。不会展示隐藏推理、请求报文或密钥。', 'Stage status is shown by default. Expand an item to inspect its read-only tools, files, and evidence. Hidden reasoning, request payloads, and secrets are never shown.')}</p>
+          <p className="mt-0.5 text-muted-foreground">{t('这里会展示为回答问题实际查阅的文档、章节和补充资料。只有用户问题仍缺少必要来源时，助手才会继续阅读；展开单项可查看读取原因、已确认内容和仍需确认的信息。', 'This shows the documents, sections, and supplementary sources actually read to answer your question. The assistant continues only when a necessary part of your question still lacks evidence. Expand an item to see why it was read, what is confirmed, and what still needs confirmation.')}</p>
         </div>
         <span className={`shrink-0 text-[11px] ${failed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{latest ? `${stageLabels(latest.stage, language)} · ${completed}/${events.length}` : `${events.length}`}{failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}</span>
       </div>
       <div className="mt-3 divide-y divide-border/70">
-        {grouped.map((group) => {
+        {grouped.map((group, groupIndex) => {
           const stageHasRunning = group.events.some((event) => event.status === 'running');
           const stageErrors = group.events.filter((event) => event.status === 'error').length;
           const duration = group.events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
           const Icon = stageErrors > 0 ? AlertCircle : stageHasRunning ? CircleDot : CheckCircle2;
+          const label = group.round && ['planning', 'retrieval', 'verification', 'replanning'].includes(group.stage ?? '')
+            ? `${t('第', 'Round ')}${group.round}${t('轮 · ', ' · ')}${stageLabels(group.stage, language)}`
+            : stageLabels(group.stage, language);
           return (
-            <details key={group.stage ?? 'other'} className="group py-2" open={isRunning && stageHasRunning}>
+            <details key={`${group.stage ?? 'other'}-${group.round ?? 'global'}-${groupIndex}`} className="group py-2" open={isRunning && stageHasRunning}>
               <summary className="flex cursor-pointer list-none items-center gap-2">
                 <Icon className={`h-4 w-4 shrink-0 ${stageErrors > 0 ? 'text-destructive' : stageHasRunning ? 'animate-pulse text-primary' : 'text-emerald-500'}`} aria-hidden="true" />
-                <span className="min-w-0 flex-1 font-medium text-foreground">{stageLabels(group.stage, language)}</span>
+                <span className="min-w-0 flex-1 font-medium text-foreground">{label}</span>
                 <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{stageErrors > 0 ? t('需注意', 'Needs attention') : stageHasRunning ? t('进行中', 'In progress') : t('已完成', 'Completed')}{duration > 0 ? ` · ${formatToolDuration(duration)}` : ''}</span>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
               </summary>
@@ -76,8 +89,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                   return (
                     <li key={event.id} className="grid gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium text-foreground">{event.round ? `${t('第', 'Round ')}${event.round}${t('轮 · ', ' · ')}` : ''}{event.paramSummary}</span>
-                        <code className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{event.toolName}</code>
+                        <span className="font-medium text-foreground">{event.paramSummary}</span>
                         <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                       </div>
                       {event.detail && <p className="break-words text-muted-foreground">{event.detail}</p>}
@@ -226,12 +238,13 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading || isSending}>
             {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
-            {t('基于最新版本新建会话', 'New chat from latest')}
+            {t('新建会话', 'New chat')}
           </Button>
           <Button
             type="button"
             variant={showHistory ? 'secondary' : 'ghost'}
             size="sm"
+            className="ml-auto"
             onClick={() => setShowHistory((previous) => !previous)}
             aria-pressed={showHistory}
           >
@@ -293,7 +306,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       t('这个仓库是做什么的？', 'What does this repository do?'),
-                      t('这个项目怎样使用？', 'How do I use this project?'),
+                      t('如何安装并开始使用这个项目？', 'How do I install and get started with this project?'),
                     ].map((prompt) => (
                       <Button key={prompt} type="button" variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left text-xs" onClick={() => setDraft(prompt)}>
                         {prompt}
@@ -374,7 +387,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               id="repository-chat-draft"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={t('询问实现、部署、架构或创作内容…', 'Ask about implementation, deployment, architecture, or content…')}
+              placeholder={t('例如：这个仓库是做什么的？如何安装和使用？', 'For example: What does this repository do? How do I install and use it?')}
               className="min-h-20 resize-y text-sm"
               disabled={!activeSession || !canChat || isSending}
             />
@@ -389,7 +402,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             )}
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>{t('来源优先：实现事实会附带仓库来源；证据不足时会明确说明。', 'Source-first: implementation claims include repository sources; insufficient evidence is stated clearly.')}</p>
+            <p>{t('适合围绕仓库文档、功能和使用方式进行简明问答；复杂代码分析、跨文件改造或调试建议先克隆代码到本地，再使用专业 Coding Agent 完成。', 'Best for concise questions about a repository’s documentation, features, and usage. For complex code analysis, cross-file changes, or debugging, clone the repository locally and use a dedicated coding agent.')}</p>
             {!isSending && messages.some((message) => message.status === 'error' || message.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
           </div>
         </form>

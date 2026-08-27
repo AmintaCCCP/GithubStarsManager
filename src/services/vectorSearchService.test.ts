@@ -7,6 +7,7 @@ import {
   indexAllRepos,
   needsReindex,
   EMBEDDING_FORMAT_VERSION,
+  findSimilarRepositories,
 } from './vectorSearchService';
 
 // Minimal mock: only the `.embed` method is used by embedWithFallback.
@@ -349,5 +350,91 @@ describe('embedWithFallback', () => {
     controller.abort();
     const client = makeClient(async () => [vec(1)]);
     await expect(embedWithFallback(['a'], client, controller.signal, 6000)).rejects.toThrow('Aborted');
+  });
+});
+
+
+describe('findSimilarRepositories', () => {
+  const makeSimilarityClients = (matches: Array<{ id: string; score: number }>) => {
+    const embeddingClient = {
+      embed: vi.fn(async () => [[0.1, 0.2, 0.3]]),
+    } as unknown as Parameters<typeof findSimilarRepositories>[1]['embeddingClient'];
+    const vectorService = {
+      query: vi.fn(async () => matches),
+    } as unknown as Parameters<typeof findSimilarRepositories>[1]['vectorService'];
+    return { embeddingClient, vectorService };
+  };
+
+  it('uses the source README and index truncation when querying a README-enriched index', async () => {
+    const source = makeRepository(1, { description: 'Generic metadata only' });
+    const { embeddingClient, vectorService } = makeSimilarityClients([{ id: '2', score: 0.82 }]);
+    const readmeFetcher = vi.fn(async () => '# Semantic search\nEmbeddings and similarity settings.');
+
+    const results = await findSimilarRepositories(source, {
+      embeddingClient,
+      vectorService,
+      allRepos: [source, makeRepository(2)],
+      topK: 3,
+      threshold: 0.2,
+      indexMode: 'readme',
+      readmeMaxChars: 1234,
+      readmeFetcher,
+    });
+
+    expect(readmeFetcher).toHaveBeenCalledWith('owner', 'repo-1', undefined);
+    expect(embeddingClient.embed).toHaveBeenCalledWith(
+      [expect.stringContaining('Embeddings and similarity settings.')],
+      'query',
+      undefined,
+    );
+    expect(results.map((repository) => repository.id)).toEqual([2]);
+  });
+
+  it('does not fetch README content for a description-mode index', async () => {
+    const source = makeRepository(1);
+    const { embeddingClient, vectorService } = makeSimilarityClients([{ id: '2', score: 0.82 }]);
+    const readmeFetcher = vi.fn(async () => '# This must not be fetched');
+
+    await findSimilarRepositories(source, {
+      embeddingClient,
+      vectorService,
+      allRepos: [source, makeRepository(2)],
+      topK: 3,
+      threshold: 0.2,
+      indexMode: 'description',
+      readmeFetcher,
+    });
+
+    expect(readmeFetcher).not.toHaveBeenCalled();
+    expect(embeddingClient.embed).toHaveBeenCalledWith(
+      [expect.not.stringContaining('This must not be fetched')],
+      'query',
+      undefined,
+    );
+  });
+
+  it('filters self, duplicates, and stale vector IDs then orders valid repositories by score', async () => {
+    const source = makeRepository(1);
+    const repo2 = makeRepository(2, { full_name: 'owner/second' });
+    const repo3 = makeRepository(3, { full_name: 'owner/third' });
+    const { embeddingClient, vectorService } = makeSimilarityClients([
+      { id: '2', score: 0.52 },
+      { id: '999', score: 0.99 },
+      { id: '1', score: 1 },
+      { id: '3', score: 0.91 },
+      { id: '2', score: 0.8 },
+    ]);
+
+    const results = await findSimilarRepositories(source, {
+      embeddingClient,
+      vectorService,
+      allRepos: [source, repo2, repo3],
+      topK: 3,
+      threshold: 0.2,
+      indexMode: 'description',
+    });
+
+    expect(vectorService.query).toHaveBeenCalledWith([0.1, 0.2, 0.3], { topK: 11, threshold: 0.2 }, undefined);
+    expect(results.map((repository) => repository.id)).toEqual([3, 2]);
   });
 });
