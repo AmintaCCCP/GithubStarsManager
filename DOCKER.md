@@ -58,28 +58,34 @@ docker compose -f docker-compose.fullstack.yml up -d
 curl http://localhost:8080/api/health
 ```
 
-You can also run the full-stack image directly. The data volume stores both SQLite data and the automatically generated encryption key, so keep the `-v` option when upgrading or recreating the container.
+You can also run the full-stack image directly. The data volume stores SQLite data and an automatically generated encryption key, so keep the `-v` option when upgrading or recreating the container. A direct `docker run` does not load Compose's `.env` file; export `IMAGE_TAG` (or replace it inline) to pin the image version.
 
 ```bash
+# Set this to 0.7.8 for a version-pinned deployment, or latest for main.
+export IMAGE_TAG=0.7.8
+
 docker run -d \
   --name github-stars-manager-fullstack \
   -p 8080:3000 \
   -v github-stars-data:/app/data \
   -e API_SECRET="your-secret-here" \
-  -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager-fullstack:latest
+  ghcr.io/amintacccp/github-stars-manager-fullstack:${IMAGE_TAG}
 ```
 
-Add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
+For a new deployment, omit `ENCRYPTION_KEY` and the service generates a key in the persisted data volume. If an existing deployment already uses `ENCRYPTION_KEY`, always pass the **exact same value** on every recreation and during migration; an environment-provided key overrides the file key, and changing it makes already encrypted credentials unreadable.
+
+For Compose deployments, add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
 
 ```bash
 API_SECRET=replace-with-a-long-random-secret
 IMAGE_TAG=0.7.8
+# Set this only when preserving an existing environment-provided key.
+# ENCRYPTION_KEY=the-exact-existing-key
 ```
 
 ### Migrate an Existing Docker Compose Deployment
 
-Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. To migrate, first back up the current Docker volume. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
+Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. Before migration, preserve the exact existing `API_SECRET` in the full-stack `.env`; this keeps current browser, API, and MCP clients authenticated without reconfiguration. If the existing service explicitly sets `ENCRYPTION_KEY`, copy the **same value** into the full-stack `.env` as well. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
 
 ```bash
 # Stop all SQLite writers without deleting the named data volume.
@@ -94,7 +100,8 @@ docker run --rm \
   -v "$PWD":/backup \
   alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
 
-# Set API_SECRET in .env before starting the new network-facing service.
+# Copy the current API_SECRET into .env before startup; copy the same
+# ENCRYPTION_KEY too when the old service set one explicitly.
 # Reuse the same Compose project directory and volume name.
 docker compose -f docker-compose.fullstack.yml up -d
 # For a custom project: docker compose -p <project-name> -f docker-compose.fullstack.yml up -d

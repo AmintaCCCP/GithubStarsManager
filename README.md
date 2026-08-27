@@ -245,9 +245,10 @@ docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
-An additional **optional full-stack image** (`ghcr.io/amintacccp/github-stars-manager-fullstack`) is available for users who prefer one container, one image tag, and one persistent data volume. It serves the same web UI, `/api`, and MCP endpoints from one origin:
+An additional **optional full-stack image** (`ghcr.io/amintacccp/github-stars-manager-fullstack`) is available for users who prefer one container, one image tag, and one persistent data volume. It serves the same web UI, `/api`, and MCP endpoints from one origin. Set `API_SECRET` in a root `.env` file first; the full-stack Compose file refuses to start a new unauthenticated deployment:
 
 ```bash
+API_SECRET=replace-with-a-long-random-secret
 docker compose -f docker-compose.fullstack.yml up -d
 ```
 
