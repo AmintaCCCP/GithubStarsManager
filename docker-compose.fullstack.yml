@@ -1,0 +1,14 @@
+services:
+  app:
+    image: ghcr.io/amintacccp/github-stars-manager:${IMAGE_TAG:-latest}
+    ports:
+      - "8080:3000"
+    environment:
+      API_SECRET: ${API_SECRET:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  backend-data:

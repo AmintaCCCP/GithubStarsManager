@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+
+# The frontend build only produces static assets. Build it once on the native
+# BuildKit platform instead of emulating ARM64 for Node/Vite work.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-build
+WORKDIR /frontend
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Keep this stage target-platform aware: better-sqlite3 may contain native code
+# and must match the final amd64 or arm64 Node runtime.
+FROM node:22-alpine AS server-build
+WORKDIR /app
+COPY server/package*.json ./
+RUN npm ci
+COPY server/ ./
+RUN npm run build && npm prune --omit=dev
+
+# One Node/Express process serves the SPA, API and MCP endpoints. This avoids
+# introducing nginx plus process supervision into a single-container deployment.
+FROM node:22-alpine AS runtime
+ENV NODE_ENV=production \
+    STATIC_DIR=/app/public
+WORKDIR /app
+COPY --from=server-build --chown=node:node /app/dist ./dist
+COPY --from=server-build --chown=node:node /app/node_modules ./node_modules
+COPY --from=server-build --chown=node:node /app/package.json ./package.json
+COPY --from=frontend-build --chown=node:node /frontend/dist ./public
+RUN mkdir -p /app/data && chown node:node /app/data
+USER node
+VOLUME ["/app/data"]
+EXPOSE 3000
+CMD ["node", "dist/index.js"]

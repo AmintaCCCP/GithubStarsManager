@@ -1,6 +1,6 @@
 # Docker Deployment
 
-This application can be deployed using Docker with minimal configuration. The Docker setup serves the static frontend files via Nginx and handles CORS properly.
+This application can be deployed using Docker with minimal configuration. Existing deployments use separate frontend and backend containers; an additional opt-in full-stack image is available for users who prefer a single container. The existing images and `docker-compose.yml` remain supported and unchanged.
 
 ## Prerequisites
 
@@ -32,6 +32,69 @@ Available image tags (both images share the same tagging scheme):
 Published images:
 - Backend: `ghcr.io/amintacccp/github-stars-manager-server`
 - Frontend: `ghcr.io/amintacccp/github-stars-manager-frontend`
+- Full stack (optional): `ghcr.io/amintacccp/github-stars-manager`
+
+## Optional Single-Container Full-Stack Deployment
+
+The full-stack image is an additional deployment option. It runs one Node/Express process that serves the web application, `/api`, and MCP endpoints from the same origin. It does **not** replace the standalone backend image, frontend image, or existing `docker-compose.yml` workflow.
+
+Use the dedicated Compose file for the simplest setup:
+
+```bash
+# This leaves docker-compose.yml unchanged for existing deployments.
+docker compose -f docker-compose.fullstack.yml up -d
+
+# Open the application at http://localhost:8080
+curl http://localhost:8080/api/health
+```
+
+You can also run the full-stack image directly. The data volume stores both SQLite data and the automatically generated encryption key, so keep the `-v` option when upgrading or recreating the container.
+
+```bash
+docker run -d \
+  --name github-stars-manager-fullstack \
+  -p 8080:3000 \
+  -v github-stars-data:/app/data \
+  -e API_SECRET="your-secret-here" \
+  -e ENCRYPTION_KEY="your-encryption-key" \
+  ghcr.io/amintacccp/github-stars-manager:latest
+```
+
+Set `IMAGE_TAG` in a `.env` file to pin a full-stack version:
+
+```bash
+IMAGE_TAG=0.7.0
+```
+
+### Migrate an Existing Docker Compose Deployment
+
+Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. To migrate, first back up the current Docker volume. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
+
+```bash
+# Create a portable backup of the SQLite database and encryption key.
+docker run --rm \
+  -v <existing-backend-data-volume>:/data:ro \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
+
+# Stop the split deployment without deleting its named volume.
+docker compose down
+
+# Reuse the same Compose project directory and volume name.
+docker compose -f docker-compose.fullstack.yml up -d
+
+# Verify the UI, API, and persisted data.
+curl http://localhost:8080/api/health
+```
+
+Both Compose files declare the same `backend-data` volume key. When they run from the same directory with the same Compose project name, the full-stack deployment reuses the existing SQLite database and `.encryption-key`. If you normally use `docker compose -p <project>`, pass the same `-p <project>` value for the migration command.
+
+To roll back, stop the full-stack container and start the original split deployment again. Do not add `-v` to either command, because that would delete the persisted data volume.
+
+```bash
+docker compose -f docker-compose.fullstack.yml down
+docker compose up -d
+```
 
 To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
 `FRONTEND_IMAGE_TAG` in your `.env` file:
@@ -185,12 +248,12 @@ docker stop github-stars-backend && docker rm github-stars-backend
 This Docker setup does not affect the existing desktop packaging workflows. The GitHub Actions workflow for building desktop applications remains unchanged and continues to work as before.
 ## MCP Server (Agent access)
 
-With Docker Compose, the backend MCP endpoints are exposed through nginx (frontend container) so agents on the host do not need a published backend port:
+With the existing Docker Compose deployment, the backend MCP endpoints are exposed through nginx (frontend container) so agents on the host do not need a published backend port. The optional full-stack Compose deployment exposes the same endpoint URLs directly from its single Node service:
 
 | Endpoint | URL (default compose) | Notes |
 |----------|------------------------|--------|
-| Streamable HTTP | `http://localhost:8080/mcp` | Preferred for Claude Code / modern clients |
-| Legacy SSE | `http://localhost:8080/mcp/sse` | GET opens `text/event-stream`; client then POSTs to `/mcp/sse/messages?sessionId=…` |
+| Streamable HTTP | `http://localhost:8080/mcp` | Same URL for split Compose and optional full-stack Compose; preferred for Claude Code / modern clients |
+| Legacy SSE | `http://localhost:8080/mcp/sse` | Same URL for split Compose and optional full-stack Compose; GET opens `text/event-stream`, then clients POST to `/mcp/sse/messages?sessionId=…` |
 | Legacy SSE (alias) | `http://localhost:8080/sse` | Same protocol; messages at `/messages?sessionId=…` |
 
 **Desktop (Electron)** after enabling MCP in Settings:
