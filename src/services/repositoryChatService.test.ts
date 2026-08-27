@@ -239,6 +239,74 @@ describe('runRepositoryChatTurn evidence-driven loop', () => {
     expect(result.content).toContain('`/README.md - 1-3`');
   });
 
+  it('uses fallback Evidence Gate escalation when code is required and documentation is exhausted', async () => {
+    configureTreeAndFiles({
+      'README.md': '# Example\n\nThis document does not describe the implementation.',
+      'src/App.tsx': 'export const App = () => <main>implementation detail</main>;',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ intent: 'implementation', code_need: 'required', expected_evidence: ['implementation detail'] }))
+      .mockResolvedValueOnce(plan('README.md'))
+      .mockResolvedValueOnce('not valid Evidence Gate JSON')
+      .mockResolvedValueOnce(plan('src/App.tsx'))
+      .mockResolvedValueOnce(gate('sufficient', 'The code file directly answers the implementation question.'))
+      .mockResolvedValueOnce('The implementation renders the required detail. `/src/App.tsx - 1`');
+
+    const result = await runRepositoryChatTurn(turnInput('How is the implementation structured?'));
+
+    expect(mocks.getRepositoryFile.mock.calls.map((call: unknown[]) => call[2])).toEqual(['README.md', 'src/App.tsx']);
+    expect(result.content).toContain('`/src/App.tsx - 1`');
+  });
+
+  it('does not synthesize an answer when the final Evidence Gate has not confirmed sufficient coverage', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan('README.md'))
+      .mockResolvedValueOnce(gate('insufficient', 'The file does not answer the question.'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('evidence');
+    expect(result.content).not.toContain('documented example project');
+  });
+
+  it('rejects a draft with an uncited factual section after the synthesis-only repair attempt', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan('README.md'))
+      .mockResolvedValueOnce(gate('sufficient'))
+      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`\n\nIt also offers an uncited deployment guarantee.')
+      .mockResolvedValueOnce('The project is documented. `/README.md - 1-3`\n\nIt also offers an uncited deployment guarantee.');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(mocks.getRepositoryFile).toHaveBeenCalledTimes(1);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(5);
+    expect(result.content).toContain('source-verifiable summary');
+  });
+
+  it('propagates cancellation raised after evidence retrieval and before final synthesis', async () => {
+    const controller = new AbortController();
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan('README.md'))
+      .mockResolvedValueOnce(gate('sufficient'));
+
+    const turn = runRepositoryChatTurn({
+      ...turnInput(),
+      signal: controller.signal,
+      onToolEvent: (event) => {
+        if (event.toolName === 'evidence_gate' && event.status === 'success') {
+          controller.abort(new DOMException('Cancelled before synthesis.', 'AbortError'));
+        }
+      },
+    });
+
+    await expect(turn).rejects.toThrow('Cancelled before synthesis.');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+  });
+
   it('never writes to the legacy vector index during a repository-chat turn', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
