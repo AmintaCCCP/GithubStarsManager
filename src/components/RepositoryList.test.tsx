@@ -83,6 +83,7 @@ const mockUseAppStore = vi.mocked(useAppStore);
 beforeEach(() => {
   vi.clearAllMocks();
   storeState.repositoryViewMode = 'grid';
+  storeState.similarView = null;
   Object.assign(searchFilters, { sortBy: 'stars', sortOrder: 'desc' });
   mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
   Object.assign(mockUseAppStore, {
@@ -101,6 +102,27 @@ describe('RepositoryList view mode controls', () => {
       'higher-star',
       'repository-one',
       'lower-star',
+    ]);
+  });
+
+  it('preserves the card vector-result order in similar view instead of applying the normal star sort', () => {
+    const lowScoreLowStarRepository = { ...repository, id: 2, name: 'first-by-vector-score', full_name: 'owner/first-by-vector-score', stargazers_count: 1 };
+    const highScoreHighStarRepository = { ...repository, id: 3, name: 'second-by-vector-score', full_name: 'owner/second-by-vector-score', stargazers_count: 999 };
+    storeState.similarView = {
+      active: true,
+      anchorRepoFullName: repository.full_name,
+      anchorRepoName: repository.name,
+      similarResults: [lowScoreLowStarRepository, highScoreHighStarRepository, repository],
+      originalSearchResults: [],
+      originalSearchFilters: searchFilters,
+    } as never;
+
+    render(<RepositoryList repositories={[lowScoreLowStarRepository, highScoreHighStarRepository, repository]} selectedCategory="all" />);
+
+    expect(screen.getAllByTestId(/repository-card-/).map((card) => card.textContent)).toEqual([
+      'first-by-vector-score',
+      'second-by-vector-score',
+      'repository-one',
     ]);
   });
 
