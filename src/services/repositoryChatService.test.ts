@@ -661,6 +661,21 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).not.toContain('已验证来源');
   });
 
+  it('canonicalizes citations with slash-prefix and em-dash variants', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce('## Overview\n\nA documented example / /README.md — 3-4`` for repository research.');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // `/ /README.md — 3-4`` `（斜杠+空格、全角破折号、多余闭合反引号）规范化为精确引用。
+    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).not.toContain('/ /README.md');
+    expect(result.content).not.toContain('``');
+  });
+
   it('maps footnote-style citations onto verified sources instead of discarding the answer', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
@@ -692,7 +707,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(chunks.length).toBeGreaterThan(0);
   });
 
-  it('keeps an answer with partial citations instead of replacing it with the digest', async () => {
+  it('demotes uncited sections instead of discarding the whole answer', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
       .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
@@ -710,9 +725,12 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    expect(result.content).toContain('Uncited prose without any reference.');
+    // 剪枝降级：有引用的小节保留，未引用段落显式移入“未证实”区块而不是丢弃。
+    expect(result.content).toContain('A documented example for repository research.');
     expect(result.content).toContain(overviewRef);
-    expect(result.content).not.toContain('已验证来源');
+    expect(result.content).toContain('Uncited prose without any reference.');
+    expect(result.content).toContain('Unverified or missing information');
+    expect(result.content).not.toContain('Verified sources');
     expect(result.content).not.toContain('insufficient');
   });
 

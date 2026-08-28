@@ -2489,9 +2489,11 @@ html.dark .markdown-body {
 }
 
 .markdown-table-scroll table {
-  /* 覆盖 github-markdown-css 的 table { display: block; width: max-content }，
-     让滚动由包装层接管，表格自身保持块级自动宽度。 */
+  /* 上游的 max-width:100% 会在包装层内压缩表格；滚动交给包装层，表格按
+     内容宽度展开（width:max-content 来自上游 github-markdown 规则）。 */
   min-width: 0;
+  max-width: none;
+  overflow: visible;
 }
 
 /* ---- 仓库问答侧栏的排版安全 ---------------------------------------------- */
@@ -2509,4 +2511,11 @@ html.dark .markdown-body {
 /* 长 URL / 长 token（内联代码、表格单元格）允许断行，避免横向溢出。 */
 .repository-chat-markdown :is(code, th, td) {
   overflow-wrap: anywhere;
+}
+
+/* 代码块与 ASCII 文本绘图不换行（会破坏图形），改为在块内横向滚动，
+   不把消息卡片或侧栏撑出横向溢出。 */
+.repository-chat-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
