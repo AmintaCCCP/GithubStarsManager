@@ -9,6 +9,7 @@ import { safeWriteText } from '../utils/clipboardUtils';
 import { useShallow } from 'zustand/react/shallow';
 import { useRepositoryChatSessions } from '../features/repository-chat/hooks/useRepositoryChatSessions';
 import { useRepositoryChat } from '../features/repository-chat/hooks/useRepositoryChat';
+import { useTurnStatusAnnouncement } from '../features/repository-chat/hooks/useTurnStatusAnnouncement';
 import { RepositoryChatHistoryPanel } from './RepositoryChatHistoryPanel';
 import MarkdownRenderer from './MarkdownRenderer';
 import { CitationBadge } from '../features/repository-chat/components/CitationBadge';
@@ -142,10 +143,9 @@ const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]
       .map((id) => evidenceById[id])
       .filter((evidence): evidence is ToolEvidence => Boolean(evidence));
     if (evidences.length === 0) return null;
-    const evidence = resolveCitation(text, evidences);
-    if (!evidence?.path) return null;
-    const lineStart = evidence.lineStart ?? 1;
-    return <CitationBadge target={{ evidence, path: evidence.path, lineStart, lineEnd: evidence.lineEnd ?? lineStart }} language={language} />;
+    const resolved = resolveCitation(text, evidences);
+    if (!resolved) return null;
+    return <CitationBadge target={resolved} language={language} />;
   }, [evidenceIds, evidenceById, language]);
   return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" renderInlineCode={renderInlineCode} />;
 });
@@ -274,17 +274,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
 
   // 仅在回答从流式进入终态时向屏幕阅读器通报一次，避免 aria-live 在流式期间反复朗读。
   const lastAssistantStatus = lastMessage?.role === 'assistant' ? lastMessage.status : '';
-  const [statusAnnouncement, setStatusAnnouncement] = useState('');
-  const prevAssistantStatusRef = useRef('');
-  useEffect(() => {
-    const previous = prevAssistantStatusRef.current;
-    prevAssistantStatusRef.current = lastAssistantStatus;
-    if (previous !== 'streaming') return;
-    const zh = language === 'zh';
-    if (lastAssistantStatus === 'complete') setStatusAnnouncement(zh ? '回答已完成。' : 'Answer complete.');
-    else if (lastAssistantStatus === 'error') setStatusAnnouncement(zh ? '回答生成失败。' : 'Answer generation failed.');
-    else if (lastAssistantStatus === 'aborted') setStatusAnnouncement(zh ? '已停止生成。' : 'Generation stopped.');
-  }, [lastAssistantStatus, language]);
+  const statusAnnouncement = useTurnStatusAnnouncement(lastAssistantStatus, language);
 
   const isCopyableMessage = (message: RepositoryChatMessage): boolean => (
     message.role === 'assistant'
@@ -570,7 +560,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
-            {!isSending && messages.some((message) => message.status === 'error' || message.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
+            {!isSending && lastMessage?.role === 'assistant' && (lastMessage.status === 'error' || lastMessage.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
           </div>
         </form>
       </SheetContent>

@@ -1306,7 +1306,8 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       input.signal?.addEventListener('abort', abortForCaller, { once: true });
       const timeoutId = globalThis.setTimeout(
         () => controller.abort(new DOMException('Repository chat answer step timed out.', 'TimeoutError')),
-        Math.max(remainingMs(), ANSWER_STEP_TIMEOUT_MS),
+        // 固定 180s：不随剩余取证预算放大，无响应的上游不会额外阻塞回答流程。
+        ANSWER_STEP_TIMEOUT_MS,
       );
       try {
         streamed = await ai.generateChatTextStream({
