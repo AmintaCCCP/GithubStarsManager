@@ -1,4 +1,4 @@
-name: Publish Docker Image to GHCR
+name: Publish Backend Docker Image to GHCR
 
 on:
   push:
@@ -9,12 +9,14 @@ on:
 # Keep only the newest run for each branch or tag, while allowing release tags
 # and main to publish independently.
 concurrency:
-  group: server-image-${{ github.ref }}
+  group: backend-image-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-server
+  IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-backend
+  # Compatibility alias used by the existing docker-compose.yml and direct users.
+  LEGACY_IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-server
 
 jobs:
   build-and-push:
@@ -30,6 +32,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Verify release tag matches client version
+        if: github.ref_type == 'tag'
+        run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -48,11 +54,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.LEGACY_IMAGE_NAME }}
           tags: |
             # branch push → "latest"
             type=raw,value=latest,enable={{is_default_branch}}
             # tag push → "v1.2.3", "1.2.3", "1.2", "1"
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -67,6 +76,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Do not share the default `buildkit` scope with the frontend image.
-          cache-from: type=gha,scope=github-stars-manager-server-${{ github.ref_type }},timeout=5m
-          cache-to: type=gha,scope=github-stars-manager-server-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true
+          # Do not share the default `buildkit` scope with frontend or full-stack images.
+          cache-from: type=gha,scope=github-stars-manager-backend-${{ github.ref_type }},timeout=5m
+          cache-to: type=gha,scope=github-stars-manager-backend-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true

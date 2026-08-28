@@ -237,13 +237,22 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ### 🐳 Run With Docker
 
-Pre-built backend **and frontend** images are available on GHCR — no local build required:
+Pre-built backend **and frontend** images are available on GHCR — no local build required. Existing Docker users should continue to use the unchanged two-service Compose deployment:
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
 docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
+
+An additional **optional full-stack image** (`ghcr.io/amintacccp/github-stars-manager-fullstack`) is available for users who prefer one container, one image tag, and one persistent data volume. It serves the same web UI, `/api`, and MCP endpoints from one origin. Set `API_SECRET` in a root `.env` file first; the full-stack Compose file refuses to start a new unauthenticated deployment:
+
+```bash
+API_SECRET=replace-with-a-long-random-secret
+docker compose -f docker-compose.fullstack.yml up -d
+```
+
+This new option does not replace or modify the existing frontend image, backend image, `docker-compose.yml`, or desktop clients. The canonical role names are `-frontend`, `-backend`, and `-fullstack`; the existing `-server` backend image remains a compatibility alias for current deployments. Formal `vX.Y.Z` Docker tags must match the root `package.json` client version, while `latest` and `sha-*` remain development and traceability tags. See [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment) for full-stack deployment, migration, backup, and rollback instructions.
 
 > If the package is private, run `docker login ghcr.io` first (use a [PAT](https://github.com/settings/tokens) with `read:packages` scope).
 
@@ -260,14 +269,14 @@ The app works fully without a backend (pure frontend, localStorage). An optional
 ```bash
 docker-compose up -d
 ```
-Frontend on port 8080, backend on port 3000. Data persisted in a Docker volume.
+Frontend on port 8080, backend on port 3000. Data is persisted in a Docker volume. This existing split deployment remains the recommended option when you need to version, operate, or scale the frontend and backend independently; the optional single-container alternative is documented in [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment).
 
 To customize, create a `.env` file:
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=0.6.2   # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.6.2  # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.7.8   # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.7.8  # pin frontend image version (default: latest)
 ```
 
 #### Backend only (docker run)
