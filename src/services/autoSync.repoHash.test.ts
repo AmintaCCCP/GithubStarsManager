@@ -1,8 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
-import { repositoryPayloadHash } from './autoSync';
+import { repositoryPayloadHash, syncFromBackend } from './autoSync';
+import { backend } from './backendAdapter';
+import { useAppStore } from '../store/useAppStore';
+
+vi.mock('./backendAdapter', () => ({
+  backend: {
+    isAvailable: true,
+    fetchRepositories: vi.fn(),
+    fetchReleases: vi.fn(),
+    fetchAIConfigs: vi.fn(),
+    fetchWebDAVConfigs: vi.fn(),
+    fetchEmbeddingConfigs: vi.fn(),
+    fetchVectorSearchConfig: vi.fn(),
+    fetchSettings: vi.fn(),
+  },
+}));
+
+// src/test/setup.ts replaces the store with a hook-level mock for component
+// tests. syncFromBackend drives the real store directly (setRepositories,
+// getState), so restore the actual module for this file.
+vi.mock('../store/useAppStore', async () => await vi.importActual('../store/useAppStore'));
 
 // Regression for Issue #304: the repos hash committed after a pull must be the
 // RAW backend hash. Committing quickHash(merged) instead made the next poll's
@@ -147,6 +167,59 @@ it('omits client-only fields from both pull and successful-push hashes', () => {
 
     expect(repositoryPayloadHash(localRepos)).toBe(repositoryPayloadHash(backendPayload));
     expect(JSON.stringify(stripLocalRepositoryFields(localRepos))).toBe(JSON.stringify(backendPayload));
+  });
+});
+
+describe('syncFromBackend two-pull loop (Issue #304 end-to-end)', () => {
+  const backendPayload = [createRepository(1, { ai_summary: 'from backend' })];
+
+  beforeEach(() => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: backendPayload, total: 1 });
+    vi.mocked(backend.fetchReleases).mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchVectorSearchConfig).mockResolvedValue({
+      enabled: false,
+      workerUrl: '',
+      authToken: '',
+      embeddingConfigId: '',
+      indexMode: 'readme',
+      readmeMaxChars: 6000,
+    });
+    vi.mocked(backend.fetchSettings).mockResolvedValue({});
+  });
+
+  it('applies a changed backend payload once; an unchanged second pull is a no-op', async () => {
+    // The local repo carries client-only metadata (analysis_error) the backend
+    // never stores, so quickHash(merged) — the pre-fix commit value — can never
+    // equal the raw backend hash. If the pull side ever reverts to committing
+    // quickHash(merged), the second pull below re-applies setRepositories
+    // (new repositories reference) and this test fails.
+    const localRepo = createRepository(1, { ai_summary: 'from backend', analysis_error: 'stale local error' });
+    useAppStore.setState({
+      repositories: [localRepo],
+      searchResults: [localRepo],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: 'repo' },
+    });
+    const searchResultsBeforePull = useAppStore.getState().searchResults;
+
+    await syncFromBackend(); // pull 1 — payload differs from the initial hash → applied
+
+    const afterFirstPull = useAppStore.getState();
+    expect(afterFirstPull.repositories).toHaveLength(1);
+    expect(afterFirstPull.repositories[0].ai_summary).toBe('from backend');
+    // Local-only metadata survives the merge.
+    expect(afterFirstPull.repositories[0].analysis_error).toBe('stale local error');
+    // Active search filters: the searchResults reference is preserved so the
+    // card being edited stays mounted.
+    expect(afterFirstPull.searchResults).toBe(searchResultsBeforePull);
+
+    const repositoriesAfterFirstPull = afterFirstPull.repositories;
+    await syncFromBackend(); // pull 2 — identical backend payload
+
+    expect(useAppStore.getState().repositories).toBe(repositoriesAfterFirstPull);
+    expect(useAppStore.getState().searchResults).toBe(searchResultsBeforePull);
   });
 });
 

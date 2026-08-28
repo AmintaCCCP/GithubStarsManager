@@ -616,6 +616,29 @@ describe('useAppStore repository performance guards', () => {
 
     expect(useAppStore.getState().searchResults).toBe(refreshed);
   });
+
+  it('preserves an active search result set when addRepository runs (Issue #304)', () => {
+    const existing = createRepository(2);
+    useAppStore.setState({
+      repositories: [existing],
+      searchResults: [existing],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: 'repo-2' },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    useAppStore.getState().addRepository(createRepository(3));
+
+    // Same guard as setRepositories: swapping the full list into searchResults
+    // while filters are active would unmount the filtered card being edited.
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+    expect(useAppStore.getState().repositories).toHaveLength(2);
+
+    // Without active filters, the full list is published to searchResults.
+    useAppStore.setState({ searchFilters: { ...useAppStore.getState().searchFilters, query: '' } });
+    useAppStore.getState().addRepository(createRepository(4));
+
+    expect(useAppStore.getState().searchResults).toBe(useAppStore.getState().repositories);
+  });
 });
 
 describe('useAppStore auth localStorage mirror (Issue #259)', () => {
