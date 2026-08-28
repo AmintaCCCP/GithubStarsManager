@@ -145,6 +145,18 @@ export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData:
         // event:/id:/注释行与这些 API 无关，直接忽略。
       }
     }
+    // 冲刷解码器中剩余的多字节序列，并把 EOF 处未以换行结尾的最后一行当作
+    // 完整事件处理（部分上游的 data: 载荷不带结尾 LF）。
+    buffer += decoder.decode();
+    if (buffer !== '') {
+      const line = buffer.replace(/\r$/, '');
+      buffer = '';
+      if (line === '') {
+        flush();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''));
+      }
+    }
     flush();
   } finally {
     reader.releaseLock();
@@ -829,10 +841,15 @@ ${options.user}` : options.user;
       throw new Error('No content received from AI service (empty body)');
     }
     if (!contentType.includes('text/event-stream')) {
-      // 服务端忽略 stream:true（可能返回 application/json、text/plain 或缺失
-      // content-type）时按整段响应处理：一次性回调后返回。
-      const data: unknown = await response.json();
-      const text = extractFullTextFromResponse(apiType, data);
+      // 服务端忽略 stream:true 时可能返回整段 JSON（application/json）或纯文本
+      // 回答：先按 JSON 解析提取结构化文本，失败则把原始文本作为一次性 chunk。
+      const raw = await response.text();
+      let text = '';
+      try {
+        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+      } catch {
+        text = raw;
+      }
       if (!text) {
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');

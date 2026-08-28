@@ -40,8 +40,15 @@ describe('parseCitationToken', () => {
     expect(parseCitationToken('http://localhost:3000')).toBeNull();
     expect(parseCitationToken('https://example.com - 8080')).toBeNull();
     expect(parseCitationToken('https://example.com/page')).toBeNull();
+    // 裸 host:port（无协议）同样不是 file:line 引用。
+    expect(parseCitationToken('example.com:8080')).toBeNull();
+    expect(parseCitationToken('127.0.0.1:8080')).toBeNull();
+    expect(parseCitationToken('example.com - 8080')).toBeNull();
+    expect(parseCitationToken('README.md:12')).toEqual({ path: 'README.md', lineStart: 12, lineEnd: 12 });
     expect(stripCitationsForCopy('See `http://localhost:3000` for the local server.'))
       .toBe('See `http://localhost:3000` for the local server.');
+    expect(stripCitationsForCopy('Visit `example.com:8080` for details.'))
+      .toBe('Visit `example.com:8080` for details.');
   });
 });
 
@@ -52,10 +59,20 @@ describe('resolveCitation', () => {
       evidence({ id: 'b', path: 'README.md', lineStart: 9, lineEnd: 11 }),
       evidence({ id: 'c', path: 'docs/nested/README.md', lineStart: 1, lineEnd: 4 }),
     ];
-    expect(resolveCitation('/README.md - 9-10', evidences)?.id).toBe('b');
+    expect(resolveCitation('/README.md - 9-10', evidences)?.evidence.id).toBe('b');
     // 未覆盖行号时回退到同路径证据中最精确（行区间最小）的一条。
-    expect(resolveCitation('/README.md - 100-120', evidences)?.id).toBe('b');
-    expect(resolveCitation('/nested/README.md - 2-3', evidences)?.id).toBe('c');
+    expect(resolveCitation('/README.md - 100-120', evidences)?.evidence.id).toBe('b');
+    expect(resolveCitation('/nested/README.md - 2-3', evidences)?.evidence.id).toBe('c');
+  });
+
+  it('keeps the citation token line range for the badge target', () => {
+    const resolved = resolveCitation('/src/a.ts - 50-52', [evidence({ id: 'w', path: 'src/a.ts', lineStart: 40, lineEnd: 80 })]);
+    expect(resolved).toEqual({
+      evidence: expect.objectContaining({ id: 'w' }),
+      path: 'src/a.ts',
+      lineStart: 50,
+      lineEnd: 52,
+    });
   });
 
   it('returns null for non-citation tokens or empty evidence lists', () => {
@@ -91,10 +108,17 @@ describe('stripCitationsForCopy', () => {
 });
 
 describe('citationAnchorUrl', () => {
-  it('appends the line anchor when missing and keeps existing anchors', () => {
+  it('appends the line anchor when missing', () => {
     expect(citationAnchorUrl(evidence({ url: 'https://github.com/o/r/blob/sha/file.md' })))
       .toBe('https://github.com/o/r/blob/sha/file.md#L3-L5');
+  });
+
+  it('replaces any existing anchor, preferring explicit citation lines', () => {
     expect(citationAnchorUrl(evidence({ url: 'https://github.com/o/r/blob/sha/file.md#L9' })))
-      .toBe('https://github.com/o/r/blob/sha/file.md#L9');
+      .toBe('https://github.com/o/r/blob/sha/file.md#L3-L5');
+    expect(citationAnchorUrl(evidence({ url: 'https://github.com/o/r/blob/sha/file.md#L9' }), 50, 52))
+      .toBe('https://github.com/o/r/blob/sha/file.md#L50-L52');
+    expect(citationAnchorUrl(evidence({ url: 'https://github.com/o/r/blob/sha/file.md' }), 50))
+      .toBe('https://github.com/o/r/blob/sha/file.md#L50');
   });
 });

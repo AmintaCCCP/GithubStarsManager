@@ -13,6 +13,12 @@ export interface ParsedCitation {
 
 const CITATION_DASH_PATTERN = /^\/?([^\s`]+?)\s+-\s+(\d+)(?:\s*-\s*(\d+))?$/;
 const CITATION_COLON_PATTERN = /^\/?([^\s`]+?):(\d+)(?:-(\d+))?$/;
+/** 常见源码/文档扩展名，用于把 file:line 与 host:port 区分开。 */
+const SOURCE_FILE_EXT = /\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|toml|sh|bash|zsh|py|go|rs|java|kt|rb|php|cs|html?|css|scss|less|sql|vue|svelte|c|cpp|cc|h|hpp|swift|dart|lua|scala|ex|exs|erl|clj|groovy|ini|cfg|conf|env|properties|gradle|lock)$/i;
+/** 无扩展名的仓库特殊文件。 */
+const SOURCE_FILE_NAME = /^(?:dockerfile|makefile|license|procfile|jenkinsfile|vagrantfile|cmakelists\.txt)$/i;
+
+const isSourceLikePath = (path: string): boolean => path.includes('/') || SOURCE_FILE_EXT.test(path) || SOURCE_FILE_NAME.test(path);
 
 /** 解析一段行内 code 文本是否为 file:line 引用；路径必须包含 / 或 . 以避免误伤命令。 */
 export const parseCitationToken = (raw: string): ParsedCitation | null => {
@@ -26,14 +32,14 @@ export const parseCitationToken = (raw: string): ParsedCitation | null => {
     const [, path, start, end] = dashMatch;
     const lineStart = Number(start);
     const lineEnd = Number(end ?? start);
-    if (!path || !Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
+    if (!path || !isSourceLikePath(path) || !Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
     return { path: path.replace(/\/+$/, ''), lineStart, lineEnd: Math.max(lineStart, lineEnd) };
   }
   const colonMatch = CITATION_COLON_PATTERN.exec(token);
   if (colonMatch) {
     const [, path, start, end] = colonMatch;
     // path 段内再出现 ":" 即为 URL/主机:端口形态（如 example.com:8080），排除。
-    if (!path || path.includes(':')) return null;
+    if (!path || path.includes(':') || !isSourceLikePath(path)) return null;
     const lineStart = Number(start);
     const lineEnd = Number(end ?? start);
     if (!Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
@@ -44,8 +50,16 @@ export const parseCitationToken = (raw: string): ParsedCitation | null => {
 
 const normalizeEvidencePath = (path: string): string => path.replace(/^\/+/, '');
 
+/** resolveCitation 的结果：命中的证据 + 引用令牌自身的行范围（Badge 展示与跳转用它）。 */
+export interface ResolvedCitation {
+  evidence: ToolEvidence;
+  path: string;
+  lineStart: number;
+  lineEnd: number;
+}
+
 /** 把行内引用匹配到本轮证据：路径精确 + 行区间重叠优先（取最精确区间），其次路径相同，再次路径后缀匹配。 */
-export const resolveCitation = (raw: string, evidences: ToolEvidence[]): ToolEvidence | null => {
+export const resolveCitation = (raw: string, evidences: ToolEvidence[]): ResolvedCitation | null => {
   const parsed = parseCitationToken(raw);
   if (!parsed || evidences.length === 0) return null;
   const path = normalizeEvidencePath(parsed.path);
@@ -70,7 +84,10 @@ export const resolveCitation = (raw: string, evidences: ToolEvidence[]): ToolEvi
     mostSpecific(suffixMatch.filter(overlaps)),
     mostSpecific(suffixMatch),
   ];
-  return candidates.find((candidate): candidate is ToolEvidence & { path: string } => Boolean(candidate)) ?? null;
+  const evidence = candidates.find((candidate): candidate is ToolEvidence & { path: string } => Boolean(candidate));
+  if (!evidence) return null;
+  // Badge 展示与跳转使用引用令牌自身的行范围，而不是证据窗口的范围。
+  return { evidence, path: evidence.path, lineStart: parsed.lineStart, lineEnd: parsed.lineEnd };
 };
 
 /** 引用 Badge 的展示文案：path:L12-L34（单行时省略区间）。 */
@@ -85,11 +102,14 @@ export const citationExcerptPreview = (excerpt: string, maxChars = 600): string 
   return trimmed.length > maxChars ? `${trimmed.slice(0, maxChars)}…` : trimmed;
 };
 
-/** 悬停与点击共用的跳转地址：补齐 #L 锚点（GitHub blob URL 固定 commit SHA）。 */
-export const citationAnchorUrl = (evidence: ToolEvidence): string => {
-  if (!evidence.path || !evidence.lineStart || /#L\d+/.test(evidence.url)) return evidence.url;
-  const lineEnd = evidence.lineEnd && evidence.lineEnd !== evidence.lineStart ? `-L${evidence.lineEnd}` : '';
-  return `${evidence.url}#L${evidence.lineStart}${lineEnd}`;
+/** 悬停与点击共用的跳转地址：以给定行号（缺省用证据窗口）覆盖 URL 上已有的 #L 锚点。 */
+export const citationAnchorUrl = (evidence: ToolEvidence, lineStart?: number, lineEnd?: number): string => {
+  const start = lineStart ?? evidence.lineStart;
+  if (!evidence.path || !start) return evidence.url;
+  const end = lineEnd ?? evidence.lineEnd ?? start;
+  const base = evidence.url.replace(/#.*$/, '');
+  const anchor = end > start ? `#L${start}-L${end}` : `#L${start}`;
+  return `${base}${anchor}`;
 };
 
 /**

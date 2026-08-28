@@ -21,7 +21,7 @@ interface CitationBadgeProps {
  */
 export const CitationBadge = ({ target, language }: CitationBadgeProps) => {
   const { evidence, path, lineStart, lineEnd } = target;
-  const href = citationAnchorUrl(evidence);
+  const href = citationAnchorUrl(evidence, lineStart, lineEnd);
   return (
     <HoverCard openDelay={150} closeDelay={120}>
       <HoverCardTrigger asChild>
