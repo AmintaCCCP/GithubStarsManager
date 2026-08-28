@@ -661,6 +661,41 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).not.toContain('已验证来源');
   });
 
+  it('canonicalizes bare root-file citations like /README.md - 35-44', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce('## Overview\n\nA documented example for repository research. /README.md - 3-4');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // 根目录文件的裸引用（无反引号、无目录段）同样要规范化为精确引用，
+    // 否则正确回答会被 digest 替换。
+    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).not.toContain('Verified sources');
+    expect(result.content).not.toContain('insufficient');
+  });
+
+  it('keeps round 1 documentation-first even when the plan proposes code targets', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(
+        target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code'),
+        target('README.md', ['Overview'], 'project overview'),
+      ))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput(), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 第 1 轮的 code 目标被拒绝（文档优先），README 章节照常读取，无代码解锁。
+    expect(readPaths()).toEqual(['README.md']);
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(false);
+    expect(result.content).toContain(overviewRef);
+  });
+
   it('canonicalizes citations with slash-prefix and em-dash variants', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
