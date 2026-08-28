@@ -11,7 +11,9 @@ export interface ParsedCitation {
   lineEnd: number;
 }
 
-const CITATION_DASH_PATTERN = /^\/?([^\s`]+?)\s+-\s+(\d+)(?:\s*-\s*(\d+))?$/;
+// 分隔符容差：模型会输出 `-`、全角/半角破折号（—–）；行区间后可跟 `、397-481`
+// 形式的补充区间（解析时忽略，Badge 只链接第一段）。
+const CITATION_DASH_PATTERN = /^(.+?)\s*[-—–]\s+(\d+)(?:\s*-\s*(\d+))?(?:\s*[、,]\s*\d+(?:\s*-\s*\d+)?)*$/;
 const CITATION_COLON_PATTERN = /^\/?([^\s`]+?):(\d+)(?:-(\d+))?$/;
 /** 常见源码/文档扩展名，用于把 file:line 与 host:port 区分开。 */
 const SOURCE_FILE_EXT = /\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|toml|sh|bash|zsh|py|go|rs|java|kt|rb|php|cs|html?|css|scss|less|sql|vue|svelte|c|cpp|cc|h|hpp|swift|dart|lua|scala|ex|exs|erl|clj|groovy|ini|cfg|conf|env|properties|gradle|lock)$/i;
@@ -29,18 +31,22 @@ const isSourceLikePath = (path: string): boolean => {
 
 /** 解析一段行内 code 文本是否为 file:line 引用；路径必须包含 / 或 . 以避免误伤命令。 */
 export const parseCitationToken = (raw: string): ParsedCitation | null => {
-  const token = raw.trim();
+  // 前缀容差：模型会输出 `/path`、`//path` 甚至是 `/ /path`（斜杠后带空格）。
+  const token = raw.trim().replace(/^(?:\/|\s)+/, '/');
   if (!token || !/[./]/.test(token)) return null;
   // 带协议的 URL（如 https://example.com:8080）与主机:端口不是文件引用，
   // 否则 stripCitationsForCopy 会把常见 URL 行内代码误删。
   if (token.includes('://')) return null;
   const dashMatch = CITATION_DASH_PATTERN.exec(token);
   if (dashMatch) {
-    const [, path, start, end] = dashMatch;
+    const [, rawPath, start, end] = dashMatch;
+    // 前导斜杠已在前缀归一化时收拢；这里按相对路径做源文件判定，
+    // example.com - 8080 这类 host:port 仍然会被扩展名守卫拒绝。
+    const path = rawPath.trim().replace(/^\/+/, '').replace(/\/+$/, '');
     const lineStart = Number(start);
     const lineEnd = Number(end ?? start);
     if (!path || !isSourceLikePath(path) || !Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
-    return { path: path.replace(/\/+$/, ''), lineStart, lineEnd: Math.max(lineStart, lineEnd) };
+    return { path, lineStart, lineEnd: Math.max(lineStart, lineEnd) };
   }
   const colonMatch = CITATION_COLON_PATTERN.exec(token);
   if (colonMatch) {

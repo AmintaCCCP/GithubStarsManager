@@ -28,6 +28,16 @@ describe('parseCitationToken', () => {
     expect(parseCitationToken('docs/guide.md:12')).toEqual({ path: 'docs/guide.md', lineStart: 12, lineEnd: 12 });
   });
 
+  it('tolerates slash-prefix, dash, and multi-range variants models actually emit', () => {
+    expect(parseCitationToken('/ /docs/adr/0001-frontend-layering.md - 49-76'))
+      .toEqual({ path: 'docs/adr/0001-frontend-layering.md', lineStart: 49, lineEnd: 76 });
+    expect(parseCitationToken('//docs/adr/0001-frontend-layering.md - 49-76'))
+      .toEqual({ path: 'docs/adr/0001-frontend-layering.md', lineStart: 49, lineEnd: 76 });
+    expect(parseCitationToken('/src/components/RepositoryList.tsx — 1-69、397-481'))
+      .toEqual({ path: 'src/components/RepositoryList.tsx', lineStart: 1, lineEnd: 69 });
+    expect(parseCitationToken('/src/a.ts – 5')).toEqual({ path: 'src/a.ts', lineStart: 5, lineEnd: 5 });
+  });
+
   it('rejects commands, prose, and tokens without path separators', () => {
     expect(parseCitationToken('npm run dev')).toBeNull();
     expect(parseCitationToken('pnpm install')).toBeNull();
