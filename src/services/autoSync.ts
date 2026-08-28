@@ -310,7 +310,11 @@ export async function syncFromBackend(): Promise<void> {
       } else {
         const merged = mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
         state.setRepositories(merged);
-        _lastHash.repos = quickHash(merged);
+        // Commit the RAW backend hash, not the merged one. The merge preserves
+        // local-only metadata (e.g. vector_indexed_at) the backend never stores,
+        // so hashing `merged` here made the next poll's backend hash differ
+        // forever — re-applying setRepositories every poll cycle.
+        _lastHash.repos = hashes.repos;
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
