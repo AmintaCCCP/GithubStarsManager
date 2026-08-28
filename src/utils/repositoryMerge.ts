@@ -1,6 +1,7 @@
 import type { Repository } from '../types';
 
 const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
+  'analysis_error',
   'has_fetched_releases',
   'last_release_fetch_time',
   'ai_summary',
@@ -17,14 +18,28 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'vector_indexed_at',
 ];
 
-/** Drop the local-only fields from a repo list — the projection the backend
- * actually stores. Used to hash the push payload so the next pull compares
- * against the same raw shape (same class of loop-breaker as the pull path).
+/**
+ * Fields the repository endpoint never stores or returns (client-only state).
+ * This is the projection both sync fingerprints must agree on: the pull side
+ * hashes the backend payload through it, the successful-push side hashes the
+ * store through it, so the next pull sees no change (Issue #304 loop-breaker).
+ */
+export const CLIENT_ONLY_REPOSITORY_FIELDS: ReadonlySet<keyof Repository> = new Set([
+  'forks_count',
+  'forks',
+  'analysis_error',
+  'has_fetched_releases',
+  'last_release_fetch_time',
+]);
+
+/** Drop client-only fields from a repo list, projecting the shape the backend
+ * actually stores/returns. Shared by the pull and push fingerprint paths so
+ * the two hashes always use the same field set.
  */
 export function stripLocalRepositoryFields(repos: Repository[]): Repository[] {
   return repos.map(repo => {
     const stripped: Repository = { ...repo };
-    for (const field of LOCAL_REPOSITORY_FIELDS) {
+    for (const field of CLIENT_ONLY_REPOSITORY_FIELDS) {
       delete (stripped as Record<keyof Repository, unknown>)[field];
     }
     return stripped;

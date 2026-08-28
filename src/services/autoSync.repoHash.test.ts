@@ -6,10 +6,15 @@ import { repositoryPayloadHash } from './autoSync';
 
 // Regression for Issue #304: the repos hash committed after a pull must be the
 // RAW backend hash. Committing quickHash(merged) instead made the next poll's
-// backend hash differ forever (the merge injects local-only metadata such as
-// vector_indexed_at that the backend never returns), so setRepositories —
-// which used to reset searchResults — fired on every 5s poll cycle and
-// unmounted the card whose edit modal was open.
+// backend hash differ forever (the merge injects client-only metadata such as
+// analysis_error / has_fetched_releases that the backend never stores), so
+// setRepositories — which used to reset searchResults — fired on every 5s poll
+// cycle and unmounted the card whose edit modal was open.
+//
+// The same loop-breaker applies to the push side: syncToBackend commits the
+// hash through stripLocalRepositoryFields, the identical projection the pull
+// side uses (repositoryPayloadHash delegates to it), so a successful push and
+// the next pull always agree.
 
 const createRepository = (id: number, overrides: Partial<Repository> = {}): Repository => ({
   id,
@@ -82,30 +87,23 @@ it('omits client-only fields from both pull and successful-push hashes', () => {
     expect(repositoryPayloadHash(localRepositories)).toBe(repositoryPayloadHash(backendPayload));
   });
 
-  it('stripLocalRepositoryFields removes all local-only fields (CodeRabbit push-hash fix)', () => {
+  it('stripLocalRepositoryFields removes every client-only field (CodeRabbit push-hash fix)', () => {
     const repo = createRepository(1, {
-      vector_indexed_at: '2026-08-01T00:00:00.000Z',
-      ai_summary: 'summary',
-      ai_tags: ['tag'],
-      ai_platforms: ['github'],
-      analyzed_at: '2026-08-01T00:00:00.000Z',
-      analysis_failed: false,
-      subscribed_to_releases: true,
-      custom_description: 'desc',
-      custom_tags: ['custom'],
-      custom_category: 'cat',
-      category_locked: true,
-      last_edited: '2026-08-01T00:00:00.000Z',
+      analysis_error: 'model unavailable',
       has_fetched_releases: true,
       last_release_fetch_time: '2026-08-01T00:00:00.000Z',
+      vector_indexed_at: '2026-08-01T00:00:00.000Z',
+      ai_summary: 'summary',
     });
 
     const stripped = stripLocalRepositoryFields([repo]);
 
-    // All local-only fields are gone
-    expect(stripped[0].vector_indexed_at).toBeUndefined();
-    expect(stripped[0].ai_summary).toBeUndefined();
+    // All client-only fields are gone
+    expect(stripped[0].analysis_error).toBeUndefined();
     expect(stripped[0].has_fetched_releases).toBeUndefined();
+    expect(stripped[0].last_release_fetch_time).toBeUndefined();
+    expect(stripped[0].forks_count).toBeUndefined();
+    expect(stripped[0].forks).toBeUndefined();
     // Backend-owned fields survive
     expect(stripped[0].id).toBe(1);
     expect(stripped[0].name).toBe('repo-1');
@@ -113,22 +111,42 @@ it('omits client-only fields from both pull and successful-push hashes', () => {
   });
 
   it('stripLocalRepositoryFields hash matches the backend pull payload hash (CodeRabbit convergence)', () => {
-    // The backend stores only GitHub API data — local-only fields (ai_summary,
-    // ai_tags, vector_indexed_at…) never appear in its payload.
-    const backendPayload = [createRepository(1)];
+    // Model what the server actually returns: no forks_count/forks (not stored),
+    // no analysis_error / has_fetched_releases (client-only), but vector_indexed_at
+    // IS round-tripped (stored + returned by GET /api/repositories).
+    const backendPayload = [createRepository(1, {
+      forks_count: undefined,
+      forks: undefined,
+      vector_indexed_at: '2026-08-01T00:00:00.000Z',
+    })];
     const localRepos = [createRepository(1, {
-      ai_summary: 'local summary',
-      ai_tags: ['ai-tag'],
+      analysis_error: 'model unavailable',
+      has_fetched_releases: true,
       vector_indexed_at: '2026-08-01T00:00:00.000Z',
     })];
 
     // After push, we hash stripLocalRepositoryFields(state.repositories) — the
-    // state has local-only fields injected by the merge. After pull, we hash the
-    // raw backend payload. These must be equal so the next poll skips the merge.
+    // state has client-only fields injected by the merge. After pull, we hash
+    // the raw backend payload. These must be equal so the next poll skips the
+    // merge.
     const pushHash = JSON.stringify(stripLocalRepositoryFields(localRepos));
     const pullHash = JSON.stringify(backendPayload);
 
     expect(pushHash).toBe(pullHash);
+  });
+
+  it('push and pull fingerprints share the same projection even with analysis_error (CodeRabbit)', () => {
+    // analysis_error is client-only: the backend never stores it. The push side
+    // hashes the store (which may carry analysis_error) through
+    // stripLocalRepositoryFields; the pull side hashes the backend payload
+    // through repositoryPayloadHash (which delegates to the same projection).
+    // Both must yield the same hash so a repo with a local analysis_error
+    // doesn't re-trigger setRepositories forever.
+    const backendPayload = [createRepository(1, { forks_count: undefined, forks: undefined })];
+    const localRepos = [createRepository(1, { analysis_error: 'model unavailable' })];
+
+    expect(repositoryPayloadHash(localRepos)).toBe(repositoryPayloadHash(backendPayload));
+    expect(JSON.stringify(stripLocalRepositoryFields(localRepos))).toBe(JSON.stringify(backendPayload));
   });
 });
 

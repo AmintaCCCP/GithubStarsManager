@@ -1,7 +1,6 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
-import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
-import { stripLocalRepositoryFields } from '../utils/repositoryMerge';
+import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { GitHubApiService } from './githubApi';
 import { logger } from './logger';
 import type { Repository } from '../types';
@@ -45,25 +44,14 @@ function quickHash(data: unknown): string {
   return JSON.stringify(data);
 }
 
-const LOCAL_ONLY_REPOSITORY_FIELDS = new Set<keyof Repository>([
-  'analysis_error',
-  'has_fetched_releases',
-  'last_release_fetch_time',
-  'vector_indexed_at',
-]);
-
 /**
- * The repository endpoint does not round-trip these client-only fields. Keep
- * them out of sync fingerprints while still sending the unchanged store value.
+ * The repository endpoint does not round-trip client-only fields. Keep them
+ * out of sync fingerprints while still sending the unchanged store value.
+ * Uses the same field set as stripLocalRepositoryFields so the pull and push
+ * fingerprints always project the identical shape (Issue #304 loop-breaker).
  */
 export function repositoryPayloadHash(repositories: Repository[]): string {
-  return quickHash(repositories.map(repository =>
-    Object.fromEntries(
-      Object.entries(repository).filter(([field]) =>
-        !LOCAL_ONLY_REPOSITORY_FIELDS.has(field as keyof Repository)
-      )
-    )
-  ));
+  return quickHash(stripLocalRepositoryFields(repositories));
 }
 
 /** Canonical fingerprint for the vector search config.
