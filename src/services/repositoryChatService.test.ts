@@ -234,6 +234,11 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
   });
 
   it('stops after the configured consecutive no-progress rounds while preserving the insufficient-evidence outcome', async () => {
+    // 代码候选为空时，无进展停止语义保持不变（有代码预算时会先自动升级读代码）。
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
       .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find missing feature documentation')))
@@ -615,6 +620,102 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 
+  it('automatically escalates to code reads when documentation stalls', async () => {
+    const codeRef = '/src/engine.ts - 1';
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['implementation detail'], target: 'proxy switching implementation' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find implementation detail')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('implementation detail', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('implementation detail', 'verified', [codeRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The implementation exports the proxy-switching function.', codeRef, 'Implementation'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('How is proxy switching implemented?'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 文档停滞一轮后自动解锁代码取证，第二轮读到代码并完成回答。
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(true);
+    expect(readPaths()).toEqual(['README.md', 'src/engine.ts']);
+    expect(result.content).toContain(codeRef);
+  });
+
+  it('canonicalizes sub-range citations that fall inside an evidence window', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('A documented example for repository research.', '/README.md - 3-4', 'Overview'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // 引用 3-4 落在证据窗口 3-5 内：规范化为精确引用而不是整题丢弃。
+    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).not.toContain('已验证来源');
+  });
+
+  it('maps footnote-style citations onto verified sources instead of discarding the answer', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      const body = [
+        '## Overview',
+        '',
+        'A documented example project for repository research[^E1].',
+        '',
+        '[^E1]: /README.md - 3-4',
+      ].join('\n');
+      onChunk(body);
+      return body;
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(result.content).toContain('A documented example project for repository research');
+    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).not.toContain('[^E1]');
+    expect(result.content).not.toContain('已验证来源');
+    expect(chunks.length).toBeGreaterThan(0);
+  });
+
+  it('keeps an answer with partial citations instead of replacing it with the digest', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatText
+      .mockResolvedValueOnce([
+        '## Overview',
+        '',
+        `A documented example for repository research. \`${overviewRef}\``,
+        '',
+        '## Extra notes',
+        '',
+        'Uncited prose without any reference.',
+      ].join('\n'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    expect(result.content).toContain('Uncited prose without any reference.');
+    expect(result.content).toContain(overviewRef);
+    expect(result.content).not.toContain('已验证来源');
+    expect(result.content).not.toContain('insufficient');
+  });
+
   it('applies the quick task-depth preset with its tighter no-progress budget', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
@@ -633,6 +734,10 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
   });
 
   it('lets the unlimited task-depth preset exceed the default budget clamps', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
     // 按 plan → gate 交替注册 5 轮；unlimited 档 maxNoProgressRounds=4，应执行满 4 轮（默认档 2 轮即停）。
