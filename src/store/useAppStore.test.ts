@@ -564,6 +564,39 @@ describe('useAppStore repository performance guards', () => {
     expect(notifications).toBe(0);
     expect(useAppStore.getState().analyzingRepositoryIds).toBe(previousAnalyzingIds);
   });
+
+  it('preserves an active search result set when setRepositories runs (Issue #304)', () => {
+    const first = createRepository(1);
+    const second = createRepository(2);
+    useAppStore.setState({
+      repositories: [first, second],
+      searchResults: [second],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: 'repo-2' },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    const refreshed = [createRepository(1), createRepository(2), createRepository(3)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    // The stale searchResults reference is kept so the filtered card (and its
+    // open edit modal) stays mounted; SearchBar recomputes results afterwards.
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+    expect(useAppStore.getState().repositories).toBe(refreshed);
+  });
+
+  it('resets searchResults to the full list when no search filter is active', () => {
+    const repo = createRepository(1);
+    useAppStore.setState({
+      repositories: [repo],
+      searchResults: [repo],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: '' },
+    });
+
+    const refreshed = [repo, createRepository(2)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    expect(useAppStore.getState().searchResults).toBe(refreshed);
+  });
 });
 
 describe('useAppStore auth localStorage mirror (Issue #259)', () => {
