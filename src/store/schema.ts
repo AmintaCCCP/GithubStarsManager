@@ -161,10 +161,14 @@ export const normalizeRepositoryChatSettings = (value: unknown): RepositoryChatS
     maxNoProgressRounds: inRange(rawBudget.maxNoProgressRounds, defaultRepositoryChatAgentBudget.maxNoProgressRounds, 1, 4),
     maxDurationMs: inRange(rawBudget.maxDurationMs, defaultRepositoryChatAgentBudget.maxDurationMs, 15_000, 300_000),
   };
+  const taskDepth = record.taskDepth === 'quick' || record.taskDepth === 'deep' || record.taskDepth === 'unlimited'
+    ? record.taskDepth
+    : 'default';
   return {
     enabled: record.enabled !== false,
     chatConfigId: typeof record.chatConfigId === 'string' ? record.chatConfigId : null,
     streamingMode: record.streamingMode === 'off' ? 'off' : 'auto',
+    taskDepth,
     enableWebTools: record.enableWebTools === true,
     retainSessionDays,
     maxToolsPerTurn: maxToolCalls,

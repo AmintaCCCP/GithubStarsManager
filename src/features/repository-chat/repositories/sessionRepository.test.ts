@@ -108,7 +108,9 @@ describe('repositoryChatSessionRepository local fallback', () => {
   });
 
   it('rejects fallback writes when localStorage persistence is unavailable', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    // jsdom 24+ 的 window.localStorage 不再以 Storage.prototype 为原型，
+    // 必须直接对实例打桩才能拦截写入。
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('storage is unavailable');
     });
 

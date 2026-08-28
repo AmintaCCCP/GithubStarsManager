@@ -4,6 +4,7 @@ import type { RepositoryChatSession, RepositoryChatToolEvent } from '../types/re
 
 const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
+  generateChatTextStream: vi.fn(),
   getRepositoryTree: vi.fn(),
   getRepositoryFile: vi.fn(),
   getRepositoryMarkdownEvidenceFile: vi.fn(),
@@ -16,7 +17,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./aiService', () => ({
-  AIService: class { generateChatText = mocks.generateChatText; },
+  AIService: class {
+    generateChatText = mocks.generateChatText;
+    generateChatTextStream = mocks.generateChatTextStream;
+  },
+  isAIStreamUnsupportedError: (error: unknown): boolean => error instanceof Error && error.name === 'AIStreamUnsupportedError',
 }));
 
 vi.mock('./githubApiFactory', () => ({
@@ -139,15 +144,9 @@ const gate = (options: {
   recommended_targets: options.recommendedTargets ?? [],
 });
 
-const answer = (text: string, source: string, heading = 'Verified answer') => JSON.stringify({
-  items: [{ heading, text, sources: [source] }],
-  not_found: [],
-});
+const answer = (text: string, source: string, heading = 'Verified answer') => `## ${heading}\n\n${text} \`${source}\``;
 
-const notFoundAnswer = (text: string, source: string) => JSON.stringify({
-  items: [],
-  not_found: [{ text, sources: [source] }],
-});
+const notFoundAnswer = (text: string, source: string) => `## Unverified or missing information\n\n${text} \`${source}\``;
 
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
@@ -518,7 +517,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 
-  it('repairs invalid structured synthesis once without re-running retrieval', async () => {
+  it('repairs invalid synthesis once without re-running retrieval', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
       .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
@@ -567,5 +566,88 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.vectorWrites.upsert).not.toHaveBeenCalled();
     expect(mocks.vectorWrites.delete).not.toHaveBeenCalled();
     expect(mocks.vectorWrites.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('streams the final answer incrementally and returns the source-verified text', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk('## Overview\n\nA documented ');
+      onChunk(`example project. \`${overviewRef}\``);
+      return `## Overview\n\nA documented example project. \`${overviewRef}\``;
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toBe('## Overview\n\nA documented ');
+    expect(result.content).toContain(overviewRef);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(mocks.generateChatTextStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a blocking answer when the stream fails before completing', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+    const streamFailure = Object.assign(new Error('Streaming is not supported on this transport'), { name: 'AIStreamUnsupportedError' });
+    mocks.generateChatTextStream.mockRejectedValue(streamFailure);
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(result.content).toContain(overviewRef);
+    expect(result.content).not.toContain('insufficient');
+    expect(chunks[chunks.length - 1]).toBe('');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+  });
+
+  it('applies the quick task-depth preset with its tighter no-progress budget', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find missing feature documentation')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'quick' });
+
+    // quick 档 maxNoProgressRounds=1：第 1 轮无进展即停止（默认档会继续到第 2 轮，共 5 次调用）。
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('insufficient');
+  });
+
+  it('lets the unlimited task-depth preset exceed the default budget clamps', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
+    // 按 plan → gate 交替注册 5 轮；unlimited 档 maxNoProgressRounds=4，应执行满 4 轮（默认档 2 轮即停）。
+    for (let round = 0; round < 5; round += 1) {
+      mocks.generateChatText.mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck missing feature documentation')));
+      mocks.generateChatText.mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+    }
+
+    const result = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'unlimited' });
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(9);
+    expect(result.content).toContain('insufficient');
   });
 });
