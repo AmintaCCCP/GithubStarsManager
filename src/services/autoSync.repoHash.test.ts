@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Repository } from '../types';
-import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
+import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
 import { repositoryPayloadHash } from './autoSync';
 
@@ -71,7 +71,7 @@ describe('backend sync hash convergence (Issue #304 loop-breaker)', () => {
     expect(JSON.stringify(secondMerge)).toBe(JSON.stringify(firstMerge));
   });
 
-  it('omits client-only fields from both pull and successful-push hashes', () => {
+it('omits client-only fields from both pull and successful-push hashes', () => {
     const backendPayload = [createRepository(1)];
     const localRepositories = [createRepository(1, {
       analysis_error: 'temporary failure detail',
@@ -80,6 +80,55 @@ describe('backend sync hash convergence (Issue #304 loop-breaker)', () => {
     })];
 
     expect(repositoryPayloadHash(localRepositories)).toBe(repositoryPayloadHash(backendPayload));
+  });
+
+  it('stripLocalRepositoryFields removes all local-only fields (CodeRabbit push-hash fix)', () => {
+    const repo = createRepository(1, {
+      vector_indexed_at: '2026-08-01T00:00:00.000Z',
+      ai_summary: 'summary',
+      ai_tags: ['tag'],
+      ai_platforms: ['github'],
+      analyzed_at: '2026-08-01T00:00:00.000Z',
+      analysis_failed: false,
+      subscribed_to_releases: true,
+      custom_description: 'desc',
+      custom_tags: ['custom'],
+      custom_category: 'cat',
+      category_locked: true,
+      last_edited: '2026-08-01T00:00:00.000Z',
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-08-01T00:00:00.000Z',
+    });
+
+    const stripped = stripLocalRepositoryFields([repo]);
+
+    // All local-only fields are gone
+    expect(stripped[0].vector_indexed_at).toBeUndefined();
+    expect(stripped[0].ai_summary).toBeUndefined();
+    expect(stripped[0].has_fetched_releases).toBeUndefined();
+    // Backend-owned fields survive
+    expect(stripped[0].id).toBe(1);
+    expect(stripped[0].name).toBe('repo-1');
+    expect(stripped[0].stargazers_count).toBe(10);
+  });
+
+  it('stripLocalRepositoryFields hash matches the backend pull payload hash (CodeRabbit convergence)', () => {
+    // The backend stores only GitHub API data — local-only fields (ai_summary,
+    // ai_tags, vector_indexed_at…) never appear in its payload.
+    const backendPayload = [createRepository(1)];
+    const localRepos = [createRepository(1, {
+      ai_summary: 'local summary',
+      ai_tags: ['ai-tag'],
+      vector_indexed_at: '2026-08-01T00:00:00.000Z',
+    })];
+
+    // After push, we hash stripLocalRepositoryFields(state.repositories) — the
+    // state has local-only fields injected by the merge. After pull, we hash the
+    // raw backend payload. These must be equal so the next poll skips the merge.
+    const pushHash = JSON.stringify(stripLocalRepositoryFields(localRepos));
+    const pullHash = JSON.stringify(backendPayload);
+
+    expect(pushHash).toBe(pullHash);
   });
 });
 
@@ -105,6 +154,10 @@ describe('hasActiveSearchFilters (Issue #304 searchResults guard)', () => {
 
   it('treats facet selections as active', () => {
     expect(hasActiveSearchFilters({ ...baseFilters(), languages: ['TypeScript'] })).toBe(true);
+    expect(hasActiveSearchFilters({ ...baseFilters(), licenses: ['MIT'] })).toBe(true);
+  });
+
+  it('treats a license-only selection as active (CodeRabbit)', () => {
     expect(hasActiveSearchFilters({ ...baseFilters(), licenses: ['MIT'] })).toBe(true);
   });
 });
