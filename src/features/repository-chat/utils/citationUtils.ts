@@ -18,7 +18,14 @@ const SOURCE_FILE_EXT = /\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|mjs|cjs|json|ya?
 /** 无扩展名的仓库特殊文件。 */
 const SOURCE_FILE_NAME = /^(?:dockerfile|makefile|license|procfile|jenkinsfile|vagrantfile|cmakelists\.txt)$/i;
 
-const isSourceLikePath = (path: string): boolean => path.includes('/') || SOURCE_FILE_EXT.test(path) || SOURCE_FILE_NAME.test(path);
+const isSourceLikePath = (path: string): boolean => {
+  // 仓库绝对路径（/docs/...、/src/...）直接放行。
+  if (path.startsWith('/')) return true;
+  // 相对路径只认末段有源码/文档扩展名或特殊文件名的形态，
+  // 避免 example.com/api:8080、example.com/api - 8080 这类 host:port/URL 被当成引用。
+  const lastSegment = path.split('/').pop() ?? path;
+  return SOURCE_FILE_EXT.test(lastSegment) || SOURCE_FILE_NAME.test(lastSegment);
+};
 
 /** 解析一段行内 code 文本是否为 file:line 引用；路径必须包含 / 或 . 以避免误伤命令。 */
 export const parseCitationToken = (raw: string): ParsedCitation | null => {
