@@ -48,6 +48,7 @@ const createEvidence = (id: string): ToolEvidence => ({
 
 describe('repositoryChatSessionRepository local fallback', () => {
   const originalIndexedDb = Object.getOwnPropertyDescriptor(window, 'indexedDB');
+  const originalLocalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
 
   beforeEach(() => {
     window.localStorage.clear();
@@ -58,6 +59,7 @@ describe('repositoryChatSessionRepository local fallback', () => {
     vi.restoreAllMocks();
     if (originalIndexedDb) Object.defineProperty(window, 'indexedDB', originalIndexedDb);
     else delete (window as { indexedDB?: IDBFactory }).indexedDB;
+    if (originalLocalStorage) Object.defineProperty(window, 'localStorage', originalLocalStorage);
   });
 
   it('filters, orders, and soft-deletes sessions strictly within the selected repository', async () => {
@@ -108,11 +110,18 @@ describe('repositoryChatSessionRepository local fallback', () => {
   });
 
   it('rejects fallback writes when localStorage persistence is unavailable', async () => {
-    // jsdom 24+ 的 window.localStorage 不再以 Storage.prototype 为原型，
-    // 必须直接对实例打桩才能拦截写入。
-    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
-      throw new DOMException('storage is unavailable');
-    });
+    // 直接把 window.localStorage 换成抛错桩：不同平台的 jsdom 对 Storage 原型/
+    // 实例方法的实现有差异，逐方法 spy 在 CI（Linux）上不可靠。
+    const storageError = () => { throw new DOMException('storage is unavailable'); };
+    const throwingStorage = {
+      getItem: storageError,
+      setItem: storageError,
+      removeItem: storageError,
+      clear: storageError,
+      key: storageError,
+      get length() { throw new DOMException('storage is unavailable'); },
+    };
+    Object.defineProperty(window, 'localStorage', { configurable: true, value: throwingStorage });
 
     await expect(repositoryChatSessionRepository.saveSession(createSession('cannot-persist', 1, '2026-08-26T00:00:00.000Z')))
       .rejects.toThrow('unable to persist fallback snapshot');
