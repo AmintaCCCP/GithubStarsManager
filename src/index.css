@@ -448,6 +448,11 @@ html {
    to compensate for a scrollbar that html already reserves permanently. */
 html body[data-scroll-locked] {
   margin-right: 0 !important;
+  /* react-remove-scroll sets overflow:hidden, which turns body into a scroll
+     container and re-anchors position:sticky headers to the document top
+     (off-screen on long pages). overflow:clip blocks scrolling without
+     creating a scroll container, so sticky keeps anchoring to the viewport. */
+  overflow: clip !important;
 }
 
 /* 窗口滚动条颜色由 --ui-line-strong 等 token 统一驱动（见文件底部 Linear 段落）。 */

@@ -30,6 +30,11 @@ interface MarkdownRendererProps {
   fontSize?: 'small' | 'medium' | 'large';
   /** Convert single newlines to <br> (GitHub READMEs do not; AI summaries rely on it). */
   breaks?: boolean;
+  /**
+   * 可选的行内 code 自定义渲染（如仓库问答的引用 Badge）：返回一个 ReactNode
+   * 时替换默认的 <code>；返回 null/undefined 时保持原样式。
+   */
+  renderInlineCode?: (text: string) => React.ReactNode | null;
 }
 
 // GitHub-style remark pipeline: GFM tables/tasklists/strikethrough, [!NOTE]-style
@@ -756,7 +761,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   baseUrl,
   headingIds,
   fontSize = 'medium',
-  breaks = false
+  breaks = false,
+  renderInlineCode
 }) => {
   const headingCounterRef = useRef(headingIds?.size ?? 0);
   const headingTextCountMapRef = useRef(new Map<string, number>());
@@ -868,6 +874,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       const language = match ? match[1] : '';
 
       if (isInline) {
+        const codeText = typeof children === 'string' ? children : extractTextFromChildren(children);
+        const rendered = renderInlineCode?.(codeText);
+        if (rendered) return rendered;
         return <code {...stripAstNode(props)}>{children}</code>;
       }
 
@@ -892,7 +901,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       }
       return <Input {...props} />;
     },
-  }), [baseUrl, headingIds, getHeadingId]);
+  }), [baseUrl, headingIds, getHeadingId, renderInlineCode]);
 
   if (!shouldRender) {
     return <div className="h-32 flex items-center justify-center text-muted-foreground dark:text-muted-foreground/70">Loading...</div>;

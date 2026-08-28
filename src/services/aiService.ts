@@ -104,6 +104,142 @@ function parseRetryAfterMs(response: Response): number | undefined {
   return undefined;
 }
 
+/** 流式请求不可用（如走后端代理等仅支持整段 JSON 的通道）。调用方应降级为非流式。 */
+export class AIStreamUnsupportedError extends Error {
+  constructor(message = 'Streaming is not supported on this transport') {
+    super(message);
+    this.name = 'AIStreamUnsupportedError';
+  }
+}
+
+export function isAIStreamUnsupportedError(error: unknown): boolean {
+  return error instanceof AIStreamUnsupportedError;
+}
+
+/** 逐事件消费 SSE 字节流，把每个 data: 载荷交给回调（自动跨 chunk 缓冲不完整行）。 */
+export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData: (payload: string) => void): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let dataLines: string[] = [];
+  const flush = () => {
+    if (dataLines.length > 0) {
+      onData(dataLines.join('\n'));
+      dataLines = [];
+    }
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line === '') {
+          flush();
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).replace(/^ /, ''));
+        }
+        // event:/id:/注释行与这些 API 无关，直接忽略。
+      }
+    }
+    flush();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export function extractOpenAiChatDelta(payload: string): string {
+  if (!payload || payload === '[DONE]') return '';
+  try {
+    const json = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string | null } }> };
+    const delta = json.choices?.[0]?.delta?.content;
+    return typeof delta === 'string' ? delta : '';
+  } catch {
+    return '';
+  }
+}
+
+export function extractOpenAiResponsesDelta(payload: string): string {
+  try {
+    const json = JSON.parse(payload) as { type?: string; delta?: unknown };
+    if (json.type === 'response.output_text.delta' && typeof json.delta === 'string') return json.delta;
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+export function extractClaudeDelta(payload: string): string {
+  try {
+    const json = JSON.parse(payload) as { type?: string; delta?: { type?: string; text?: string } };
+    if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta' && typeof json.delta.text === 'string') {
+      return json.delta.text;
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+export function extractGeminiDelta(payload: string): string {
+  try {
+    const json = JSON.parse(payload) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }> };
+    const parts = json.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return '';
+    return parts
+      .filter((p) => p && !p.thought && typeof p.text === 'string')
+      .map((p) => p.text as string)
+      .join('');
+  } catch {
+    return '';
+  }
+}
+
+/** 服务端未按 SSE 返回时，从整段 JSON 响应里提取文本（与 requestText 的解析保持一致）。 */
+function extractFullTextFromResponse(apiType: AIApiType, data: unknown): string {
+  if (apiType === 'openai-responses') {
+    const typed = data as OpenAIResponse;
+    if (typeof typed.output_text === 'string' && typed.output_text) return typed.output_text;
+    if (Array.isArray(typed.output)) {
+      return typed.output
+        .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
+        .map((part) => part?.text || '')
+        .join('');
+    }
+    return '';
+  }
+  if (apiType === 'claude') {
+    const blocks = (data as { content?: unknown }).content;
+    if (!Array.isArray(blocks)) return '';
+    return blocks
+      .map((b) => {
+        if (!b || typeof b !== 'object') return '';
+        const block = b as { type?: unknown; text?: unknown };
+        return block.type === 'text' && typeof block.text === 'string' ? block.text : '';
+      })
+      .join('');
+  }
+  if (apiType === 'gemini') {
+    const candidates = (data as { candidates?: unknown }).candidates;
+    if (!Array.isArray(candidates) || candidates.length === 0) return '';
+    const parts = (candidates[0] as { content?: { parts?: unknown } }).content?.parts;
+    if (!Array.isArray(parts)) return '';
+    return parts
+      .filter((p) => p && typeof p === 'object' && !(p as { thought?: boolean }).thought)
+      .map((p) => {
+        if (!p || typeof p !== 'object') return '';
+        const part = p as { text?: unknown };
+        return typeof part.text === 'string' ? part.text : '';
+      })
+      .join('');
+  }
+  const content = (data as { choices?: OpenAIResponseChoice[] }).choices?.[0]?.message?.content;
+  return typeof content === 'string' ? content : '';
+}
+
 function getStatusCodeMeaning(statusCode: number, language: string): string {
   const meanings: Record<number, { zh: string; en: string }> = {
     400: { zh: '请求参数错误', en: 'Bad Request' },
@@ -560,6 +696,155 @@ ${options.user}` : options.user;
     throw new Error('No content received from AI service');
   }
 
+  /**
+   * 流式文本生成（SSE）。仅支持直连模式；走后端代理时抛 AIStreamUnsupportedError，
+   * 由调用方决定降级。返回完整拼接文本；增量通过 onChunk 逐段回调。
+   */
+  private async requestTextStream(options: {
+    system: string;
+    user: string;
+    temperature: number;
+    maxTokens: number;
+    signal?: AbortSignal;
+    onChunk: (delta: string) => void;
+  }): Promise<string> {
+    if (backend.isAvailable) {
+      // /api/proxy/ai 会整体缓冲 JSON 响应，无法转发 SSE 帧。
+      throw new AIStreamUnsupportedError();
+    }
+
+    const apiType = this.getApiType();
+    const model = this.config.model;
+    const configId = this.config.id;
+    const startTime = Date.now();
+
+    let requestUrl: string;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    };
+    let body: unknown;
+    let extractDelta: (payload: string) => string;
+
+    if (apiType === 'claude') {
+      requestUrl = buildApiUrl(this.config.baseUrl, 'v1/messages');
+      headers['x-api-key'] = this.config.apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+      body = {
+        model,
+        stream: true,
+        ...(options.system.trim() ? { system: options.system } : {}),
+        messages: [{ role: 'user', content: options.user }],
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+      };
+      extractDelta = extractClaudeDelta;
+    } else if (apiType === 'gemini') {
+      const rawModel = this.config.model.trim();
+      const geminiModel = rawModel.startsWith('models/') ? rawModel.slice('models/'.length) : rawModel;
+      const prompt = options.system ? `${options.system}\n\n${options.user}` : options.user;
+      const urlObj = new URL(buildApiUrl(this.config.baseUrl, `v1beta/models/${encodeURIComponent(geminiModel)}:streamGenerateContent`));
+      urlObj.searchParams.set('alt', 'sse');
+      urlObj.searchParams.set('key', this.config.apiKey);
+      requestUrl = urlObj.toString();
+      body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: options.temperature,
+          maxOutputTokens: options.maxTokens,
+        },
+      };
+      extractDelta = extractGeminiDelta;
+    } else if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
+      const messages = [
+        ...(options.system.trim() ? [{ role: 'system', content: options.system }] : []),
+        { role: 'user', content: options.user },
+      ];
+      const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
+      const isDeepSeekThinking = this.isDeepSeekThinkingModel();
+      const isMiMoModel = this.isMiMoModel();
+      const reasoning = this.getOpenAIReasoningPayload();
+
+      body = apiType === 'openai-responses'
+        ? {
+            model,
+            input: messages,
+            stream: true,
+            temperature: options.temperature,
+            max_output_tokens: options.maxTokens,
+            ...(reasoning ? { reasoning } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
+          }
+        : {
+            model,
+            messages,
+            stream: true,
+            max_tokens: options.maxTokens,
+            ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
+            ...(!isDeepSeekReasoner && !isDeepSeekThinking && !isMiMoModel && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
+            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
+          };
+      requestUrl = buildFinalApiUrl(this.config.baseUrl, apiType);
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      extractDelta = apiType === 'openai-responses' ? extractOpenAiResponsesDelta : extractOpenAiChatDelta;
+    } else {
+      throw new AIStreamUnsupportedError();
+    }
+
+    // 请求头仅在 debug 日志中展示，密钥做掩码
+    const debugHeaders: Record<string, string> = { ...headers };
+    if (debugHeaders['Authorization']) debugHeaders['Authorization'] = 'Bearer ***';
+    if (debugHeaders['x-api-key']) debugHeaders['x-api-key'] = '***';
+    const maskedUrl = requestUrl.replace(/([?&]key=)[^&]+/, '$1***');
+
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: options.signal,
+    });
+    if (!response.ok) {
+      const errorDetail = await this.extractErrorDetail(response);
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
+        url: maskedUrl, requestHeaders: debugHeaders, status: response.status,
+      });
+      throw new AIRequestError(
+        `AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`,
+        response.status,
+        parseRetryAfterMs(response)
+      );
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.body || (!contentType.includes('text/event-stream') && contentType.includes('application/json'))) {
+      // 服务端忽略 stream:true 直接返回整段 JSON：一次性回调后返回。
+      const data: unknown = await response.json();
+      const text = extractFullTextFromResponse(apiType, data);
+      if (!text) {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
+        throw new Error('No content received from AI service');
+      }
+      options.onChunk(text);
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, { url: maskedUrl, streamed: false });
+      return text;
+    }
+
+    let full = '';
+    await consumeSseStream(response.body, (payload) => {
+      const delta = extractDelta(payload);
+      if (delta) {
+        full += delta;
+        options.onChunk(delta);
+      }
+    });
+
+    this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
+    if (!full.trim()) {
+      throw new Error('No content received from AI service (stream)');
+    }
+    return full;
+  }
+
   async generateChatText(options: {
     system: string;
     user: string;
@@ -573,6 +858,25 @@ ${options.user}` : options.user;
       temperature: options.temperature ?? 0.2,
       maxTokens: options.maxTokens ?? 4000,
       signal: options.signal,
+    });
+  }
+
+  /** 流式版本的 generateChatText；不支持流式的通道抛 AIStreamUnsupportedError。 */
+  async generateChatTextStream(options: {
+    system: string;
+    user: string;
+    temperature?: number;
+    maxTokens?: number;
+    signal?: AbortSignal;
+    onChunk: (delta: string) => void;
+  }): Promise<string> {
+    return await this.requestTextStream({
+      system: options.system,
+      user: options.user,
+      temperature: options.temperature ?? 0.2,
+      maxTokens: options.maxTokens ?? 4000,
+      signal: options.signal,
+      onChunk: options.onChunk,
     });
   }
 
