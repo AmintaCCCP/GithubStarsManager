@@ -61,9 +61,12 @@
     transition: background 0.3s ease;
   }
 
+  /* Scrollbar layout is constant: the gutter is always reserved and only the
+     thumb's color toggles on scroll. Toggling scrollbar-width/overflow instead
+     changed the content width mid-scroll and jittered text and borders (#309). */
   .scrollbar-on-scroll {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
 
   .scrollbar-on-scroll::-webkit-scrollbar {
@@ -83,7 +86,6 @@
   }
 
   .scrollbar-on-scroll.scrolling {
-    scrollbar-width: thin;
     scrollbar-color: hsl(var(--foreground) / 0.25) transparent;
   }
 

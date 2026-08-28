@@ -1,8 +1,9 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
-import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
+import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { GitHubApiService } from './githubApi';
 import { logger } from './logger';
+import type { Repository } from '../types';
 
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
@@ -41,6 +42,16 @@ const _lastHash = {
 
 function quickHash(data: unknown): string {
   return JSON.stringify(data);
+}
+
+/**
+ * The repository endpoint does not round-trip client-only fields. Keep them
+ * out of sync fingerprints while still sending the unchanged store value.
+ * Uses the same field set as stripLocalRepositoryFields so the pull and push
+ * fingerprints always project the identical shape (Issue #304 loop-breaker).
+ */
+export function repositoryPayloadHash(repositories: Repository[]): string {
+  return quickHash(stripLocalRepositoryFields(repositories));
 }
 
 /** Canonical fingerprint for the vector search config.
@@ -229,7 +240,7 @@ export async function syncFromBackend(): Promise<void> {
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
     if (reposResult.status === 'fulfilled') {
-      const hash = quickHash(reposResult.value.repositories);
+      const hash = repositoryPayloadHash(reposResult.value.repositories);
       if (hash !== _lastHash.repos) {
         hashes.repos = hash;
         changed.repos = true;
@@ -310,7 +321,11 @@ export async function syncFromBackend(): Promise<void> {
       } else {
         const merged = mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
         state.setRepositories(merged);
-        _lastHash.repos = quickHash(merged);
+        // Commit the RAW backend hash, not the merged one. The merge preserves
+        // local-only metadata (e.g. vector_indexed_at) the backend never stores,
+        // so hashing `merged` here made the next poll's backend hash differ
+        // forever — re-applying setRepositories every poll cycle.
+        _lastHash.repos = hashes.repos;
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
@@ -506,8 +521,11 @@ export async function syncToBackend(): Promise<void> {
       _hasPendingLocalChanges = false;
     }
 
-    // Only update _lastHash for successfully synced slices
-    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(state.repositories);
+    // Only update _lastHash for successfully synced slices.
+    // Hash the raw pushed payload (local-only fields like vector_indexed_at are
+    // never stored by the backend), so the next pull compares against the same
+    // projection and doesn't re-apply setRepositories after a push.
+    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(stripLocalRepositoryFields(state.repositories));
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);

@@ -185,6 +185,29 @@ export function applyRepoFilters<T extends Repository>(
   return sortRepositories(filtered, sortBy, sortOrder);
 }
 
+/**
+ * Check if any search/filter/sort condition is active (non-default).
+ * Used to decide whether to display searchResults or the full repository list.
+ */
+export function hasActiveSearchFilters(filters: SearchFilters): boolean {
+  return (
+    !!filters.query.trim() ||
+    filters.languages.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.platforms.length > 0 ||
+    filters.licenses.length > 0 ||
+    filters.minStars !== undefined ||
+    filters.maxStars !== undefined ||
+    filters.isAnalyzed !== undefined ||
+    filters.isSubscribed !== undefined ||
+    filters.isEdited !== undefined ||
+    filters.isCategoryLocked !== undefined ||
+    filters.analysisFailed !== undefined ||
+    filters.sortBy !== 'stars' ||
+    filters.sortOrder !== 'desc'
+  );
+}
+
 /** Full text search + filters + optional category + pagination for MCP/API use. */
 export function searchRepositories<T extends Repository>(
   repos: T[],

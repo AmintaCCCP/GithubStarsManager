@@ -564,6 +564,81 @@ describe('useAppStore repository performance guards', () => {
     expect(notifications).toBe(0);
     expect(useAppStore.getState().analyzingRepositoryIds).toBe(previousAnalyzingIds);
   });
+
+  it('preserves an active search result set when setRepositories runs (Issue #304)', () => {
+    const first = createRepository(1);
+    const second = createRepository(2);
+    useAppStore.setState({
+      repositories: [first, second],
+      searchResults: [second],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: 'repo-2' },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    const refreshed = [createRepository(1), createRepository(2), createRepository(3)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    // The stale searchResults reference is kept so the filtered card (and its
+    // open edit modal) stays mounted; SearchBar recomputes results afterwards.
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+    expect(useAppStore.getState().repositories).toBe(refreshed);
+  });
+
+  it('preserves an active search result set when only a license filter is active', () => {
+    const first = createRepository(1);
+    const second = createRepository(2);
+    useAppStore.setState({
+      repositories: [first, second],
+      searchResults: [second],
+      searchFilters: { ...useAppStore.getState().searchFilters, licenses: ['MIT'] },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    const refreshed = [createRepository(1), createRepository(2), createRepository(3)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+  });
+
+  it('resets searchResults to the full list when no search filter is active', () => {
+    // Reset searchFilters to defaults before the test; the license-only test above
+    // may have left licenses set, which would keep hasActiveSearchFilters true.
+    useAppStore.setState({ searchFilters: { ...useAppStore.getState().searchFilters, licenses: [] } });
+    const repo = createRepository(1);
+    useAppStore.setState({
+      repositories: [repo],
+      searchResults: [repo],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: '' },
+    });
+
+    const refreshed = [repo, createRepository(2)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    expect(useAppStore.getState().searchResults).toBe(refreshed);
+  });
+
+  it('preserves an active search result set when addRepository runs (Issue #304)', () => {
+    const existing = createRepository(2);
+    useAppStore.setState({
+      repositories: [existing],
+      searchResults: [existing],
+      searchFilters: { ...useAppStore.getState().searchFilters, query: 'repo-2' },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    useAppStore.getState().addRepository(createRepository(3));
+
+    // Same guard as setRepositories: swapping the full list into searchResults
+    // while filters are active would unmount the filtered card being edited.
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+    expect(useAppStore.getState().repositories).toHaveLength(2);
+
+    // Without active filters, the full list is published to searchResults.
+    useAppStore.setState({ searchFilters: { ...useAppStore.getState().searchFilters, query: '' } });
+    useAppStore.getState().addRepository(createRepository(4));
+
+    expect(useAppStore.getState().searchResults).toBe(useAppStore.getState().repositories);
+  });
 });
 
 describe('useAppStore auth localStorage mirror (Issue #259)', () => {
