@@ -19,29 +19,8 @@ import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { useBackendLifecycle } from './features/lifecycle/useBackendLifecycle';
-import type { AppState, SearchFilters } from './types';
-
-/**
- * Check if any search/filter/sort condition is active (non-default).
- * Used to decide whether to display searchResults or the full repository list.
- */
-function hasActiveSearchFilters(filters: SearchFilters): boolean {
-  return (
-    !!filters.query.trim() ||
-    filters.languages.length > 0 ||
-    filters.tags.length > 0 ||
-    filters.platforms.length > 0 ||
-    filters.minStars !== undefined ||
-    filters.maxStars !== undefined ||
-    filters.isAnalyzed !== undefined ||
-    filters.isSubscribed !== undefined ||
-    filters.isEdited !== undefined ||
-    filters.isCategoryLocked !== undefined ||
-    filters.analysisFailed !== undefined ||
-    filters.sortBy !== 'stars' ||
-    filters.sortOrder !== 'desc'
-  );
-}
+import type { AppState } from './types';
+import { hasActiveSearchFilters } from './utils/repoSearch';
 
 const LazyReleaseTimeline = React.lazy(() =>
   import('./components/ReleaseTimeline').then((module) => ({ default: module.ReleaseTimeline }))

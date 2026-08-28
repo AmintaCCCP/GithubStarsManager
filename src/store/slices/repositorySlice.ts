@@ -4,6 +4,7 @@ import { matchesCategory } from '../../utils/categoryUtils';
 import type { AppStoreSlice } from '../types';
 import { defaultCategories, initialSearchFilters } from '../schema';
 import { getAllCategories, getCategoryNameVariants } from '../helpers/categoryHelpers';
+import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
 
 export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppActions,
@@ -29,7 +30,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setSearchResults'
 >> = (set, get) => ({
       // Repository actions
-      setRepositories: (repositories) => set({ repositories, searchResults: repositories }),
+      setRepositories: (repositories) => set((state) => ({
+        repositories,
+        // Background sync must not wipe an active search result set: replacing
+        // it with the full list shrinks the visible slice and unmounts the card
+        // being edited (closing its edit modal). SearchBar recomputes results
+        // from the new repositories on its own effect.
+        searchResults: hasActiveSearchFilters(state.searchFilters) ? state.searchResults : repositories,
+      })),
       updateRepository: (repo) => set((state) => {
         const repositoriesResult = replaceRepositoryInList(state.repositories, repo);
         const searchResultsResult = state.searchResults === state.repositories
@@ -125,7 +133,13 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
         return {
           repositories: updatedRepositories,
-          searchResults: updatedRepositories
+          // Same guard as setRepositories: while search filters are active the
+          // visible list is searchResults, and swapping in the full list would
+          // unmount filtered cards (closing their edit modal). SearchBar
+          // recomputes results from the updated repositories on its own effect.
+          searchResults: hasActiveSearchFilters(state.searchFilters)
+            ? state.searchResults
+            : updatedRepositories
         };
       }),
       setLoading: (isLoading) => set({ isLoading }),
