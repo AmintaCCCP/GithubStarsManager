@@ -8,8 +8,27 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Pull requests and ordinary builds receive only repository read access. The
+# release job elevates this explicitly when it creates a tagged GitHub release.
+permissions:
+  contents: read
+
 jobs:
+  verify-release-version:
+    name: Verify release tag matches client version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Verify tagged release version
+        if: github.ref_type == 'tag'
+        run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
+
   build:
+    needs: verify-release-version
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     
@@ -21,6 +40,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        persist-credentials: false
       
     - name: Setup Node.js
       uses: actions/setup-node@v6
@@ -387,7 +408,9 @@ jobs:
     - name: Build Electron app
       run: npm run dist
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Only tagged release builds receive a token; PR and branch builds never
+        # expose a credential to package scripts or electron-builder hooks.
+        GH_TOKEN: ${{ github.ref_type == 'tag' && secrets.GITHUB_TOKEN || '' }}
         CI: true
         DEBUG: electron-builder
         # Linux 特定环境变量
@@ -452,9 +475,11 @@ jobs:
         if-no-files-found: ignore
 
   release:
-    needs: build
+    needs: [verify-release-version, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && always()
+    # Keep partial platform releases possible, but never publish when the tag
+    # does not match the root package.json client version.
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
     permissions:
       contents: write
     
