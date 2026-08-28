@@ -290,6 +290,8 @@ export class AIService {
       responseHeaders?: Record<string, string>;
       responseBody?: string;
       status?: number;
+      /** 是否走 SSE 流式返回（流式调试日志使用）。 */
+      streamed?: boolean;
     }
   ): void {
     if (logger.isDebugMode()) {
