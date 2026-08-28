@@ -195,6 +195,7 @@ export function hasActiveSearchFilters(filters: SearchFilters): boolean {
     filters.languages.length > 0 ||
     filters.tags.length > 0 ||
     filters.platforms.length > 0 ||
+    filters.licenses.length > 0 ||
     filters.minStars !== undefined ||
     filters.maxStars !== undefined ||
     filters.isAnalyzed !== undefined ||

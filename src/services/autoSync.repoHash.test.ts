@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
+import { repositoryPayloadHash } from './autoSync';
 
 // Regression for Issue #304: the repos hash committed after a pull must be the
 // RAW backend hash. Committing quickHash(merged) instead made the next poll's
@@ -69,6 +70,17 @@ describe('backend sync hash convergence (Issue #304 loop-breaker)', () => {
 
     expect(JSON.stringify(secondMerge)).toBe(JSON.stringify(firstMerge));
   });
+
+  it('omits client-only fields from both pull and successful-push hashes', () => {
+    const backendPayload = [createRepository(1)];
+    const localRepositories = [createRepository(1, {
+      analysis_error: 'temporary failure detail',
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-08-01T00:00:00.000Z',
+    })];
+
+    expect(repositoryPayloadHash(localRepositories)).toBe(repositoryPayloadHash(backendPayload));
+  });
 });
 
 describe('hasActiveSearchFilters (Issue #304 searchResults guard)', () => {
@@ -93,5 +105,6 @@ describe('hasActiveSearchFilters (Issue #304 searchResults guard)', () => {
 
   it('treats facet selections as active', () => {
     expect(hasActiveSearchFilters({ ...baseFilters(), languages: ['TypeScript'] })).toBe(true);
+    expect(hasActiveSearchFilters({ ...baseFilters(), licenses: ['MIT'] })).toBe(true);
   });
 });

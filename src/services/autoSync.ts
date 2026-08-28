@@ -3,6 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
 import { GitHubApiService } from './githubApi';
 import { logger } from './logger';
+import type { Repository } from '../types';
 
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
@@ -41,6 +42,28 @@ const _lastHash = {
 
 function quickHash(data: unknown): string {
   return JSON.stringify(data);
+}
+
+const LOCAL_ONLY_REPOSITORY_FIELDS = new Set<keyof Repository>([
+  'forks_count',
+  'forks',
+  'analysis_error',
+  'has_fetched_releases',
+  'last_release_fetch_time',
+]);
+
+/**
+ * The repository endpoint does not round-trip these client-only fields. Keep
+ * them out of sync fingerprints while still sending the unchanged store value.
+ */
+export function repositoryPayloadHash(repositories: Repository[]): string {
+  return quickHash(repositories.map(repository =>
+    Object.fromEntries(
+      Object.entries(repository).filter(([field]) =>
+        !LOCAL_ONLY_REPOSITORY_FIELDS.has(field as keyof Repository)
+      )
+    )
+  ));
 }
 
 /** Canonical fingerprint for the vector search config.
@@ -229,7 +252,7 @@ export async function syncFromBackend(): Promise<void> {
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
     if (reposResult.status === 'fulfilled') {
-      const hash = quickHash(reposResult.value.repositories);
+      const hash = repositoryPayloadHash(reposResult.value.repositories);
       if (hash !== _lastHash.repos) {
         hashes.repos = hash;
         changed.repos = true;
@@ -511,7 +534,7 @@ export async function syncToBackend(): Promise<void> {
     }
 
     // Only update _lastHash for successfully synced slices
-    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(state.repositories);
+    if (reposSync.status === 'fulfilled') _lastHash.repos = repositoryPayloadHash(state.repositories);
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
