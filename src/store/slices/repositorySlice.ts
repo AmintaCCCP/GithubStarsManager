@@ -133,7 +133,13 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
         return {
           repositories: updatedRepositories,
-          searchResults: updatedRepositories
+          // Same guard as setRepositories: while search filters are active the
+          // visible list is searchResults, and swapping in the full list would
+          // unmount filtered cards (closing their edit modal). SearchBar
+          // recomputes results from the updated repositories on its own effect.
+          searchResults: hasActiveSearchFilters(state.searchFilters)
+            ? state.searchResults
+            : updatedRepositories
         };
       }),
       setLoading: (isLoading) => set({ isLoading }),
