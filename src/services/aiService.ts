@@ -714,6 +714,12 @@ ${options.user}` : options.user;
       // /api/proxy/ai 会整体缓冲 JSON 响应，无法转发 SSE 帧。
       throw new AIStreamUnsupportedError();
     }
+    if (this.isDeepSeekReasonerModel()) {
+      // deepseek-reasoner 的最终文本可能仅存在于 reasoning_content（思考链），
+      // 非流式路径对此有专门处理（且思考链不得用于其他 DeepSeek 模型）。流式
+      // 增量无法安全区分思考与正文，直接走阻塞路径以复用既有语义。
+      throw new AIStreamUnsupportedError();
+    }
 
     const apiType = this.getApiType();
     const model = this.config.model;
@@ -818,8 +824,13 @@ ${options.user}` : options.user;
     }
 
     const contentType = response.headers.get('content-type') || '';
-    if (!response.body || (!contentType.includes('text/event-stream') && contentType.includes('application/json'))) {
-      // 服务端忽略 stream:true 直接返回整段 JSON：一次性回调后返回。
+    if (!response.body) {
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'empty response body' }, { url: maskedUrl });
+      throw new Error('No content received from AI service (empty body)');
+    }
+    if (!contentType.includes('text/event-stream')) {
+      // 服务端忽略 stream:true（可能返回 application/json、text/plain 或缺失
+      // content-type）时按整段响应处理：一次性回调后返回。
       const data: unknown = await response.json();
       const text = extractFullTextFromResponse(apiType, data);
       if (!text) {

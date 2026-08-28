@@ -31,8 +31,8 @@ interface MarkdownRendererProps {
   /** Convert single newlines to <br> (GitHub READMEs do not; AI summaries rely on it). */
   breaks?: boolean;
   /**
-   * 可选的行内 code 自定义渲染（如仓库问答的引用 Badge）：返回一个 ReactNode
-   * 时替换默认的 <code>；返回 null/undefined 时保持原样式。
+   * 可选的行内 code 自定义渲染（如仓库问答的引用 Badge）：返回 ReactNode 时替换
+   * 默认的 <code>（含 0、''、false 等合法节点）；返回 null/undefined 时保持原样式。
    */
   renderInlineCode?: (text: string) => React.ReactNode | null;
 }
@@ -876,7 +876,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       if (isInline) {
         const codeText = typeof children === 'string' ? children : extractTextFromChildren(children);
         const rendered = renderInlineCode?.(codeText);
-        if (rendered) return rendered;
+        // 仅 null/undefined 回退默认 <code>，保留回调返回的合法 ReactNode（含 0、''、false）。
+        if (rendered !== null && rendered !== undefined) return rendered;
         return <code {...stripAstNode(props)}>{children}</code>;
       }
 

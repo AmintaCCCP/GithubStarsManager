@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { AIConfig } from '../types';
 import {
+  AIService,
+  AIStreamUnsupportedError,
   consumeSseStream,
   extractClaudeDelta,
   extractGeminiDelta,
@@ -43,8 +46,7 @@ describe('consumeSseStream', () => {
   });
 });
 
-describe('stream delta extractors', () => {
-  it('extracts OpenAI chat-completions deltas and stops at [DONE]', () => {
+describe('stream delta extractors', () => {  it('extracts OpenAI chat-completions deltas and stops at [DONE]', () => {
     expect(extractOpenAiChatDelta('{"choices":[{"delta":{"content":"Hello"}}]}')).toBe('Hello');
     expect(extractOpenAiChatDelta('{"choices":[{"delta":{}}]}')).toBe('');
     expect(extractOpenAiChatDelta('[DONE]')).toBe('');
@@ -68,5 +70,23 @@ describe('stream delta extractors', () => {
     expect(extractGeminiDelta('{"candidates":[{"content":{"parts":[{"text":"Ciao"},{"thought":true,"text":"hidden"}]}}]}')).toBe('Ciao');
     expect(extractGeminiDelta('{"candidates":[]}')).toBe('');
     expect(extractGeminiDelta('not json')).toBe('');
+  });
+});
+
+describe('requestTextStream gating', () => {
+  it('rejects streaming for deepseek-reasoner so reasoning_content stays on the blocking path', async () => {
+    const config: AIConfig = {
+      id: 'ai-reasoner',
+      name: 'DeepSeek Reasoner',
+      apiType: 'deepseek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: 'test-key',
+      model: 'deepseek-reasoner',
+      isActive: true,
+    };
+    const service = new AIService(config, 'en');
+
+    await expect(service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }))
+      .rejects.toBeInstanceOf(AIStreamUnsupportedError);
   });
 });

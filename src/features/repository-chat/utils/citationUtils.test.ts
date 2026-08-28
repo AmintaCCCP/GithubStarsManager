@@ -34,6 +34,15 @@ describe('parseCitationToken', () => {
     expect(parseCitationToken('some text without line numbers')).toBeNull();
     expect(parseCitationToken('42')).toBeNull();
   });
+
+  it('rejects URLs with a scheme or host:port forms', () => {
+    expect(parseCitationToken('https://example.com:8080')).toBeNull();
+    expect(parseCitationToken('http://localhost:3000')).toBeNull();
+    expect(parseCitationToken('https://example.com - 8080')).toBeNull();
+    expect(parseCitationToken('https://example.com/page')).toBeNull();
+    expect(stripCitationsForCopy('See `http://localhost:3000` for the local server.'))
+      .toBe('See `http://localhost:3000` for the local server.');
+  });
 });
 
 describe('resolveCitation', () => {

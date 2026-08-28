@@ -245,6 +245,13 @@ export const useRepositoryChat = ({
             scheduleStreamedFlush();
           },
         });
+        // 拿到最终结果后立即取消挂起的节流刷新：否则最后一个分片若在
+        // saveEvidence/saveMessage 等持久化 await 之前不足 60ms 到达，挂起
+        // 定时器会把已完成的回答覆盖回流式状态（status: streaming 且无证据）。
+        if (streamFlushTimer) {
+          globalThis.clearTimeout(streamFlushTimer);
+          streamFlushTimer = null;
+        }
         await Promise.all(result.evidences.map((evidence) => repositoryChatSessionRepository.saveEvidence(evidence)));
         const completedAssistant: RepositoryChatMessage = {
           ...assistantMessage,
