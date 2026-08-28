@@ -271,6 +271,21 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   };
 
   const lastMessage = messages[messages.length - 1];
+
+  // 仅在回答从流式进入终态时向屏幕阅读器通报一次，避免 aria-live 在流式期间反复朗读。
+  const lastAssistantStatus = lastMessage?.role === 'assistant' ? lastMessage.status : '';
+  const [statusAnnouncement, setStatusAnnouncement] = useState('');
+  const prevAssistantStatusRef = useRef('');
+  useEffect(() => {
+    const previous = prevAssistantStatusRef.current;
+    prevAssistantStatusRef.current = lastAssistantStatus;
+    if (previous !== 'streaming') return;
+    const zh = language === 'zh';
+    if (lastAssistantStatus === 'complete') setStatusAnnouncement(zh ? '回答已完成。' : 'Answer complete.');
+    else if (lastAssistantStatus === 'error') setStatusAnnouncement(zh ? '回答生成失败。' : 'Answer generation failed.');
+    else if (lastAssistantStatus === 'aborted') setStatusAnnouncement(zh ? '已停止生成。' : 'Generation stopped.');
+  }, [lastAssistantStatus, language]);
+
   const isCopyableMessage = (message: RepositoryChatMessage): boolean => (
     message.role === 'assistant'
     && message.content.length > 0
@@ -349,7 +364,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             </div>
           ) : (
             <div className="relative min-h-0 flex-1">
-              <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto pr-1" aria-live="polite">
+              <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto pr-1">
                 {error ? (
                   <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-destructive/40 bg-muted/20 px-5 text-center">
                     <p className="text-sm text-destructive">{error}</p>
@@ -502,6 +517,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
           className="border-t border-border pt-3"
           onSubmit={handleSubmit}
         >
+          <p role="status" className="sr-only">{statusAnnouncement}</p>
           <label className="sr-only" htmlFor="repository-chat-draft">{t('问题', 'Question')}</label>
           <div className="flex items-end gap-2">
             <Textarea

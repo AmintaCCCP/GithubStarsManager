@@ -18,13 +18,28 @@ const CITATION_COLON_PATTERN = /^\/?([^\s`]+?):(\d+)(?:-(\d+))?$/;
 export const parseCitationToken = (raw: string): ParsedCitation | null => {
   const token = raw.trim();
   if (!token || !/[./]/.test(token)) return null;
-  const match = CITATION_DASH_PATTERN.exec(token) ?? CITATION_COLON_PATTERN.exec(token);
-  if (!match) return null;
-  const [, path, start, end] = match;
-  const lineStart = Number(start);
-  const lineEnd = Number(end ?? start);
-  if (!path || !Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
-  return { path: path.replace(/\/+$/, ''), lineStart, lineEnd: Math.max(lineStart, lineEnd) };
+  // 带协议的 URL（如 https://example.com:8080）与主机:端口不是文件引用，
+  // 否则 stripCitationsForCopy 会把常见 URL 行内代码误删。
+  if (token.includes('://')) return null;
+  const dashMatch = CITATION_DASH_PATTERN.exec(token);
+  if (dashMatch) {
+    const [, path, start, end] = dashMatch;
+    const lineStart = Number(start);
+    const lineEnd = Number(end ?? start);
+    if (!path || !Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
+    return { path: path.replace(/\/+$/, ''), lineStart, lineEnd: Math.max(lineStart, lineEnd) };
+  }
+  const colonMatch = CITATION_COLON_PATTERN.exec(token);
+  if (colonMatch) {
+    const [, path, start, end] = colonMatch;
+    // path 段内再出现 ":" 即为 URL/主机:端口形态（如 example.com:8080），排除。
+    if (!path || path.includes(':')) return null;
+    const lineStart = Number(start);
+    const lineEnd = Number(end ?? start);
+    if (!Number.isFinite(lineStart) || !Number.isFinite(lineEnd)) return null;
+    return { path: path.replace(/\/+$/, ''), lineStart, lineEnd: Math.max(lineStart, lineEnd) };
+  }
+  return null;
 };
 
 const normalizeEvidencePath = (path: string): string => path.replace(/^\/+/, '');
