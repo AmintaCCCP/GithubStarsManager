@@ -896,6 +896,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
       // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
       return <pre>{children}</pre>;
     },
+    table: (outerProps) => {
+      // 宽表格（模型常输出多列对比表）在窄容器内横向滚动，而不是撑破布局或被截断。
+      const domProps = stripAstNode(outerProps);
+      return (
+        <div className="markdown-table-scroll">
+          <table {...domProps} />
+        </div>
+      );
+    },
     input: (props) => {
       if (props.type === 'checkbox') {
         return <input {...stripAstNode(props)} readOnly />;

@@ -147,7 +147,7 @@ const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]
     if (!resolved) return null;
     return <CitationBadge target={resolved} language={language} />;
   }, [evidenceIds, evidenceById, language]);
-  return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" renderInlineCode={renderInlineCode} />;
+  return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" className="repository-chat-markdown" renderInlineCode={renderInlineCode} />;
 });
 
 const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
@@ -451,7 +451,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                           </details>
                         )}
                         {message.role === 'assistant' && message.status !== 'streaming' && (isCopyableMessage(message) || canRegenerate) && (
-                          <div className="mt-2 flex items-center gap-1 opacity-100 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/message:opacity-100">
+                          <div className="mt-2 flex items-center justify-end gap-1 opacity-100 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/message:opacity-100">
                             {isCopyableMessage(message) && (
                               <Button
                                 type="button"
