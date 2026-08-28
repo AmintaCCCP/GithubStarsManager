@@ -584,7 +584,26 @@ describe('useAppStore repository performance guards', () => {
     expect(useAppStore.getState().repositories).toBe(refreshed);
   });
 
+  it('preserves an active search result set when only a license filter is active', () => {
+    const first = createRepository(1);
+    const second = createRepository(2);
+    useAppStore.setState({
+      repositories: [first, second],
+      searchResults: [second],
+      searchFilters: { ...useAppStore.getState().searchFilters, licenses: ['MIT'] },
+    });
+    const previousSearchResults = useAppStore.getState().searchResults;
+
+    const refreshed = [createRepository(1), createRepository(2), createRepository(3)];
+    useAppStore.getState().setRepositories(refreshed);
+
+    expect(useAppStore.getState().searchResults).toBe(previousSearchResults);
+  });
+
   it('resets searchResults to the full list when no search filter is active', () => {
+    // Reset searchFilters to defaults before the test; the license-only test above
+    // may have left licenses set, which would keep hasActiveSearchFilters true.
+    useAppStore.setState({ searchFilters: { ...useAppStore.getState().searchFilters, licenses: [] } });
     const repo = createRepository(1);
     useAppStore.setState({
       repositories: [repo],

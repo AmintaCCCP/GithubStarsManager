@@ -1,6 +1,7 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata } from '../utils/repositoryMerge';
+import { stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { GitHubApiService } from './githubApi';
 import { logger } from './logger';
 import type { Repository } from '../types';
@@ -45,11 +46,10 @@ function quickHash(data: unknown): string {
 }
 
 const LOCAL_ONLY_REPOSITORY_FIELDS = new Set<keyof Repository>([
-  'forks_count',
-  'forks',
   'analysis_error',
   'has_fetched_releases',
   'last_release_fetch_time',
+  'vector_indexed_at',
 ]);
 
 /**
@@ -533,8 +533,11 @@ export async function syncToBackend(): Promise<void> {
       _hasPendingLocalChanges = false;
     }
 
-    // Only update _lastHash for successfully synced slices
-    if (reposSync.status === 'fulfilled') _lastHash.repos = repositoryPayloadHash(state.repositories);
+    // Only update _lastHash for successfully synced slices.
+    // Hash the raw pushed payload (local-only fields like vector_indexed_at are
+    // never stored by the backend), so the next pull compares against the same
+    // projection and doesn't re-apply setRepositories after a push.
+    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(stripLocalRepositoryFields(state.repositories));
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
