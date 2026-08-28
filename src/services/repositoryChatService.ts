@@ -1293,6 +1293,8 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
     return cleaned === noVerifiedSummaryResponse(input.language) ? null : cleaned;
   };
   const answerEventDetail = input.language === 'zh' ? '证据充分；现在仅依据已验证来源生成回答。' : 'Evidence is sufficient; generate the answer only from verified sources.';
+  // 回答阶段统一截止时间：流式与阻塞降级共享同一窗口，降级只能使用剩余时长。
+  const answerDeadlineAt = Date.now() + ANSWER_STEP_TIMEOUT_MS;
 
   let answerRaw: string | null = null;
   if (input.streaming && input.onAnswerChunk) {
@@ -1306,8 +1308,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       input.signal?.addEventListener('abort', abortForCaller, { once: true });
       const timeoutId = globalThis.setTimeout(
         () => controller.abort(new DOMException('Repository chat answer step timed out.', 'TimeoutError')),
-        // 固定 180s：不随剩余取证预算放大，无响应的上游不会额外阻塞回答流程。
-        ANSWER_STEP_TIMEOUT_MS,
+        Math.max(1_000, answerDeadlineAt - Date.now()),
       );
       try {
         streamed = await ai.generateChatTextStream({
@@ -1345,19 +1346,32 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   }
 
   if (!answerRaw) {
-    answerRaw = await callModelWithRetry(
-      'synthesize_answer',
-      input.language === 'zh' ? '基于已验证证据生成最终回答' : 'Generate the final answer from verified evidence',
-      'answer',
-      turns,
-      answerEventDetail,
-      answerSystem,
-      answerUser,
-      answerMaxTokens,
-      1,
-      ANSWER_STEP_TIMEOUT_MS,
-      true,
-    );
+    const remainingAnswerMs = answerDeadlineAt - Date.now();
+    if (remainingAnswerMs <= 0) {
+      // 流式尝试已耗尽回答窗口：跳过阻塞降级，直接走 digest 兜底，避免成倍等待。
+      emit({
+        toolName: 'synthesize_answer',
+        status: 'error',
+        paramSummary: input.language === 'zh' ? '基于已验证证据生成最终回答' : 'Generate the final answer from verified evidence',
+        stage: 'answer',
+        round: turns,
+        detail: input.language === 'zh' ? '回答窗口已耗尽，未能生成最终回答。' : 'The answer window was exhausted before the answer completed.',
+      });
+    } else {
+      answerRaw = await callModelWithRetry(
+        'synthesize_answer',
+        input.language === 'zh' ? '基于已验证证据生成最终回答' : 'Generate the final answer from verified evidence',
+        'answer',
+        turns,
+        answerEventDetail,
+        answerSystem,
+        answerUser,
+        answerMaxTokens,
+        1,
+        remainingAnswerMs,
+        true,
+      );
+    }
   }
 
   let finalContent = validAnswer(answerRaw);

@@ -44,6 +44,8 @@ describe('parseCitationToken', () => {
     expect(parseCitationToken('example.com:8080')).toBeNull();
     expect(parseCitationToken('127.0.0.1:8080')).toBeNull();
     expect(parseCitationToken('example.com - 8080')).toBeNull();
+    expect(parseCitationToken('example.com/api:8080')).toBeNull();
+    expect(parseCitationToken('example.com/api - 8080')).toBeNull();
     expect(parseCitationToken('README.md:12')).toEqual({ path: 'README.md', lineStart: 12, lineEnd: 12 });
     expect(stripCitationsForCopy('See `http://localhost:3000` for the local server.'))
       .toBe('See `http://localhost:3000` for the local server.');
