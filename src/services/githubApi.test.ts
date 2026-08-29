@@ -226,30 +226,26 @@ describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
 
 
 describe('GitHubApiService.searchRepositoryIssues', () => {
-  it('strips embedded key:value qualifiers from untrusted keywords and keeps the repo scope intact', async () => {
+  it('strips embedded qualifiers, boolean operators, and prefixed tokens from untrusted keywords', async () => {
     const service = new GitHubApiService('token');
     const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
       .mockResolvedValueOnce({ total_count: 0, items: [] } as never);
 
     await service.searchRepositoryIssues('owner', 'repo', [
       'crash repo:other/repo is:pr',
+      'OR (repo:github/docs)',
+      '-repo:owner/repo',
       'audio crackle',
       'user:someone label:good-first-issue',
+      'AND -is:open',
     ]);
 
     const endpoint = (makeRequestSpy.mock.calls as unknown as Array<[string]>)[0]?.[0] ?? '';
     expect(endpoint.startsWith('/search/issues?q=')).toBe(true);
-    const query = decodeURIComponent(endpoint.slice('/search/issues?q='.length));
-    expect(query).toContain('repo:owner/repo');
-    expect(query).toContain('is:issue');
-    expect(query).toContain('crash');
-    expect(query).toContain('audio');
-    expect(query).toContain('crackle');
-    // 嵌入在关键词中段的限定符同样被移除，不再劫持仓库范围或混入 PR。
-    expect(query).not.toContain('other/repo');
-    expect(query).not.toContain('is:pr');
-    expect(query).not.toContain('user:someone');
-    expect(query).not.toContain('label:good-first-issue');
+    // 固定的仓库范围 + is:issue 之外，只允许纯文本关键词存活：
+    // 限定符（任何位置）、括号分组、-/+ 前缀与布尔操作符全部被剥离。
+    const query = decodeURIComponent(endpoint.slice('/search/issues?q='.length).split('&')[0] ?? '');
+    expect(query.split(/\s+/)).toEqual(['repo:owner/repo', 'is:issue', 'crash', 'audio', 'crackle']);
   });
 
   it('normalizes search hits into bounded issue reads', async () => {
