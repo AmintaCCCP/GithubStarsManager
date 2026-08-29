@@ -313,6 +313,7 @@ export interface AIConfig {
   requestsPerMinute?: number; // 每分钟 AI 请求数上限（供批量分析的共享限流器使用），0/缺省=不限制
   reasoningEffort?: AIReasoningEffort; // OpenAI GPT-5/Responses 可选 reasoning 强度
   mimoPlan?: MiMoPlan; // MiMo 渠道：api（按量付费）或 token-plan（订阅制）
+  supportsToolCalls?: boolean; // 端点/模型支持 OpenAI 风格 function calling（仓库问答工具循环用，默认关闭）
   apiKeyStatus?: SecretStatus;
 }
 

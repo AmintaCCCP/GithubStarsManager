@@ -5,9 +5,13 @@ import type { RepositoryChatSession, RepositoryChatToolEvent } from '../types/re
 const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
   generateChatTextStream: vi.fn(),
+  generateWithTools: vi.fn(),
   getRepositoryTree: vi.fn(),
   getRepositoryFile: vi.fn(),
   getRepositoryMarkdownEvidenceFile: vi.fn(),
+  getRepositoryReleases: vi.fn(),
+  searchRepositoryIssues: vi.fn(),
+  getRepositoryIssueComments: vi.fn(),
   vectorWrites: {
     indexAllRepos: vi.fn(),
     upsert: vi.fn(),
@@ -20,8 +24,11 @@ vi.mock('./aiService', () => ({
   AIService: class {
     generateChatText = mocks.generateChatText;
     generateChatTextStream = mocks.generateChatTextStream;
+    generateWithTools = mocks.generateWithTools;
   },
   isAIStreamUnsupportedError: (error: unknown): boolean => error instanceof Error && error.name === 'AIStreamUnsupportedError',
+  isAIToolCallUnsupportedError: (error: unknown): boolean => error instanceof Error && error.name === 'AIToolCallUnsupportedError',
+  supportsChatToolCalls: (): boolean => true,
 }));
 
 vi.mock('./githubApiFactory', () => ({
@@ -29,6 +36,9 @@ vi.mock('./githubApiFactory', () => ({
     getRepositoryTree: mocks.getRepositoryTree,
     getRepositoryFile: mocks.getRepositoryFile,
     getRepositoryMarkdownEvidenceFile: mocks.getRepositoryMarkdownEvidenceFile,
+    getRepositoryReleases: mocks.getRepositoryReleases,
+    searchRepositoryIssues: mocks.searchRepositoryIssues,
+    getRepositoryIssueComments: mocks.getRepositoryIssueComments,
   }),
 }));
 
@@ -41,7 +51,7 @@ vi.mock('./vectorSearchService', () => ({
   },
 }));
 
-import { runRepositoryChatTurn } from './repositoryChatService';
+import { runRepositoryChatTurn } from './repositoryChatRunner';
 
 const repository: Repository = {
   id: 1,
@@ -124,7 +134,7 @@ const understanding = (overrides: Record<string, unknown> = {}) => JSON.stringif
   ...overrides,
 });
 
-const target = (path: string, sections: string[], purpose: string, scope: 'documentation' | 'code' = 'documentation') => ({ path, sections, purpose, scope });
+const target = (path: string, sections: string[], purpose: string, scope: 'documentation' | 'code' | 'meta' = 'documentation') => ({ path, sections, purpose, scope });
 const plan = (...targets: ReturnType<typeof target>[]) => JSON.stringify({ rationale: 'Read sections that close the current answer gaps.', targets });
 const requirement = (name: string, status: 'verified' | 'missing' | 'not_applicable', evidence: string[] = []) => ({ requirement: name, status, evidence });
 const gate = (options: {
@@ -836,5 +846,189 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     expect(mocks.generateChatText).toHaveBeenCalledTimes(9);
     expect(result.content).toContain('insufficient');
+  });
+});
+
+describe('runRepositoryChatTurn meta sources (releases / issues)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 清掉排队的 once 响应（前面用例可能注册多于消耗），避免溢出到本组。
+    mocks.generateChatText.mockReset();
+    mocks.generateChatTextStream.mockReset();
+    mocks.generateWithTools.mockReset();
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
+  });
+
+  const releasesPayload = [
+    {
+      id: 1,
+      tag_name: 'v1.0.0',
+      name: 'First release',
+      body: 'Adds a dashboard and an API gateway.',
+      published_at: '2026-07-01T00:00:00.000Z',
+      html_url: 'https://github.com/owner/example/releases/tag/v1.0.0',
+      prerelease: false,
+      assets: [
+        { id: 11, name: 'app-macos.dmg', size: 1024, download_count: 5, browser_download_url: 'https://example.com/app-macos.dmg', content_type: 'application/x-apple-diskimage', created_at: '2026-07-01T00:00:00.000Z', updated_at: '2026-07-01T00:00:00.000Z' },
+        { id: 12, name: 'app-win.exe', size: 2048, download_count: 7, browser_download_url: 'https://example.com/app-win.exe', content_type: 'application/octet-stream', created_at: '2026-07-01T00:00:00.000Z', updated_at: '2026-07-01T00:00:00.000Z' },
+      ],
+    },
+  ];
+  const releaseRef = '/release-v1.0.0.md - 1-2';
+
+  it('auto-escalates to recent releases when documentation stalls on a recent-updates question', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ entities: ['recent releases'], expected_answer: ['recent release notes'], target: 'recent updates' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'recent release notes')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('recent release notes', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'recheck recent release notes')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('recent release notes', 'verified', [releaseRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The latest release v1.0.0 adds a dashboard and an API gateway with macOS and Windows builds.', releaseRef, 'Recent updates'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('这个仓库最近更新了什么？'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 第 1 轮只读文档；文档停滞 + meta 意图触发安全网，第 2 轮读取 Release。
+    expect(readPaths()[0]).toBe('README.md');
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(events.some((event) => event.toolName === 'escalate_to_meta')).toBe(true);
+    expect(events.some((event) => event.toolName === 'read_releases' && event.status === 'success')).toBe(true);
+    expect(result.content).toContain(releaseRef);
+  });
+
+  it('cites platform-tagged release evidence when asked which build packages are provided', async () => {
+    mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['platform build packages'], target: 'build packages' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find platform build packages')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('platform build packages', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck platform build packages')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('platform build packages', 'verified', [releaseRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The repository publishes macOS disk images and Windows executables as release assets.', releaseRef, 'Build packages'));
+
+    const result = await runRepositoryChatTurn(turnInput('Which platform build packages does this repository provide?'));
+
+    expect(result.content).toContain(releaseRef);
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers troubleshooting with searched issue evidence including comment excerpts', async () => {
+    const issueRef = '/issue-42.md - 1-3';
+    mocks.searchRepositoryIssues.mockResolvedValue([
+      {
+        number: 42,
+        title: 'App crashes on start',
+        state: 'closed' as const,
+        html_url: 'https://github.com/owner/example/issues/42',
+        body: 'Crash fixed by setting APP_PORT explicitly.',
+        comments: 2,
+        updated_at: '2026-06-01T00:00:00.000Z',
+        labels: ['bug'],
+      },
+    ]);
+    mocks.getRepositoryIssueComments.mockResolvedValue([
+      { user: 'alice', createdAt: '2026-06-02T00:00:00.000Z', body: 'Fixed in v1.0.0; set APP_PORT before starting.' },
+    ]);
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ intent: 'troubleshooting', information_scope: 'both', entities: ['startup crash'], search_concepts: ['crash', 'startup'], expected_answer: ['how to fix the startup crash'], target: 'startup crash fix' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find startup crash fix')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('how to fix the startup crash', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck startup crash fix')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('how to fix the startup crash', 'verified', [issueRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('Issue #42 fixed the startup crash by setting APP_PORT explicitly.', issueRef, 'Troubleshooting'));
+
+    const result = await runRepositoryChatTurn(turnInput('I hit a crash on startup — how do I fix it?'));
+
+    expect(mocks.searchRepositoryIssues).toHaveBeenCalledTimes(1);
+    expect(mocks.getRepositoryIssueComments).toHaveBeenCalledTimes(1);
+    const searchKeywords = mocks.searchRepositoryIssues.mock.calls[0][2] as string[];
+    expect(searchKeywords).toContain('startup crash');
+    expect(result.content).toContain(issueRef);
+  });
+
+  it('reports an empty release history as citable evidence instead of failing', async () => {
+    mocks.getRepositoryReleases.mockResolvedValue([]);
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ entities: ['releases'], expected_answer: ['recent release notes'], target: 'recent updates' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find recent release notes')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('recent release notes', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck recent release notes')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('recent release notes', 'verified', ['/releases-empty.md - 1-2'])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The repository has no published releases yet, so no release notes exist.', '/releases-empty.md - 1-2', 'Releases'));
+
+    const result = await runRepositoryChatTurn(turnInput('这个仓库最近更新了什么？'));
+
+    expect(result.content).toContain('/releases-empty.md - 1-2');
+  });
+
+  it('keeps round 1 documentation-only even when the planner proposes meta targets', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ entities: ['releases'], expected_answer: ['recent release notes'], target: 'recent updates' }))
+      .mockResolvedValueOnce(plan(
+        target('@meta/releases', [], 'recent release notes', 'meta'),
+        target('README.md', ['Overview'], 'project overview'),
+      ))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('recent release notes', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The README overview documents the project scope.', overviewRef, 'Overview'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('这个仓库最近更新了什么？'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // README 优先是硬规则：第 1 轮的 meta 目标被拒绝，回退到文档读取。
+    expect(mocks.getRepositoryReleases).not.toHaveBeenCalled();
+    expect(events.some((event) => event.toolName === 'escalate_to_meta')).toBe(false);
+    expect(readPaths()).toEqual(['README.md']);
+    expect(result.content).toContain(overviewRef);
+  });
+
+  it('falls back to the orchestrated loop when the endpoint rejects native tool calling', async () => {
+    mocks.generateWithTools.mockRejectedValue(Object.assign(new Error('tools not supported'), { name: 'AIToolCallUnsupportedError' }));
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput(), enableAgentToolLoop: true });
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(1);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain(overviewRef);
   });
 });

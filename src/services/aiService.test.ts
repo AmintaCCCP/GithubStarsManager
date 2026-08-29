@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Repository } from '../types';
-import { AIService, AIRequestError, isRateLimitedError, getRetryAfterMsFromError } from './aiService';
+import {
+  AIService,
+  AIRequestError,
+  isRateLimitedError,
+  getRetryAfterMsFromError,
+  isAIToolCallUnsupportedError,
+  supportsChatToolCalls,
+  type AIToolLoopMessage,
+} from './aiService';
+import { isToolCallCapableApiType } from '../constants/aiCapabilities';
 
 // Minimal AIConfig that lets AIService construct without a real token.
 const makeConfig = () => ({
@@ -150,5 +159,72 @@ describe('AIRequestError / 限流辅助函数', () => {
     expect(getRetryAfterMsFromError(new AIRequestError('x', 429, 1234))).toBe(1234);
     expect(getRetryAfterMsFromError({})).toBeUndefined();
     expect(getRetryAfterMsFromError(undefined)).toBeUndefined();
+  });
+});
+
+
+describe('AIService.generateWithTools — native function calling', () => {
+  // generateWithTools / supportsChatToolCalls 均要求显式勾选 supportsToolCalls。
+  const toolCallConfig = { ...makeConfig(), supportsToolCalls: true as const };
+  const tools = [
+    { name: 'read_documentation', description: 'Read docs', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
+  ];
+  const messages: AIToolLoopMessage[] = [
+    { role: 'user', content: 'Question: What is this repo?' },
+    { role: 'assistant', content: null, toolCalls: [{ id: 'call_1', name: 'read_documentation', arguments: '{"path":"README.md"}' }] },
+    { role: 'tool', toolCallId: 'call_1', content: 'SOURCE: /README.md - 1-5' },
+  ];
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+  beforeEach(() => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockReset();
+  });
+
+  it('sends the tools payload with tool results and parses returned tool calls', async () => {
+    const service = new AIService(toolCallConfig);
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(fetchJson({
+      choices: [{
+        message: {
+          content: '',
+          tool_calls: [{ id: 'call_2', type: 'function', function: { name: 'ready_to_answer', arguments: '{"missing":[]}' } }],
+        },
+      }],
+    }));
+
+    const result = await service.generateWithTools({ system: 'agent rules', messages, tools, temperature: 0, maxTokens: 1_200 });
+
+    const [, init] = (window.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const requestBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(Array.isArray(requestBody.tools)).toBe(true);
+    expect(requestBody.tool_choice).toBe('auto');
+    const sentMessages = requestBody.messages as Array<Record<string, unknown>>;
+    expect(sentMessages[0]).toEqual({ role: 'system', content: 'agent rules' });
+    expect(sentMessages[2]).toMatchObject({ role: 'assistant', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_documentation' } }] });
+    // content 为空时必须整体省略：显式 null / 空字符串在部分网关上会被拒绝。
+    expect(sentMessages[2]).not.toHaveProperty('content');
+    expect(sentMessages[3]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: 'SOURCE: /README.md - 1-5' });
+    expect(result.content).toBe('');
+    expect(result.toolCalls).toEqual([{ id: 'call_2', name: 'ready_to_answer', arguments: '{"missing":[]}' }]);
+  });
+
+  it('converts endpoint rejection of tools into AIToolCallUnsupportedError', async () => {
+    const service = new AIService(toolCallConfig);
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(fetchJson({ error: { message: 'tools is not supported by this model' } }, 400));
+
+    await expect(service.generateWithTools({ system: 'rules', messages, tools }))
+      .rejects.toSatisfy(isAIToolCallUnsupportedError);
+  });
+
+  it('throws AIToolCallUnsupportedError for protocol families without tool support', async () => {
+    const service = new AIService({ ...makeConfig(), apiType: 'claude' });
+    await expect(service.generateWithTools({ system: 'rules', messages, tools }))
+      .rejects.toSatisfy(isAIToolCallUnsupportedError);
+    expect(window.fetch).not.toHaveBeenCalled();
+    // 能力判定 = 协议族支持 且 显式勾选；两者缺一不可。
+    expect(supportsChatToolCalls({ apiType: 'openai-compatible', supportsToolCalls: true })).toBe(true);
+    expect(supportsChatToolCalls({ apiType: 'openai-compatible' })).toBe(false);
+    expect(supportsChatToolCalls({ apiType: 'gemini', supportsToolCalls: true })).toBe(false);
+    expect(isToolCallCapableApiType('openai-compatible')).toBe(true);
+    expect(isToolCallCapableApiType('claude')).toBe(false);
   });
 });

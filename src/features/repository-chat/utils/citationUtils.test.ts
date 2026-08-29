@@ -133,4 +133,16 @@ describe('citationAnchorUrl', () => {
     expect(citationAnchorUrl(evidence({ url: 'https://github.com/o/r/blob/sha/file.md' }), 50))
       .toBe('https://github.com/o/r/blob/sha/file.md#L50');
   });
+
+  it('uses the evidence URL as-is for release/issue evidence without a pinned SHA', () => {
+    const releaseEvidence = evidence({
+      refSha: undefined,
+      path: 'release-v1.0.0.md',
+      lineStart: 1,
+      lineEnd: 12,
+      url: 'https://github.com/owner/repo/releases/tag/v1.0.0',
+    });
+    expect(citationAnchorUrl(releaseEvidence)).toBe('https://github.com/owner/repo/releases/tag/v1.0.0');
+    expect(citationAnchorUrl(releaseEvidence, 1, 3)).toBe('https://github.com/owner/repo/releases/tag/v1.0.0');
+  });
 });

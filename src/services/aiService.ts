@@ -1,4 +1,5 @@
 import { Repository, Gist, AIConfig, AIApiType } from '../types';
+import { isToolCallCapableApiType } from '../constants/aiCapabilities';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
@@ -114,6 +115,46 @@ export class AIStreamUnsupportedError extends Error {
 
 export function isAIStreamUnsupportedError(error: unknown): boolean {
   return error instanceof AIStreamUnsupportedError;
+}
+
+/** 当前 AI 配置/端点不支持模型原生工具调用（function calling）。调用方应降级到编排式循环。 */
+export class AIToolCallUnsupportedError extends Error {
+  constructor(message = 'Tool calling is not supported on this AI configuration') {
+    super(message);
+    this.name = 'AIToolCallUnsupportedError';
+  }
+}
+
+export function isAIToolCallUnsupportedError(error: unknown): boolean {
+  return error instanceof AIToolCallUnsupportedError;
+}
+
+export interface AIToolDefinition {
+  name: string;
+  description: string;
+  /** JSON Schema 格式的参数定义。 */
+  parameters: Record<string, unknown>;
+}
+
+export interface AIToolCall {
+  id: string;
+  name: string;
+  /** 原始 JSON 字符串参数（由调用方解析，解析失败按空对象处理）。 */
+  arguments: string;
+}
+
+export type AIToolLoopMessage =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; toolCalls: AIToolCall[] }
+  | { role: 'tool'; toolCallId: string; content: string };
+
+/**
+ * 该配置是否实际启用原生工具调用：协议族支持 且 用户在该 AI 配置中显式
+ * 勾选“支持工具调用”。两者缺一不可——避免未经验证的端点默认进入工具循环。
+ * 端点实际能力不足时由请求失败降级兜底。
+ */
+export function supportsChatToolCalls(config: Pick<AIConfig, 'apiType' | 'supportsToolCalls'>): boolean {
+  return isToolCallCapableApiType(config.apiType) && config.supportsToolCalls === true;
 }
 
 /** 逐事件消费 SSE 字节流，把每个 data: 载荷交给回调（自动跨 chunk 缓冲不完整行）。 */
@@ -996,6 +1037,171 @@ ${options.user}` : options.user;
       signal: options.signal,
       onChunk: options.onChunk,
     });
+  }
+
+  /**
+   * 原生 function calling（OpenAI chat completions 线格式）。与 generateChatText
+   * 共享 URL/鉴权/重定向守卫；只做单次请求——多轮对话由调用方把返回的
+   * tool_calls 与工具结果追加进 messages 后再次调用。端点不支持 tools 时抛
+   * AIToolCallUnsupportedError，调用方可降级到编排式循环。
+   */
+  async generateWithTools(options: {
+    system: string;
+    messages: AIToolLoopMessage[];
+    tools: AIToolDefinition[];
+    temperature?: number;
+    maxTokens?: number;
+    signal?: AbortSignal;
+  }): Promise<{ content: string; toolCalls: AIToolCall[] }> {
+    const apiType = this.getApiType();
+    if (!supportsChatToolCalls(this.config)) {
+      throw new AIToolCallUnsupportedError(`API type "${apiType}" does not support native tool calling`);
+    }
+    this.requireSecureDirectEndpoint();
+    const startTime = Date.now();
+    const model = this.config.model;
+    const configId = this.config.id;
+    const isDeepSeekReasoner = this.isDeepSeekReasonerModel();
+    const isDeepSeekThinking = this.isDeepSeekThinkingModel();
+    const isMiMoModel = this.isMiMoModel();
+    const reasoning = this.getOpenAIReasoningPayload();
+
+    const messages = [
+      ...(options.system.trim() ? [{ role: 'system', content: options.system }] : []),
+      ...options.messages.map((message): Record<string, unknown> => {
+        if (message.role === 'assistant') {
+          return {
+            role: 'assistant',
+            // content 为空（null/''）时直接省略该字段：显式 null 与空字符串在
+            // 部分网关与模型上会被拒绝；带 tool_calls 的消息省略 content 是
+            // 兼容性最好的线格式。
+            ...(message.content ? { content: message.content } : {}),
+            // 空 tool_calls 会与 content:null 组合成部分网关拒绝的请求体，直接省略。
+            ...(message.toolCalls.length > 0 ? {
+              tool_calls: message.toolCalls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: { name: call.name, arguments: call.arguments },
+              })),
+            } : {}),
+          };
+        }
+        if (message.role === 'tool') {
+          return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+        }
+        return { role: message.role, content: message.content };
+      }),
+    ];
+
+    const requestBody = {
+      model: this.config.model,
+      messages,
+      tools: options.tools.map((tool) => ({
+        type: 'function',
+        function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+      })),
+      tool_choice: 'auto',
+      max_tokens: options.maxTokens ?? 4_000,
+      ...(!isDeepSeekReasoner ? { temperature: options.temperature ?? 0 } : {}),
+      ...(!isDeepSeekReasoner && !isDeepSeekThinking && !isMiMoModel && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
+      ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
+    };
+
+    const requestUrl = buildFinalApiUrl(this.config.baseUrl, apiType);
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer ***',
+    };
+    let responseHeaders: Record<string, string> | undefined;
+    let responseBodyPreview: string | undefined;
+    let responseStatus: number | undefined;
+    let data: Record<string, unknown>;
+
+    if (backend.isAvailable) {
+      // 代理整体透传请求体（含 tools 字段），响应仍由客户端解析。
+      try {
+        data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
+      } catch (error) {
+        // 代理错误不保留上游响应体：按状态码 + 消息识别端点拒绝 tools 的情形，
+        // 与直连路径同样转为 AIToolCallUnsupportedError，让调用方落回编排式循环。
+        const carrier = error as { status?: unknown; statusCode?: unknown };
+        const status = typeof carrier.status === 'number' ? carrier.status : carrier.statusCode;
+        const message = error instanceof Error ? error.message : String(error ?? '');
+        if ((status === 400 || status === 404 || status === 422) && /\btools?\b|function/i.test(message)) {
+          throw new AIToolCallUnsupportedError(`Endpoint rejected tool calling: ${message.slice(0, 200)}`);
+        }
+        throw error;
+      }
+    } else {
+      const response = await fetch(requestUrl, {
+        // 直连携带 API Key，禁止跟随重定向以防凭据外泄。
+        redirect: 'error',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: options.signal,
+      });
+      responseHeaders = {};
+      response.headers.forEach((v, k) => { responseHeaders![k] = v; });
+      responseStatus = response.status;
+      try {
+        const cloned = response.clone();
+        const text = await cloned.text();
+        if (text.length > 0) {
+          responseBodyPreview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+        }
+      } catch { /* body not readable */ }
+      if (!response.ok) {
+        const errorDetail = await this.extractErrorDetail(response);
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, {
+          url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+        });
+        const error = new AIRequestError(
+          `AI API error: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`,
+          response.status,
+          parseRetryAfterMs(response),
+        );
+        // 网关不支持 tools 时通常以 4xx 拒绝并提及 tools/function：识别为
+        // 能力缺失而非瞬时故障，让调用方落回编排式循环。
+        if ((response.status === 400 || response.status === 404 || response.status === 422) && /\btools?\b|function/i.test(errorDetail)) {
+          throw new AIToolCallUnsupportedError(`Endpoint rejected tool calling: ${errorDetail.slice(0, 200)}`);
+        }
+        throw error;
+      }
+      data = await response.json();
+    }
+
+    const httpDetails = logger.isDebugMode() ? {
+      url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
+    } : undefined;
+
+    const message = (data as { choices?: OpenAIResponseChoice[] }).choices?.[0]?.message;
+    const rawToolCalls = (message as { tool_calls?: unknown } | undefined)?.tool_calls;
+    const toolCalls = Array.isArray(rawToolCalls)
+      ? rawToolCalls.flatMap((call): AIToolCall[] => {
+          if (!call || typeof call !== 'object') return [];
+          const typed = call as { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
+          const name = typeof typed.function?.name === 'string' ? typed.function.name : '';
+          if (!name) return [];
+          return [{
+            id: typeof typed.id === 'string' ? typed.id : `call_${name}`,
+            name,
+            arguments: typeof typed.function?.arguments === 'string' ? typed.function.arguments : '{}',
+          }];
+        })
+      : [];
+    const content = typeof message?.content === 'string' ? message.content : '';
+    if (!content && toolCalls.length === 0) {
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
+      throw new Error('No content or tool calls received from AI service');
+    }
+    this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: content.length + toolCalls.length }, httpDetails);
+    return { content, toolCalls };
   }
 
   async analyzeRepository(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string, signal?: AbortSignal): Promise<RepositoryAnalysisResult> {

@@ -117,8 +117,11 @@ export const citationExcerptPreview = (excerpt: string, maxChars = 600): string 
 
 /** 悬停与点击共用的跳转地址：以给定行号（缺省用证据窗口）覆盖 URL 上已有的 #L 锚点。 */
 export const citationAnchorUrl = (evidence: ToolEvidence, lineStart?: number, lineEnd?: number): string => {
+  // Release/Issue 等元信息证据没有固定 SHA 的 blob 锚点（不带 refSha），
+  // 证据上的 url 本身就是最终跳转地址（release 页 / issue 页）。
+  if (!evidence.refSha || !evidence.path) return evidence.url;
   const start = lineStart ?? evidence.lineStart;
-  if (!evidence.path || !start) return evidence.url;
+  if (!start) return evidence.url;
   const end = lineEnd ?? evidence.lineEnd ?? start;
   const base = evidence.url.replace(/#.*$/, '');
   const anchor = end > start ? `#L${start}-L${end}` : `#L${start}`;

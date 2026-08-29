@@ -110,6 +110,12 @@ export interface RepositoryChatSettings {
   enableWebTools: boolean;
   retainSessionDays: number;
   /**
+   * 实验性：问答取证改用模型原生 function calling 的受控工具循环。
+   * 仅当问答模型的 AI 配置勾选"支持工具调用"时实际生效，否则自动沿用
+   * 编排式循环。默认关闭。
+   */
+  enableAgentToolLoop: boolean;
+  /**
    * Kept for persisted configurations created before the evidence-driven loop.
    * New callers should use agentBudget.maxToolCalls.
    */
@@ -132,6 +138,7 @@ export const defaultRepositoryChatSettings: RepositoryChatSettings = {
   streamingMode: 'auto',
   taskDepth: 'default',
   enableWebTools: false,
+  enableAgentToolLoop: false,
   retainSessionDays: 90,
   maxToolsPerTurn: defaultRepositoryChatAgentBudget.maxToolCalls,
   agentBudget: { ...defaultRepositoryChatAgentBudget },
