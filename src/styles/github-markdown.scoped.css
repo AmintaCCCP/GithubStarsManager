@@ -2478,3 +2478,44 @@ html.dark .markdown-body {
   --fgColor-danger: #f85149;
   --bgColor-danger-muted: #f851491a;
 }
+
+/* ---- 宽表格滚动容器（MarkdownRenderer 的 table 组件包装） ------------------ */
+
+/* 模型常输出多列对比表；在窄容器（问答侧栏、README 弹层）内横向滚动而不是
+   撑破布局或被截断。包装层只在需要时出现滚动条。 */
+.markdown-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-table-scroll table {
+  /* 上游的 max-width:100% 会在包装层内压缩表格；滚动交给包装层，表格按
+     内容宽度展开（width:max-content 来自上游 github-markdown 规则）。 */
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+}
+
+/* ---- 仓库问答侧栏的排版安全 ---------------------------------------------- */
+
+/* 侧栏较窄。默认表格是 display:block + width:max-content（单元格不换行、
+   横向滚动条沉在长表格底部，等于看不见）。聊天场景改为占满容器宽度、
+   单元格自动换行；确实放不下的多列表由上方包装层横向滚动。 */
+.repository-chat-markdown table {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+
+/* 长 URL / 长 token（内联代码、表格单元格）允许断行，避免横向溢出。 */
+.repository-chat-markdown :is(code, th, td) {
+  overflow-wrap: anywhere;
+}
+
+/* 代码块与 ASCII 文本绘图不换行（会破坏图形），改为在块内横向滚动，
+   不把消息卡片或侧栏撑出横向溢出。 */
+.repository-chat-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+}

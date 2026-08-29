@@ -4,6 +4,7 @@ import type { RepositoryChatSession, RepositoryChatToolEvent } from '../types/re
 
 const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
+  generateChatTextStream: vi.fn(),
   getRepositoryTree: vi.fn(),
   getRepositoryFile: vi.fn(),
   getRepositoryMarkdownEvidenceFile: vi.fn(),
@@ -16,7 +17,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./aiService', () => ({
-  AIService: class { generateChatText = mocks.generateChatText; },
+  AIService: class {
+    generateChatText = mocks.generateChatText;
+    generateChatTextStream = mocks.generateChatTextStream;
+  },
+  isAIStreamUnsupportedError: (error: unknown): boolean => error instanceof Error && error.name === 'AIStreamUnsupportedError',
 }));
 
 vi.mock('./githubApiFactory', () => ({
@@ -139,15 +144,9 @@ const gate = (options: {
   recommended_targets: options.recommendedTargets ?? [],
 });
 
-const answer = (text: string, source: string, heading = 'Verified answer') => JSON.stringify({
-  items: [{ heading, text, sources: [source] }],
-  not_found: [],
-});
+const answer = (text: string, source: string, heading = 'Verified answer') => `## ${heading}\n\n${text} \`${source}\``;
 
-const notFoundAnswer = (text: string, source: string) => JSON.stringify({
-  items: [],
-  not_found: [{ text, sources: [source] }],
-});
+const notFoundAnswer = (text: string, source: string) => `## Unverified or missing information\n\n${text} \`${source}\``;
 
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
@@ -235,6 +234,11 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
   });
 
   it('stops after the configured consecutive no-progress rounds while preserving the insufficient-evidence outcome', async () => {
+    // 代码候选为空时，无进展停止语义保持不变（有代码预算时会先自动升级读代码）。
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
       .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find missing feature documentation')))
@@ -518,7 +522,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 
-  it('repairs invalid structured synthesis once without re-running retrieval', async () => {
+  it('repairs invalid synthesis once without re-running retrieval', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
       .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
@@ -567,5 +571,270 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(mocks.vectorWrites.upsert).not.toHaveBeenCalled();
     expect(mocks.vectorWrites.delete).not.toHaveBeenCalled();
     expect(mocks.vectorWrites.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('streams the final answer incrementally and returns the source-verified text', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk('## Overview\n\nA documented ');
+      onChunk(`example project. \`${overviewRef}\``);
+      return `## Overview\n\nA documented example project. \`${overviewRef}\``;
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toBe('## Overview\n\nA documented ');
+    expect(result.content).toContain(overviewRef);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(mocks.generateChatTextStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a blocking answer when the stream fails before completing', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+    const streamFailure = Object.assign(new Error('Streaming is not supported on this transport'), { name: 'AIStreamUnsupportedError' });
+    mocks.generateChatTextStream.mockRejectedValue(streamFailure);
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(result.content).toContain(overviewRef);
+    expect(result.content).not.toContain('insufficient');
+    expect(chunks[chunks.length - 1]).toBe('');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+  });
+
+  it('automatically escalates to code reads when documentation stalls', async () => {
+    const codeRef = '/src/engine.ts - 1';
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['implementation detail'], target: 'proxy switching implementation' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find implementation detail')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('implementation detail', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('implementation detail', 'verified', [codeRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The implementation exports the proxy-switching function.', codeRef, 'Implementation'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('How is proxy switching implemented?'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 文档停滞一轮后自动解锁代码取证，第二轮读到代码并完成回答。
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(true);
+    expect(readPaths()).toEqual(['README.md', 'src/engine.ts']);
+    expect(result.content).toContain(codeRef);
+  });
+
+  it('canonicalizes sub-range citations that fall inside an evidence window', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('A documented example for repository research.', '/README.md - 3-4', 'Overview'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // 引用 3-4 落在证据窗口 3-5 内：视为有效引用并保留实际引用的行号。
+    expect(result.content).toContain('`/README.md - 3-4`');
+    expect(result.content).not.toContain('已验证来源');
+  });
+
+  it('reads documentation first even when the question intent is code', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    const codeRef = '/src/engine.ts - 1';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ intent: 'code_analysis', information_scope: 'code', expected_answer: ['implementation detail'], initial_targets: ['src/engine.ts'], target: 'proxy switching implementation' }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('implementation detail', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('implementation detail', 'verified', [codeRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The implementation exports the proxy-switching function.', codeRef, 'Implementation'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('How is proxy switching implemented?'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 即使意图是 code，首轮大纲仍先读 README/docs；第 2 轮才解锁代码读取。
+    expect(readPaths()[0]).toBe('README.md');
+    expect(readPaths()).toContain('src/engine.ts');
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(true);
+    expect(result.content).toContain(codeRef);
+  });
+
+  it('canonicalizes bare root-file citations like /README.md - 35-44', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce('## Overview\n\nA documented example for repository research. /README.md - 3-4');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // 根目录文件的裸引用（无反引号、无目录段）同样要规范化为精确引用，
+    // 否则正确回答会被 digest 替换。
+    expect(result.content).toContain('`/README.md - 3-4`');
+    expect(result.content).not.toContain('Verified sources');
+    expect(result.content).not.toContain('insufficient');
+  });
+
+  it('keeps round 1 documentation-first even when the plan proposes code targets', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(
+        target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code'),
+        target('README.md', ['Overview'], 'project overview'),
+      ))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput(), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 第 1 轮的 code 目标被拒绝（文档优先），README 章节照常读取，无代码解锁。
+    expect(readPaths()).toEqual(['README.md']);
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(false);
+    expect(result.content).toContain(overviewRef);
+  });
+
+  it('canonicalizes citations with slash-prefix and em-dash variants', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce('## Overview\n\nA documented example / /README.md — 3-4`` for repository research.');
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // `/ /README.md — 3-4``` `（斜杠+空格、全角破折号、多余闭合反引号）规范化为
+    // 精确路径 + 保留实际引用行号。
+    expect(result.content).toContain('`/README.md - 3-4`');
+    expect(result.content).not.toContain('/ /README.md');
+    expect(result.content).not.toContain('``');
+  });
+
+  it('maps footnote-style citations onto verified sources instead of discarding the answer', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      const body = [
+        '## Overview',
+        '',
+        'A documented example project for repository research[^E1].',
+        '',
+        '[^E1]: /README.md - 3-4',
+      ].join('\n');
+      onChunk(body);
+      return body;
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(result.content).toContain('A documented example project for repository research');
+    expect(result.content).toContain('`/README.md - 3-4`');
+    expect(result.content).not.toContain('[^E1]');
+    expect(result.content).not.toContain('已验证来源');
+    expect(chunks.length).toBeGreaterThan(0);
+  });
+
+  it('demotes uncited sections instead of discarding the whole answer', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    mocks.generateChatText
+      .mockResolvedValueOnce([
+        '## Overview',
+        '',
+        `A documented example for repository research. \`${overviewRef}\``,
+        '',
+        '## Extra notes',
+        '',
+        'Uncited prose without any reference.',
+      ].join('\n'));
+
+    const result = await runRepositoryChatTurn(turnInput());
+
+    // 剪枝降级：有引用的小节保留，未引用段落显式移入“未证实”区块而不是丢弃。
+    expect(result.content).toContain('A documented example for repository research.');
+    expect(result.content).toContain(overviewRef);
+    expect(result.content).toContain('Uncited prose without any reference.');
+    expect(result.content).toContain('Unverified or missing information');
+    expect(result.content).not.toContain('Verified sources');
+    expect(result.content).not.toContain('insufficient');
+  });
+
+  it('applies the quick task-depth preset with its tighter no-progress budget', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'find missing feature documentation')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'quick' });
+
+    // quick 档 maxNoProgressRounds=1：第 1 轮无进展即停止（默认档会继续到第 2 轮，共 5 次调用）。
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('insufficient');
+  });
+
+  it('lets the unlimited task-depth preset exceed the default budget clamps', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
+    // 按 plan → gate 交替注册 5 轮；unlimited 档 maxNoProgressRounds=4，应执行满 4 轮（默认档 2 轮即停）。
+    for (let round = 0; round < 5; round += 1) {
+      mocks.generateChatText.mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck missing feature documentation')));
+      mocks.generateChatText.mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('missing feature documentation', 'missing')],
+        nextAction: 'retrieve_more',
+      }));
+    }
+
+    const result = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'unlimited' });
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(9);
+    expect(result.content).toContain('insufficient');
   });
 });
