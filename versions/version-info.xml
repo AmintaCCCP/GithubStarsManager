@@ -577,4 +577,18 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.8</downloadUrl>
   </version>
+  <version>
+    <number>0.7.9</number>
+    <releaseDate>2026-08-29</releaseDate>
+    <changelog>
+      <item>ci: Stabilized multi-architecture Docker publishing: the frontend static build now runs once on its native platform instead of under slow QEMU emulation, superseded publishing runs are canceled automatically, and the frontend/backend images use separate build caches with timeouts, making amd64 + arm64 publishing reliable. (PR #307)</item>
+      <item>feat: Added an optional all-in-one Docker image (ghcr.io/amintacccp/github-stars-manager) that serves the web UI and the backend API from a single container, with a docker-compose.fullstack.yml example and setup/migration docs; all existing deployment options remain unchanged. (PR #308)</item>
+      <item>fix: The repository edit modal no longer closes by itself seconds after opening it from a keyword-searched list (background sync no longer wipes active search results), and the page no longer jitters when the scrollbar appears or hides thanks to a constant scrollbar gutter. (PR #310)</item>
+      <item>feat: Major Repository Q&amp;A experience upgrade: real streaming answers rendered character by character (OpenAI, DeepSeek, Claude, Gemini and compatible providers), a task depth selector (Default / Quick / Deep / Unlimited) that controls retrieval rounds and read scope, inline file:line citation badges with hover previews that jump to the exact GitHub source line, a collapsible execution timeline, and copy/regenerate actions under each answer; also fixed the top header disappearing when dropdowns opened. (PR #311)</item>
+      <item>fix: The AI search bar no longer covers the top header when scrolled, and the page behind an open modal or side sheet is now properly scroll-locked, fixing the double scrollbars in the Repository Q&amp;A sheet. (PR #312)</item>
+      <item>feat: Unified platform icons to Simple Icons brand glyphs, added square platform badges and per-asset update dates to release asset rows, and made platform detection deterministic from file extensions and filename semantics across recent releases, so repository cards show what a project actually builds. (PR #313)</item>
+      <item>feat: The Repository Q&amp;A Assistant gains Release notes and asset list sources (answering "what changed recently" and "which platform builds are provided") and GitHub issue search including closed issues with comment excerpts (answering "I hit this problem, how do I fix it"); an experimental native function calling tool loop is also available and disabled by default. The assistant remains an early-stage feature intended for simple questions, not whole-codebase analysis. (PR #314)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.9</downloadUrl>
+  </version>
 </versions>
