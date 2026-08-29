@@ -179,6 +179,25 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
   });
 
+  it('retries a failed release fetch when the model asks again after a tool error', async () => {
+    // 工具失败会释放 actionHash 并回退 metaFetched 标记：相同的 read_recent_releases
+    // 第二次调用必须真正重新请求 GitHub，而不是被当作重复动作拦截。
+    mocks.getRepositoryReleases
+      .mockRejectedValueOnce(new Error('network glitch'))
+      .mockResolvedValueOnce(releasesPayload);
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'read_recent_releases')]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_recent_releases')]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c4', 'ready_to_answer', {})]));
+    mocks.generateChatText.mockResolvedValueOnce('## Updates\n\nShips macOS builds. `/release-v1.0.0.md - 1-4`');
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('What changed recently?'));
+
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(2);
+    expect(result.content).toContain('/release-v1.0.0.md - 1-4');
+  });
+
   it('returns the insufficient-evidence response when the model never gathers evidence', async () => {
     mocks.generateWithTools
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'docs/missing.md' })]))

@@ -1020,9 +1020,12 @@ export class GitHubApiService {
     options: { perPage?: number; signal?: AbortSignal } = {},
   ): Promise<RepositoryIssueSearchRead[]> {
     const perPage = Math.min(20, Math.max(1, options.perPage ?? 8));
-    // 关键词来自模型与用户问题（不可信输入）：剥掉 `key:value` 形态的搜索
-    // 限定符，防止 `repo:other/repo`、`is:pr` 之类把搜索范围劫持到别的仓库。
-    const sanitizedKeywords = keywords.map((keyword) => keyword.replace(/^[a-z][a-z0-9_-]*:/i, '').trim()).filter(Boolean);
+    // 关键词来自模型与用户问题（不可信输入）：按空白分词后丢弃任何位置的
+    // `key:value` 形态搜索限定符，防止嵌入的 `repo:other/repo`、`is:pr` 把
+    // 搜索范围劫持到其他仓库或混入 Pull Request。
+    const sanitizedKeywords = keywords
+      .flatMap((keyword) => keyword.split(/\s+/))
+      .filter((token) => token && !/^[a-z][a-z0-9_-]*:/i.test(token));
     const query = [`repo:${owner}/${repo}`, 'is:issue', ...sanitizedKeywords]
       .filter(Boolean)
       .join(' ');

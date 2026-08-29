@@ -1036,6 +1036,9 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
       return { ok: true, value };
     } catch (error) {
       if (input.signal?.aborted) throw error;
+      // 失败的动作释放去重键，让后续轮次能以相同参数重试（仍受工具预算、
+      // 轮次与无进展上限约束）；成功动作的去重键保留，防止重复读取。
+      actionHashes.delete(actionHash);
       const message = error instanceof Error ? error.message : String(error ?? 'Tool error');
       toolErrors.push(message);
       emit({ toolName, status: 'error', paramSummary, stage, round, detail: `${input.language === 'zh' ? '工具错误：' : 'Tool error: '}${message.slice(0, 180)}`, durationMs: Date.now() - toolStartedAt, resultSize: 0 });
