@@ -133,10 +133,14 @@ export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData:
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
-        buffer = buffer.slice(newlineIndex + 1);
+      let separatorIndex: number;
+      // SSE 行分隔符按规范接受 CRLF / LF / 裸 CR。
+      while ((separatorIndex = buffer.search(/[\r\n]/)) >= 0) {
+        // 末尾的 \r 可能与下一块开头的 \n 组成 CRLF，先等更多数据再定。
+        if (buffer[separatorIndex] === '\r' && separatorIndex === buffer.length - 1) break;
+        const separatorLength = buffer[separatorIndex] === '\r' && buffer[separatorIndex + 1] === '\n' ? 2 : 1;
+        const line = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + separatorLength);
         if (line === '') {
           flush();
         } else if (line.startsWith('data:')) {
@@ -145,12 +149,12 @@ export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData:
         // event:/id:/注释行与这些 API 无关，直接忽略。
       }
     }
-    // 冲刷解码器中剩余的多字节序列，并把 EOF 处未以换行结尾的最后一行当作
-    // 完整事件处理（部分上游的 data: 载荷不带结尾 LF）。
+    // 冲刷解码器中剩余的多字节序列，EOF 残余按同样规则切分：覆盖未以换行
+    // 结尾的最后一行、裸 CR 分隔与末尾悬挂的 \r。
     buffer += decoder.decode();
-    if (buffer !== '') {
-      const line = buffer.replace(/\r$/, '');
-      buffer = '';
+    const residualLines = buffer.split(/\r\n|\r|\n/);
+    buffer = '';
+    for (const line of residualLines) {
       if (line === '') {
         flush();
       } else if (line.startsWith('data:')) {
