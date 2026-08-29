@@ -4,6 +4,7 @@ import {
   assetFingerprint,
   assetsFingerprint,
   changedAssetIds,
+  detectAssetPlatform,
   effectiveReleaseTime,
   findReleasesWithChangedAssets,
   hasAssetsChanged,
@@ -261,5 +262,74 @@ describe('shouldShowAssetsUpdatedIndicator', () => {
       updated_asset_ids: undefined,
     };
     expect(shouldShowAssetsUpdatedIndicator(release)).toBe(false);
+  });
+});
+
+describe('detectAssetPlatform', () => {
+  it('detects macOS from decisive extensions', () => {
+    expect(detectAssetPlatform('MyApp-1.2.0-arm64.dmg')).toBe('macos');
+    expect(detectAssetPlatform('installer.pkg')).toBe('macos');
+    // Tauri 的 macOS 更新包
+    expect(detectAssetPlatform('MyApp.app.tar.gz')).toBe('macos');
+  });
+
+  it('detects Windows from decisive extensions', () => {
+    expect(detectAssetPlatform('setup-x64.exe')).toBe('windows');
+    expect(detectAssetPlatform('app-1.0.msi')).toBe('windows');
+    expect(detectAssetPlatform('app-1.0.msix')).toBe('windows');
+  });
+
+  it('detects Linux package formats including Arch multi-suffix before macOS .pkg', () => {
+    expect(detectAssetPlatform('app-1.0-1-x86_64.pkg.tar.zst')).toBe('linux');
+    expect(detectAssetPlatform('app_amd64.deb')).toBe('linux');
+    expect(detectAssetPlatform('app.x86_64.rpm')).toBe('linux');
+    expect(detectAssetPlatform('myapp.AppImage')).toBe('linux');
+  });
+
+  it('detects Android and iOS packages', () => {
+    expect(detectAssetPlatform('app-1.2.0-android.apk')).toBe('android');
+    expect(detectAssetPlatform('app-release.aab')).toBe('android');
+    expect(detectAssetPlatform('App-1.0.ipa')).toBe('ios');
+  });
+
+  it('reads the OS segment of GoReleaser-style archive names regardless of arch', () => {
+    expect(detectAssetPlatform('alist-darwin-amd64.tar.gz')).toBe('macos');
+    expect(detectAssetPlatform('alist-darwin-arm64.tar.gz')).toBe('macos');
+    expect(detectAssetPlatform('alist-linux-amd64.tar.gz')).toBe('linux');
+    expect(detectAssetPlatform('alist-linux-arm-5.tar.gz')).toBe('linux');
+    expect(detectAssetPlatform('alist-android-arm64.tar.gz')).toBe('android');
+    expect(detectAssetPlatform('app.macos.zip')).toBe('macos');
+    expect(detectAssetPlatform('app_win64_portable.7z')).toBe('windows');
+  });
+
+  it('reads OS tokens from Rust triple and bare binary names', () => {
+    expect(detectAssetPlatform('x86_64-pc-windows-msvc.zip')).toBe('windows');
+    expect(detectAssetPlatform('aarch64-apple-darwin.tar.xz')).toBe('macos');
+    // 裸二进制（无扩展名）
+    expect(detectAssetPlatform('tool-linux-amd64')).toBe('linux');
+  });
+
+  it('picks the earliest OS token when a name mentions several', () => {
+    expect(detectAssetPlatform('myapp-macos-windows.tar.gz')).toBe('macos');
+    expect(detectAssetPlatform('myapp-windows-macos.tar.gz')).toBe('windows');
+  });
+
+  it('does not mistake substrings for OS words (darwin contains win, archive contains arch)', () => {
+    expect(detectAssetPlatform('search-tool.zip')).toBeNull();
+    expect(detectAssetPlatform('app-arch64.zip')).toBeNull();
+    // darwin 内部的 "win" 不是 windows
+    expect(detectAssetPlatform('alist-darwin-amd64.tar.gz')).toBe('macos');
+  });
+
+  it('returns null for BSD, checksum files, and unknown names', () => {
+    expect(detectAssetPlatform('alist-freebsd-amd64.tar.gz')).toBeNull();
+    expect(detectAssetPlatform('checksums.txt')).toBeNull();
+    expect(detectAssetPlatform('Source code (v1.2.0).zip')).toBeNull();
+  });
+
+  it('falls back to platform-signalling content types', () => {
+    expect(detectAssetPlatform('dropdown-installer', 'application/vnd.android.package-archive')).toBe('android');
+    expect(detectAssetPlatform('image', 'application/x-apple-diskimage')).toBe('macos');
+    expect(detectAssetPlatform('binary', 'application/octet-stream')).toBeNull();
   });
 });

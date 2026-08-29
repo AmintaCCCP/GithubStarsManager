@@ -9,6 +9,10 @@ export interface ReleaseDownloadLink {
   size: number | null;
   isSourceCode: boolean;
   assetId?: number;
+  /** 资产自身的 updated_at（ISO 字符串）；Source code 条目没有。 */
+  updatedAt?: string;
+  /** GitHub 给出的 MIME 类型，供平台推断的 MIME 兜底层使用。 */
+  contentType?: string;
 }
 
 export const buildReleaseDownloadLinks = (release: Release): ReleaseDownloadLink[] => {
@@ -21,6 +25,8 @@ export const buildReleaseDownloadLinks = (release: Release): ReleaseDownloadLink
     size: asset.size,
     isSourceCode: false,
     assetId: asset.id,
+    updatedAt: asset.updated_at,
+    contentType: asset.content_type,
   }));
 
   if (release.zipball_url) {
