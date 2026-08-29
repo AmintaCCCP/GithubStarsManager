@@ -170,6 +170,7 @@ export const normalizeRepositoryChatSettings = (value: unknown): RepositoryChatS
     streamingMode: record.streamingMode === 'off' ? 'off' : 'auto',
     taskDepth,
     enableWebTools: record.enableWebTools === true,
+    enableAgentToolLoop: record.enableAgentToolLoop === true,
     retainSessionDays,
     maxToolsPerTurn: maxToolCalls,
     agentBudget,
