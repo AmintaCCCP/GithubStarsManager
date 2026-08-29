@@ -1,4 +1,5 @@
 import { Repository, Gist, AIConfig, AIApiType } from '../types';
+import { isToolCallCapableApiType } from '../constants/aiCapabilities';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
@@ -147,12 +148,13 @@ export type AIToolLoopMessage =
   | { role: 'assistant'; content: string | null; toolCalls: AIToolCall[] }
   | { role: 'tool'; toolCallId: string; content: string };
 
-/** 原生工具调用目前仅覆盖 OpenAI chat completions 线格式的一族协议（其余协议走编排式循环）。 */
-const CHAT_TOOL_CALL_API_TYPES: ReadonlySet<AIApiType> = new Set<AIApiType>(['openai', 'deepseek', 'mimo', 'openai-compatible']);
-
-/** 该配置是否可尝试原生工具调用（协议族判定；端点实际能力不足时由请求失败降级兜底）。 */
-export function supportsChatToolCalls(config: Pick<AIConfig, 'apiType'>): boolean {
-  return CHAT_TOOL_CALL_API_TYPES.has(config.apiType || 'openai');
+/**
+ * 该配置是否实际启用原生工具调用：协议族支持 且 用户在该 AI 配置中显式
+ * 勾选“支持工具调用”。两者缺一不可——避免未经验证的端点默认进入工具循环。
+ * 端点实际能力不足时由请求失败降级兜底。
+ */
+export function supportsChatToolCalls(config: Pick<AIConfig, 'apiType' | 'supportsToolCalls'>): boolean {
+  return isToolCallCapableApiType(config.apiType) && config.supportsToolCalls === true;
 }
 
 /** 逐事件消费 SSE 字节流，把每个 data: 载荷交给回调（自动跨 chunk 缓冲不完整行）。 */
@@ -1115,7 +1117,19 @@ ${options.user}` : options.user;
 
     if (backend.isAvailable) {
       // 代理整体透传请求体（含 tools 字段），响应仍由客户端解析。
-      data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
+      try {
+        data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
+      } catch (error) {
+        // 代理错误不保留上游响应体：按状态码 + 消息识别端点拒绝 tools 的情形，
+        // 与直连路径同样转为 AIToolCallUnsupportedError，让调用方落回编排式循环。
+        const carrier = error as { status?: unknown; statusCode?: unknown };
+        const status = typeof carrier.status === 'number' ? carrier.status : carrier.statusCode;
+        const message = error instanceof Error ? error.message : String(error ?? '');
+        if ((status === 400 || status === 404 || status === 422) && /\btools?\b|function/i.test(message)) {
+          throw new AIToolCallUnsupportedError(`Endpoint rejected tool calling: ${message.slice(0, 200)}`);
+        }
+        throw error;
+      }
     } else {
       const response = await fetch(requestUrl, {
         // 直连携带 API Key，禁止跟随重定向以防凭据外泄。

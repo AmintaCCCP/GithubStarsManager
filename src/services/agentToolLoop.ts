@@ -281,7 +281,11 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       zh ? '补充仓库元信息：发布历史、资产清单与平台标签。' : 'Supplement repository metadata: release history, assets, and platform tags.',
       async (signal) => await github.getRepositoryReleases(owner, repo, 1, 5, signal),
     );
-    if (!releasesResult.ok) return zh ? `工具错误：${releasesResult.message}` : `Tool error: ${releasesResult.message}`;
+    if (!releasesResult.ok) {
+      // 瞬时工具失败时回退标记，让模型在本轮内可以重试该来源。
+      if (releasesResult.errorCode === 'tool_error') metaFetched.delete(META_RELEASES_TARGET);
+      return zh ? `工具错误：${releasesResult.message}` : `Tool error: ${releasesResult.message}`;
+    }
     const newEvidence = releasesResult.value.length > 0
       ? buildReleasesEvidence(input.repository, releasesResult.value)
       : [buildNoReleasesEvidence(input.repository, new Date())];
@@ -323,7 +327,10 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
         return withComments;
       },
     );
-    if (!issuesResult.ok) return zh ? `工具错误：${issuesResult.message}` : `Tool error: ${issuesResult.message}`;
+    if (!issuesResult.ok) {
+      if (issuesResult.errorCode === 'tool_error') metaFetched.delete(META_ISSUES_TARGET);
+      return zh ? `工具错误：${issuesResult.message}` : `Tool error: ${issuesResult.message}`;
+    }
     const newEvidence = issuesResult.value.length > 0
       ? buildIssuesEvidence(input.repository, issuesResult.value)
       : [buildNoIssuesEvidence(input.repository, keywords, new Date())];

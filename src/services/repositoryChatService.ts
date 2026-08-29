@@ -9,9 +9,8 @@ import type {
   RepositoryChatTaskDepth,
 } from '../types/repositoryChat';
 import { TASK_DEPTH_PRESETS, DEFAULT_ANSWER_MAX_TOKENS } from '../types/repositoryChat';
-import { AIService, isAIStreamUnsupportedError, isAIToolCallUnsupportedError, supportsChatToolCalls } from './aiService';
+import { AIService, isAIStreamUnsupportedError } from './aiService';
 import { createGitHubApiService } from './githubApiFactory';
-import { runToolLoopRepositoryChatTurn } from './agentToolLoop';
 import {
   buildIssuesEvidence,
   buildNoIssuesEvidence,
@@ -1253,7 +1252,7 @@ export const synthesizeVerifiedAnswer = async (
  * target; programmatic code constrains candidate paths, duplicate reads,
  * cancellation, retry, and bounded work.
  */
-const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInput): Promise<RepositoryChatTurnResult> => {
+export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInput): Promise<RepositoryChatTurnResult> => {
   if (!input.session.sourceRefSha) throw new Error('A pinned source SHA is required before asking this repository');
   if (!input.githubToken) throw new Error(input.language === 'zh' ? '请先配置 GitHub token。' : 'Configure a GitHub token before asking this repository.');
   if (!input.question.trim()) throw new Error(input.language === 'zh' ? '请输入问题。' : 'Enter a question.');
@@ -1445,7 +1444,11 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
         input.language === 'zh' ? '补充仓库元信息：发布历史、资产清单与平台标签。' : 'Supplement repository metadata: release history, assets, and platform tags.',
         async (signal) => await github.getRepositoryReleases(owner, repo, 1, 5, signal),
       );
-      if (!releasesResult.ok) return 0;
+      if (!releasesResult.ok) {
+        // 瞬时工具失败时回退标记，安全网下一轮仍可重新提出该 meta 目标。
+        if (releasesResult.errorCode === 'tool_error') metaFetched.delete(target.path);
+        return 0;
+      }
       const newEvidence = releasesResult.value.length > 0
         ? buildReleasesEvidence(input.repository, releasesResult.value)
         : [buildNoReleasesEvidence(input.repository, checkedAt)];
@@ -1495,7 +1498,10 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
           return withComments;
         },
       );
-      if (!issuesResult.ok) return 0;
+      if (!issuesResult.ok) {
+        if (issuesResult.errorCode === 'tool_error') metaFetched.delete(target.path);
+        return 0;
+      }
       const newEvidence = issuesResult.value.length > 0
         ? buildIssuesEvidence(input.repository, issuesResult.value)
         : [buildNoIssuesEvidence(input.repository, keywords, checkedAt)];
@@ -1777,24 +1783,4 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry);
   return { content, evidences };
 };
-/** 后端代理通道不保留 AIToolCallUnsupportedError 类型：以 4xx 配置类状态码兜底识别端点拒绝。 */
-const isEndpointRejectionError = (error: unknown): boolean => {
-  if (!(error instanceof Error)) return false;
-  const carrier = error as { status?: unknown; statusCode?: unknown };
-  const status = carrier.status ?? carrier.statusCode;
-  return status === 400 || status === 404 || status === 422;
-};
 
-export const runRepositoryChatTurn = async (input: RepositoryChatTurnInput): Promise<RepositoryChatTurnResult> => {
-  // 受控工具循环（实验性）：仅在设置开启且当前 AI 配置属于支持 function
-  // calling 的协议族时启用；端点不支持工具调用时本轮自动落回编排式循环。
-  if (input.enableAgentToolLoop && supportsChatToolCalls(input.aiConfig)) {
-    try {
-      return await runToolLoopRepositoryChatTurn(input);
-    } catch (error) {
-      if (input.signal?.aborted) throw error;
-      if (!isAIToolCallUnsupportedError(error) && !isEndpointRejectionError(error)) throw error;
-    }
-  }
-  return await runEvidenceDrivenRepositoryChatTurn(input);
-};

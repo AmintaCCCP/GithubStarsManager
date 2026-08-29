@@ -9,6 +9,7 @@ import {
   supportsChatToolCalls,
   type AIToolLoopMessage,
 } from './aiService';
+import { isToolCallCapableApiType } from '../constants/aiCapabilities';
 
 // Minimal AIConfig that lets AIService construct without a real token.
 const makeConfig = () => ({
@@ -163,6 +164,8 @@ describe('AIRequestError / 限流辅助函数', () => {
 
 
 describe('AIService.generateWithTools — native function calling', () => {
+  // generateWithTools / supportsChatToolCalls 均要求显式勾选 supportsToolCalls。
+  const toolCallConfig = { ...makeConfig(), supportsToolCalls: true as const };
   const tools = [
     { name: 'read_documentation', description: 'Read docs', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
   ];
@@ -178,7 +181,7 @@ describe('AIService.generateWithTools — native function calling', () => {
   });
 
   it('sends the tools payload with tool results and parses returned tool calls', async () => {
-    const service = new AIService(makeConfig());
+    const service = new AIService(toolCallConfig);
     (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(fetchJson({
       choices: [{
         message: {
@@ -203,7 +206,7 @@ describe('AIService.generateWithTools — native function calling', () => {
   });
 
   it('converts endpoint rejection of tools into AIToolCallUnsupportedError', async () => {
-    const service = new AIService(makeConfig());
+    const service = new AIService(toolCallConfig);
     (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(fetchJson({ error: { message: 'tools is not supported by this model' } }, 400));
 
     await expect(service.generateWithTools({ system: 'rules', messages, tools }))
@@ -215,7 +218,11 @@ describe('AIService.generateWithTools — native function calling', () => {
     await expect(service.generateWithTools({ system: 'rules', messages, tools }))
       .rejects.toSatisfy(isAIToolCallUnsupportedError);
     expect(window.fetch).not.toHaveBeenCalled();
-    expect(supportsChatToolCalls({ apiType: 'openai-compatible' })).toBe(true);
-    expect(supportsChatToolCalls({ apiType: 'gemini' })).toBe(false);
+    // 能力判定 = 协议族支持 且 显式勾选；两者缺一不可。
+    expect(supportsChatToolCalls({ apiType: 'openai-compatible', supportsToolCalls: true })).toBe(true);
+    expect(supportsChatToolCalls({ apiType: 'openai-compatible' })).toBe(false);
+    expect(supportsChatToolCalls({ apiType: 'gemini', supportsToolCalls: true })).toBe(false);
+    expect(isToolCallCapableApiType('openai-compatible')).toBe(true);
+    expect(isToolCallCapableApiType('claude')).toBe(false);
   });
 });

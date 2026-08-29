@@ -51,7 +51,7 @@ vi.mock('./vectorSearchService', () => ({
   },
 }));
 
-import { runRepositoryChatTurn } from './repositoryChatService';
+import { runRepositoryChatTurn } from './repositoryChatRunner';
 
 const repository: Repository = {
   id: 1,

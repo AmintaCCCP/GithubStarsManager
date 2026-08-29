@@ -131,6 +131,10 @@ const releasesPayload = [
 describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks 不清 Once 队列：显式 reset，防止用例间响应串味。
+    mocks.generateWithTools.mockReset();
+    mocks.generateChatText.mockReset();
+    mocks.generateChatTextStream.mockReset();
     configureTreeAndFiles({
       'README.md': README,
       'src/engine.ts': 'export const switchProxy = () => "implementation detail";',
