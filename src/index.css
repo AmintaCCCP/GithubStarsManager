@@ -455,6 +455,15 @@ html body[data-scroll-locked] {
   overflow: clip !important;
 }
 
+/* body's overflow never propagates to the viewport (html owns overflow), so the
+   root scroller must be locked directly or the page behind a modal overlay keeps
+   scrolling (scrollbar drag + wheel). hidden — not clip — keeps the viewport a
+   scroll container, so the scroll offset, the sticky header's anchor and the
+   scrollbar-gutter: stable reservation all survive the lock. */
+html:has(body[data-scroll-locked]) {
+  overflow: hidden !important;
+}
+
 /* 窗口滚动条颜色由 --ui-line-strong 等 token 统一驱动（见文件底部 Linear 段落）。 */
 
 
