@@ -17,7 +17,7 @@ vi.mock('../../../store/useAppStore', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) => selector(mocks.appState),
 }));
 
-vi.mock('../../../services/repositoryChatService', () => ({
+vi.mock('../../../services/repositoryChatRunner', () => ({
   runRepositoryChatTurn: mocks.runRepositoryChatTurn,
 }));
 

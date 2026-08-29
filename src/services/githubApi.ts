@@ -65,6 +65,25 @@ export interface RepositoryFileRead {
   content: string;
 }
 
+/** 仓库问答 search_issues 工具使用的 Issue 搜索结果（正文已截断以限制体积）。 */
+export interface RepositoryIssueSearchRead {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  html_url: string;
+  body: string;
+  comments: number;
+  updated_at: string;
+  labels: string[];
+}
+
+/** Issue 评论（供疑难排查场景补充解决方案摘录）。 */
+export interface RepositoryIssueCommentRead {
+  user: string;
+  createdAt: string;
+  body: string;
+}
+
 interface GitHubStarredItem {
   starred_at?: string;
   repo?: Repository;
@@ -166,6 +185,9 @@ export interface MultipleReleasesResult {
   failedRepos: { repoId: number; full_name: string; error: string }[];
 }
 
+
+/** GitHub 搜索的裸布尔操作符：不可信关键词中一律丢弃，防止改变查询语义。 */
+const SEARCH_BOOLEAN_OPERATORS = new Set(['or', 'and', 'not']);
 
 export class GitHubApiService {
   private token: string;
@@ -987,6 +1009,84 @@ export class GitHubApiService {
     }
 
     return allReleases;
+  }
+
+  /**
+   * 按关键词搜索仓库 Issue（open + closed，best-match 排序）。
+   * 供仓库问答的 search_issues 工具使用：search API 有独立限速（认证后
+   * 30 次/分钟），调用方每轮最多发起一次。
+   */
+  async searchRepositoryIssues(
+    owner: string,
+    repo: string,
+    keywords: string[],
+    options: { perPage?: number; signal?: AbortSignal } = {},
+  ): Promise<RepositoryIssueSearchRead[]> {
+    const perPage = Math.min(20, Math.max(1, options.perPage ?? 8));
+    // 关键词来自模型与用户问题（不可信输入）：按空白分词后只保留"纯文本"词元。
+    // 丢弃含冒号（任何位置的 key:value 限定符）、括号（分组限定符）与 -/+ 前缀
+    // （一元操作符）的词元，以及裸布尔操作符，防止 `repo:other/repo`、`is:pr`、
+    // `OR (repo:x/y)`、`-repo:owner/repo` 之类改变固定的仓库范围或混入 PR。
+    const sanitizedKeywords = keywords
+      .flatMap((keyword) => keyword.split(/\s+/))
+      .filter((token) => {
+        if (!token || token.includes(':') || token.includes('(') || token.includes(')')) return false;
+        if (/^[-+]/.test(token)) return false;
+        return !SEARCH_BOOLEAN_OPERATORS.has(token.toLowerCase());
+      });
+    // 无纯文本关键词时不发起搜索：仅含 repo/is:issue 的裸查询会命中仓库内
+    // 任意 Issue，返回与问题无关的证据。
+    if (sanitizedKeywords.length === 0) return [];
+    const query = [`repo:${owner}/${repo}`, 'is:issue', ...sanitizedKeywords]
+      .filter(Boolean)
+      .join(' ');
+    const endpoint = `/search/issues?q=${encodeURIComponent(query)}&per_page=${perPage}`;
+    const response = await this.makeRequest<{ total_count?: number; items?: Array<Record<string, unknown>> }>(
+      endpoint,
+      { operationTag: 'issue-search' },
+      options.signal,
+    );
+    const items = Array.isArray(response.items) ? response.items : [];
+    return items.map((item) => {
+      const state: 'open' | 'closed' = item.state === 'closed' ? 'closed' : 'open';
+      const labels = Array.isArray(item.labels)
+        ? item.labels.map((label) => {
+            if (label && typeof label === 'object' && typeof (label as { name?: unknown }).name === 'string') return (label as { name: string }).name;
+            return '';
+          }).filter(Boolean).slice(0, 6)
+        : [];
+      return {
+        number: typeof item.number === 'number' ? item.number : 0,
+        title: typeof item.title === 'string' ? item.title : '',
+        state,
+        html_url: typeof item.html_url === 'string' ? item.html_url : '',
+        // 搜索结果正文在这里截断，保证响应体积可控；摘要层还有更细的上限。
+        body: typeof item.body === 'string' ? item.body.slice(0, 8_000) : '',
+        comments: typeof item.comments === 'number' ? item.comments : 0,
+        updated_at: typeof item.updated_at === 'string' ? item.updated_at : '',
+        labels,
+      };
+    }).filter((issue) => issue.number > 0);
+  }
+
+  /** 抓取单条 Issue 的评论（时间正序），供疑难排查场景补充解决方案。 */
+  async getRepositoryIssueComments(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    options: { perPage?: number; signal?: AbortSignal } = {},
+  ): Promise<RepositoryIssueCommentRead[]> {
+    const perPage = Math.min(30, Math.max(1, options.perPage ?? 10));
+    const response = await this.makeRequest<Array<Record<string, unknown>>>(
+      `/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=${perPage}`,
+      { operationTag: 'issue-comments' },
+      options.signal,
+    );
+    return (Array.isArray(response) ? response : []).map((comment) => ({
+      user: (comment.user as { login?: unknown } | undefined)?.login ? String((comment.user as { login: unknown }).login) : 'unknown',
+      createdAt: typeof comment.created_at === 'string' ? comment.created_at : '',
+      body: typeof comment.body === 'string' ? comment.body.slice(0, 4_000) : '',
+    }));
   }
 
   async getMultipleRepositoryReleases(

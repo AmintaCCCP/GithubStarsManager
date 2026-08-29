@@ -225,6 +225,74 @@ describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
 });
 
 
+describe('GitHubApiService.searchRepositoryIssues', () => {
+  it('strips embedded qualifiers, boolean operators, and prefixed tokens from untrusted keywords', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({ total_count: 0, items: [] } as never);
+
+    await service.searchRepositoryIssues('owner', 'repo', [
+      'crash repo:other/repo is:pr',
+      'OR (repo:github/docs)',
+      '-repo:owner/repo',
+      'audio crackle',
+      'user:someone label:good-first-issue',
+      'AND -is:open',
+    ]);
+
+    const endpoint = (makeRequestSpy.mock.calls as unknown as Array<[string]>)[0]?.[0] ?? '';
+    expect(endpoint.startsWith('/search/issues?q=')).toBe(true);
+    // 固定的仓库范围 + is:issue 之外，只允许纯文本关键词存活：
+    // 限定符（任何位置）、括号分组、-/+ 前缀与布尔操作符全部被剥离。
+    const query = decodeURIComponent(endpoint.slice('/search/issues?q='.length).split('&')[0] ?? '');
+    expect(query.split(/\s+/)).toEqual(['repo:owner/repo', 'is:issue', 'crash', 'audio', 'crackle']);
+  });
+
+  it('does not call the search endpoint when no plain-text keywords survive sanitization', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest');
+
+    await expect(service.searchRepositoryIssues('owner', 'repo', [
+      'repo:other/repo',
+      'OR AND NOT',
+      '-is:pr',
+      '(repo:github/docs)',
+    ])).resolves.toEqual([]);
+
+    // 裸 repo+is:issue 查询会命中仓库内任意 Issue：无纯文本关键词时不得发起请求。
+    expect(makeRequestSpy).not.toHaveBeenCalled();
+  });
+
+  it('normalizes search hits into bounded issue reads', async () => {
+    const service = new GitHubApiService('token');
+    vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({
+        total_count: 1,
+        items: [{
+          number: 42,
+          title: 'App crashes on start',
+          state: 'closed',
+          html_url: 'https://github.com/owner/repo/issues/42',
+          body: 'Crash body',
+          comments: 2,
+          updated_at: '2026-06-01T00:00:00.000Z',
+          labels: [{ name: 'bug' }, { name: 'crash' }],
+        }],
+      } as never);
+
+    await expect(service.searchRepositoryIssues('owner', 'repo', ['crash'])).resolves.toEqual([{
+      number: 42,
+      title: 'App crashes on start',
+      state: 'closed',
+      html_url: 'https://github.com/owner/repo/issues/42',
+      body: 'Crash body',
+      comments: 2,
+      updated_at: '2026-06-01T00:00:00.000Z',
+      labels: ['bug', 'crash'],
+    }]);
+  });
+});
+
 describe('GitHubApiService repository chat read APIs', () => {
   it('resolves default branch, immutable head SHA, and a recursive tree through tagged read requests', async () => {
     const service = new GitHubApiService('token');
