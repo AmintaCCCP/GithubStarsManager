@@ -137,16 +137,23 @@ export function inferPlatformsFromRepositoryMetadata(
 
 /**
  * 汇总 P1+P2 信号并按展示顺序输出确定性平台列表。
+ * 只统计 `release.repository.id === repository.id` 的 release——调用方
+ * （useRepositoryPlatforms）传入的是全局 releases 数组，若不过滤，
+ * 其它仓库的资产信号会串台到当前仓库的平台列表。
  * 信号总分达到 PLATFORM_DISPLAY_THRESHOLD 的平台才入选；
  * 没有任何平台达标时回退 ai_platforms（保持旧行为）。
  */
 export function resolveRepositoryPlatforms(
-  repository: Pick<Repository, 'topics' | 'description' | 'language' | 'ai_platforms'>,
-  releases: Array<Pick<Release, 'assets' | 'published_at'>>,
+  repository: Pick<Repository, 'id' | 'topics' | 'description' | 'language' | 'ai_platforms'>,
+  releases: Array<Pick<Release, 'repository' | 'assets' | 'published_at'>>,
 ): string[] {
+  const ownReleases = releases.filter(
+    release => release.repository?.id === repository.id,
+  );
+
   const totals = new Map<string, number>();
   for (const signal of [
-    ...inferPlatformsFromReleases(releases),
+    ...inferPlatformsFromReleases(ownReleases),
     ...inferPlatformsFromRepositoryMetadata(repository),
   ]) {
     totals.set(signal.platform, (totals.get(signal.platform) ?? 0) + signal.weight);
