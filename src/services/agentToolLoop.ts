@@ -312,7 +312,9 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
           if (index < 3 && hit.comments > 0) {
             try {
               comments = await github.getRepositoryIssueComments(owner, repo, hit.number, { perPage: 6, signal });
-            } catch {
+            } catch (error) {
+              // 中止（用户停止 / 工具超时）必须向上传播，不能被静默吞掉。
+              if (signal.aborted) throw error;
               comments = [];
             }
           }
@@ -456,10 +458,16 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     messages.push({ role: 'assistant', content: result.content || null, toolCalls: result.toolCalls });
     conversationChars += Math.max(64, result.content.length) + result.toolCalls.length * 48;
     for (const call of result.toolCalls) {
+      if (call.name === 'ready_to_answer') {
+        const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
+        conversationChars += confirmText.length;
+        messages.push({ role: 'tool', toolCallId: call.id, content: confirmText });
+        ready = true;
+        break;
+      }
       const toolOutput = await dispatchToolCall(call, loopTurns);
       conversationChars += toolOutput.length;
       messages.push({ role: 'tool', toolCallId: call.id, content: toolOutput });
-      if (call.name === 'ready_to_answer') ready = true;
     }
   }
 

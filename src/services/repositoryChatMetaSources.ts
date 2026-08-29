@@ -148,14 +148,15 @@ export const buildIssueDigest = (issue: IssueSearchHit, comments: IssueComment[]
   return lines.join('\n');
 };
 
-/** 一批 Release 摘要证据；tag 相同的条目按顺序去重避免虚拟路径冲突。 */
+/** 一批 Release 摘要证据；按规范化后的虚拟路径去重，避免不同 tag 归一化后冲突。 */
 export const buildReleasesEvidence = (repository: Repository, releases: Array<Pick<Release, 'tag_name' | 'name' | 'body' | 'published_at' | 'html_url' | 'prerelease' | 'assets'>>): ToolEvidence[] => {
-  const seenTags = new Set<string>();
+  const seenPaths = new Set<string>();
   return releases.slice(0, MAX_RELEASES).flatMap((release) => {
-    const tag = release.tag_name || `unknown-${seenTags.size + 1}`;
-    if (seenTags.has(tag)) return [];
-    seenTags.add(tag);
-    return [makeMetaEvidence(repository, virtualReleasePath(tag), release.html_url, buildReleaseDigest(release))];
+    const tag = release.tag_name || `unknown-${seenPaths.size + 1}`;
+    const virtualPath = virtualReleasePath(tag);
+    if (seenPaths.has(virtualPath)) return [];
+    seenPaths.add(virtualPath);
+    return [makeMetaEvidence(repository, virtualPath, release.html_url, buildReleaseDigest(release))];
   });
 };
 

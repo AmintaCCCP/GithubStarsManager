@@ -1484,7 +1484,9 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
             if (index < 3 && hit.comments > 0) {
               try {
                 comments = await github.getRepositoryIssueComments(owner, repo, hit.number, { perPage: 6, signal });
-              } catch {
+              } catch (error) {
+                // 中止（用户停止 / 工具超时）必须向上传播，不能被静默吞掉。
+                if (signal.aborted) throw error;
                 comments = [];
               }
             }
@@ -1775,6 +1777,14 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry);
   return { content, evidences };
 };
+/** 后端代理通道不保留 AIToolCallUnsupportedError 类型：以 4xx 配置类状态码兜底识别端点拒绝。 */
+const isEndpointRejectionError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  const carrier = error as { status?: unknown; statusCode?: unknown };
+  const status = carrier.status ?? carrier.statusCode;
+  return status === 400 || status === 404 || status === 422;
+};
+
 export const runRepositoryChatTurn = async (input: RepositoryChatTurnInput): Promise<RepositoryChatTurnResult> => {
   // 受控工具循环（实验性）：仅在设置开启且当前 AI 配置属于支持 function
   // calling 的协议族时启用；端点不支持工具调用时本轮自动落回编排式循环。
@@ -1782,7 +1792,8 @@ export const runRepositoryChatTurn = async (input: RepositoryChatTurnInput): Pro
     try {
       return await runToolLoopRepositoryChatTurn(input);
     } catch (error) {
-      if (input.signal?.aborted || !isAIToolCallUnsupportedError(error)) throw error;
+      if (input.signal?.aborted) throw error;
+      if (!isAIToolCallUnsupportedError(error) && !isEndpointRejectionError(error)) throw error;
     }
   }
   return await runEvidenceDrivenRepositoryChatTurn(input);
