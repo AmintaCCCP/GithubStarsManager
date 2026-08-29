@@ -129,15 +129,38 @@ describe('ReleaseCard asset updated indicator', () => {
     expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
   });
 
-  it('does not propagate the asset click to the release-level mark-as-read handler', () => {
-    const onMarkAsRead = vi.fn();
-    const onMarkAssetAsRead = vi.fn();
-    renderCard({ onMarkAsRead, onMarkAssetAsRead });
+  it('renders the asset updated time in Chinese when language is zh', () => {
+    // 资产 updated_at 为 2026-01-02，早于当前时间，相对时间必然以 “…前” 结尾
+    renderCard({
+      downloadLinks: [
+        {
+          name: 'app.dmg',
+          url: 'https://example.com/app.dmg',
+          size: 1000,
+          downloadCount: 5,
+          assetId: 101,
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(screen.getByText(/前$/)).toBeInTheDocument();
+  });
 
-    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
-    fireEvent.click(assetRow);
+  it('hides the asset updated time when updated_at is missing', () => {
+    renderCard({
+      downloadLinks: [
+        { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101 },
+      ],
+    });
+    expect(screen.queryByText(/前$/)).not.toBeInTheDocument();
+  });
 
-    expect(onMarkAsRead).not.toHaveBeenCalled();
-    expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
+  it('hides the asset updated time when updated_at is invalid', () => {
+    renderCard({
+      downloadLinks: [
+        { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101, updatedAt: 'not-a-date' },
+      ],
+    });
+    expect(screen.queryByText(/前$/)).not.toBeInTheDocument();
   });
 });

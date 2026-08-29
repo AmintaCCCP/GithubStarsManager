@@ -2,6 +2,7 @@ import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -51,14 +52,17 @@ const AssetLeadingIcon = ({ name, contentType }: { name: string; contentType?: s
   );
 };
 
-/** 资产相对时间：updated_at 非法时不渲染，避免 date-fns 对 Invalid Date 抛错。 */
-const AssetUpdatedTime = ({ updatedAt }: { updatedAt?: string }) => {
+/** 资产相对时间：updated_at 非法时不渲染，避免 date-fns 对 Invalid Date 抛错；中文界面用 zhCN。 */
+const AssetUpdatedTime = ({ updatedAt, language }: { updatedAt?: string; language: 'zh' | 'en' }) => {
   if (!updatedAt) return null;
   const time = new Date(updatedAt).getTime();
   if (Number.isNaN(time)) return null;
   return (
     <span title={new Date(time).toLocaleString()}>
-      {formatDistanceToNow(new Date(time), { addSuffix: true })}
+      {formatDistanceToNow(new Date(time), {
+        addSuffix: true,
+        ...(language === 'zh' ? { locale: zhCN } : {}),
+      })}
     </span>
   );
 };
@@ -437,7 +441,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                               {t('资产已更新', 'Asset updated')}
                             </span>
                           )}
-                          <AssetUpdatedTime updatedAt={link.updatedAt} />
+                          <AssetUpdatedTime updatedAt={link.updatedAt} language={language} />
                           {link.size > 0 && (
                             <span>{formatFileSize(link.size)}</span>
                           )}
@@ -479,7 +483,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                             {t('资产已更新', 'Asset updated')}
                           </span>
                         )}
-                        <AssetUpdatedTime updatedAt={link.updatedAt} />
+                        <AssetUpdatedTime updatedAt={link.updatedAt} language={language} />
                         {link.size > 0 && (
                           <span>{formatFileSize(link.size)}</span>
                         )}

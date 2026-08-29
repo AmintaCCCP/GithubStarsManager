@@ -13,7 +13,11 @@ const makeAsset = (name: string, contentType = 'application/octet-stream') => ({
   updated_at: '2026-01-01T00:00:00.000Z',
 });
 
-const makeRelease = (assets: string[], publishedAt = '2026-01-01T00:00:00.000Z'): Pick<Release, 'assets' | 'published_at'> => ({
+const makeRelease = (
+  assets: string[],
+  publishedAt = '2026-01-01T00:00:00.000Z',
+): Pick<Release, 'repository' | 'assets' | 'published_at'> => ({
+  repository: { id: 1, full_name: 'owner/app', name: 'app' },
   published_at: publishedAt,
   assets: assets.map((name) => makeAsset(name)),
 });
@@ -120,5 +124,23 @@ describe('resolveRepositoryPlatforms', () => {
 
   it('returns an empty list when there is no signal at all', () => {
     expect(resolveRepositoryPlatforms(makeRepo(), [])).toEqual([]);
+  });
+
+  it('regression: only counts releases of the same repository (no cross-repo bleed)', () => {
+    const repoA = makeRepo({ id: 1, full_name: 'owner/a', name: 'a' });
+    const repoB = makeRepo({ id: 2, full_name: 'owner/b', name: 'b' });
+    const releaseFor = (repo: Repository, names: string[]) => ({
+      ...makeRelease(names),
+      repository: { id: repo.id, full_name: repo.full_name, name: repo.name },
+    });
+
+    const releases = [
+      releaseFor(repoA, ['app.dmg']),
+      releaseFor(repoB, ['setup.exe', 'app.apk']),
+    ];
+
+    // A 的列表只来自 A 的资产；B 的 windows/android 不许串台
+    expect(resolveRepositoryPlatforms(repoA, releases)).toEqual(['macos']);
+    expect(resolveRepositoryPlatforms(repoB, releases)).toEqual(['windows', 'android']);
   });
 });
