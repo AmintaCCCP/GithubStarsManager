@@ -201,7 +201,8 @@ export const detectMetaIntent = (question: string): MetaInfoKind[] => {
   if (/(?:最近|最新|更新了|更新日志|变更|新版本|版本历史|what'?s new|changelog|recent(?:ly)?\s+(?:update|release|change)|latest\s+(?:release|update|version)|release\s+notes?)/i.test(normalized)) kinds.push('releases');
   if (/(?:构建包|安装包|安装文件|安装介质|哪些平台|什么平台|平台.*(?:构建|包|下载)|下载.*(?:包|文件)|binar|artifact|installer|build\s*packages?|prebuilt|download\s+(?:page|link|asset)|which\s+platforms?)/i.test(normalized)) kinds.push('releases');
   if (/(?:报错|出错|错误|异常|崩溃|闪退|无法|失败|遇到.{0,8}问题|疑难|已知问题|bug|crash|broken|error|fail(?:ed|ure)?|not\s+work|issue\s+with|troubleshoot|doesn'?t\s+work)/i.test(normalized)) kinds.push('issues');
-  return kinds;
+  // 两个 releases 正则可能同时命中：去重，避免重复占用 meta 目标名额。
+  return Array.from(new Set(kinds));
 };
 
 /** meta 意图 → 虚拟目标路径。 */

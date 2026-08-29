@@ -451,7 +451,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
         ready = true;
         break;
       }
-      messages.push({ role: 'assistant', content: result.content || null, toolCalls: [] });
+      messages.push({ role: 'assistant', content: result.content ?? '', toolCalls: [] });
       messages.push({
         role: 'user',
         content: zh
@@ -462,7 +462,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       continue;
     }
 
-    messages.push({ role: 'assistant', content: result.content || null, toolCalls: result.toolCalls });
+    messages.push({ role: 'assistant', content: result.content ?? '', toolCalls: result.toolCalls });
     conversationChars += Math.max(64, result.content.length) + result.toolCalls.length * 48;
     for (const call of result.toolCalls) {
       if (call.name === 'ready_to_answer') {

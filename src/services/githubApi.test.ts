@@ -248,6 +248,21 @@ describe('GitHubApiService.searchRepositoryIssues', () => {
     expect(query.split(/\s+/)).toEqual(['repo:owner/repo', 'is:issue', 'crash', 'audio', 'crackle']);
   });
 
+  it('does not call the search endpoint when no plain-text keywords survive sanitization', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest');
+
+    await expect(service.searchRepositoryIssues('owner', 'repo', [
+      'repo:other/repo',
+      'OR AND NOT',
+      '-is:pr',
+      '(repo:github/docs)',
+    ])).resolves.toEqual([]);
+
+    // 裸 repo+is:issue 查询会命中仓库内任意 Issue：无纯文本关键词时不得发起请求。
+    expect(makeRequestSpy).not.toHaveBeenCalled();
+  });
+
   it('normalizes search hits into bounded issue reads', async () => {
     const service = new GitHubApiService('token');
     vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')

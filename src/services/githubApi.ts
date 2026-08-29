@@ -1034,6 +1034,9 @@ export class GitHubApiService {
         if (/^[-+]/.test(token)) return false;
         return !SEARCH_BOOLEAN_OPERATORS.has(token.toLowerCase());
       });
+    // 无纯文本关键词时不发起搜索：仅含 repo/is:issue 的裸查询会命中仓库内
+    // 任意 Issue，返回与问题无关的证据。
+    if (sanitizedKeywords.length === 0) return [];
     const query = [`repo:${owner}/${repo}`, 'is:issue', ...sanitizedKeywords]
       .filter(Boolean)
       .join(' ');

@@ -200,6 +200,8 @@ describe('AIService.generateWithTools — native function calling', () => {
     const sentMessages = requestBody.messages as Array<Record<string, unknown>>;
     expect(sentMessages[0]).toEqual({ role: 'system', content: 'agent rules' });
     expect(sentMessages[2]).toMatchObject({ role: 'assistant', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_documentation' } }] });
+    // content 为空时必须整体省略：显式 null / 空字符串在部分网关上会被拒绝。
+    expect(sentMessages[2]).not.toHaveProperty('content');
     expect(sentMessages[3]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: 'SOURCE: /README.md - 1-5' });
     expect(result.content).toBe('');
     expect(result.toolCalls).toEqual([{ id: 'call_2', name: 'ready_to_answer', arguments: '{"missing":[]}' }]);
