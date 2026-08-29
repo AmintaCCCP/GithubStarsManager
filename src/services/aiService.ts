@@ -337,6 +337,29 @@ export class AIService {
     return this.config.apiType || 'openai';
   }
 
+  /**
+   * 直连模式安全守卫：禁止把 Authorization / x-api-key / URL key 通过明文
+   * HTTP 发往远端。仅 localhost / 127.0.0.1 / [::1] / 0.0.0.0 等本机地址豁免
+   * （本地推理服务场景）。走后端代理时由代理负责，不在此检查。
+   */
+  private requireSecureDirectEndpoint(): void {
+    if (backend.isAvailable) return;
+    const base = this.config.baseUrl.trim();
+    if (!/^http:\/\//i.test(base)) return;
+    let host = base.replace(/^http:\/\//i, '').split('/')[0] || '';
+    try {
+      host = new URL(base).hostname;
+    } catch {
+      // 保留字符串解析结果
+    }
+    const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\[::1\])$/i.test(host);
+    if (!isLocal) {
+      throw new Error(this.language === 'zh'
+        ? 'AI 服务地址必须使用 HTTPS：为保护 API Key，仅 localhost / 127.0.0.1 等本机地址允许 HTTP。'
+        : 'The AI endpoint must use HTTPS: to protect your API key, plain HTTP is only allowed for local addresses (localhost / 127.0.0.1).');
+    }
+  }
+
   private getOpenAIReasoningPayload(): { effort: 'none' | 'low' | 'medium' | 'high' | 'xhigh' } | undefined {
     const effort = this.config.reasoningEffort;
     return effort ? { effort } : undefined;
@@ -384,6 +407,7 @@ export class AIService {
     maxTokens: number;
     signal?: AbortSignal;
   }): Promise<string> {
+    this.requireSecureDirectEndpoint();
     const startTime = Date.now();
     const apiType = this.getApiType();
     const model = this.config.model;
@@ -726,6 +750,7 @@ ${options.user}` : options.user;
       // /api/proxy/ai 会整体缓冲 JSON 响应，无法转发 SSE 帧。
       throw new AIStreamUnsupportedError();
     }
+    this.requireSecureDirectEndpoint();
     if (this.isDeepSeekReasonerModel()) {
       // deepseek-reasoner 的最终文本可能仅存在于 reasoning_content（思考链），
       // 非流式路径对此有专门处理（且思考链不得用于其他 DeepSeek 模型）。流式
