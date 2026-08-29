@@ -150,8 +150,8 @@ export const ReleaseTimeline: React.FC = () => {
   };
 
   const getDownloadLinks = useCallback((release: Release) => {
-    const links: Array<{ name: string; url: string; size: number; downloadCount: number; isSourceCode?: boolean; assetId?: number }> = [];
-    
+    const links: Array<{ name: string; url: string; size: number; downloadCount: number; isSourceCode?: boolean; assetId?: number; updatedAt?: string; contentType?: string }> = [];
+
     if (release.assets && release.assets.length > 0) {
       release.assets.forEach(asset => {
         links.push({
@@ -160,6 +160,8 @@ export const ReleaseTimeline: React.FC = () => {
           size: asset.size,
           downloadCount: asset.download_count,
           assetId: asset.id,
+          updatedAt: asset.updated_at,
+          contentType: asset.content_type,
         });
       });
     }

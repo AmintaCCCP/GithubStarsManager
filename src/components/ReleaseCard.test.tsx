@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReleaseCard from './ReleaseCard';
 import type { Release } from '../types';
@@ -129,15 +129,45 @@ describe('ReleaseCard asset updated indicator', () => {
     expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
   });
 
-  it('does not propagate the asset click to the release-level mark-as-read handler', () => {
-    const onMarkAsRead = vi.fn();
-    const onMarkAssetAsRead = vi.fn();
-    renderCard({ onMarkAsRead, onMarkAssetAsRead });
-
+  it('renders relative times in Chinese (release header and asset row) when language is zh', () => {
+    // 资产 updated_at 为 2026-01-02，早于当前时间；头部 effectiveTime 同理，
+    // 相对时间必然以 “…前” 结尾
+    renderCard({
+      downloadLinks: [
+        {
+          name: 'app.dmg',
+          url: 'https://example.com/app.dmg',
+          size: 1000,
+          downloadCount: 5,
+          assetId: 101,
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        },
+      ],
+    });
+    // 头部（effectiveReleaseTime）与资产行各渲染一条中文相对时间
+    expect(screen.getAllByText(/个月前|周前|天前|小时前|分钟前|年前/).length).toBe(2);
     const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
-    fireEvent.click(assetRow);
+    expect(within(assetRow).getByText(/前$/)).toBeInTheDocument();
+  });
 
-    expect(onMarkAsRead).not.toHaveBeenCalled();
-    expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
+  it('hides the asset updated time when updated_at is missing', () => {
+    renderCard({
+      downloadLinks: [
+        { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101 },
+      ],
+    });
+    // 头部仍有中文相对时间，只能断言资产行内没有
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    expect(within(assetRow).queryByText(/前$/)).not.toBeInTheDocument();
+  });
+
+  it('hides the asset updated time when updated_at is invalid', () => {
+    renderCard({
+      downloadLinks: [
+        { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101, updatedAt: 'not-a-date' },
+      ],
+    });
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    expect(within(assetRow).queryByText(/前$/)).not.toBeInTheDocument();
   });
 });

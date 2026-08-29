@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Monitor, Apple, Smartphone, Package, Terminal } from 'lucide-react';
+import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Package } from 'lucide-react';
+import { SiAndroid, SiApple, SiLinux } from '@icons-pack/react-simple-icons';
+import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { FilterModal } from './FilterModal';
@@ -7,13 +9,15 @@ import { AssetFilter } from '../types';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 
-// 图标映射
+// 图标映射。
+// 存量数据里持久化的是 lucide 图标名（见 store/schema.ts PRESET_FILTER_ICONS），
+// 渲染时按名 remap 到 Simple Icons 品牌字形；'Package'（源码预设）沿用 lucide。
 const ICON_MAP: Record<string, React.ElementType> = {
-  Monitor,
-  Apple,
-  Smartphone,
+  Monitor: SiWindows,
+  Apple: SiApple,
+  Smartphone: SiAndroid,
+  Terminal: SiLinux,
   Package,
-  Terminal,
 };
 
 // 图标名称映射（基于 PRESET_FILTERS 的 id）

@@ -11,14 +11,12 @@ import {
   Crown,
   Filter,
   ChevronDown,
-  Monitor,
-  Apple,
-  Terminal,
-  Smartphone,
   Globe,
   X,
   Calendar
 } from 'lucide-react';
+import { SiAndroid, SiApple, SiLinux } from '@icons-pack/react-simple-icons';
+import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
@@ -232,10 +230,10 @@ interface PlatformFilterProps {
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
   const platforms: { id: DiscoveryPlatform; name: string; nameEn: string; icon: React.ReactNode }[] = [
     { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="w-4 h-4" /> },
-    { id: 'Android', name: 'Android', nameEn: 'Android', icon: <Smartphone className="w-4 h-4" /> },
-    { id: 'Macos', name: 'macOS', nameEn: 'macOS', icon: <Apple className="w-4 h-4" /> },
-    { id: 'Windows', name: 'Windows', nameEn: 'Windows', icon: <Monitor className="w-4 h-4" /> },
-    { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <Terminal className="w-4 h-4" /> },
+    { id: 'Android', name: 'Android', nameEn: 'Android', icon: <SiAndroid className="w-4 h-4" /> },
+    { id: 'Macos', name: 'macOS', nameEn: 'macOS', icon: <SiApple className="w-4 h-4" /> },
+    { id: 'Windows', name: 'Windows', nameEn: 'Windows', icon: <SiWindows className="w-4 h-4" /> },
+    { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <SiLinux className="w-4 h-4" /> },
   ];
 
   const selectedPlatform = platforms.find(p => p.id === platform);
