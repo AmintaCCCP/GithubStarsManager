@@ -4,6 +4,7 @@ import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import MarkdownRenderer from './MarkdownRenderer';
+import AssetLeadingIcon from './AssetLeadingIcon';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
@@ -11,10 +12,8 @@ import { sendToRpcDownload } from '../services/rpcDownloadService';
 import { AIService } from '../services/aiService';
 import {
   effectiveReleaseTime,
-  detectAssetPlatform,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
-import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { Button } from './ui/button';
 
 type SummaryState = {
@@ -33,24 +32,6 @@ interface DownloadLink {
   updatedAt?: string;
   contentType?: string;
 }
-
-/**
- * 资产行左侧图标：按文件名/扩展名（含 MIME 兜底）推断平台 → 方形品牌徽章；
- * 推断不出时回退到通用下载图标（不猜）。
- * 下载状态图标（进行中/已完成/源码）由调用方优先渲染。
- */
-const AssetLeadingIcon = ({ name, contentType }: { name: string; contentType?: string }) => {
-  const platform = detectAssetPlatform(name, contentType);
-  if (!platform) {
-    return <Download className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground/70 flex-shrink-0" />;
-  }
-  const Icon = getPlatformIcon(platform);
-  return (
-    <span className="asset-platform-badge flex-shrink-0" title={getPlatformDisplayName(platform)}>
-      <Icon className="h-[11px] w-[11px]" />
-    </span>
-  );
-};
 
 /** 资产相对时间：updated_at 非法时不渲染，避免 date-fns 对 Invalid Date 抛错；中文界面用 zhCN。 */
 const AssetUpdatedTime = ({ updatedAt, language }: { updatedAt?: string; language: 'zh' | 'en' }) => {

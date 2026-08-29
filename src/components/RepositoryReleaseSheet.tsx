@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Download, ExternalLink, FileArchive, FileCode2, Loader2, PackageOpen, RefreshCw, Sparkles } from 'lucide-react';
+import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, ExternalLink, Loader2, PackageOpen, RefreshCw, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { Release, Repository } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
+import AssetLeadingIcon from './AssetLeadingIcon';
 import { useAppStore } from '../store/useAppStore';
 import { useRepositoryReleaseSheet } from '../features/repositories/hooks/useRepositoryReleaseSheet';
 import { buildReleaseDownloadLinks, type ReleaseDownloadLink } from '../utils/releaseDownloadLinks';
@@ -111,7 +112,7 @@ const ReleaseAssetsTable: React.FC<{
               <TableRow key={link.id} className={link.isSourceCode ? 'bg-muted/30' : undefined}>
                 <TableCell className="max-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    {link.isSourceCode ? <FileCode2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <FileArchive className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    {link.isSourceCode ? <Code2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <AssetLeadingIcon name={link.name} contentType={link.contentType} />}
                     <span className="truncate text-xs" title={link.name}>{link.name}</span>
                   </div>
                 </TableCell>
