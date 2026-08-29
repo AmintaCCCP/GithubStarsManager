@@ -1,6 +1,11 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Monitor, Smartphone, Globe, Terminal, Package, Edit3, BookOpen, Apple, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen, MessageSquareText } from 'lucide-react';
+import {
+  getPlatformDisplayName,
+  getPlatformIcon,
+} from './platformMeta';
+import { useRepositoryPlatforms } from '../hooks/useRepositoryPlatforms';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Terminal, Edit3, BookOpen, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen, MessageSquareText } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
@@ -285,43 +290,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     return languageColors[language as keyof typeof languageColors] || '#6b7280';
   }, [languageColors]);
 
-  // 缓存平台图标映射
-  const platformIconMap = useMemo(() => ({
-    mac: Apple,
-    macos: Apple,
-    ios: Apple,
-    windows: Monitor,
-    win: Monitor,
-    linux: Terminal,
-    android: Smartphone,
-    web: Globe,
-    cli: Terminal,
-    docker: Package,
-  }), []);
-
-  const getPlatformIcon = useCallback((platform: string) => {
-    const platformLower = platform.toLowerCase();
-    return platformIconMap[platformLower as keyof typeof platformIconMap] || Monitor;
-  }, [platformIconMap]);
-
-  // 缓存平台显示名称映射
-  const platformNameMap = useMemo(() => ({
-    mac: 'macOS',
-    macos: 'macOS',
-    windows: 'Windows',
-    win: 'Windows',
-    linux: 'Linux',
-    ios: 'iOS',
-    android: 'Android',
-    web: 'Web',
-    cli: 'CLI',
-    docker: 'Docker',
-  }), []);
-
-  const getPlatformDisplayName = useCallback((platform: string) => {
-    const platformLower = platform.toLowerCase();
-    return platformNameMap[platformLower as keyof typeof platformNameMap] || platform;
-  }, [platformNameMap]);
+  // 展示平台：优先 release 资产/仓库元数据的确定性识别，无信号时回退 ai_platforms
+  const displayPlatforms = useRepositoryPlatforms(repository);
 
   // Convert GitHub URL to DeepWiki URL
   const getDeepWikiUrl = (githubUrl: string) => {
@@ -1133,13 +1103,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Platform Icons */}
-      {viewMode === 'grid' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
+      {viewMode === 'grid' && displayPlatforms.length > 0 && (
         <div className="flex items-center space-x-2 mb-4">
           <span className="text-xs text-muted-foreground dark:text-muted-foreground">
             {language === 'zh' ? '支持平台:' : 'Platforms:'}
           </span>
           <div className="flex space-x-1">
-            {repository.ai_platforms.slice(0, 6).map((platform, index) => {
+            {displayPlatforms.slice(0, 6).map((platform, index) => {
               const IconComponent = getPlatformIcon(platform);
               const displayName = getPlatformDisplayName(platform);
 
@@ -1174,10 +1144,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <Star className="w-3.5 h-3.5" />
             <span className="truncate max-w-16">{formatNumber(repository.stargazers_count)}</span>
           </div>
-          {viewMode === 'list' && repository.ai_platforms && repository.ai_platforms.length > 0 && (
+          {viewMode === 'list' && displayPlatforms.length > 0 && (
             <div className="flex items-center space-x-1 min-w-0">
               <Terminal className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate max-w-40">{repository.ai_platforms.slice(0, 3).map(getPlatformDisplayName).join(' · ')}</span>
+              <span className="truncate max-w-40">{displayPlatforms.slice(0, 3).map(getPlatformDisplayName).join(' · ')}</span>
             </div>
           )}
           {(() => {
@@ -1331,6 +1301,7 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.repository.license === nextProps.repository.license &&
     prevProps.repository.stargazers_count === nextProps.repository.stargazers_count &&
     prevProps.repository.pushed_at === nextProps.repository.pushed_at &&
+    prevProps.repository.language === nextProps.repository.language &&
     prevProps.repository.updated_at === nextProps.repository.updated_at &&
     prevProps.showAISummary === nextProps.showAISummary &&
     prevProps.searchQuery === nextProps.searchQuery &&

@@ -1,6 +1,7 @@
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, Monitor, Smartphone, Globe, Terminal, Package, CheckCircle, Bell, BellOff, Apple, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
+import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
+import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { AIService } from '../services/aiService';
@@ -706,48 +707,7 @@ export const SearchBar: React.FC = () => {
     (searchFilters.isCategoryLocked !== undefined ? 1 : 0) +
     (searchFilters.analysisFailed !== undefined ? 1 : 0);
 
-  const getPlatformIcon = (platform: string) => {
-    const platformLower = platform.toLowerCase();
-    
-    switch (platformLower) {
-      case 'mac':
-      case 'macos':
-      case 'ios':
-        return Apple;
-      case 'windows':
-      case 'win':
-        return Monitor;
-      case 'linux':
-        return Terminal;
-      case 'android':
-        return Smartphone;
-      case 'web':
-        return Globe;
-      case 'cli':
-        return Terminal;
-      case 'docker':
-        return Package;
-      default:
-        return Monitor;
-    }
-  };
-
-  const getPlatformDisplayName = (platform: string) => {
-    const platformLower = platform.toLowerCase();
-    const nameMap: Record<string, string> = {
-      mac: 'macOS',
-      macos: 'macOS',
-      windows: 'Windows',
-      win: 'Windows',
-      linux: 'Linux',
-      ios: 'iOS',
-      android: 'Android',
-      web: 'Web',
-      cli: 'CLI',
-      docker: 'Docker',
-    };
-    return nameMap[platformLower] || platform;
-  };
+  // 平台图标与显示名统一由 platformMeta 模块提供
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
