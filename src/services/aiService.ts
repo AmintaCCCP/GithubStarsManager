@@ -867,8 +867,8 @@ ${options.user}` : options.user;
       const raw = await response.text();
       const ssePayloads: string[] = [];
       let dataLines: string[] = [];
-      for (const rawLine of raw.split(/\r?\n/)) {
-        const line = rawLine.replace(/\r$/, '');
+      // SSE 行分隔符按规范接受 CRLF / LF / 裸 CR。
+      for (const line of raw.split(/\r\n|\r|\n/)) {
         if (line === '') {
           if (dataLines.length > 0) {
             ssePayloads.push(dataLines.join('\n'));
