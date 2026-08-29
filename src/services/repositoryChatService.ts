@@ -474,12 +474,25 @@ const pruneUnverifiableSections = (content: string, evidences: ToolEvidence[], l
   if (!cleaned || evidences.length === 0 || !hasAnyValidReference(cleaned, evidences)) return null;
   const kept: string[] = [];
   const unverified: string[] = [];
+  // 标题暂存，跟随其后第一个内容小节归属：内容被降级时标题一起降级，
+  // 避免出现悬空的孤立标题。
+  let pendingHeadings: string[] = [];
   for (const rawSection of cleaned.split(/\n{2,}/)) {
     const section = rawSection.trim();
     if (!section) continue;
-    if (isStandaloneHeading(section) || hasAnyValidReference(section, evidences)) kept.push(section);
-    else unverified.push(section);
+    if (isStandaloneHeading(section)) {
+      pendingHeadings.push(section);
+      continue;
+    }
+    if (hasAnyValidReference(section, evidences)) {
+      kept.push(...pendingHeadings, section);
+    } else {
+      unverified.push(...pendingHeadings, section);
+    }
+    pendingHeadings = [];
   }
+  // 末尾无内容的孤立标题保留原位。
+  kept.push(...pendingHeadings);
   if (kept.filter((section) => !isStandaloneHeading(section)).length === 0) return null;
   if (unverified.length === 0) return kept.join('\n\n');
   const heading = language === 'zh' ? '## 未证实或缺失的信息' : '## Unverified or missing information';
@@ -1171,10 +1184,12 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   // The LLM selects initial targets. Program logic merely loads their outline so
   // a subsequent LLM retrieval plan can name real document sections, not guessed
   // line ranges or a fixed first chunk.
-  const initialScope: RetrievalScope = understanding.informationScope === 'code' ? 'code' : 'documentation';
-  const initialAllowed = initialScope === 'code' ? codeSet : documentationSet;
+  // README/docs 优先是硬规则：即使 understanding 判定为 code 意图，首轮大纲仍
+  // 从文档开始；代码读取等文档证据不足后再按计划/停滞解锁。
+  const initialScope: RetrievalScope = 'documentation';
+  const initialAllowed = documentationSet;
   const initialTargets = understanding.initialTargets.filter((path) => initialAllowed.has(path)).slice(0, 3);
-  await Promise.all((initialTargets.length > 0 ? initialTargets : (initialScope === 'code' ? codeCandidates : documentationCandidates).slice(0, 1)).map((path) => loadDocument(
+  await Promise.all((initialTargets.length > 0 ? initialTargets : documentationCandidates.slice(0, 1)).map((path) => loadDocument(
     path,
     initialScope,
     undefined,
@@ -1186,7 +1201,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
   let requirements: RequirementAssessment[] = [];
   let finalReason = '';
   let canAnswer = false;
-  let codeEligible = understanding.informationScope === 'code';
+  let codeEligible = false;
   let pendingTargets: RetrievalTarget[] = [];
 
   const validReferences = () => new Set(sourceReferences(evidences));
@@ -1269,7 +1284,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       unreadCode.length > 0 ? unreadCode : codeCandidates,
       missing,
       turns,
-      codeEligible || understanding.informationScope === 'code',
+      codeEligible,
     );
     const planRaw = await callModelWithRetry(
       turns === 1 ? 'plan_research' : 'replan_research',
@@ -1282,7 +1297,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       900,
       1,
     );
-    const fallbackScope: RetrievalScope = codeEligible || understanding.informationScope === 'code' ? 'code' : 'documentation';
+    const fallbackScope: RetrievalScope = codeEligible ? 'code' : 'documentation';
     let plan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, fallbackScope) : null;
     if (!plan) {
       const fallbackPath = (fallbackScope === 'code' ? unreadCode : unreadDocumentation)[0];
@@ -1297,7 +1312,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       !codeEligible
       && plannedTargets.some((target) => target.scope === 'code')
       && turns >= 2
-      && consecutiveNoProgressRounds > 0
+      && (consecutiveNoProgressRounds > 0 || understanding.informationScope === 'code')
       && budget.maxCodeReads > 0
       && codeCandidates.length > 0
     ) {
@@ -1305,7 +1320,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       emit({ toolName: 'escalate_to_code', status: 'success', paramSummary: input.language === 'zh' ? '文档检索不足，按计划解锁代码取证' : 'Documentation stalled; unlocking code reads as planned', stage: 'escalation', round: turns, detail: input.language === 'zh' ? '已优先读取文档但缺口仍在，按检索计划补充实现细节。' : 'Documentation was read first but the gap remains; reading implementation details as planned.' });
     }
     let targets = plannedTargets.filter((target) => {
-      if (target.scope === 'code' && !(codeEligible || understanding.informationScope === 'code')) return false;
+      if (target.scope === 'code' && !(codeEligible)) return false;
       return target.scope === 'code' ? codeSet.has(target.path) : documentationSet.has(target.path);
     }).slice(0, 3);
     // 规划器只提出了（尚不可用的）code 目标时，回退到未读的文档候选，
@@ -1337,7 +1352,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
       unreadCode.filter((path) => !readPaths.has(path)),
       missing,
       turns,
-      codeEligible || understanding.informationScope === 'code',
+      codeEligible,
     );
     const gateRaw = await callModelWithRetry(
       'evidence_gate',
@@ -1358,7 +1373,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
         : (input.language === 'zh' ? '本轮未获得与计划匹配的新章节。' : 'This round did not produce a new section matching the plan.'),
       requirements,
       missing,
-      nextAction: (codeEligible || understanding.informationScope === 'code') ? 'read_code' : 'retrieve_more',
+      nextAction: (codeEligible) ? 'read_code' : 'retrieve_more',
       recommendedTargets: [],
     };
     const gate = gateRaw ? parseEvidenceGate(gateRaw, documentationSet, codeSet, fallbackScope, understanding.answerRequirements, (reference) => validReferences().has(reference) || Boolean(referenceCoveredByEvidence(reference, evidences))) ?? fallbackGate : fallbackGate;
@@ -1371,7 +1386,7 @@ const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatTurnInpu
     requirements = completeRequirementAssessments(understanding.answerRequirements, gate.requirements);
     missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
     finalReason = gate.reason || finalReason;
-    pendingTargets = gate.recommendedTargets.filter((target) => target.scope !== 'code' || codeEligible || understanding.informationScope === 'code');
+    pendingTargets = gate.recommendedTargets.filter((target) => target.scope !== 'code' || codeEligible);
     emit({
       toolName: 'evidence_gate',
       status: 'success',

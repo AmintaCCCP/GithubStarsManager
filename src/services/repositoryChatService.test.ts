@@ -661,6 +661,34 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).not.toContain('已验证来源');
   });
 
+  it('reads documentation first even when the question intent is code', async () => {
+    const events: RepositoryChatToolEvent[] = [];
+    const codeRef = '/src/engine.ts - 1';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ intent: 'code_analysis', information_scope: 'code', expected_answer: ['implementation detail'], initial_targets: ['src/engine.ts'], target: 'proxy switching implementation' }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: false,
+        requirements: [requirement('implementation detail', 'missing')],
+        nextAction: 'retrieve_more',
+      }))
+      .mockResolvedValueOnce(plan(target('src/engine.ts', ['switchProxy'], 'implementation detail', 'code')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('implementation detail', 'verified', [codeRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The implementation exports the proxy-switching function.', codeRef, 'Implementation'));
+
+    const result = await runRepositoryChatTurn({ ...turnInput('How is proxy switching implemented?'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
+
+    // 即使意图是 code，首轮大纲仍先读 README/docs；第 2 轮才解锁代码读取。
+    expect(readPaths()[0]).toBe('README.md');
+    expect(readPaths()).toContain('src/engine.ts');
+    expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(true);
+    expect(result.content).toContain(codeRef);
+  });
+
   it('canonicalizes bare root-file citations like /README.md - 35-44', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())

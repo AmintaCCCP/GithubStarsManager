@@ -73,6 +73,29 @@ describe('stream delta extractors', () => {  it('extracts OpenAI chat-completion
   });
 });
 
+describe('insecure endpoint guard', () => {
+  const baseConfig = (baseUrl: string): AIConfig => ({
+    id: 'ai-guard',
+    name: 'Guarded',
+    apiType: 'openai',
+    baseUrl,
+    apiKey: 'secret-key',
+    model: 'test-model',
+    isActive: true,
+  });
+
+  it('refuses to send credentials over plain http to non-local endpoints', async () => {
+    const service = new AIService(baseConfig('http://api.example.com/v1'), 'en');
+    await expect(service.generateChatText({ system: 's', user: 'u' })).rejects.toThrow(/HTTPS/);
+  });
+
+  it('allows plain http only for local addresses', async () => {
+    const service = new AIService(baseConfig('http://localhost:11434/v1'), 'en');
+    // 守卫放行后请求会继续（测试环境 fetch 未实现），但绝不抛 HTTPS 守卫错误。
+    await expect(service.generateChatText({ system: 's', user: 'u' })).rejects.not.toThrow(/HTTPS/);
+  });
+});
+
 describe('requestTextStream gating', () => {
   it('rejects streaming for deepseek-reasoner so reasoning_content stays on the blocking path', async () => {
     const config: AIConfig = {
