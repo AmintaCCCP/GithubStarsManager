@@ -8,7 +8,7 @@ import type {
   RepositoryChatToolEvent,
   ToolEvidence,
 } from '../../../types/repositoryChat';
-import { runRepositoryChatTurn } from '../../../services/repositoryChatService';
+import { runRepositoryChatTurn } from '../../../services/repositoryChatRunner';
 import { repositoryChatSessionRepository } from '../repositories/sessionRepository';
 
 const createId = (prefix: string): string => {

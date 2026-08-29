@@ -13,6 +13,7 @@ import { useAIConfigActions } from '../../features/settings/hooks/useAIConfigAct
 import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
+import { isToolCallCapableApiType } from '../../constants/aiCapabilities';
 
 interface AIConfigPanelProps {
   t: (zh: string, en: string) => string;
@@ -32,8 +33,8 @@ type AIFormState = {
   supportsToolCalls: boolean;
 };
 
-/** 与 aiService 的 CHAT_TOOL_CALL_API_TYPES 保持一致：可勾选工具调用的协议族。 */
-const TOOL_CALL_CAPABLE_API_TYPES: ReadonlySet<AIApiType> = new Set<AIApiType>(['openai', 'deepseek', 'mimo', 'openai-compatible']);
+/** 能力判定唯一来源为 aiService，避免 UI 勾选项与运行时判定漂移。 */
+const isToolCallCapable = (apiType: AIApiType): boolean => isToolCallCapableApiType(apiType);
 
 const MIMO_PLAN_ENDPOINTS: Record<MiMoPlan, string> = {
   api: 'https://api.xiaomimimo.com/v1',
@@ -224,7 +225,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
           concurrency: form.concurrency,
           reasoningEffort: form.reasoningEffort || undefined,
           mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
-          supportsToolCalls: form.supportsToolCalls && TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) ? true : undefined,
+          supportsToolCalls: form.supportsToolCalls && isToolCallCapable(form.apiType) ? true : undefined,
           isActive: existingConfig.isActive,
         };
         updateAIConfig(editingId, updates);
@@ -243,7 +244,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
         concurrency: form.concurrency,
         reasoningEffort: form.reasoningEffort || undefined,
         mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
-        supportsToolCalls: form.supportsToolCalls && TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) ? true : undefined,
+        supportsToolCalls: form.supportsToolCalls && isToolCallCapable(form.apiType) ? true : undefined,
       };
       addAIConfig(config);
       if (!activeAIConfig) setActiveAIConfig(config.id);
@@ -559,7 +560,7 @@ Repository information:
               </p>
             </div>
 
-            {TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) && (
+            {isToolCallCapable(form.apiType) && (
               <div>
                 <label className="flex items-start gap-2 text-sm text-foreground">
                   <Checkbox checked={form.supportsToolCalls} onCheckedChange={(checked) => setForm(prev => ({ ...prev, supportsToolCalls: checked === true }))} />
