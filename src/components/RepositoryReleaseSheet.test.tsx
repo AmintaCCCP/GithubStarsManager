@@ -140,6 +140,36 @@ describe('RepositoryReleaseSheet', () => {
     expect(hookMocks.generateSummary).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 
+  it('shows the same platform badges as the Release page for asset icons', async () => {
+    const user = userEvent.setup();
+    hookMocks.state.releases = [{
+      ...createRelease(1, 0),
+      assets: [
+        { id: 901, name: 'MyApp-1.0.dmg', size: 1024, download_count: 0, browser_download_url: 'https://example.com/MyApp-1.0.dmg', content_type: 'application/x-apple-diskimage', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+        { id: 902, name: 'MyApp-1.0-setup.exe', size: 2048, download_count: 0, browser_download_url: 'https://example.com/MyApp-1.0-setup.exe', content_type: 'application/x-msdownload', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+        { id: 903, name: 'myapp-1.0-linux-amd64.tar.gz', size: 4096, download_count: 0, browser_download_url: 'https://example.com/myapp-1.0-linux-amd64.tar.gz', content_type: 'application/gzip', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+        { id: 904, name: 'myapp-1.0.zip', size: 8192, download_count: 0, browser_download_url: 'https://example.com/myapp-1.0.zip', content_type: 'application/zip', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+      ],
+    }];
+    renderSheet();
+
+    await user.click(screen.getByText('v1').closest('button')!);
+
+    // 可识别平台的资产渲染品牌徽章（与 ReleaseCard 的 AssetLeadingIcon 一致）。
+    // getAllByTitle：simple-icons 的 svg 内部也带 <title>，需按徽章 class 过滤出外层 span。
+    const getBadge = (title: string) =>
+      screen.getAllByTitle(title).find((el) => el.classList.contains('asset-platform-badge'));
+    expect(getBadge('macOS')).toBeDefined();
+    expect(getBadge('Windows')).toBeDefined();
+    expect(getBadge('Linux')).toBeDefined();
+
+    // 平台不可识别的资产回退到通用下载图标，不猜平台
+    const zipRow = screen.getByText('myapp-1.0.zip').closest('tr');
+    expect(zipRow).not.toBeNull();
+    expect(zipRow!.querySelector('.asset-platform-badge')).toBeNull();
+    expect(zipRow!.querySelector('svg.lucide-download')).not.toBeNull();
+  });
+
   it('delegates asset download to the authenticated hook action when RPC is enabled', async () => {
     const user = userEvent.setup();
     hookMocks.state.isRpcEnabled = true;
