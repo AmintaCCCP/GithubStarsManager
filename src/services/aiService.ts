@@ -1072,7 +1072,10 @@ ${options.user}` : options.user;
         if (message.role === 'assistant') {
           return {
             role: 'assistant',
-            content: message.content,
+            // content 为空（null/''）时直接省略该字段：显式 null 与空字符串在
+            // 部分网关与模型上会被拒绝；带 tool_calls 的消息省略 content 是
+            // 兼容性最好的线格式。
+            ...(message.content ? { content: message.content } : {}),
             // 空 tool_calls 会与 content:null 组合成部分网关拒绝的请求体，直接省略。
             ...(message.toolCalls.length > 0 ? {
               tool_calls: message.toolCalls.map((call) => ({
