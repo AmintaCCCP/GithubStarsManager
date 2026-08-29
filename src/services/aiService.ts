@@ -465,6 +465,8 @@ export class AIService {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal) as Record<string, unknown>;
       } else {
         const response = await fetch(requestUrl, {
+          // 直连携带 API Key，禁止跟随重定向以防凭据外泄。
+          redirect: 'error',
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -578,6 +580,8 @@ export class AIService {
         data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
       } else {
         const response = await fetch(requestUrl, {
+          // 直连携带 API Key，禁止跟随重定向以防凭据外泄。
+          redirect: 'error',
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -676,6 +680,8 @@ ${options.user}` : options.user;
       data = await backend.proxyAIRequestWithFallback(this.config.id, this.config, requestBody, options.signal);
     } else {
       const response = await fetch(requestUrl, {
+        // 直连在 URL 携带 API Key，禁止跟随重定向以防凭据外泄。
+        redirect: 'error',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -847,6 +853,8 @@ ${options.user}` : options.user;
     const maskedUrl = requestUrl.replace(/([?&]key=)[^&]+/, '$1***');
 
     const response = await fetch(requestUrl, {
+      // 直连携带 API Key（URL 或请求头），禁止跟随重定向以防凭据外泄。
+      redirect: 'error',
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -885,20 +893,20 @@ ${options.user}` : options.user;
       if (dataLines.length > 0) ssePayloads.push(dataLines.join('\n'));
 
       if (ssePayloads.length > 0) {
-        let full = '';
-        for (const payload of ssePayloads) {
-          const delta = extractDelta(payload);
-          if (delta) {
+        // 只有至少一帧解出当前 API 的有效增量才算 SSE；普通文本里恰好出现
+        // "data:" 开头的行时继续走下方 JSON / 纯文本回退。
+        const deltas = ssePayloads
+          .map((payload) => extractDelta(payload))
+          .filter((delta) => delta !== '');
+        if (deltas.length > 0) {
+          let full = '';
+          for (const delta of deltas) {
             full += delta;
             options.onChunk(delta);
           }
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
+          return full;
         }
-        if (!full.trim()) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
-          throw new Error('No content received from AI service');
-        }
-        this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
-        return full;
       }
 
       let text = '';
