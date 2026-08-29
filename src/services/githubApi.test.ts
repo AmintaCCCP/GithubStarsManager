@@ -225,6 +225,63 @@ describe('GitHubApiService.getRepositoryReleases draft filtering', () => {
 });
 
 
+describe('GitHubApiService.searchRepositoryIssues', () => {
+  it('strips embedded key:value qualifiers from untrusted keywords and keeps the repo scope intact', async () => {
+    const service = new GitHubApiService('token');
+    const makeRequestSpy = vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({ total_count: 0, items: [] } as never);
+
+    await service.searchRepositoryIssues('owner', 'repo', [
+      'crash repo:other/repo is:pr',
+      'audio crackle',
+      'user:someone label:good-first-issue',
+    ]);
+
+    const endpoint = (makeRequestSpy.mock.calls as unknown as Array<[string]>)[0]?.[0] ?? '';
+    expect(endpoint.startsWith('/search/issues?q=')).toBe(true);
+    const query = decodeURIComponent(endpoint.slice('/search/issues?q='.length));
+    expect(query).toContain('repo:owner/repo');
+    expect(query).toContain('is:issue');
+    expect(query).toContain('crash');
+    expect(query).toContain('audio');
+    expect(query).toContain('crackle');
+    // 嵌入在关键词中段的限定符同样被移除，不再劫持仓库范围或混入 PR。
+    expect(query).not.toContain('other/repo');
+    expect(query).not.toContain('is:pr');
+    expect(query).not.toContain('user:someone');
+    expect(query).not.toContain('label:good-first-issue');
+  });
+
+  it('normalizes search hits into bounded issue reads', async () => {
+    const service = new GitHubApiService('token');
+    vi.spyOn(service as unknown as { makeRequest: () => Promise<unknown> }, 'makeRequest')
+      .mockResolvedValueOnce({
+        total_count: 1,
+        items: [{
+          number: 42,
+          title: 'App crashes on start',
+          state: 'closed',
+          html_url: 'https://github.com/owner/repo/issues/42',
+          body: 'Crash body',
+          comments: 2,
+          updated_at: '2026-06-01T00:00:00.000Z',
+          labels: [{ name: 'bug' }, { name: 'crash' }],
+        }],
+      } as never);
+
+    await expect(service.searchRepositoryIssues('owner', 'repo', ['crash'])).resolves.toEqual([{
+      number: 42,
+      title: 'App crashes on start',
+      state: 'closed',
+      html_url: 'https://github.com/owner/repo/issues/42',
+      body: 'Crash body',
+      comments: 2,
+      updated_at: '2026-06-01T00:00:00.000Z',
+      labels: ['bug', 'crash'],
+    }]);
+  });
+});
+
 describe('GitHubApiService repository chat read APIs', () => {
   it('resolves default branch, immutable head SHA, and a recursive tree through tagged read requests', async () => {
     const service = new GitHubApiService('token');
