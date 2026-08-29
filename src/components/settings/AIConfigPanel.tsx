@@ -29,7 +29,11 @@ type AIFormState = {
   concurrency: number;
   reasoningEffort: '' | AIReasoningEffort;
   mimoPlan: MiMoPlan;
+  supportsToolCalls: boolean;
 };
+
+/** 与 aiService 的 CHAT_TOOL_CALL_API_TYPES 保持一致：可勾选工具调用的协议族。 */
+const TOOL_CALL_CAPABLE_API_TYPES: ReadonlySet<AIApiType> = new Set<AIApiType>(['openai', 'deepseek', 'mimo', 'openai-compatible']);
 
 const MIMO_PLAN_ENDPOINTS: Record<MiMoPlan, string> = {
   api: 'https://api.xiaomimimo.com/v1',
@@ -145,6 +149,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     concurrency: 1,
     reasoningEffort: '',
     mimoPlan: 'api',
+    supportsToolCalls: false,
   });
 
   // Auto-fill baseUrl when API type changes
@@ -189,6 +194,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       concurrency: 1,
       reasoningEffort: '',
       mimoPlan: 'api',
+      supportsToolCalls: false,
     });
     setShowForm(false);
     setEditingId(null);
@@ -218,6 +224,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
           concurrency: form.concurrency,
           reasoningEffort: form.reasoningEffort || undefined,
           mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
+          supportsToolCalls: form.supportsToolCalls && TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) ? true : undefined,
           isActive: existingConfig.isActive,
         };
         updateAIConfig(editingId, updates);
@@ -236,6 +243,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
         concurrency: form.concurrency,
         reasoningEffort: form.reasoningEffort || undefined,
         mimoPlan: form.apiType === 'mimo' ? form.mimoPlan : undefined,
+        supportsToolCalls: form.supportsToolCalls && TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) ? true : undefined,
       };
       addAIConfig(config);
       if (!activeAIConfig) setActiveAIConfig(config.id);
@@ -264,6 +272,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       concurrency: config.concurrency || 1,
       reasoningEffort: config.reasoningEffort || '',
       mimoPlan: config.mimoPlan || 'api',
+      supportsToolCalls: config.supportsToolCalls || false,
     });
     setEditingId(config.id);
     setShowForm(true);
@@ -549,6 +558,20 @@ Repository information:
                 )}
               </p>
             </div>
+
+            {TOOL_CALL_CAPABLE_API_TYPES.has(form.apiType) && (
+              <div>
+                <label className="flex items-start gap-2 text-sm text-foreground">
+                  <Checkbox checked={form.supportsToolCalls} onCheckedChange={(checked) => setForm(prev => ({ ...prev, supportsToolCalls: checked === true }))} />
+                  <span>
+                    {t('支持工具调用（Function Calling）', 'Supports tool calling (function calling)')}
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {t('勾选后仓库问答可对该模型启用实验性的工具循环模式；端点实际不支持时会自动回退。', 'Lets repository chat use the experimental tool-loop mode with this model; falls back automatically if the endpoint rejects tools.')}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
@@ -827,6 +850,7 @@ Repository information:
           <summary className="cursor-pointer text-sm font-medium text-foreground">{t('高级设置', 'Advanced settings')}<span className="ml-2 text-xs font-normal text-muted-foreground">{t('聊天窗口任务深度选“默认”时使用这些参数', 'Used by the chat window when task depth is “Default”')}</span></summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('外部网页搜索与抓取', 'External web search and fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('默认关闭；当前版本不会将其暴露为工具。', 'Disabled by default; the current version does not expose it as a tool.')}</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableAgentToolLoop} onCheckedChange={(checked) => setRepositoryChatSettings({ enableAgentToolLoop: checked === true })} /><span>{t('工具循环模式（实验性）', 'Tool-loop mode (experimental)')}<span className="mt-1 block text-xs text-muted-foreground">{t('取证改由模型原生 function calling 驱动；仅对勾选了“支持工具调用”的问答模型生效，不支持时自动回退。', 'Evidence gathering is driven by native function calling; applies only to chat models marked as supporting tool calling, with automatic fallback otherwise.')}</span></span></label>
             <div>
               <label id="repository-chat-streaming-label" className="mb-1 block text-sm font-medium text-foreground">{t('流式回答', 'Streaming answers')}</label>
               <Select value={repositoryChatSettings.streamingMode} onValueChange={(value) => setRepositoryChatSettings({ streamingMode: value === 'off' ? 'off' : 'auto' })}>
