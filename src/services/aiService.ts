@@ -1071,11 +1071,14 @@ ${options.user}` : options.user;
           return {
             role: 'assistant',
             content: message.content,
-            tool_calls: message.toolCalls.map((call) => ({
-              id: call.id,
-              type: 'function',
-              function: { name: call.name, arguments: call.arguments },
-            })),
+            // 空 tool_calls 会与 content:null 组合成部分网关拒绝的请求体，直接省略。
+            ...(message.toolCalls.length > 0 ? {
+              tool_calls: message.toolCalls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: { name: call.name, arguments: call.arguments },
+              })),
+            } : {}),
           };
         }
         if (message.role === 'tool') {
