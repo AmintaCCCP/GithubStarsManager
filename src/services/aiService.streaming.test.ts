@@ -118,6 +118,25 @@ describe('missing Content-Type sniffing', () => {
     }
   });
 
+  it('parses headerless SSE frames separated only by bare CR', async () => {
+    const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => 'data: {"choices":[{"delta":{"content":"A"}}]}\r\rdata: {"choices":[{"delta":{"content":"B"}}]}\r\rdata: [DONE]\r',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const chunks: string[] = [];
+      const full = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: (delta) => chunks.push(delta) });
+      expect(full).toBe('AB');
+      expect(chunks).toEqual(['A', 'B']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('falls back to plain text when a headerless body is not SSE', async () => {
     const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
     const fetchMock = vi.fn().mockResolvedValue({
