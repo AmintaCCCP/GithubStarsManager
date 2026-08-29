@@ -861,10 +861,57 @@ ${options.user}` : options.user;
     }
 
     const contentType = response.headers.get('content-type') || '';
-    if (!response.body) {
-      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'empty response body' }, { url: maskedUrl });
-      throw new Error('No content received from AI service (empty body)');
+    if (!contentType) {
+      // 缺失 Content-Type 时按内容嗅探：body 含 data: 帧走 SSE 解析，
+      // 否则按整段 JSON / 纯文本回退（此时 body 已整体读入，逐段回调）。
+      const raw = await response.text();
+      const ssePayloads: string[] = [];
+      let dataLines: string[] = [];
+      for (const rawLine of raw.split(/\r?\n/)) {
+        const line = rawLine.replace(/\r$/, '');
+        if (line === '') {
+          if (dataLines.length > 0) {
+            ssePayloads.push(dataLines.join('\n'));
+            dataLines = [];
+          }
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).replace(/^ /, ''));
+        }
+      }
+      if (dataLines.length > 0) ssePayloads.push(dataLines.join('\n'));
+
+      if (ssePayloads.length > 0) {
+        let full = '';
+        for (const payload of ssePayloads) {
+          const delta = extractDelta(payload);
+          if (delta) {
+            full += delta;
+            options.onChunk(delta);
+          }
+        }
+        if (!full.trim()) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
+          throw new Error('No content received from AI service');
+        }
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
+        return full;
+      }
+
+      let text = '';
+      try {
+        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+      } catch {
+        text = raw;
+      }
+      if (!text) {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
+        throw new Error('No content received from AI service');
+      }
+      options.onChunk(text);
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, { url: maskedUrl, streamed: false });
+      return text;
     }
+
     if (!contentType.includes('text/event-stream')) {
       // 服务端忽略 stream:true 时可能返回整段 JSON（application/json）或纯文本
       // 回答：先按 JSON 解析提取结构化文本，失败则把原始文本作为一次性 chunk。
@@ -884,6 +931,10 @@ ${options.user}` : options.user;
       return text;
     }
 
+    if (!response.body) {
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'empty response body' }, { url: maskedUrl });
+      throw new Error('No content received from AI service (empty body)');
+    }
     let full = '';
     await consumeSseStream(response.body, (payload) => {
       const delta = extractDelta(payload);
