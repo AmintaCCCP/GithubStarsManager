@@ -274,7 +274,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDistanceToNow(new Date(effectiveTime), { addSuffix: true })}</span>
+                <span>
+                  {formatDistanceToNow(new Date(effectiveTime), {
+                    addSuffix: true,
+                    ...(language === 'zh' ? { locale: zhCN } : {}),
+                  })}
+                </span>
                 {showAssetsUpdatedIndicator && (
                   <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
                     {t('资产已更新', 'Assets updated')}
