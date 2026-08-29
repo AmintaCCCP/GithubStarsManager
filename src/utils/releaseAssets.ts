@@ -136,3 +136,113 @@ export function shouldShowAssetsUpdatedIndicator(
 ): boolean {
   return (release.updated_asset_ids?.length ?? 0) > 0;
 }
+
+/**
+ * 资产所属平台（与 platformMeta 的平台键一致，可直接取品牌图标）。
+ */
+export type AssetPlatform = 'macos' | 'windows' | 'linux' | 'android' | 'ios' | 'docker';
+
+/**
+ * 平台推断规则（detectAssetPlatform）按四层依次判定，命中即返回：
+ *
+ * 1. 决定性扩展名 —— 安装包/包管理器格式只属于一个平台：
+ *    .dmg/.pkg/.app.tar.gz(macOS)、.exe/.msi/.msix/.appx(Windows)、
+ *    .AppImage/.deb/.rpm/.snap/.flatpak/.pkg.tar.zst(Arch)(Linux)、
+ *    .apk/.aab(Android)、.ipa(iOS)。
+ *    注意后缀按长度优先匹配：'.pkg.tar.zst' 必须先于 '.pkg' 判定，
+ *    否则 Arch 包会被误判成 macOS。
+ * 2. 文件名 OS 语义段 —— 覆盖 GoReleaser（{name}-{os}-{arch}）、
+ *    Rust triple（x86_64-pc-windows-msvc、aarch64-apple-darwin）等主流
+ *    命名约定。做法是按非字母数字分词后查词表，例如
+ *    'alist-darwin-arm64.tar.gz' → [alist, darwin, arm64, tar, gz] → darwin → macos。
+ *    裸二进制（无扩展名）同样适用；同文件名出现多个 OS 词时取最靠前的
+ *    （命名约定中 OS 段紧跟产品名）。
+ *    词表用整词匹配而非子串，天然避开 darwin 里的 win、search/archive 里的 arch。
+ * 3. 架构词（arm64/aarch64/x86_64/amd64/mips…）是跨平台的，不参与判定——
+ *    macOS 的 aarch64 包和 Linux 的 aarch64 包只有 OS 段不同。
+ * 4. MIME 类型兜底（GitHub 常给二进制填 application/octet-stream，
+ *    仅当文件名毫无线索且 content_type 有明确平台语义时生效）。
+ *
+ * 全部不命中返回 null：BSD（freebsd 等）刻意不映射到 Linux，宁缺毋滥。
+ */
+
+/** OS 语义词表：token → 平台。 */
+export const OS_TOKEN_PLATFORM: Record<string, AssetPlatform> = {
+  // macOS（含历史写法 osx 与内核名 darwin）
+  macos: 'macos', mac: 'macos', osx: 'macos', darwin: 'macos', apple: 'macos',
+  // Windows（win32/win64 常见于 C++ 生态，mingw 是其工具链）
+  windows: 'windows', win: 'windows', win32: 'windows', win64: 'windows', mingw: 'windows',
+  // Linux（发行版与 libc 变体：alpine/musl 只出现在 Linux 生态）
+  linux: 'linux', ubuntu: 'linux', debian: 'linux', fedora: 'linux', redhat: 'linux',
+  archlinux: 'linux', arch: 'linux', manjaro: 'linux', alpine: 'linux', musl: 'linux',
+  raspberrypi: 'linux', raspbian: 'linux', nixos: 'linux',
+  // 移动端
+  android: 'android',
+  ios: 'ios', ipados: 'ios', iphone: 'ios',
+  // 容器镜像（docker save 导出的 tar 等）
+  docker: 'docker',
+};
+
+/** 决定性扩展名 → 平台；使用时按后缀长度降序逐个 endsWith。 */
+const PLATFORM_EXTENSIONS: ReadonlyArray<readonly [suffix: string, platform: AssetPlatform]> = ([
+  ['.app.tar.gz', 'macos'], ['.app.zip', 'macos'],
+  ['.dmg', 'macos'], ['.pkg', 'macos'],
+  ['.exe', 'windows'], ['.msi', 'windows'], ['.msix', 'windows'],
+  ['.appx', 'windows'], ['.appxbundle', 'windows'],
+  ['.appinstaller', 'windows'], ['.msibundle', 'windows'],
+  ['.appimage', 'linux'], ['.flatpak', 'linux'], ['.snap', 'linux'],
+  ['.deb', 'linux'], ['.rpm', 'linux'],
+  ['.pkg.tar.zst', 'linux'], ['.pkg.tar.xz', 'linux'],
+  ['.apk', 'android'], ['.aab', 'android'], ['.apks', 'android'],
+  ['.ipa', 'ios'],
+] as Array<[string, AssetPlatform]>).sort((a, b) => b[0].length - a[0].length);
+
+/** content_type 中的平台语义片段 → 平台。 */
+const CONTENT_TYPE_PLATFORM: ReadonlyArray<readonly [pattern: RegExp, platform: AssetPlatform]> = [
+  [/android\.package-archive/, 'android'],
+  [/apple-diskimage/, 'macos'],
+  [/x-msdownload|x-msi|x-ms-installer/, 'windows'],
+  [/x-deb|redhat-package-manager|x-rpm/, 'linux'],
+];
+
+/** 把文件名切成小写语义 token；分隔符为字母数字以外的任意字符。 */
+function tokenize(name: string): string[] {
+  return name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/**
+ * 根据资产文件名（可选 content_type）推断其所属平台。
+ * 分层规则见上方 AssetPlatform 注释；全部不命中时返回 null，
+ * 调用方应隐藏平台标识而不是猜测。
+ */
+export function detectAssetPlatform(fileName: string, contentType?: string): AssetPlatform | null {
+  const name = fileName.toLowerCase();
+
+  // 第 1 层：决定性扩展名（长后缀优先，避免 .pkg 吞掉 .pkg.tar.zst）
+  for (const [suffix, platform] of PLATFORM_EXTENSIONS) {
+    if (name.endsWith(suffix)) {
+      return platform;
+    }
+  }
+
+  // 第 2 层：文件名 OS 语义段（裸二进制同样适用；多 OS 词取最靠前者）
+  const tokens = tokenize(fileName);
+  for (let i = 0; i < tokens.length; i++) {
+    const platform = OS_TOKEN_PLATFORM[tokens[i]];
+    if (platform) {
+      return platform;
+    }
+  }
+
+  // 第 3/4 层：MIME 兜底（架构词不参与判定）
+  if (contentType) {
+    const type = contentType.toLowerCase();
+    for (const [pattern, platform] of CONTENT_TYPE_PLATFORM) {
+      if (pattern.test(type)) {
+        return platform;
+      }
+    }
+  }
+
+  return null;
+}

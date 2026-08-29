@@ -36,6 +36,8 @@ describe('buildReleaseDownloadLinks', () => {
         size: 1024,
         isSourceCode: false,
         assetId: 7,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        contentType: 'application/zip',
       },
       {
         id: 'source-zip-12',
