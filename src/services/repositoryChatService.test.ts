@@ -656,8 +656,8 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    // 引用 3-4 落在证据窗口 3-5 内：规范化为精确引用而不是整题丢弃。
-    expect(result.content).toContain('`/README.md - 3-5`');
+    // 引用 3-4 落在证据窗口 3-5 内：视为有效引用并保留实际引用的行号。
+    expect(result.content).toContain('`/README.md - 3-4`');
     expect(result.content).not.toContain('已验证来源');
   });
 
@@ -700,7 +700,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     // 根目录文件的裸引用（无反引号、无目录段）同样要规范化为精确引用，
     // 否则正确回答会被 digest 替换。
-    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).toContain('`/README.md - 3-4`');
     expect(result.content).not.toContain('Verified sources');
     expect(result.content).not.toContain('insufficient');
   });
@@ -733,8 +733,9 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    // `/ /README.md — 3-4`` `（斜杠+空格、全角破折号、多余闭合反引号）规范化为精确引用。
-    expect(result.content).toContain('`/README.md - 3-5`');
+    // `/ /README.md — 3-4``` `（斜杠+空格、全角破折号、多余闭合反引号）规范化为
+    // 精确路径 + 保留实际引用行号。
+    expect(result.content).toContain('`/README.md - 3-4`');
     expect(result.content).not.toContain('/ /README.md');
     expect(result.content).not.toContain('``');
   });
@@ -764,7 +765,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     });
 
     expect(result.content).toContain('A documented example project for repository research');
-    expect(result.content).toContain('`/README.md - 3-5`');
+    expect(result.content).toContain('`/README.md - 3-4`');
     expect(result.content).not.toContain('[^E1]');
     expect(result.content).not.toContain('已验证来源');
     expect(chunks.length).toBeGreaterThan(0);

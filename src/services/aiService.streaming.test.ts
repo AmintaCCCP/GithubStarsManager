@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AIConfig } from '../types';
 import {
   AIService,
@@ -73,16 +73,17 @@ describe('stream delta extractors', () => {  it('extracts OpenAI chat-completion
   });
 });
 
+const baseConfig = (baseUrl: string): AIConfig => ({
+  id: 'ai-guard',
+  name: 'Guarded',
+  apiType: 'openai',
+  baseUrl,
+  apiKey: 'secret-key',
+  model: 'test-model',
+  isActive: true,
+});
+
 describe('insecure endpoint guard', () => {
-  const baseConfig = (baseUrl: string): AIConfig => ({
-    id: 'ai-guard',
-    name: 'Guarded',
-    apiType: 'openai',
-    baseUrl,
-    apiKey: 'secret-key',
-    model: 'test-model',
-    isActive: true,
-  });
 
   it('refuses to send credentials over plain http to non-local endpoints', async () => {
     const service = new AIService(baseConfig('http://api.example.com/v1'), 'en');
@@ -93,6 +94,47 @@ describe('insecure endpoint guard', () => {
     const service = new AIService(baseConfig('http://localhost:11434/v1'), 'en');
     // 守卫放行后请求会继续（测试环境 fetch 未实现），但绝不抛 HTTPS 守卫错误。
     await expect(service.generateChatText({ system: 's', user: 'u' })).rejects.not.toThrow(/HTTPS/);
+  });
+});
+
+describe('missing Content-Type sniffing', () => {
+  it('parses SSE frames even when the Content-Type header is missing', async () => {
+    const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
+    // undici 的 Response 构造器会自动补 Content-Type，用最小 stub 模拟真正无头的响应。
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: {"choices":[{"delta":{"content":" there"}}]}\n\ndata: [DONE]\n\n',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const chunks: string[] = [];
+      const full = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: (delta) => chunks.push(delta) });
+      expect(full).toBe('Hi there');
+      expect(chunks).toEqual(['Hi', ' there']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('falls back to plain text when a headerless body is not SSE', async () => {
+    const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => 'plain answer',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const chunks: string[] = [];
+      const full = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: (delta) => chunks.push(delta) });
+      expect(full).toBe('plain answer');
+      expect(chunks).toEqual(['plain answer']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

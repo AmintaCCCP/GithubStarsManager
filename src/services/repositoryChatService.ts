@@ -309,9 +309,14 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
   const canonicalize = (token: string): string | null => {
     const normalized = normalizedReferences.get(token.replace(/^\//, ''));
     if (normalized) return normalized;
-    // 子区间引用（如 `/README.md - 170-180` 落在证据窗口 166-222 内）规范化为窗口的精确引用。
-    const covered = referenceCoveredByEvidence(token, evidences);
-    return covered ? formatSourceReference(covered) : null;
+    // 子区间引用（如 `/README.md - 170-180` 落在证据窗口 166-222 内）视为有效，
+    // 但保留回答实际引用的行号，只取覆盖证据的规范化路径——Badge 跳转到
+    // 引用的行，而不是被放大到整个证据窗口。
+    const parsed = parseSourceReference(token);
+    const covered = parsed ? referenceCoveredByEvidence(token, evidences) : null;
+    if (!parsed || !covered?.path) return null;
+    const range = parsed.lineEnd !== parsed.lineStart ? `-${parsed.lineEnd}` : '';
+    return `/${normalizePath(covered.path)} - ${parsed.lineStart}${range}`;
   };
   const normalizePathAndLine = (whole: string, leading: string, rawPath: string, start: string, end?: string): string => {
     const expectedRange = end ? `${start}-${end}` : start;
@@ -412,9 +417,12 @@ const mapFootnoteReferences = (content: string, evidences: ToolEvidence[]): stri
   if (!/\[\^/.test(content)) return content;
   const definitions = new Map<string, string>();
   const withoutDefinitionLines = content.replace(/^\s*\[\^([^\]]+)\]:\s*`?([^`\n]+?)`?\s*$/gm, (_whole, marker: string, target: string) => {
-    const covered = referenceCoveredByEvidence(target, evidences);
-    const canonical = covered ? formatSourceReference(covered) : null;
-    if (canonical) definitions.set(marker.trim(), canonical);
+    // 与 canonicalize 一致：路径取覆盖证据，行号保留脚注定义中实际引用的区间。
+    const parsed = parseSourceReference(target);
+    const covered = parsed ? referenceCoveredByEvidence(target, evidences) : null;
+    if (!parsed || !covered?.path) return '';
+    const range = parsed.lineEnd !== parsed.lineStart ? `-${parsed.lineEnd}` : '';
+    definitions.set(marker.trim(), `/${normalizePath(covered.path)} - ${parsed.lineStart}${range}`);
     return '';
   });
   if (definitions.size === 0) return content;
