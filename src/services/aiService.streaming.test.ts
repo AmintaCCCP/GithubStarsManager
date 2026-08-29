@@ -37,6 +37,14 @@ describe('consumeSseStream', () => {
     expect(payloads).toEqual(['{"a":1}', '{"b":2}', '[DONE]']);
   });
 
+  it('parses explicit event-stream bodies separated only by bare CR', async () => {
+    const payloads: string[] = [];
+    await consumeSseStream(streamFrom([
+      'data: {"a":1}\r\rdata: {"b":2}\r\rdata: [DONE]\r',
+    ]), (payload) => payloads.push(payload));
+    expect(payloads).toEqual(['{"a":1}', '{"b":2}', '[DONE]']);
+  });
+
   it('handles CRLF separators and ignores event/comment lines', async () => {
     const payloads: string[] = [];
     await consumeSseStream(streamFrom([
