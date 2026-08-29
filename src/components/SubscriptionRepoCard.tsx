@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Star, StarOff, ExternalLink, Bot, GitFork, Monitor, Smartphone, Globe, Terminal, Package, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
+import { Star, StarOff, ExternalLink, Bot, GitFork, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
+import { getPlatformIcon as getSharedPlatformIcon } from './platformMeta';
 import type { DiscoveryRepo } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
@@ -80,21 +81,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     return 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground';
   }, []);
 
-  const platformIconMap = useMemo(() => ({
-    mac: <Monitor className="w-3 h-3" />, 
-    macos: <Monitor className="w-3 h-3" />, 
-    ios: <Smartphone className="w-3 h-3" />, 
-    windows: <Monitor className="w-3 h-3" />, 
-    win: <Monitor className="w-3 h-3" />,
-    linux: <Monitor className="w-3 h-3" />, 
-    android: <Smartphone className="w-3 h-3" />, 
-    web: <Globe className="w-3 h-3" />, 
-    cli: <Terminal className="w-3 h-3" />, 
-    docker: <Package className="w-3 h-3" />,
-  }), []);
-
+  // 平台图标统一由 platformMeta 模块提供
   const getPlatformIcon = (platform: string) => {
-    return platformIconMap[platform.toLowerCase() as keyof typeof platformIconMap] || <Monitor className="w-3 h-3" />;
+    const Icon = getSharedPlatformIcon(platform);
+    return <Icon className="w-3 h-3" />;
   };
 
   // 执行取消Star操作
