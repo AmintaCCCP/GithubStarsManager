@@ -105,6 +105,47 @@ describe('insecure endpoint guard', () => {
   });
 });
 
+describe('redirect and sniff safety', () => {
+  it('passes redirect: error so direct fetches never follow redirects with credentials', async () => {
+    const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      capturedInit = init;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await service.generateChatText({ system: 's', user: 'u' });
+      expect(capturedInit?.redirect).toBe('error');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('falls back to plain text when headerless prose merely contains data:-prefixed lines', async () => {
+    const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => 'SSE 协议示例：\ndata: {"not":"a real frame"}',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const full = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
+      // 未识别出有效 SSE 帧：整段原文走纯文本回退（含 data: 字样的说明文字）。
+      expect(full).toBe('SSE 协议示例：\ndata: {"not":"a real frame"}');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('missing Content-Type sniffing', () => {
   it('parses SSE frames even when the Content-Type header is missing', async () => {
     const service = new AIService(baseConfig('https://api.example.com/v1'), 'en');
