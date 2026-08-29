@@ -72,7 +72,13 @@ export const useRepositoryChat = ({
   const [toolEvents, setToolEvents] = useState<RepositoryChatToolEvent[]>([]);
   const [evidenceById, setEvidenceById] = useState<Record<string, ToolEvidence>>({});
 
+  const loadedEvidenceKeyRef = useRef('');
   useEffect(() => {
+    // 流式回答会让 messages 每 ~60ms 变化一次，但证据集合只在回合完成时变化；
+    // 用 key 去重，避免流式期间反复查询 IndexedDB。
+    const evidenceKey = messages.map((message) => message.evidenceIds.join('|')).join(',');
+    if (evidenceKey === loadedEvidenceKeyRef.current) return;
+    loadedEvidenceKeyRef.current = evidenceKey;
     const evidenceIds = Array.from(new Set(messages.flatMap((message) => message.evidenceIds)));
     if (evidenceIds.length === 0) {
       setEvidenceById({});
@@ -189,50 +195,90 @@ export const useRepositoryChat = ({
     const nextMessages = [...baseMessages, userMessage, assistantMessage];
     onMessagesChange(nextMessages);
 
+    // 流式渲染：增量回调以 ~60ms 节流刷新最后一条助手消息，最终结果仍以经过
+    // 引用校验的 result.content 为准。声明在外层以便中止时保留半截回答。
+    let streamedContent = '';
     try {
       await Promise.all([
         repositoryChatSessionRepository.saveMessage(userMessage),
         repositoryChatSessionRepository.saveMessage(assistantMessage),
       ]);
-      const result = await runRepositoryChatTurn({
-        repository,
-        session,
-        messages: [...baseMessages, userMessage],
-        question: normalizedQuestion,
-        githubToken: githubToken ?? '',
-        aiConfig,
-        language,
-        maxToolsPerTurn: repositoryChatSettings.maxToolsPerTurn,
-        agentBudget: repositoryChatSettings.agentBudget,
-        signal: controller.signal,
-        onToolEvent: (event) => {
-          void persistToolEvent(event, assistantMessage.id);
-        },
-      });
-      await Promise.all(result.evidences.map((evidence) => repositoryChatSessionRepository.saveEvidence(evidence)));
-      const completedAssistant: RepositoryChatMessage = {
-        ...assistantMessage,
-        content: result.content,
-        status: 'complete',
-        evidenceIds: result.evidences.map((evidence) => evidence.id),
+      let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
+      const flushStreamedContent = (content: string) => {
+        if (streamFlushTimer) {
+          globalThis.clearTimeout(streamFlushTimer);
+          streamFlushTimer = null;
+        }
+        onMessagesChange([...baseMessages, userMessage, { ...assistantMessage, content }]);
       };
-      await repositoryChatSessionRepository.saveMessage(completedAssistant);
-      onMessagesChange([...baseMessages, userMessage, completedAssistant]);
-      await onSessionChange({
-        ...session,
-        title: session.title === (language === 'zh' ? '新对话' : 'New conversation')
-          ? normalizedQuestion.slice(0, 72)
-          : session.title,
-        modelConfigId: aiConfig.id,
-        modelLabelAtTime: `${aiConfig.name} · ${aiConfig.model}`,
-        updatedAt: new Date().toISOString(),
-      });
+      const scheduleStreamedFlush = () => {
+        if (streamFlushTimer) return;
+        streamFlushTimer = globalThis.setTimeout(() => {
+          streamFlushTimer = null;
+          onMessagesChange([...baseMessages, userMessage, { ...assistantMessage, content: streamedContent }]);
+        }, 60);
+      };
+      try {
+        const result = await runRepositoryChatTurn({
+          repository,
+          session,
+          messages: [...baseMessages, userMessage],
+          question: normalizedQuestion,
+          githubToken: githubToken ?? '',
+          aiConfig,
+          language,
+          maxToolsPerTurn: repositoryChatSettings.maxToolsPerTurn,
+          agentBudget: repositoryChatSettings.agentBudget,
+          taskDepth: repositoryChatSettings.taskDepth,
+          streaming: repositoryChatSettings.streamingMode !== 'off',
+          signal: controller.signal,
+          onToolEvent: (event) => {
+            void persistToolEvent(event, assistantMessage.id);
+          },
+          onAnswerChunk: (fullText) => {
+            streamedContent = fullText;
+            if (fullText.length === 0) {
+              // 流式降级：立即清空已流出的无效内容。
+              flushStreamedContent('');
+              return;
+            }
+            scheduleStreamedFlush();
+          },
+        });
+        // 拿到最终结果后立即取消挂起的节流刷新：否则最后一个分片若在
+        // saveEvidence/saveMessage 等持久化 await 之前不足 60ms 到达，挂起
+        // 定时器会把已完成的回答覆盖回流式状态（status: streaming 且无证据）。
+        if (streamFlushTimer) {
+          globalThis.clearTimeout(streamFlushTimer);
+          streamFlushTimer = null;
+        }
+        await Promise.all(result.evidences.map((evidence) => repositoryChatSessionRepository.saveEvidence(evidence)));
+        const completedAssistant: RepositoryChatMessage = {
+          ...assistantMessage,
+          content: result.content,
+          status: 'complete',
+          evidenceIds: result.evidences.map((evidence) => evidence.id),
+        };
+        await repositoryChatSessionRepository.saveMessage(completedAssistant);
+        onMessagesChange([...baseMessages, userMessage, completedAssistant]);
+        await onSessionChange({
+          ...session,
+          title: session.title === (language === 'zh' ? '新对话' : 'New conversation')
+            ? normalizedQuestion.slice(0, 72)
+            : session.title,
+          modelConfigId: aiConfig.id,
+          modelLabelAtTime: `${aiConfig.name} · ${aiConfig.model}`,
+          updatedAt: new Date().toISOString(),
+        });
+      } finally {
+        if (streamFlushTimer) globalThis.clearTimeout(streamFlushTimer);
+      }
     } catch (unknownError) {
       const aborted = controller.signal.aborted;
       const failedAssistant: RepositoryChatMessage = {
         ...assistantMessage,
         content: aborted
-          ? (language === 'zh' ? '已停止生成。' : 'Generation stopped.')
+          ? (streamedContent || (language === 'zh' ? '已停止生成。' : 'Generation stopped.'))
           : (language === 'zh' ? '回答生成失败，请重试。' : 'Answer generation failed. Please retry.'),
         status: aborted ? 'aborted' : 'error',
       };
@@ -249,29 +295,34 @@ export const useRepositoryChat = ({
       abortControllerRef.current = null;
       setIsSending(false);
     }
-  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.maxToolsPerTurn, session, unavailableReason]);
+  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, session, unavailableReason]);
 
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();
   }, []);
 
-  const retry = useCallback(async () => {
-    if (retryInFlightRef.current) return;
-    const failedAssistantIndex = [...messages].map((message) => message.role === 'assistant' && (message.status === 'error' || message.status === 'aborted')).lastIndexOf(true);
-    if (failedAssistantIndex !== messages.length - 1) return;
-    const failedAssistant = failedAssistantIndex >= 0 ? messages[failedAssistantIndex] : undefined;
-    const failedUser = failedAssistantIndex > 0 ? messages[failedAssistantIndex - 1] : undefined;
-    if (!failedAssistant || !failedUser || failedUser.role !== 'user') return;
-    const baseMessages = messages.slice(0, failedAssistantIndex - 1);
+  const resendLastPair = useCallback(async (requireFailedStatus: boolean) => {
+    if (retryInFlightRef.current || isSending) return;
+    if (messages.length < 2) return;
+    const lastAssistant = messages[messages.length - 1];
+    const lastUser = messages[messages.length - 2];
+    if (lastAssistant.role !== 'assistant' || lastUser.role !== 'user') return;
+    if (requireFailedStatus && lastAssistant.status !== 'error' && lastAssistant.status !== 'aborted') return;
+    const baseMessages = messages.slice(0, messages.length - 2);
     retryInFlightRef.current = true;
     try {
-      await repositoryChatSessionRepository.permanentlyDeleteMessages([failedUser.id, failedAssistant.id]);
+      await repositoryChatSessionRepository.permanentlyDeleteMessages([lastUser.id, lastAssistant.id]);
       onMessagesChange(baseMessages);
-      await send(failedUser.content, baseMessages, true);
+      await send(lastUser.content, baseMessages, true);
     } finally {
       retryInFlightRef.current = false;
     }
-  }, [messages, onMessagesChange, send]);
+  }, [isSending, messages, onMessagesChange, send]);
+
+  const retry = useCallback(() => resendLastPair(true), [resendLastPair]);
+
+  /** 以同一问题、当前深度重跑最后一轮（ChatGPT 式“重新生成”）。 */
+  const regenerate = useCallback(() => resendLastPair(false), [resendLastPair]);
 
   return {
     canChat: !unavailableReason,
@@ -283,5 +334,6 @@ export const useRepositoryChat = ({
     send,
     stop,
     retry,
+    regenerate,
   };
 };

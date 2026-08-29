@@ -39,4 +39,13 @@ describe('normalizeRepositoryChatSettings', () => {
       maxDurationMs: 300_000,
     });
   });
+
+  it('normalizes the task depth and rejects unknown values', () => {
+    expect(normalizeRepositoryChatSettings({}).taskDepth).toBe('default');
+    expect(normalizeRepositoryChatSettings({ taskDepth: 'quick' }).taskDepth).toBe('quick');
+    expect(normalizeRepositoryChatSettings({ taskDepth: 'deep' }).taskDepth).toBe('deep');
+    expect(normalizeRepositoryChatSettings({ taskDepth: 'unlimited' }).taskDepth).toBe('unlimited');
+    expect(normalizeRepositoryChatSettings({ taskDepth: 'bogus' }).taskDepth).toBe('default');
+    expect(normalizeRepositoryChatSettings({ taskDepth: 42 }).taskDepth).toBe('default');
+  });
 });

@@ -824,7 +824,7 @@ Repository information:
           </div>
         </div>
         <details className="mt-4 rounded-md border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">{t('高级设置', 'Advanced settings')}</summary>
+          <summary className="cursor-pointer text-sm font-medium text-foreground">{t('高级设置', 'Advanced settings')}<span className="ml-2 text-xs font-normal text-muted-foreground">{t('聊天窗口任务深度选“默认”时使用这些参数', 'Used by the chat window when task depth is “Default”')}</span></summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('外部网页搜索与抓取', 'External web search and fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('默认关闭；当前版本不会将其暴露为工具。', 'Disabled by default; the current version does not expose it as a tool.')}</span></span></label>
             <div>
@@ -832,10 +832,11 @@ Repository information:
               <Select value={repositoryChatSettings.streamingMode} onValueChange={(value) => setRepositoryChatSettings({ streamingMode: value === 'off' ? 'off' : 'auto' })}>
                 <SelectTrigger aria-labelledby="repository-chat-streaming-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">{t('自动（当前浏览器模式自动降级）', 'Auto (browser mode falls back automatically)')}</SelectItem>
+                  <SelectItem value="auto">{t('自动（不支持时降级为整段返回）', 'Auto (falls back to full response when unsupported)')}</SelectItem>
                   <SelectItem value="off">{t('关闭', 'Off')}</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-xs text-muted-foreground">{t('仅对最终回答生效，取证过程仍按步骤进行；走后端代理时自动降级为整段返回。', 'Applies to the final answer only; retrieval still runs step by step. Falls back to a full response when the backend proxy is used.')}</p>
             </div>
             <div>
               <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具调用上限', 'Maximum tool calls per turn')}</label>
