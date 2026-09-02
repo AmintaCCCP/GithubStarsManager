@@ -325,9 +325,19 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
 
-    // 宽松档（放行回环/私有网段）只用于「用户已保存的 AI 配置」(configId)。
-    // 内联 config 路径（任意客户端均可携带目标地址）保持严格档，避免 SSRF 放宽被滥用。
-    const allowPrivate = Boolean(configId);
+    // 内联 config 路径（表单内测、未保存）同样放行回环与私有网段，与已保存
+    // 配置（configId）行为一致——否则用户无法在保存前测试局域网/本地 AI 服务
+    // （如 Ollama 127.0.0.1、10.x 私有 IP 网关）。IMDS 等最高危目标仍由
+    // validateUrl 宽松档兜底拦截（169.254.169.254 始终被拒）。
+    let allowPrivate = Boolean(configId);
+    if (!allowPrivate) {
+      try {
+        const parsed = new URL(targetUrl);
+        if (isPrivateOrLoopback(parsed.hostname)) {
+          allowPrivate = true;
+        }
+      } catch { /* 交由 validateUrl 处理非法 URL */ }
+    }
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({
