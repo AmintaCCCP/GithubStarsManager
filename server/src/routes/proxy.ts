@@ -325,9 +325,19 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
 
-    // 宽松档（放行回环/私有网段）只用于「用户已保存的 AI 配置」(configId)。
-    // 内联 config 路径（任意客户端均可携带目标地址）保持严格档，避免 SSRF 放宽被滥用。
-    const allowPrivate = Boolean(configId);
+    // 内联 config 路径（表单内测、未保存）同样放行回环与私有网段，与已保存
+    // 配置（configId）行为一致——否则用户无法在保存前测试局域网/本地 AI 服务
+    // （如 Ollama 127.0.0.1、10.x 私有 IP 网关）。IMDS 等最高危目标仍由
+    // validateUrl 宽松档兜底拦截（169.254.169.254 始终被拒）。
+    let allowPrivate = Boolean(configId);
+    if (!allowPrivate) {
+      try {
+        const parsed = new URL(targetUrl);
+        if (isPrivateOrLoopback(parsed.hostname)) {
+          allowPrivate = true;
+        }
+      } catch { /* 交由 validateUrl 处理非法 URL */ }
+    }
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({
@@ -345,6 +355,117 @@ router.post('/api/proxy/ai', async (req, res) => {
   } catch (err) {
     logger.errorFromError('proxy.ai', 'AI proxy error', err);
     res.status(500).json({ error: 'AI proxy failed', code: 'AI_PROXY_FAILED' });
+  }
+});
+
+// POST /api/proxy/ai/models
+// 获取指定 AI 配置可用的模型列表。入参与 /api/proxy/ai 一致：{ configId } 或 { config }。
+// 归一化各厂商响应为模型 ID 字符串数组：
+//   - OpenAI 兼容 / DeepSeek / MiMo: GET {base}/models -> { data: [{ id }] }
+//   - Anthropic:                     GET {base}/v1/models -> { data: [{ id }] }
+//   - Gemini:                        GET {base}/v1beta/models -> { models: [{ name: "models/..." }] }
+router.post('/api/proxy/ai/models', async (req, res) => {
+  try {
+    const db = getDb();
+    const { configId, config: inlineConfig } = req.body as {
+      configId?: string;
+      config?: { apiType?: string; baseUrl: string; apiKey: string; model?: string; reasoningEffort?: string };
+    };
+
+    let apiKey: string;
+    let apiType: string;
+    let baseUrl: string;
+
+    if (inlineConfig && !configId) {
+      apiKey = inlineConfig.apiKey;
+      apiType = inlineConfig.apiType || 'openai';
+      baseUrl = inlineConfig.baseUrl;
+      if (!baseUrl || !apiKey) {
+        res.status(400).json({ error: 'baseUrl and apiKey are required', code: 'INVALID_REQUEST' });
+        return;
+      }
+    } else if (configId) {
+      const aiConfig = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined;
+      if (!aiConfig) {
+        res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
+        return;
+      }
+      apiKey = decrypt(aiConfig.api_key_encrypted as string, config.encryptionKey);
+      apiType = (aiConfig.api_type as string) || 'openai';
+      baseUrl = aiConfig.base_url as string;
+    } else {
+      res.status(400).json({ error: 'configId or config required', code: 'CONFIG_ID_REQUIRED' });
+      return;
+    }
+
+    // 放行回环/私有网段：与 /api/proxy/ai 的内联测试一致，支持局域网/本地 AI 网关。
+    let allowPrivate = Boolean(configId);
+    if (!allowPrivate) {
+      try {
+        const parsed = new URL(baseUrl);
+        if (isPrivateOrLoopback(parsed.hostname)) {
+          allowPrivate = true;
+        }
+      } catch { /* 交由 validateUrl 处理非法 URL */ }
+    }
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    let targetUrl: string;
+
+    if (apiType === 'claude') {
+      targetUrl = buildApiUrl(baseUrl, 'v1/models');
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    } else if (apiType === 'gemini') {
+      targetUrl = buildApiUrl(baseUrl, 'v1beta/models');
+      const urlObj = new URL(targetUrl);
+      urlObj.searchParams.set('key', apiKey);
+      targetUrl = urlObj.toString();
+    } else {
+      // openai / openai-responses / openai-compatible / deepseek / mimo
+      targetUrl = buildApiUrl(baseUrl, 'v1/models');
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const proxyConfig = getProxyConfig();
+    const result = await proxyRequest({
+      url: targetUrl,
+      method: 'GET',
+      headers,
+      timeout: 30000,
+      proxyConfig,
+      allowPrivate,
+    });
+
+    relayRateLimitHeaders(res, result.headers);
+
+    if (result.status >= 400) {
+      res.status(result.status).json(result.data);
+      return;
+    }
+
+    // 归一化模型列表
+    const data = result.data as {
+      data?: Array<{ id?: unknown }>;
+      models?: Array<{ name?: unknown }>;
+    };
+    let ids: string[] = [];
+    if (Array.isArray(data?.data)) {
+      ids = data.data
+        .map((m) => (typeof m?.id === 'string' ? m.id : ''))
+        .filter((v): v is string => v.length > 0);
+    } else if (Array.isArray(data?.models)) {
+      ids = data.models
+        .map((m) => (typeof m?.name === 'string' ? m.name.replace(/^models\//, '') : ''))
+        .filter((v): v is string => v.length > 0);
+    }
+
+    res.status(result.status).json({ models: ids });
+  } catch (err) {
+    logger.errorFromError('proxy.ai.models', 'AI models proxy error', err);
+    res.status(500).json({ error: 'AI models proxy failed', code: 'AI_MODELS_PROXY_FAILED' });
   }
 });
 

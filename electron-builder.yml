@@ -4,7 +4,7 @@ productName: GitHub Stars Manager
 copyright: Copyright © 2024 GitHub Stars Manager
 
 directories:
-  output: release
+  output: dist-electron
   buildResources: build
 
 files:

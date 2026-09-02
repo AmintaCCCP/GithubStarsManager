@@ -384,8 +384,10 @@ export class AIService {
 
   /**
    * 直连模式安全守卫：禁止把 Authorization / x-api-key / URL key 通过明文
-   * HTTP 发往远端。仅 localhost / 127.0.0.1 / [::1] / 0.0.0.0 等本机地址豁免
-   * （本地推理服务场景）。走后端代理时由代理负责，不在此检查。
+   * HTTP 发往远端。仅本机回环与私有网段（localhost / 127.0.0.1 / [::1] /
+   * 0.0.0.0 / 10.x / 172.16-31.x / 192.168.x）豁免——覆盖本地推理服务与
+   * 局域网 AI 网关（如 http://10.255.114.31:3000/v1）。公网地址必须 HTTPS。
+   * 走后端代理时由代理负责 SSRF 校验，不在此检查。
    */
   private requireSecureDirectEndpoint(): void {
     if (backend.isAvailable) return;
@@ -397,11 +399,13 @@ export class AIService {
     } catch {
       // 保留字符串解析结果
     }
-    const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\[::1\])$/i.test(host);
-    if (!isLocal) {
+    host = host.replace(/\.$/, '').replace(/^\[(.+)\]$/, '$1').toLowerCase();
+    const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(host);
+    const isPrivate = /^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^192\.168\./.test(host);
+    if (!isLocal && !isPrivate) {
       throw new Error(this.language === 'zh'
-        ? 'AI 服务地址必须使用 HTTPS：为保护 API Key，仅 localhost / 127.0.0.1 等本机地址允许 HTTP。'
-        : 'The AI endpoint must use HTTPS: to protect your API key, plain HTTP is only allowed for local addresses (localhost / 127.0.0.1).');
+        ? 'AI 服务地址必须使用 HTTPS：为保护 API Key，仅本机（localhost / 127.0.0.1）与私有网段（10.x / 172.16-31.x / 192.168.x）允许 HTTP。'
+        : 'The AI endpoint must use HTTPS: to protect your API key, plain HTTP is only allowed for local addresses (localhost / 127.0.0.1) and private networks (10.x / 172.16-31.x / 192.168.x).');
     }
   }
 
@@ -1996,6 +2000,68 @@ ${repoInfo}
           ? `连接失败：${errorMessage || '未知错误'}\n请检查 API 端点、API 密钥和模型名称是否正确`
           : `Connection failed: ${errorMessage || 'Unknown error'}\nPlease check API endpoint, API key and model name`,
       };
+    }
+  }
+
+  /**
+   * 获取当前配置可用的模型 ID 列表。
+   * 后端可用时走后端代理（/api/proxy/ai/models），否则直连各厂商 models 端点。
+   * 归一化为模型 ID 字符串数组；失败时返回空数组。
+   */
+  async fetchModels(signal?: AbortSignal): Promise<string[]> {
+    const apiType = this.getApiType();
+    const base = this.config.baseUrl.trim();
+
+    try {
+      if (backend.isAvailable) {
+        return await backend.fetchAIModels(this.config.id, {
+          apiType,
+          baseUrl: base,
+          apiKey: this.config.apiKey,
+          model: this.config.model,
+          reasoningEffort: this.config.reasoningEffort,
+        }, signal);
+      }
+
+      this.requireSecureDirectEndpoint();
+
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      let requestUrl: string;
+
+      if (apiType === 'claude') {
+        requestUrl = buildApiUrl(base, 'v1/models');
+        headers['x-api-key'] = this.config.apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+      } else if (apiType === 'gemini') {
+        requestUrl = buildApiUrl(base, 'v1beta/models');
+        const urlObj = new URL(requestUrl);
+        urlObj.searchParams.set('key', this.config.apiKey);
+        requestUrl = urlObj.toString();
+      } else {
+        requestUrl = buildApiUrl(base, 'v1/models');
+        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      }
+
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+        signal,
+      });
+      if (!response.ok) return [];
+      const data = (await response.json()) as {
+        data?: Array<{ id?: unknown }>;
+        models?: Array<{ name?: unknown }>;
+      };
+      if (Array.isArray(data?.data)) {
+        return data.data.map((m) => (typeof m?.id === 'string' ? m.id : '')).filter((v): v is string => v.length > 0);
+      }
+      if (Array.isArray(data?.models)) {
+        return data.models.map((m) => (typeof m?.name === 'string' ? m.name.replace(/^models\//, '') : '')).filter((v): v is string => v.length > 0);
+      }
+      return [];
+    } catch (err) {
+      logger.warn('ai', 'Failed to fetch AI models', { apiType, configId: this.config.id, error: err instanceof Error ? err.message : String(err) });
+      return [];
     }
   }
 
