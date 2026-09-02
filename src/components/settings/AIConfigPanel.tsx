@@ -14,6 +14,7 @@ import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
 import { isToolCallCapableApiType } from '../../constants/aiCapabilities';
+import { AIService } from '../../services/aiService';
 
 interface AIConfigPanelProps {
   t: (zh: string, en: string) => string;
@@ -120,6 +121,9 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -301,6 +305,41 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
       reasoningEffort: form.reasoningEffort || undefined,
     });
   };
+
+  const handleFetchModels = useCallback(async () => {
+    if (!form.baseUrl || !form.apiKey) {
+      toast(t('请先填写API端点和API密钥', 'Please fill in API Endpoint and API Key first'), 'error');
+      return;
+    }
+    setLoadingModels(true);
+    try {
+      const service = new AIService({
+        id: editingId || '',
+        name: form.name || 'Test',
+        apiType: form.apiType,
+        baseUrl: form.baseUrl.replace(/\/$/, ''),
+        apiKey: form.apiKey,
+        model: form.model,
+        isActive: false,
+        customPrompt: form.customPrompt || undefined,
+        useCustomPrompt: form.useCustomPrompt,
+        concurrency: form.concurrency,
+        reasoningEffort: form.reasoningEffort || undefined,
+      }, language);
+      const result = await service.fetchModels();
+      setModels(result);
+      if (result.length === 0) {
+        toast(t('未获取到模型列表，请检查端点是否支持模型列表接口', 'No models returned. Check that the endpoint supports a model list API.'), 'error');
+      } else {
+        toast(t(`获取到 ${result.length} 个模型`, `Fetched ${result.length} models`), 'success');
+      }
+    } catch (error) {
+      console.error('Fetch models failed:', error);
+      toast(t('获取模型失败，请检查配置', 'Failed to fetch models. Check your configuration.'), 'error');
+    } finally {
+      setLoadingModels(false);
+    }
+  }, [editingId, form, language, t, toast]);
 
   const defaultPrompt = useMemo(() => {
     if (language === 'zh') {
@@ -503,28 +542,81 @@ Repository information:
               <label htmlFor="ai-api-key" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('API密钥', 'API Key')} *
               </label>
-              <Input
-                id="ai-api-key"
-                type="password"
-                value={form.apiKey}
-                onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('输入API密钥', 'Enter API key')}
-              />
+              <div className="relative">
+                <Input
+                  id="ai-api-key"
+                  type={showApiKey ? 'text' : 'password'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
+                  className="w-full px-3 py-2 pr-10 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                  placeholder={t('输入API密钥', 'Enter API key')}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  aria-label={showApiKey ? t('隐藏API密钥', 'Hide API key') : t('显示API密钥', 'Show API key')}
+                  title={showApiKey ? t('隐藏API密钥', 'Hide API key') : t('显示API密钥', 'Show API key')}
+                  onClick={() => setShowApiKey(prev => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
+                >
+                  {showApiKey ? (
+                    <EyeOff className="h-[18px] w-[18px]" />
+                  ) : (
+                    <Eye className="h-[18px] w-[18px]" />
+                  )}
+                </button>
+              </div>
             </div>
             
             <div>
               <label htmlFor="ai-model-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('模型名称', 'Model Name')} *
               </label>
-              <Input
-                id="ai-model-name"
-                type="text"
-                value={form.model}
-                onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder="gpt-4"
-              />
+              <div className="flex items-center gap-2">
+                <Select
+                  value={form.model || '__custom__'}
+                  onValueChange={(value) => {
+                    if (value !== '__custom__') {
+                      setForm(prev => ({ ...prev, model: value }));
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    id="ai-model-name"
+                    aria-label={t('选择模型', 'Select model')}
+                    className="w-full h-10 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                  >
+                    <SelectValue placeholder={t('选择或输入模型名称', 'Select or type a model name')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.length === 0 && (
+                      <SelectItem value="__custom__" disabled>
+                        {t('暂无模型，请点击“获取模型”或手动输入', 'No models yet. Click "Get Models" or type manually')}
+                      </SelectItem>
+                    )}
+                    {models.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  onClick={handleFetchModels}
+                  disabled={loadingModels}
+                  className="flex items-center gap-1.5 px-3 py-2 h-10 whitespace-nowrap bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  title={t('获取模型', 'Get Models')}
+                >
+                  {loadingModels ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  <span>{t('获取模型', 'Get Models')}</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+                {t('点击“获取模型”从服务端拉取可用模型；也可直接输入自定义模型名称', 'Click "Get Models" to fetch available models, or type a custom model name')}
+              </p>
             </div>
             
             <div>

@@ -508,6 +508,41 @@ class BackendAdapter {
     return this.proxyAIRequestWithConfig(aiConfig, body, signal);
   }
 
+  async fetchAIModels(configId: string, aiConfig: { apiType?: string; baseUrl: string; apiKey: string; model?: string; reasoningEffort?: string }, signal?: AbortSignal): Promise<string[]> {
+    if (!this._backendUrl) throw new Error('Backend not available');
+
+    // Try configId lookup first to avoid sending API key inline
+    if (configId) {
+      try {
+        const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai/models`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ configId }),
+          signal,
+        }, 30000);
+        if (res.ok) {
+          const data = await res.json() as { models?: unknown };
+          return Array.isArray(data.models) ? data.models.filter((v): v is string => typeof v === 'string') : [];
+        }
+        // Fall through to inline config on 404 (config not synced yet)
+        if (res.status !== 404) await this.throwTranslatedError(res, 'AI models proxy error');
+      } catch (err) {
+        const e = err as Error & { statusCode?: number; code?: string };
+        if (e.statusCode !== 404 && e.code !== 'AI_CONFIG_NOT_FOUND') throw err;
+      }
+    }
+
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/ai/models`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ config: aiConfig }),
+      signal,
+    }, 30000);
+    if (!res.ok) await this.throwTranslatedError(res, 'AI models proxy error');
+    const data = await res.json() as { models?: unknown };
+    return Array.isArray(data.models) ? data.models.filter((v): v is string => typeof v === 'string') : [];
+  }
+
   // === WebDAV Proxy ===
 
   async proxyWebDAV(configId: string, method: string, path: string, body?: string, headers?: Record<string, string>): Promise<Response> {

@@ -2003,6 +2003,68 @@ ${repoInfo}
     }
   }
 
+  /**
+   * 获取当前配置可用的模型 ID 列表。
+   * 后端可用时走后端代理（/api/proxy/ai/models），否则直连各厂商 models 端点。
+   * 归一化为模型 ID 字符串数组；失败时返回空数组。
+   */
+  async fetchModels(signal?: AbortSignal): Promise<string[]> {
+    const apiType = this.getApiType();
+    const base = this.config.baseUrl.trim();
+
+    try {
+      if (backend.isAvailable) {
+        return await backend.fetchAIModels(this.config.id, {
+          apiType,
+          baseUrl: base,
+          apiKey: this.config.apiKey,
+          model: this.config.model,
+          reasoningEffort: this.config.reasoningEffort,
+        }, signal);
+      }
+
+      this.requireSecureDirectEndpoint();
+
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      let requestUrl: string;
+
+      if (apiType === 'claude') {
+        requestUrl = buildApiUrl(base, 'v1/models');
+        headers['x-api-key'] = this.config.apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+      } else if (apiType === 'gemini') {
+        requestUrl = buildApiUrl(base, 'v1beta/models');
+        const urlObj = new URL(requestUrl);
+        urlObj.searchParams.set('key', this.config.apiKey);
+        requestUrl = urlObj.toString();
+      } else {
+        requestUrl = buildApiUrl(base, 'v1/models');
+        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      }
+
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+        signal,
+      });
+      if (!response.ok) return [];
+      const data = (await response.json()) as {
+        data?: Array<{ id?: unknown }>;
+        models?: Array<{ name?: unknown }>;
+      };
+      if (Array.isArray(data?.data)) {
+        return data.data.map((m) => (typeof m?.id === 'string' ? m.id : '')).filter((v): v is string => v.length > 0);
+      }
+      if (Array.isArray(data?.models)) {
+        return data.models.map((m) => (typeof m?.name === 'string' ? m.name.replace(/^models\//, '') : '')).filter((v): v is string => v.length > 0);
+      }
+      return [];
+    } catch (err) {
+      logger.warn('ai', 'Failed to fetch AI models', { apiType, configId: this.config.id, error: err instanceof Error ? err.message : String(err) });
+      return [];
+    }
+  }
+
   async searchRepositories(repositories: Repository[], query: string): Promise<Repository[]> {
     const startTime = Date.now();
     if (!query.trim()) return repositories;
