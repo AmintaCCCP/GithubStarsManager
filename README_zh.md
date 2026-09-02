@@ -1,44 +1,136 @@
-<div align="center">
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="GithubStarsManager — AI 整理你的 GitHub 星标，让你真正找得到。向量搜索、仓库问答、MCP、Release 追踪，全部本地优先。">
+</p>
 
-![Logo](upload/logo.png)
+<div align="center">
+<img src="assets/readme/brand/logo.png" alt="GithubStarsManager logo" width="80">
 
 # GithubStarsManager
 
-![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![全平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white) [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/AmintaCCCP/GithubStarsManager) <a href="https://linux.do" alt="LINUX DO"><img src="https://img.shields.io/badge/LINUX-DO-FFB003.svg?logo=data:image/svg%2bxml;base64,DQo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxwYXRoIGQ9Ik00Ni44Mi0uMDU1aDYuMjVxMjMuOTY5IDIuMDYyIDM4IDIxLjQyNmM1LjI1OCA3LjY3NiA4LjIxNSAxNi4xNTYgOC44NzUgMjUuNDV2Ni4yNXEtMi4wNjQgMjMuOTY4LTIxLjQzIDM4LTExLjUxMiA3Ljg4NS0yNS40NDUgOC44NzRoLTYuMjVxLTIzLjk3LTIuMDY0LTM4LjAwNC0yMS40M1EuOTcxIDY3LjA1Ni0uMDU0IDUzLjE4di02LjQ3M0MxLjM2MiAzMC43ODEgOC41MDMgMTguMTQ4IDIxLjM3IDguODE3IDI5LjA0NyAzLjU2MiAzNy41MjcuNjA0IDQ2LjgyMS0uMDU2IiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZWNlY2VjO2ZpbGwtb3BhY2l0eToxIi8+PHBhdGggZD0iTTQ3LjI2NiAyLjk1N3EyMi41My0uNjUgMzcuNzc3IDE1LjczOGE0OS43IDQ5LjcgMCAwIDEgNi44NjcgMTAuMTU3cS00MS45NjQuMjIyLTgzLjkzIDAgOS43NS0xOC42MTYgMzAuMDI0LTI0LjM4N2E2MSA2MSAwIDAgMSA5LjI2Mi0xLjUwOCIgc3R5bGU9InN0cm9rZTpub25lO2ZpbGwtcnVsZTpldmVub2RkO2ZpbGw6IzE5MTkxOTtmaWxsLW9wYWNpdHk6MSIvPjxwYXRoIGQ9Ik03Ljk4IDcwLjkyNmMyNy45NzctLjAzNSA1NS45NTQgMCA4My45My4xMTNRODMuNDI2IDg3LjQ3MyA2Ni4xMyA5NC4wODZxLTE4LjgxIDYuNTQ0LTM2LjgzMi0xLjg5OC0xNC4yMDMtNy4wOS0yMS4zMTctMjEuMjYyIiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZjlhZjAwO2ZpbGwtb3BhY2l0eToxIi8+PC9zdmc+" /></a>
-
-
-一个基于AI的GitHub星标仓库管理工具，帮助您更好地组织和管理您的GitHub星标项目。
+![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![全平台](https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white) [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/AmintaCCCP/GithubStarsManager) <a href="https://linux.do"><img src="https://img.shields.io/badge/LINUX-DO-FFB003.svg?logo=data:image/svg%2bxml;base64,DQo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxwYXRoIGQ9Ik00Ni44Mi0uMDU1aDYuMjVxMjMuOTY5IDIuMDYyIDM4IDIxLjQyNmM1LjI1OCA3LjY3NiA4LjIxNSAxNi4xNTYgOC44NzUgMjUuNDV2Ni4yNXEtMi4wNjQgMjMuOTY4LTIxLjQzIDM4LTExLjUxMiA3Ljg4NS0yNS40NDUgOC44NzRoLTYuMjVxLTIzLjk3LTIuMDY0LTM4LjAwNC0yMS40M1EuOTcxIDY3LjA1Ni0uMDU0IDUzLjE4di02LjQ3M0MxLjM2MiAzMC43ODEgOC41MDMgMTguMTQ4IDIxLjM3IDguODE3IDI5LjA0NyAzLjU2MiAzNy41MjcuNjA0IDQ2LjgyMS0uMDU2IiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZWNlY2VjO2ZpbGwtb3BhY2l0eToxIi8+PHBhdGggZD0iTTQ3LjI2NiAyLjk1N3EyMi41My0uNjUgMzcuNzc3IDE1LjczOGE0OS43IDQ5LjcgMCAwIDEgNi44NjcgMTAuMTU3cS00MS45NjQuMjIyLTgzLjkzIDAgOS43NS0xOC42MTYgMzAuMDI0LTI0LjM4N2E2MSA2MSAwIDAgMSA5LjI2Mi0xLjUwOCIgc3R5bGU9InN0cm9rZTpub25lO2ZpbGwtcnVsZTpldmVub2RkO2ZpbGw6IzE5MTkxOTtmaWxsLW9wYWNpdHk6MSIvPjxwYXRoIGQ9Ik03Ljk4IDcwLjkyNmMyNy45NzctLjAzNSA1NS45NTQgMCA4My45My4xMTNRODMuNDI2IDg3LjQ3MyA2Ni4xMyA5NC4wODZxLTE4LjgxIDYuNTQ0LTM2LjgzMi0xLjg5OC0xNC4yMDMtNy4wOS0yMS4zMTctMjEuMjYyIiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZjlhZjAwO2ZpbGwtb3BhY2l0eToxIi8+PC9zdmc+" alt="LINUX DO" /></a>
 
 <a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI&#0032;organizes&#0032;GitHub&#0032;stars&#0032;for&#0032;easy&#0032;find | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a> <a href="https://trendshift.io/repositories/28489?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-28489" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/28489/daily?language=TypeScript" alt="AmintaCCCP%2FGithubStarsManager | Trendshift" width="250" height="55"/></a>
 
+**星标太多找不到？GitHub Stars Manager 自动同步您的星标仓库，使用 AI 进行摘要和分类，支持语义搜索。追踪 Release、过滤资产、一键下载——比手动标签更智能，比 GitHub 更简单。**
+
+<video src="assets/readme/video/demo.mp4" width="100%" controls muted playsinline>
+  <a href="assets/readme/video/demo.mp4">观看产品演示</a>
+</video>
+
+<p align="center">
+  <a href="README.md"><img src="./assets/readme/sections/lang-zh.svg" width="100%" alt="当前语言：中文。点击打开英文 README。"></a>
+</p>
 
 </div>
 
-中文 | **[English](README.md)**
+## 先看界面
 
-## 功能特性
+<p align="center">
+  <img src="./assets/readme/sections/see-it.zh.svg" width="100%" alt="先看界面 — Stars、搜索、Release 与仓库问答的产品截图。">
+</p>
 
-> 星标太多找不到？GitHub Stars Manager 自动同步您的星标仓库，使用 AI 进行摘要和分类，支持语义搜索。追踪 Release、过滤资产、一键下载——比手动标签更智能，比 GitHub 更简单。
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/screenshots/repo.png" alt="Stars 视图：AI 分类后的星标仓库，带标签、语言点和分类侧边栏" /></td>
+    <td width="50%"><img src="assets/readme/screenshots/search.png" alt="搜索与过滤：关键词、语言、标签、分析状态和订阅筛选" /></td>
+  </tr>
+  <tr>
+    <td><img src="assets/readme/screenshots/release.png" alt="Release 时间线：已订阅仓库、未读标记、平台过滤和一键下载" /></td>
+    <td><img src="assets/readme/screenshots/copilot.png" alt="仓库问答助手：提交固定的只读回答，带来源追溯" /></td>
+  </tr>
+</table>
 
-### 核心功能
+<details>
+<summary>更多视图 — 发现中心、Fork、Gist、设置、MCP</summary>
+
+| 视图 | 截图 |
+|------|------|
+| 发现中心 / 趋势 | ![Discovery](assets/readme/screenshots/discovery.png) |
+| Fork 管理 | ![Forks](assets/readme/screenshots/fork.png) |
+| Gist 管理 | ![Gists](assets/readme/screenshots/gist.png) |
+| 设置 | ![Settings](assets/readme/screenshots/settings.png) |
+| AI 模型 | ![AI config](assets/readme/screenshots/ai.png) |
+| 网络代理 | ![Network](assets/readme/screenshots/network.png) |
+| 向量搜索 | ![Vectorize](assets/readme/screenshots/vectorize.png) |
+| MCP 服务 | ![MCP](assets/readme/screenshots/mcp.png) |
+
+</details>
+
+<p align="center">
+  <img src="./assets/readme/workflow.svg" width="100%" alt="四步流程：同步星标、AI 整理、按语义查找，再用问答、MCP 和 Release 追踪行动。">
+</p>
+
+## ✨ 重点功能
+
+<p align="center">
+  <img src="./assets/readme/sections/key-features.zh.svg" width="100%" alt="重点功能 — AI 管理、向量搜索、仓库问答、MCP、Release 追踪。">
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+
+**🤖 AI 管理仓库**
+
+星标不再是一堆杂乱列表，而是一座图书馆。应用自动同步所有星标仓库，AI 为它们批量生成摘要、标签与分类——支持暂停/继续，锁定分类永不被 AI 覆盖。按意图搜索，而不是记住仓库名。
+
+</td>
+    <td width="50%" valign="top">
+
+**🧠 向量搜索**
+
+基于 [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) 的自然语言搜索：仓库描述（或完整 README）被嵌入为向量，按语义相似度匹配，可选 AI 重排序，失败自动回退关键词搜索。此外，在任意仓库卡片上点击 **查找相似仓库**，即可围绕它构建语义邻域——立刻找出星标中与它最相似的仓库。
+
+</td>
+  </tr>
+  <tr>
+    <td valign="top">
+
+**💬 仓库问答助手**
+
+直接从仓库卡片对单个仓库提问。每个会话固定到特定提交，展示每条回答背后的只读证据与可追溯来源，历史会话全部保存在本地。它不会索引整个仓库——深度代码分析请使用成熟的 Coding Agent。
+
+</td>
+    <td valign="top">
+
+**🛰️ MCP 服务**
+
+Claude Code、Cursor 等 Agent 可通过 [Model Context Protocol](https://modelcontextprotocol.io/) 读取并检索 AI 加工后的星标——Streamable HTTP 或旧版 SSE、Bearer Token 鉴权、全部只读工具，在设置中一键开启并提供可复制的 Agent 配置。无需额外安装。
+
+</td>
+  </tr>
+  <tr>
+    <td valign="top">
+
+**📡 Release 追踪**
+
+订阅仓库，所有新版本汇聚在统一时间线。按平台与文件类型过滤资产，保存自定义关键词规则，一键下载——浏览器直下或推送至 aria2。
+
+</td>
+    <td valign="top">
+
+**此外还包括**
+
+Fork 同步与 GitHub Actions、Gist 浏览/编辑与 AI 摘要、12 套主题预设、HTTP/SOCKS5 代理、WebDAV 备份、发现中心（趋势 / 热门发布 / 最受欢迎）、诊断日志、双语 Wiki 跳转，以及打包好的桌面客户端。
+
+</td>
+  </tr>
+</table>
+
+### 其他功能
 
 | 功能 | 描述 |
 |------|------|
 | **自动同步星标** | 连接 GitHub Token 自动拉取所有星标仓库 |
 | **GitHub Lists 双向同步** | 与 GitHub 原生 Lists（星标列表）双向同步：拉取 Lists 归类为标签/分类并自动锁定，将本地分类回写为 GitHub Lists |
-| **AI 摘要与分类** | 使用 AI 生成标签、主题和简短 README 概览 |
 | **语义搜索** | 按意图而非精确名称查找仓库 |
-| **向量语义搜索** | 将仓库描述/README 嵌入 Cloudflare Vectorize 向量库，自然语言查询实现高精度语义匹配 |
-| **MCP 服务** | 可选 Streamable HTTP / SSE，供 Claude Code、Cursor 等 Agent 检索 AI 加工后的星标；需后端或 Electron/客户端（纯前端模式不显示）；设置中开关，无需额外安装 |
-| **仓库问答助手（早期阶段）** | 在单个仓库内进行简单、聚焦的问答，提供提交固定的只读证据、可追溯来源与本地会话历史。它不会索引仓库的全部文件，复杂代码分析建议使用成熟的本地 Coding Agent。 |
-| **仓库页 Release 下载** | 从仓库卡片直接打开该仓库的最新 Release；浏览分页资产、更新日志、源码压缩包和可选 AI 摘要，并通过浏览器或已配置的 RPC 下载器下载。 |
-| **Release 追踪** | 订阅仓库并在统一时间线查看新版本 |
+| **仓库页 Release 下载** | 从仓库卡片直接打开该仓库的最新 Release；浏览分页资产、更新日志、源码压缩包和可选 AI 摘要，并通过浏览器或已配置的 RPC 下载器下载 |
 | **一键下载** | 展开 Release 资产并即时下载 |
 | **智能资产过滤** | 按关键词匹配资产 (dmg / mac / arm64 / aarch64) |
 | **发现中心** | 浏览 GitHub 趋势、热门发布、最受欢迎项目 |
 | **Fork 管理** | 查看、同步 Fork 仓库并触发 GitHub Actions 工作流 |
 | **Gist 管理** | 浏览、创建、编辑、删除 Gist；AI 摘要与语义搜索 |
-| **12 套主题预设** | 在设置中一键切换 12 套内置主题，每套均有协调的亮色与暗色配色，并提供实时预览。 |
+| **12 套主题预设** | 在设置中一键切换 12 套内置主题，每套均有协调的亮色与暗色配色，并提供实时预览 |
 | **网络代理** | HTTP / SOCKS5 代理支持，协议级连接探测测试 |
 | **远程下载 (aria2)** | 通过 aria2 JSON-RPC 将 Release 资产推送到远程下载 |
 | **诊断日志** | 前后端统一日志查看器，支持 Debug 捕获模式 |
@@ -57,7 +149,7 @@
 
 ---
 
-## 🔍 界面预览
+## 🔍 界面说明
 
 ### 1. 仓库管理 (`Stars` 视图)
 
@@ -69,13 +161,11 @@
 - **批量操作工具栏** — 批量归类到指定分类、批量恢复 AI 分析结果
 - **订阅指示器** — 直观显示哪些仓库已订阅 Release 更新
 - **AI 分析状态** — 显示已分析/未分析/分析失败状态；支持按分析状态筛选
-
-**截图：**
-![Repository Management Interface](upload/repo.png)
+- **查找相似仓库** — 从任意卡片一键进入语义邻域，找出星标中与它最相近的仓库（需启用向量搜索）
 
 ---
 
-### 2. 仓库问答助手（早期阶段）
+### 2. 仓库问答助手
 
 直接从仓库卡片对单个仓库提出简洁的问题。每个会话都绑定到启动会话时选定的特定提交，并展示生成答案所依据的证据。
 
@@ -86,9 +176,6 @@
 - **可配置检索预算** — 在 AI 设置中控制轮次、工具调用、文档/代码读取与响应时长的上限。
 
 > **早期阶段说明：** 此功能面向简单的仓库问答，可能会出现检索失败、证据不完整或无法回答的情况。它不会索引被提问仓库的全部文件；如需进行复杂的全仓库代码分析、多文件推理、调试或代码修改，请将仓库克隆到本地并使用成熟的 Coding Agent。
-
-**截图：**
-![Repository Q&A Assistant](upload/copilot.png)
 
 ---
 
@@ -103,9 +190,6 @@
 - **多视图模式** — 列表视图 / 网格视图切换
 - **分页加载** — 支持分页加载历史发布记录
 - **刷新状态指示** — 显示最后刷新时间
-
-**截图：**
-![Release Timeline Interface](upload/release.png)
 
 ---
 
@@ -123,9 +207,6 @@
 
 > 趋势数据来源于 GitHub 趋势 RSS 源，每 30 分钟自动更新。适合发现新兴热门项目、追踪技术趋势、寻找学习方向。
 
-**截图：**
-![Discovery Trending Interface](upload/discovery.png)
-
 ---
 
 ### 5. Fork 管理 (`Forks` 视图)
@@ -136,9 +217,6 @@
 - **GitHub Actions** — 在 Fork 卡片上直接查看和触发工作流
 - **未读/已读追踪** — 上游有新提交的 Fork 显示脉冲指示器
 - **搜索与分页** — 全文搜索、可配置分页大小
-
-**Screenshot:**
-![Fork](upload/fork.png)
 
 ---
 
@@ -153,9 +231,6 @@
 - **Star 与 Unstar** — 在卡片上直接 Star/Unstar Gist
 - **智能筛选** — 按分析状态、语言筛选，按名称/日期/文件数排序
 
-**截图：**
-![Gist 管理界面](upload/gist.png)
-
 ---
 
 ### 7. 搜索与过滤
@@ -168,9 +243,6 @@
 - **快捷键支持** — 显示搜索快捷键提示
 - **搜索统计** — 显示搜索结果数量和筛选条件
 - **搜索演示模式** — 展示语义搜索能力
-
-**截图：**
-![Search Interface](upload/search.png)
 
 ---
 
@@ -191,9 +263,6 @@
 | **向量搜索** | 配置 Cloudflare Vectorize Worker、Embedding 模型、索引模式（描述/README）、索引重建管理 |
 | **MCP 服务** | 开启 MCP 供 Claude Code、Cursor 等 Agent 通过 Streamable HTTP / SSE 检索 AI 加工后的星标，Bearer Token 鉴权 |
 
-**截图：**
-![Settings Panel Interface](upload/settings.png)
-
 **外观：** 在 **设置 → General → Appearance** 中任选 12 套内置主题预设。每套主题均提供匹配的亮色和暗色配色，并会立即应用到整个应用。
 
 ---
@@ -205,9 +274,6 @@
 - **自定义端点** — 支持私有部署的 AI 服务
 - **连接测试** — 配置后测试 API 连接是否可用
 - **AI 模型选择** — 选择要使用的具体模型
-
-**截图：**
-![AI Configuration Interface](upload/ai.png)
 
 ## 技术栈
 
@@ -225,6 +291,10 @@ https://github.com/AmintaCCCP/GithubStarsManager/releases
 
 ## 快速开始
 
+<p align="center">
+  <img src="./assets/readme/sections/quick-start.zh.svg" width="100%" alt="快速开始 — 桌面客户端、源码或 Docker。">
+</p>
+
 ### 1. 克隆项目
 ```bash
 git clone https://github.com/AmintaCCCP/GithubStarsManager.git
@@ -241,25 +311,26 @@ npm install
 npm run dev
 ```
 
-> 💡 本地使用 `npm run dev` 运行项目时，AI 服务和 WebDAV 的调用可能因浏览器 CORS 限制而失败。建议使用预编译客户端，或启动后端服务器（`cd server && npm run dev`）代理 API 请求以完全避免 CORS 问题。
+> [!TIP]
+> 本地使用 `npm run dev` 运行项目时，AI 服务和 WebDAV 的调用可能因浏览器 CORS 限制而失败。建议使用预编译客户端，或启动后端服务器（`cd server && npm run dev`）代理 API 请求以完全避免 CORS 问题。
 
 ### 4. 构建生产版本
 ```bash
 npm run build
 ```
 
-## 🤖 AI服务配置
+## 🤖 AI 服务配置
 
-应用支持多种AI服务提供商：
+应用支持多种 AI 服务提供商：
 
 - **OpenAI**: GPT-3.5/GPT-4
 - **Anthropic**: Claude
-- **本地部署**: Ollama等本地AI服务
-- **其他**: 任何兼容OpenAI API的服务
+- **本地部署**: Ollama 等本地 AI 服务
+- **其他**: 任何兼容 OpenAI API 的服务
 
-在设置页面中配置您的AI服务：
-1. 添加AI配置
-2. 输入API端点和密钥
+在设置页面中配置您的 AI 服务：
+1. 添加 AI 配置
+2. 输入 API 端点和密钥
 3. 选择模型
 4. 测试连接
 
@@ -274,7 +345,7 @@ npm run build
 
 在设置 → 网络标签页中配置（Electron 客户端或后端服务器可用时显示）。
 
-![network](upload/network.png)
+![network](assets/readme/screenshots/network.png)
 
 ## ⬇️ 远程下载 (aria2 RPC)
 
@@ -290,9 +361,11 @@ npm run build
 
 ## 🧠 向量语义搜索（可选）
 
-向量语义搜索基于 [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) 提供高精度的自然语言搜索。将仓库描述（或完整 README 内容）嵌入为向量，通过语义相似度匹配，而非关键词匹配。
+<p align="center">
+  <img src="./assets/readme/sections/vector-search.zh.svg" width="100%" alt="向量搜索 — 将星标嵌入 Cloudflare Vectorize，并查找相似仓库。">
+</p>
 
-![vectorize](upload/vectorize.png)
+向量语义搜索基于 [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) 提供高精度的自然语言搜索。将仓库描述（或完整 README 内容）嵌入为向量，通过语义相似度匹配，而非关键词匹配。
 
 **工作原理：**
 1. 前端通过用户配置的 Embedding 服务商（OpenAI、Gemini、Cohere、Ollama、硅基流动或任何兼容 OpenAI 的 API）生成向量
@@ -318,9 +391,22 @@ npm run build
 4. 点击 **重建索引** 将所有仓库嵌入并上传
 5. 使用 **AI 搜索** 按钮 — 启用后自动走向量搜索
 
-> ⚠️ 更换 Embedding 模型后必须重建索引 — 不同模型生成的向量维度不兼容。
+> [!WARNING]
+> 更换 Embedding 模型后必须重建索引 — 不同模型生成的向量维度不兼容。
+
+### 查找相似仓库
+
+在任意仓库卡片上点击 **查找相似仓库**（或卡片菜单中的 **查找同类仓库**），即可查看星标中与它语义最相近的仓库：
+
+- 仓库文本会被嵌入为查询向量，在你的向量索引中检索，结果按相似度排序——自动排除仓库自身
+- 匹配结果显示在专门的"相似仓库"视图中，顶部横幅展示锚点仓库；点击 **重置**（或切换任意分类）即可回到查找之前的状态
+- 需要先配置并启用向量语义搜索；未启用时该功能不可用
 
 ## 🛰️ MCP 服务（Agent 访问）
+
+<p align="center">
+  <img src="./assets/readme/sections/mcp.zh.svg" width="100%" alt="MCP 服务 — 让 Agent 通过 Model Context Protocol 检索 AI 加工后的星标。">
+</p>
 
 让 Agent（Claude Code、Cursor 等）通过 [Model Context Protocol](https://modelcontextprotocol.io/) 读取并检索 AI 加工后的星标仓库（摘要、标签、分类）。
 
@@ -330,7 +416,8 @@ npm run build
 
 **开启方式：** 设置 → MCP 服务 → 打开开关。面板会显示端点地址、Token 以及一键复制（JSON）的 Agent 配置，同时提供 Streamable HTTP 与 SSE 两套配置，无需额外安装。
 
-> 💡 MCP Token 与后端 `API_SECRET` 相互独立。纯前端（无后端）模式不显示 MCP 设置页；需要桌面（Electron）客户端或已连接后端时可用。
+> [!TIP]
+> MCP Token 与后端 `API_SECRET` 相互独立。纯前端（无后端）模式不显示 MCP 设置页；需要桌面（Electron）客户端或已连接后端时可用。
 
 **暴露的工具（全部只读）：**
 
@@ -346,7 +433,7 @@ npm run build
 
 **桌面（Electron）说明：** 仅绑定回环地址（`127.0.0.1`），只能本机 Agent 访问；可在设置中调整主机/端口（默认端口 `3927`）。
 
-![MCP](upload/mcp.png)
+![MCP](assets/readme/screenshots/mcp.png)
 
 ## 🔄 GitHub Lists 双向同步
 
@@ -355,27 +442,32 @@ npm run build
 - **拉取（GitHub → 应用）** — 在 **设置 → 星标同步** 选择 **同步星标仓库及 list**（或首次登录时选择）。通过 GraphQL 拉取 Lists；每个 list 名作为自定义标签写入，未锁定的仓库归入匹配分类并**自动锁定**，AI 分析不会重置。
 - **回写（应用 → GitHub）** — 在 **设置 → 星标同步** 点击 **同步仓库分类到 GitHub list**。每个本地分类写回为同名 GitHub List（同名覆盖、不存在则默认私有新建）；仓库按分类加入对应 list，本地未管理的其他 list 成员关系会被保留。
 
+> [!NOTE]
 > 同步范围持久化保存：可在 **设置 → 星标同步** 中随时在「仅星标仓库」与「星标仓库及 list」之间切换。
 
-## 💾 WebDAV备份配置
+## 💾 WebDAV 备份配置
 
-支持多种WebDAV服务：
+支持多种 WebDAV 服务：
 - **坚果云**: 国内用户推荐
 - **Nextcloud**: 自建云存储
 - **ownCloud**: 企业级解决方案
-- **其他**: 任何标准WebDAV服务
+- **其他**: 任何标准 WebDAV 服务
 
 配置步骤：
-1. 在设置页面添加WebDAV配置
-2. 输入服务器URL、用户名、密码和路径
+1. 在设置页面添加 WebDAV 配置
+2. 输入服务器 URL、用户名、密码和路径
 3. 测试连接
 4. 启用自动备份
 
 ## 🚀 部署
 
-### Netlify部署
-1. Fork本项目到您的GitHub账户
-2. 在Netlify中连接您的GitHub仓库
+<p align="center">
+  <img src="./assets/readme/sections/deploy.zh.svg" width="100%" alt="部署 — 静态托管、前后端分离 Docker，或全栈单镜像。">
+</p>
+
+### Netlify 部署
+1. Fork 本项目到您的 GitHub 账户
+2. 在 Netlify 中连接您的 GitHub 仓库
 3. 配置构建设置：
    - Build command: `npm run build`
    - Publish directory: `dist`
@@ -407,6 +499,7 @@ docker compose -f docker-compose.fullstack.yml up -d
 
 新增方式不会替换或修改现有的前端镜像、后端镜像、`docker-compose.yml`、桌面客户端或 API 路径。规范名称以角色结尾：`-frontend`、`-backend` 与 `-fullstack`；已有用户使用的 `-server` 后端镜像会继续作为兼容别名发布。正式的 `vX.Y.Z` Docker 标签必须与根目录 `package.json` 的客户端版本一致，`latest` 与 `sha-*` 则分别用于开发和提交追溯。完整的中文部署、数据备份、从分离部署迁移和回滚说明请参阅 [DOCKER_zh.md](DOCKER_zh.md)。英文说明请参阅 [DOCKER.md](DOCKER.md)。
 
+> [!NOTE]
 > 如果镜像为私有，需先执行 `docker login ghcr.io`（使用具有 `read:packages` 权限的 [PAT](https://github.com/settings/tokens)）。
 
 ### 🖥️ 后端服务器（可选）
@@ -427,8 +520,8 @@ docker-compose up -d
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=0.7.8   # 固定后端版本（默认：latest）
-FRONTEND_IMAGE_TAG=0.7.8  # 固定前端版本（默认：latest）
+BACKEND_IMAGE_TAG=0.7.9   # 固定后端版本（默认：latest）
+FRONTEND_IMAGE_TAG=0.7.9  # 固定前端版本（默认：latest）
 ```
 
 #### 仅后端（docker run）
@@ -478,27 +571,27 @@ npm run dev
 ## 补充说明
 
 1. 后端为可选项，但对于网页部署推荐启用。不启用时，所有数据存储在浏览器 localStorage 中，请定期备份重要数据。
-2. 我不会写代码，这个应用完全由AI编写，主要满足我个人需求。如果您有新功能需求或遇到Bug，我只能尽力尝试，但无法保证成功，因为这取决于AI能否完成。😹
+2. 我不会写代码，这个应用完全由 AI 编写，主要满足我个人需求。如果您有新功能需求或遇到 Bug，我只能尽力尝试，但无法保证成功，因为这取决于 AI 能否完成。😹
 
 ## 贡献
 
-欢迎提交Issue和Pull Request！
+欢迎提交 Issue 和 Pull Request！
 
-1. Fork项目
+1. Fork 项目
 2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启Pull Request
+5. 开启 Pull Request
 
 ## 许可证
 
-本项目采用MIT许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 支持
 
-如果您觉得这个项目有用，请给它一个⭐️！
+如果您觉得这个项目有用，请给它一个 ⭐️！
 
-如有问题或建议，请提交Issue或联系作者。
+如有问题或建议，请提交 Issue 或联系作者。
 
 ## 星标地图
 

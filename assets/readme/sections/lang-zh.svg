@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="72" viewBox="0 0 1200 72" role="img" aria-labelledby="title desc">
+  <title id="title">语言切换</title>
+  <desc id="desc">在中文与英文 README 之间切换。</desc>
+  <rect width="1200" height="72" rx="18" fill="#101a33" stroke="#3d5a99" stroke-opacity="0.55"/>
+  <rect x="24" y="16" width="132" height="40" rx="20" fill="#16224a" stroke="#f5a623" stroke-width="1.5"/>
+  <text x="90" y="43" text-anchor="middle" fill="#ffd76a" font-size="18" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">中文</text>
+  <text x="180" y="43" fill="#8ea2c9" font-size="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">·  English → README.md</text>
+  <text x="1176" y="43" text-anchor="end" fill="#8ea2c9" font-size="16" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">language</text>
+</svg>
