@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="132" viewBox="0 0 1200 132" role="img" aria-labelledby="title desc">
+  <title id="title">重点功能</title>
+  <desc id="desc">GithubStarsManager 的五项核心能力。</desc>
+  <rect width="1200" height="132" rx="22" fill="#0b1220"/>
+  <circle cx="72" cy="66" r="28" fill="#16224a" stroke="#f5a623" stroke-width="2"/>
+  <path d="M72 50 l5.2 10.6 11.7 1.7 -8.5 8.2 2 11.7 -10.4 -5.5 -10.4 5.5 2 -11.7 -8.5 -8.2 11.7 -1.7 Z" fill="#f5a623"/>
+  <text x="120" y="58" fill="#8ea2c9" font-size="16" font-weight="700" letter-spacing="2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">HEADLINE CAPABILITIES</text>
+  <text x="120" y="98" fill="#e8edf7" font-size="40" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">重点功能</text>
+  <text x="1136" y="76" text-anchor="end" fill="#8ea2c9" font-size="18" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">AI · 向量 · 问答 · MCP · Release</text>
+</svg>

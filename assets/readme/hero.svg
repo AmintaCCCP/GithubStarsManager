@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="420" viewBox="0 0 1200 420"
+     role="img" aria-labelledby="title desc">
+  <title id="title">GithubStarsManager</title>
+  <desc id="desc">AI-powered GitHub stars manager: auto-sync, semantic search, AI categorization, release tracking, and one-click downloads.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020817" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16A249" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#16A249" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="cardFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#1E293B" stop-opacity="0.15" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="420" fill="url(#bg)" />
+
+  <!-- Subtle grid dots -->
+  <g fill="#F8FAFC" opacity="0.025">
+    <circle cx="200" cy="100" r="1" /><circle cx="400" cy="60" r="1" />
+    <circle cx="600" cy="140" r="1" /><circle cx="800" cy="80" r="1" />
+    <circle cx="1000" cy="120" r="1" /><circle cx="150" cy="300" r="1" />
+    <circle cx="350" cy="360" r="1" /><circle cx="550" cy="280" r="1" />
+    <circle cx="750" cy="340" r="1" /><circle cx="950" cy="260" r="1" />
+    <circle cx="1100" cy="380" r="1" />
+  </g>
+
+  <!-- Decorative star (green, top-left motif) -->
+  <g transform="translate(64 56)" fill="#16A249" opacity="0.35">
+    <path d="M0 -11 L3.27 -3.40 L11 -3.40 L4.88 1.30 L6.78 9 L0 4.40 L-6.78 9 L-4.88 1.30 L-11 -3.40 L-3.27 -3.40 Z" />
+  </g>
+
+  <!-- ====== LEFT SIDE: TITLE & VALUE ====== -->
+  <g transform="translate(64 48)">
+    <!-- Title -->
+    <text x="0" y="98"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="56" font-weight="700" fill="#F8FAFC"
+          letter-spacing="-1.8">GithubStarsManager</text>
+
+    <!-- Subtitle -->
+    <text x="0" y="158"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="24" font-weight="400" fill="#94A3B8"
+          letter-spacing="-0.2">AI organizes your GitHub stars</text>
+    <text x="0" y="192"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="24" font-weight="400" fill="#94A3B8"
+          letter-spacing="-0.2">so you can actually find them.</text>
+
+    <!-- Feature chips -->
+    <g transform="translate(0 236)">
+      <rect x="0" y="0" width="96" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
+      <text x="48" y="21"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Auto-sync</text>
+
+      <rect x="104" y="0" width="108" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
+      <text x="158" y="21"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">AI Categorize</text>
+
+      <rect x="220" y="0" width="114" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
+      <text x="277" y="21"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Semantic Search</text>
+
+      <rect x="342" y="0" width="118" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
+      <text x="401" y="21"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Release Tracking</text>
+    </g>
+
+    <!-- Stats line -->
+    <text x="0" y="308"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="18" font-weight="400" fill="#64748B"
+          letter-spacing="-0.15">Desktop client · Docker · MCP Server · 12 themes</text>
+  </g>
+
+  <!-- ====== RIGHT SIDE: APP UI MOCKUP ====== -->
+  <g transform="translate(660 24)">
+    <!-- Outer panel -->
+    <rect x="0" y="0" width="490" height="372" rx="14" fill="#0F172A" stroke="#1E293B" stroke-width="1" />
+
+    <!-- Top bar -->
+    <rect x="0" y="0" width="490" height="46" rx="14" fill="#0F172A" />
+    <rect x="0" y="32" width="490" height="14" fill="#0F172A" />
+    <rect x="64" y="14" width="200" height="22" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
+    <text x="74" y="30"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="11" font-weight="400" fill="#64748B">Search stars…</text>
+
+    <!-- Sidebar -->
+    <rect x="12" y="54" width="44" height="306" rx="8" fill="#1E293B" opacity="0.5" />
+    <text x="34" y="82"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">All</text>
+    <circle cx="34" cy="108" r="4" fill="#16A249" opacity="0.6" />
+    <text x="34" y="128"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">AI</text>
+    <circle cx="34" cy="150" r="3" fill="#D98006" opacity="0.5" />
+    <text x="34" y="168"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">Dev</text>
+    <circle cx="34" cy="190" r="3" fill="#3178C6" opacity="0.5" />
+    <text x="34" y="208"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">Lib</text>
+    <circle cx="34" cy="230" r="3" fill="#F8FAFC" opacity="0.3" />
+
+    <!-- Card 1 -->
+    <g transform="translate(64 58)">
+      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
+      <!-- Language dot -->
+      <circle cx="18" cy="22" r="5" fill="#3178C6" />
+      <!-- Repo name -->
+      <text x="30" y="26"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="13" font-weight="600" fill="#F8FAFC">facebook/react</text>
+      <!-- Star -->
+      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
+            fill="#D98006" opacity="0.8" />
+      <text x="350" y="27"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="12" font-weight="500" fill="#94A3B8">198K</text>
+      <!-- Description -->
+      <text x="18" y="50"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="12" font-weight="400" fill="#64748B">A declarative JavaScript library for building user interfaces.</text>
+      <!-- AI tags -->
+      <rect x="18" y="66" width="60" height="20" rx="4" fill="#16A249" fill-opacity="0.12" />
+      <text x="48" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#16A249" text-anchor="middle">Frontend</text>
+      <rect x="84" y="66" width="48" height="20" rx="4" fill="#6366F1" fill-opacity="0.12" />
+      <text x="108" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#818CF8" text-anchor="middle">UI</text>
+    </g>
+
+    <!-- Card 2 -->
+    <g transform="translate(64 162)">
+      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
+      <circle cx="18" cy="22" r="5" fill="#16A249" />
+      <text x="30" y="26"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="13" font-weight="600" fill="#F8FAFC">tailwindlabs/tailwindcss</text>
+      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
+            fill="#D98006" opacity="0.8" />
+      <text x="350" y="27"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="12" font-weight="500" fill="#94A3B8">64K</text>
+      <text x="18" y="50"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="12" font-weight="400" fill="#64748B">A utility-first CSS framework for rapid UI development.</text>
+      <rect x="18" y="66" width="60" height="20" rx="4" fill="#16A249" fill-opacity="0.12" />
+      <text x="48" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#16A249" text-anchor="middle">Frontend</text>
+      <rect x="84" y="66" width="48" height="20" rx="4" fill="#D98006" fill-opacity="0.12" />
+      <text x="108" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#D98006" text-anchor="middle">CSS</text>
+    </g>
+
+    <!-- Card 3 -->
+    <g transform="translate(64 266)">
+      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
+      <circle cx="18" cy="22" r="5" fill="#D98006" />
+      <text x="30" y="26"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="13" font-weight="600" fill="#F8FAFC">pallets/flask</text>
+      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
+            fill="#D98006" opacity="0.8" />
+      <text x="350" y="27"
+            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+            font-size="12" font-weight="500" fill="#94A3B8">62K</text>
+      <text x="18" y="50"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="12" font-weight="400" fill="#64748B">A lightweight web framework for Python.</text>
+      <rect x="18" y="66" width="60" height="20" rx="4" fill="#D98006" fill-opacity="0.12" />
+      <text x="48" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#D98006" text-anchor="middle">Backend</text>
+      <rect x="84" y="66" width="48" height="20" rx="4" fill="#3178C6" fill-opacity="0.12" />
+      <text x="108" y="80"
+            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
+            font-size="10" font-weight="500" fill="#3178C6" text-anchor="middle">API</text>
+    </g>
+  </g>
+</svg>
